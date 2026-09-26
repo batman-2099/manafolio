@@ -14,8 +14,8 @@ export default function PackPriceSplitter({ entryIds, onApplied, showToast, styl
 
   const apply = async () => {
     const amount = parseFloat(total);
-    if (!(amount >= 0)) { showToast(t('split.errNoTotal')); return; }
-    if (!entryIds.length) { showToast(t('split.errNoCards')); return; }
+    if (!(amount >= 0)) { showToast(t('split.errNoTotal'), 'error'); return; }
+    if (!entryIds.length) { showToast(t('split.errNoCards'), 'error'); return; }
     setBusy(true);
     try {
       const res = await fetch('/api/collection/bulk', {
@@ -24,10 +24,10 @@ export default function PackPriceSplitter({ entryIds, onApplied, showToast, styl
         body: JSON.stringify({ entry_ids: entryIds, action: 'purchase_split', value: { total: amount, method } }),
       });
       const d = await res.json().catch(() => ({}));
-      if (res.ok) { showToast(d.message || t('split.applied')); setTotal(''); onApplied?.(); }
-      else showToast(d.error || t('split.failed'));
+      if (res.ok) { showToast(d.message || t('split.applied'), 'success'); setTotal(''); onApplied?.(); }
+      else showToast(d.error || t('split.failed'), 'error');
     } catch {
-      showToast(t('split.error'));
+      showToast(t('split.error'), 'error');
     } finally {
       setBusy(false);
     }

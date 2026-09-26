@@ -638,17 +638,17 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(t('loc.containerCreated'));
+        showToast(t('loc.containerCreated'), 'success');
         setShowCreate(false);
         await fetchLocations();
         setActiveLocationId(data.id);
         onUpdate();
       } else {
-        showToast(data.error || 'Failed to create container.');
+        showToast(data.error || 'Failed to create container.', 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('loc.errCreate'));
+      showToast(t('loc.errCreate'), 'error');
     }
   };
 
@@ -667,7 +667,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || t('loc.errCreateDeck'));
       setContainerDeckDraft(null);
-      showToast(t('deck.created'));
+      showToast(t('deck.created'), 'success');
       onUpdate?.();
     } catch (error) {
       setContainerDeckError(error.message || t('loc.errCreateDeck'));
@@ -696,13 +696,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         setContainerImportReport(data);
       }
       if (!response.ok) throw new Error(data.error || t('loc.errCreate'));
-      showToast(data.message);
+      showToast(data.message, 'success');
       setActiveLocationId(data.id);
       await refreshAll();
       onUpdate();
     } catch (error) {
       console.error(error);
-      showToast(error.message);
+      showToast(error.message, 'error');
     } finally {
       containerImportBusy.current = false;
       setImportingContainer(false);
@@ -738,7 +738,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       onUpdate();
     } catch (error) {
       console.error(error);
-      showToast(error.message || t('loc.errMove'));
+      showToast(error.message || t('loc.errMove'), 'error');
     } finally {
       containerImportMoveBusy.current = false;
       setContainerImportMovingItem(null);
@@ -759,12 +759,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || t('loc.errTransferContainer'));
-      showToast(t(isArchive ? 'loc.containerRestored' : 'loc.containerArchived', { name: selectedLoc.name }));
+      showToast(t(isArchive ? 'loc.containerRestored' : 'loc.containerArchived', { name: selectedLoc.name }), 'success');
       onUpdate?.();
       onInventoryTypeChange?.(targetInventory);
     } catch (error) {
       console.error(error);
-      showToast(error.message || t('loc.errTransferContainer'));
+      showToast(error.message || t('loc.errTransferContainer'), 'error');
     } finally {
       containerTransferBusy.current = false;
       setTransferringContainer(false);
@@ -773,30 +773,30 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
   const handleDeleteLocation = async (locId, name) => {
     if (selectedLoc && selectedLoc.id === locId && selectedLoc.locked) {
-      showToast(t('loc.lockedDelete'));
+      showToast(t('loc.lockedDelete'), 'error');
       return;
     }
     if (!window.confirm(t('loc.confirmDeleteContainer', { name }))) return;
     try {
       const res = await fetch(`/api/locations/${locId}`, { method: 'DELETE' });
       if (res.ok) {
-        showToast(t('loc.containerDeleted', { name }));
+        showToast(t('loc.containerDeleted', { name }), 'success');
         if (activeLocationId === locId) setActiveLocationId(null);
         await refreshAll();
         onUpdate();
       } else {
-        showToast(t('loc.errDelete'));
+        showToast(t('loc.errDelete'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('loc.errDeleteGeneric'));
+      showToast(t('loc.errDeleteGeneric'), 'error');
     }
   };
 
   const handleUpdateLocationFields = async (fields) => {
     if (!selectedLoc) return;
     if (selectedLoc.locked && !('locked' in fields)) {
-      showToast(t('loc.lockedSettings'));
+      showToast(t('loc.lockedSettings'), 'error');
       return;
     }
     try {
@@ -807,60 +807,60 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
-        showToast(data.evicted ? `Container updated. ${data.evicted} card${data.evicted === 1 ? '' : 's'} moved to Unsorted.` : 'Container updated.');
+        showToast(data.evicted ? `Container updated. ${data.evicted} card${data.evicted === 1 ? '' : 's'} moved to Unsorted.` : 'Container updated.', 'success');
         await refreshAll();
         onUpdate();
       } else {
         const data = await res.json().catch(() => ({}));
-        showToast(data.error || 'Failed to update container.');
+        showToast(data.error || 'Failed to update container.', 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('loc.errUpdateContainer'));
+      showToast(t('loc.errUpdateContainer'), 'error');
     }
   };
 
   const handleAddCompartment = async () => {
     if (!selectedLoc) return;
     if (selectedLoc.locked) {
-      showToast(t('loc.lockedAdd'));
+      showToast(t('loc.lockedAdd'), 'error');
       return;
     }
     try {
       const res = await fetch(`/api/locations/${selectedLoc.id}/compartments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
       if (res.ok) { 
         const created = await res.json();
-        showToast(t(isBinderType ? 'loc.pageAdded' : 'loc.rowAdded')); 
+        showToast(t(isBinderType ? 'loc.pageAdded' : 'loc.rowAdded'), 'success');
         await Promise.all([fetchCompartments(selectedLoc.id), fetchLocations()]);
         if (created && created.id) {
           setActiveCompartmentId(created.id);
           if (created.idx) setActivePageIndex(created.idx - 1);
         }
       }
-      else showToast(t('loc.errAddCompartment'));
-    } catch (err) { console.error(err); showToast(t('loc.errAddCompartmentGeneric')); }
+      else showToast(t('loc.errAddCompartment'), 'error');
+    } catch (err) { console.error(err); showToast(t('loc.errAddCompartmentGeneric'), 'error'); }
   };
 
   const handleRemoveCompartment = async (compartmentId) => {
     if (!selectedLoc) return;
     if (selectedLoc.locked) {
-      showToast(t('loc.lockedRemove'));
+      showToast(t('loc.lockedRemove'), 'error');
       return;
     }
     if (!window.confirm(t('loc.confirmRemoveCompartment'))) return;
     try {
       const res = await fetch(`/api/compartments/${compartmentId}`, { method: 'DELETE' });
       const data = await res.json();
-      if (res.ok) { showToast(t('loc.compartmentRemoved')); await Promise.all([fetchCompartments(activeLocationId), fetchLocations()]); }
-      else showToast(data.error || 'Failed to remove compartment.');
-    } catch (err) { console.error(err); showToast(t('loc.errRemoveCompartment')); }
+      if (res.ok) { showToast(t('loc.compartmentRemoved'), 'success'); await Promise.all([fetchCompartments(activeLocationId), fetchLocations()]); }
+      else showToast(data.error || 'Failed to remove compartment.', 'error');
+    } catch (err) { console.error(err); showToast(t('loc.errRemoveCompartment'), 'error'); }
   };
 
   // Lock/unlock a row/page: filing skips locked ones (existing cards stay).
   // Uses the working /locations/:id/compartments/:comp_id route.
   const handleToggleCompartmentLock = async (compartmentId, locked) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedRowLocks'));
+      showToast(t('loc.lockedRowLocks'), 'error');
       return;
     }
     if (!activeLocationId) return;
@@ -868,9 +868,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       const res = await fetch(`/api/locations/${activeLocationId}/compartments/${compartmentId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locked })
       });
-      if (res.ok) { showToast(t(locked ? 'loc.rowLocked' : 'loc.rowUnlocked')); await fetchCompartments(activeLocationId); }
-      else showToast(t('loc.errLock'));
-    } catch (err) { console.error(err); showToast(t('loc.errLockGeneric')); }
+      if (res.ok) { showToast(t(locked ? 'loc.rowLocked' : 'loc.rowUnlocked'), 'success'); await fetchCompartments(activeLocationId); }
+      else showToast(t('loc.errLock'), 'error');
+    } catch (err) { console.error(err); showToast(t('loc.errLockGeneric'), 'error'); }
   };
 
   // Lock/unlock a whole container: filing (and overflow) skip it entirely.
@@ -881,25 +881,25 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       const res = await fetch(`/api/locations/${selectedLoc.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locked: next })
       });
-      if (res.ok) { showToast(next ? `"${selectedLoc.name}" locked — filing will skip it.` : `"${selectedLoc.name}" unlocked.`); await fetchLocations(); }
-      else showToast(t('loc.errLock'));
-    } catch (err) { console.error(err); showToast(t('loc.errLockGeneric')); }
+      if (res.ok) { showToast(next ? `"${selectedLoc.name}" locked — filing will skip it.` : `"${selectedLoc.name}" unlocked.`, 'success'); await fetchLocations(); }
+      else showToast(t('loc.errLock'), 'error');
+    } catch (err) { console.error(err); showToast(t('loc.errLockGeneric'), 'error'); }
   };
 
   const handleRenameCompartment = async (compartmentId, label) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedRename'));
+      showToast(t('loc.lockedRename'), 'error');
       return;
     }
     try {
       await fetch(`/api/compartments/${compartmentId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label }) });
       await fetchCompartments(activeLocationId);
-    } catch (err) { console.error(err); showToast(t('loc.errRename')); }
+    } catch (err) { console.error(err); showToast(t('loc.errRename'), 'error'); }
   };
 
   const handleSetCapacity = async (compartmentId, capacity, forceUpdateAll = false) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedCapacity'));
+      showToast(t('loc.lockedCapacity'), 'error');
       return;
     }
     if (compartments.length > 1 && !forceUpdateAll && !capacityUpdatePending) {
@@ -910,12 +910,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     try {
       await fetch(`/api/compartments/${compartmentId}${updateAll ? '?updateAll=true' : ''}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capacity }) });
       await fetchCompartments(activeLocationId);
-    } catch (err) { console.error(err); showToast(t('loc.errResize')); }
+    } catch (err) { console.error(err); showToast(t('loc.errResize'), 'error'); }
   };
 
   const handleMoveCard = async (entryId, compartmentId) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedMove'));
+      showToast(t('loc.lockedMove'), 'error');
       return;
     }
     try {
@@ -923,19 +923,19 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ compartment_id: compartmentId })
       });
-      if (res.ok) { showToast(t('loc.cardMoved')); await refreshAll(); }
+      if (res.ok) { showToast(t('loc.cardMoved'), 'success'); await refreshAll(); }
       else {
         const errData = await res.json().catch(()=>({}));
-        showToast(errData.error || 'Failed to move card.');
+        showToast(errData.error || 'Failed to move card.', 'error');
       }
-    } catch (err) { console.error(err); showToast(t('loc.errMove')); }
+    } catch (err) { console.error(err); showToast(t('loc.errMove'), 'error'); }
   };
 
   // --- Manual tap-to-place (Arrange) ---
   // Pick/unpick a card to move. Tapping the picked card again cancels.
   const handlePickCard = (entryId) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedArrange'));
+      showToast(t('loc.lockedArrange'), 'error');
       return;
     }
     setPickedEntryId(prev => (prev === entryId ? null : entryId));
@@ -947,7 +947,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   // explicitly, because its id is known before setPickedEntryId would land.
   const handlePlaceSlot = async (compartmentId, slotNumber, occupantEntryId, entryId = pickedEntryId) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedArrange'));
+      showToast(t('loc.lockedArrange'), 'error');
       return;
     }
     if (!entryId || occupantEntryId === entryId) { setPickedEntryId(null); return; }
@@ -961,13 +961,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        showToast(body.swap_with ? 'Cards swapped.' : (data.placement?.label ? `Placed → ${data.placement.label}` : 'Card placed.'));
+        showToast(body.swap_with ? 'Cards swapped.' : (data.placement?.label ? `Placed → ${data.placement.label}` : 'Card placed.'), 'success');
         setPickedEntryId(null);
         await refreshAll(); onUpdate();
       } else {
-        showToast(data.error === 'COMPARTMENT_FULL' ? 'That page/row is full.' : (data.error || 'Failed to place card.'));
+        showToast(data.error === 'COMPARTMENT_FULL' ? 'That page/row is full.' : (data.error || 'Failed to place card.'), 'error');
       }
-    } catch (err) { console.error(err); showToast(t('loc.errPlace')); }
+    } catch (err) { console.error(err); showToast(t('loc.errPlace'), 'error'); }
   };
 
   // --- Drag-and-drop filing ---
@@ -987,7 +987,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   // and one set of rules whichever way it is triggered.
   const unfileCard = async (entryId) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedArrange'));
+      showToast(t('loc.lockedArrange'), 'error');
       return;
     }
     try {
@@ -998,13 +998,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        showToast(body?.error || t('loc.errPlace'));
+        showToast(body?.error || t('loc.errPlace'), 'error');
         return;
       }
-      showToast(t('loc.movedToUnsorted'));
+      showToast(t('loc.movedToUnsorted'), 'success');
       setPickedEntryId(null);
       await refreshAll(); onUpdate();
-    } catch (err) { console.error(err); showToast(t('loc.errPlace')); }
+    } catch (err) { console.error(err); showToast(t('loc.errPlace'), 'error'); }
   };
 
   const handleDragEnd = ({ active, over }) => {
@@ -1022,15 +1022,15 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
   const handleDeleteCard = async (entryId) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedDeleteCards'));
+      showToast(t('loc.lockedDeleteCards'), 'error');
       return;
     }
     if (!window.confirm(t('loc.confirmRemoveCard'))) return;
     try {
       const res = await fetch(`/api/collection/${entryId}`, { method: 'DELETE' });
-      if (res.ok) { showToast(t('loc.cardRemoved')); await refreshAll(); onUpdate(); }
-      else showToast(t('loc.errRemoveCard'));
-    } catch (err) { console.error(err); showToast(t('loc.errRemoveCardGeneric')); }
+      if (res.ok) { showToast(t('loc.cardRemoved'), 'success'); await refreshAll(); onUpdate(); }
+      else showToast(t('loc.errRemoveCard'), 'error');
+    } catch (err) { console.error(err); showToast(t('loc.errRemoveCardGeneric'), 'error'); }
   };
 
   // Cards physically in the open container (any compartment).
@@ -1123,14 +1123,14 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
-        showToast(data.evicted ? `Row rules updated. ${data.evicted} card${data.evicted === 1 ? '' : 's'} moved to Unsorted.` : 'Row rules updated.');
+        showToast(data.evicted ? `Row rules updated. ${data.evicted} card${data.evicted === 1 ? '' : 's'} moved to Unsorted.` : 'Row rules updated.', 'success');
         setRulesComp(null);
         await refreshAll();
         onUpdate();
       } else {
-        showToast(t('loc.errRowRules'));
+        showToast(t('loc.errRowRules'), 'error');
       }
-    } catch (err) { console.error(err); showToast(t('loc.errRowRulesGeneric')); }
+    } catch (err) { console.error(err); showToast(t('loc.errRowRulesGeneric'), 'error'); }
   };
 
   const offerContainerExpansion = async (cardsToFit) => {
@@ -1151,7 +1151,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       return true;
     } catch (error) {
       console.error(error);
-      showToast(t('loc.errExpandToFit'));
+      showToast(t('loc.errExpandToFit'), 'error');
       return false;
     }
   };
@@ -1175,9 +1175,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         body: JSON.stringify({ entry_ids: unsortedCards.map(c => c.entry_id) })
       });
       const data = await res.json();
-      if (res.ok) { showToast(data.message); await refreshAll(); onUpdate(); }
-      else showToast(data.error || 'Failed to file batch.');
-    } catch (err) { console.error(err); showToast(t('loc.errFileBatch')); }
+      if (res.ok) { showToast(data.message, 'success'); await refreshAll(); onUpdate(); }
+      else showToast(data.error || 'Failed to file batch.', 'error');
+    } catch (err) { console.error(err); showToast(t('loc.errFileBatch'), 'error'); }
   };
 
   const startFilingMode = async () => {
@@ -1191,7 +1191,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entry_ids: unsortedCards.map(c => c.entry_id) })
       });
-      if (!res.ok) { showToast(t('loc.errFilingMode')); return; }
+      if (!res.ok) { showToast(t('loc.errFilingMode'), 'error'); return; }
       const data = await res.json();
       const placeable = data.filter(d => d.recommended);
       const fullCount = data.filter(d => d.full).length;
@@ -1201,7 +1201,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       const noRoom = data.filter(d => !d.recommended);
 
       if (placeable.length === 0) {
-        showToast(t('loc.filingNoFit', { name: target?.name, count: noRoom.length }));
+        showToast(t('loc.filingNoFit', { name: target?.name, count: noRoom.length }), 'status');
         return;
       }
 
@@ -1211,9 +1211,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       setMoveMode(false);
       setPickedEntryId(null);
       if (noRoom.length > 0) {
-        showToast(t('loc.filingStarted', { count: placeable.length, name: target?.name, left: noRoom.length }));
+        showToast(t('loc.filingStarted', { count: placeable.length, name: target?.name, left: noRoom.length }), 'status');
       }
-    } catch (err) { console.error(err); showToast(t('loc.errFilingModeGeneric')); }
+    } catch (err) { console.error(err); showToast(t('loc.errFilingModeGeneric'), 'error'); }
   };
 
   // Advance the walkthrough one card; end it when past the last card.
@@ -1221,7 +1221,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     if (filingIndex < filingQueue.length - 1) {
       setFilingIndex(filingIndex + 1);
     } else {
-      showToast(t(filingReadOnly ? 'loc.resortComplete' : 'loc.filingComplete'));
+      showToast(t(filingReadOnly ? 'loc.resortComplete' : 'loc.filingComplete'), 'success');
       setFilingMode(false);
       setFilingReadOnly(false);
       onUpdate();
@@ -1268,9 +1268,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         await refreshAll();
         advanceFiling();
       } else {
-        showToast(t('loc.errFileCard'));
+        showToast(t('loc.errFileCard'), 'error');
       }
-    } catch (err) { console.error(err); showToast(t('loc.errFileCardGeneric')); }
+    } catch (err) { console.error(err); showToast(t('loc.errFileCardGeneric'), 'error'); }
   };
 
   const startResort = async (skipConfirm = false) => {
@@ -1281,17 +1281,17 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       if (res.ok) {
         const data = await res.json();
         await refreshAll();
-        if (!Array.isArray(data) || data.length === 0) { showToast(t('loc.nothingToResort')); return; }
+        if (!Array.isArray(data) || data.length === 0) { showToast(t('loc.nothingToResort'), 'status'); return; }
         setFilingQueue(data);
         setFilingIndex(0);
         setFilingReadOnly(true);
         setFilingMode(true);
         setActiveLocationId(selectedLoc.id);
-        showToast(t('loc.resorted'));
+        showToast(t('loc.resorted'), 'success');
       } else {
-        showToast(t('loc.errResort'));
+        showToast(t('loc.errResort'), 'error');
       }
-    } catch (err) { console.error(err); showToast(t('loc.errResortGeneric')); }
+    } catch (err) { console.error(err); showToast(t('loc.errResortGeneric'), 'error'); }
   };
 
   // Save the Container Settings modal: rename, sort/filter rules, and a
@@ -1369,7 +1369,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       await fetchLocations();
       setCoverLocation(null);
     } catch (error) {
-      showToast(error.message);
+      showToast(error.message, 'error');
     } finally {
       setSavingCover(false);
     }
@@ -1405,8 +1405,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     <div className="sub-nav-tabs" role="group" aria-label={t('loc.inventory')} style={{ margin: 0 }}>
       {[['collection', t('dash.physical')], ['graveyard', t('collection.graveyard')]].map(([value, label]) => (
         <button key={value} type="button" className={`sub-nav-tab ${inventoryType === value ? 'active' : ''}`}
-          aria-pressed={inventoryType === value} onClick={() => onInventoryTypeChange?.(value)}
-          style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem' }}>
+          aria-pressed={inventoryType === value} onClick={() => onInventoryTypeChange?.(value)}>
           {label}
         </button>
       ))}
@@ -1415,8 +1414,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
   if (showGallery) return (
     <section>
-      <header style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-        <h2 style={{ margin: 0 }}>{t('nav.storage')}</h2>
+      <header className="page-heading" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <h2 className="page-title">{t('nav.storage')}</h2>
+        <button type="button" className="btn btn-primary" onClick={() => setShowCreate(true)}>
+          <Plus size={16} aria-hidden="true" /> {t('loc.createContainer')}
+        </button>
+      </header>
+      <div className="view-toolbar">
         {inventorySelector}
         <input className="input-control" aria-label={t('shared.search')} placeholder={t('loc.searchPlaceholder')} value={gallerySearch} onChange={e => setGallerySearch(e.target.value)} style={{ flex: '1 1 200px' }} />
         <select className="select-control" aria-label={t('collection.sortBy')} value={gallerySort} onChange={e => setGallerySort(e.target.value)} style={{ width: 'auto' }}>
@@ -1424,13 +1428,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           <option value="qty-desc">{t('collection.sort.qty-desc')}</option>
         </select>
         <span style={{ color: 'var(--text-secondary)' }}>{galleryLocations.length} / {locations.length}</span>
-      </header>
+      </div>
       {isArchive && <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>{t('loc.graveyardStorageHint')}</p>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: '1.25rem' }}>
-        <button className="glass-panel" onClick={() => setShowCreate(true)} style={{ minHeight: '190px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', color: 'var(--accent-yellow)', cursor: 'pointer' }}>
-          <Plus size={64} />
-          <strong>{t('loc.createContainer')}</strong>
-        </button>
         {galleryLocations.map(location => (
           <div key={location.id} className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
           <button onClick={() => setActiveLocationId(location.id)} style={{ width: '100%', padding: 0, border: 0, background: 'transparent', textAlign: 'left', color: 'var(--text-strong)', cursor: 'pointer' }}>
@@ -1447,7 +1447,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           </div>
         ))}
       </div>
-      <footer style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+      <footer style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.5rem' }}>
         <button className="btn btn-secondary" onClick={() => setShowGallery(false)}>{t('bulk.unassignedPile')}</button>
         {!isArchive && <>
         <button type="button" className="btn btn-secondary" disabled={importingContainer} aria-busy={importingContainer} onClick={() => containerImportInput.current?.click()}><Download size={16} /> {t(importingContainer ? 'loc.importingContainer' : 'loc.importContainer')}</button>
@@ -1667,13 +1667,14 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       {/* Selected location detail. During mobile filing the binder stays visible
           (the recommended slot blinks in it); the compact filing bar is pinned
           at the bottom of the screen. */}
-      <div className="glass-panel" style={{ padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
+      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto' }}>
+        <div className="view-toolbar" style={{ justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', minWidth: 0 }}>
             <button className="btn btn-secondary" onClick={() => { storage.exitSelectMode(); setActiveLocationId(null); setShowGallery(true); }} title={t('nav.storage')} aria-label={t('nav.storage')}><LayoutGrid size={16} /></button>
             {inventorySelector}
             <select
               className="select-control"
+              aria-label={t('loc.selectContainer')}
               value={activeLocationId || ''}
               onChange={(e) => setActiveLocationId(parseInt(e.target.value, 10))}
               style={{ fontSize: '1rem', fontWeight: 'bold', padding: '0.3rem', width: 'auto', minWidth: '150px', maxWidth: '100%' }}
@@ -1681,7 +1682,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               <option value="" disabled>{t('loc.selectContainer')}</option>
               {locations.slice().sort((a, b) => a.name.localeCompare(b.name)).map(loc => <option key={loc.id} value={loc.id}>{loc.locked ? '🔒 ' : ''}{loc.name} ({loc.type})</option>)}
             </select>
-            <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => setShowCreate(s => !s)} style={{ width: '28px', height: '28px', padding: 0 }} title={t('loc.createContainer')}>
+            <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => setShowCreate(s => !s)} title={t('loc.createContainer')} aria-label={t('loc.createContainer')}>
               <Plus size={14} />
             </button>
             {!isArchive && <>
@@ -2017,13 +2018,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             )}
 
             {containerViewMode === 'list' && (
-              <div className="glass-panel" style={{ padding: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="view-toolbar">
                   <div style={{ position: 'relative', flex: 1 }}>
                     <Search size={14} style={{ position: 'absolute', left: '0.55rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                    <input className="input-control" value={containerFilters.search} onChange={(e) => setContainerFilters(filters => ({ ...filters, search: e.target.value }))} placeholder={t('collection.searchPlaceholder')} style={{ width: '100%', padding: '0.35rem 0.5rem 0.35rem 2rem', fontSize: '0.75rem' }} />
+                    <input className="input-control" aria-label={t('shared.search')} value={containerFilters.search} onChange={(e) => setContainerFilters(filters => ({ ...filters, search: e.target.value }))} placeholder={t('collection.searchPlaceholder')} style={{ width: '100%', paddingLeft: '2rem' }} />
                   </div>
-                  <button className={`btn ${showContainerFilters ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setShowContainerFilters(show => !show)} style={{ padding: '0.35rem 0.6rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <button className={`btn ${showContainerFilters ? 'btn-primary' : 'btn-secondary'}`} aria-expanded={showContainerFilters} onClick={() => setShowContainerFilters(show => !show)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                     <SlidersHorizontal size={13} /> {t('collection.filters')}
                   </button>
                   <select className="select-control" value={containerSortBy} onChange={(e) => setContainerSortBy(e.target.value)} style={{ maxWidth: '150px', fontSize: '0.72rem', padding: '0.35rem 0.5rem' }} aria-label={t('collection.sortBy')}>
@@ -2341,7 +2342,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       </div>
 
       {/* Unsorted queue */}
-      <div className="glass-panel location-unsorted-col" style={{ padding: '0.75rem', display: isStacked && filingMode ? 'none' : 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <div className="view-section location-unsorted-col" style={{ minWidth: 0, display: isStacked && filingMode ? 'none' : 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         {filingMode ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', height: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

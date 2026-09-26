@@ -316,9 +316,11 @@ Pricing, sorting, names/languages, printing/rarity, card options, and shuffling 
 
 ### Styling contract
 
-`main.jsx` imports **`index.css` first, then `arcane.css`**. Arcane Blue is the default `dark` account theme, not a separate navigation system or a new theme key. `App.jsx` writes the validated account theme to the root `data-theme` attribute; the supported keys remain `dark`, `light`, `jenny`, `mtg`, and `lcars`.
+`main.jsx` imports **`index.css` first, then `arcane.css`**. Arcane Blue remains the default `dark` account theme. The supported keys are `dark`, `jenny`, `mana-white`, `mana-blue`, `mana-black`, `mana-red`, `mana-green`, and `mana-colorless`, defined in `shared/themes.json`. Account settings, API validation, startup theme selection, and public-share query parameters use this same list. Unsupported or retired themes fall back to `dark`; database startup normalizes obsolete account preferences without changing inventory or game identities.
 
-`arcane.css` scopes its blue surfaces, typography, rounded controls, tables/cards, focus indicators, and responsive adjustments to `:root[data-theme="dark"]`. It uses the existing component classes and custom properties and leaves other account themes to their existing styling. Keep that scoping and import order when changing the design; do not make a cosmetic change alter inventory or route behavior. Preserve keyboard focus, disabled states, mobile layout, and chart-data access alongside visual changes.
+`arcane.css` supplies layered surfaces, luminous controls, typography, tables/cards, and focus indicators for Arcane Blue and the six explicitly scoped mana palettes. White uses ivory/gold over warm charcoal; Blue deep sea/cyan; Black charcoal/violet; Red ember; Green forest; Colorless slate/silver. Jenny retains its separate palette. Outfit carries controls and data; Cinzel is reserved for page titles, and the existing logo stays stationary and metallic. Shared layout classes and responsive behavior remain unchanged. Preserve keyboard focus, disabled states, browser zoom, and chart-data access when changing appearance.
+
+The dashboard uses a compact owned-count/value summary with supporting cost/gain figures and grouped analytics. Collection pagination appears only for multiple pages; ownership, location, and deck actions precede pricing in the inspector. Storage creation is a heading action, not a gallery item. Deck capacity status describes the target count rather than promising format legality. Rarity edges and foil treatments are static; motion is reserved for meaningful state changes.
 
 ## Development and verification
 

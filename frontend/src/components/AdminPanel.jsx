@@ -75,14 +75,14 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       const res = await fetch('/api/admin/seed-cards', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
-        showToast(data.message);
+        showToast(data.message, 'success');
         fetchUsers(); // Refresh stats
       } else {
-        showToast(t('admin.errSeed'));
+        showToast(t('admin.errSeed'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errSeedGeneric'));
+      showToast(t('admin.errSeedGeneric'), 'error');
     }
   };
 
@@ -102,7 +102,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   const handleDownloadBackup = async (file) => {
     try {
       const res = await fetch(`/api/admin/backups/${encodeURIComponent(file)}/download`);
-      if (!res.ok) { showToast(t('admin.errDownload')); return; }
+      if (!res.ok) { showToast(t('admin.errDownload'), 'error'); return; }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -114,7 +114,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errDownloadGeneric'));
+      showToast(t('admin.errDownloadGeneric'), 'error');
     }
   };
 
@@ -124,14 +124,14 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       const res = await fetch('/api/admin/backups', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        showToast(t('admin.backupCreated', { file: data.file, size: formatBytes(data.size) }));
+        showToast(t('admin.backupCreated', { file: data.file, size: formatBytes(data.size) }), 'success');
         fetchBackups();
       } else {
-        showToast(data.error || t('admin.errBackup'));
+        showToast(data.error || t('admin.errBackup'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errBackupGeneric'));
+      showToast(t('admin.errBackupGeneric'), 'error');
     } finally {
       setBackupLoading(false);
     }
@@ -146,11 +146,11 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
         if (!mountedRef.current) return;
         setUsers(data);
       } else {
-        showToast(t('admin.errUserList'));
+        showToast(t('admin.errUserList'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('common.errBackend'));
+      showToast(t('common.errBackend'), 'error');
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -187,14 +187,14 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
         const data = await response.json();
         setPublicBaseUrl(data.public_base_url || '');
         setPriceRefreshDays(data.price_refresh_days ?? 1);
-        showToast(t('admin.settingsUpdated'));
+        showToast(t('admin.settingsUpdated'), 'success');
       } else {
         const data = await response.json();
-        showToast(data.error || t('admin.errSettings'));
+        showToast(data.error || t('admin.errSettings'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errSettingsGeneric'));
+      showToast(t('admin.errSettingsGeneric'), 'error');
     } finally {
       setSettingsLoading(false);
     }
@@ -203,11 +203,11 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   const handleAddUser = async (e) => {
     e.preventDefault();
     if (newUsername.length < 3) {
-      showToast(t('admin.errUsernameShort', { count: 3 }));
+      showToast(t('admin.errUsernameShort', { count: 3 }), 'error');
       return;
     }
     if (newPassword.length < 8) {
-      showToast(t('login.errPasswordShort', { count: 8 }));
+      showToast(t('login.errPasswordShort', { count: 8 }), 'error');
       return;
     }
 
@@ -220,18 +220,18 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       });
 
       if (response.ok) {
-        showToast(t('admin.userCreated', { name: newUsername }));
+        showToast(t('admin.userCreated', { name: newUsername }), 'success');
         setNewUsername('');
         setNewPassword('');
         setNewRole('member');
         fetchUsers();
       } else {
         const data = await response.json();
-        showToast(data.error || t('admin.errCreateUser'));
+        showToast(data.error || t('admin.errCreateUser'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errCreateUserGeneric'));
+      showToast(t('admin.errCreateUserGeneric'), 'error');
     } finally {
       setAddLoading(false);
     }
@@ -240,7 +240,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   const handleToggleRole = async (user) => {
     const nextRole = user.role === 'admin' ? 'member' : 'admin';
     if (user.username === 'admin') {
-      showToast(t('admin.errDemoteRoot'));
+      showToast(t('admin.errDemoteRoot'), 'error');
       return;
     }
 
@@ -256,15 +256,15 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       });
 
       if (response.ok) {
-        showToast(t('admin.roleUpdated', { role: nextRole, name: user.username }));
+        showToast(t('admin.roleUpdated', { role: nextRole, name: user.username }), 'success');
         fetchUsers();
       } else {
         const data = await response.json();
-        showToast(data.error || t('admin.errRoleChange'));
+        showToast(data.error || t('admin.errRoleChange'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errRoleChangeGeneric'));
+      showToast(t('admin.errRoleChangeGeneric'), 'error');
     }
   };
 
@@ -272,7 +272,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
     e.preventDefault();
     if (!targetUser) return;
     if (updatePassword.length < 8) {
-      showToast(t('login.errPasswordShort', { count: 8 }));
+      showToast(t('login.errPasswordShort', { count: 8 }), 'error');
       return;
     }
 
@@ -285,16 +285,16 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       });
 
       if (response.ok) {
-        showToast(t('admin.passwordUpdated', { name: targetUser.username }));
+        showToast(t('admin.passwordUpdated', { name: targetUser.username }), 'success');
         setUpdatePassword('');
         setTargetUser(null);
       } else {
         const data = await response.json();
-        showToast(data.error || t('settings.errPasswordUpdate'));
+        showToast(data.error || t('settings.errPasswordUpdate'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('settings.errPasswordUpdateGeneric'));
+      showToast(t('settings.errPasswordUpdateGeneric'), 'error');
     } finally {
       setPwdLoading(false);
     }
@@ -302,7 +302,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
   const handleDeleteUser = async (user) => {
     if (user.username === 'admin') {
-      showToast(t('admin.errDeleteRoot'));
+      showToast(t('admin.errDeleteRoot'), 'error');
       return;
     }
 
@@ -316,15 +316,15 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       });
 
       if (response.ok) {
-        showToast(t('admin.userDeleted', { name: user.username }));
+        showToast(t('admin.userDeleted', { name: user.username }), 'success');
         fetchUsers();
       } else {
         const data = await response.json();
-        showToast(data.error || t('admin.errDeleteUser'));
+        showToast(data.error || t('admin.errDeleteUser'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errDeleteUserGeneric'));
+      showToast(t('admin.errDeleteUserGeneric'), 'error');
     }
   };
 

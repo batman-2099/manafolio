@@ -85,7 +85,7 @@ function Notes({ showToast }) {
         const list = Array.isArray(d.notes) ? d.notes : (Array.isArray(d) ? d : []);
         setNotes(list);
       })
-      .catch(() => showToast?.(t('notes.errLoad')))
+      .catch(() => showToast?.(t('notes.errLoad'), 'error'))
       .finally(() => setLoading(false));
   }, [showToast, t]);
 
@@ -100,13 +100,13 @@ function Notes({ showToast }) {
         body: JSON.stringify({ title: t('notes.untitled'), body: '' }),
       });
       if (!r.ok) {
-        showToast?.(t('notes.errCreate'));
+        showToast?.(t('notes.errCreate'), 'error');
         return;
       }
       const d = await r.json();
       if (d.note) setNotes(prev => [d.note, ...prev]);
     } catch {
-      showToast?.(t('notes.errCreate'));
+      showToast?.(t('notes.errCreate'), 'error');
     }
   };
 
@@ -119,9 +119,9 @@ function Notes({ showToast }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [field]: value }),
       });
-      if (!r.ok) showToast?.(t('notes.errSave'));
+      if (!r.ok) showToast?.(t('notes.errSave'), 'error');
     } catch {
-      showToast?.(t('notes.errSave'));
+      showToast?.(t('notes.errSave'), 'error');
     }
   };
 
@@ -132,12 +132,12 @@ function Notes({ showToast }) {
     try {
       const r = await fetch(`/api/notes/${id}`, { method: 'DELETE' });
       if (!r.ok) {
-        showToast?.(t('notes.errDelete'));
+        showToast?.(t('notes.errDelete'), 'error');
         return;
       }
       setNotes(prev => prev.filter(n => n.id !== id));
     } catch {
-      showToast?.(t('notes.errDelete'));
+      showToast?.(t('notes.errDelete'), 'error');
     }
   };
 

@@ -2,6 +2,7 @@
 // request from bundled JSON fixtures so the static GitHub Pages build is a
 // read-only tour of the real UI. Only bundled when VITE_DEMO is set (see
 // main.jsx guard) so production/mobile builds carry none of this.
+import themes from '../../../shared/themes.json';
 
 // Route = '/api/' + fixture basename with '_' -> '/'. Capture filenames were
 // chosen so this mapping is exact: stats_history -> /api/stats/history,
@@ -30,6 +31,13 @@ window.fetch = (input, opts = {}) => {
 
   const method = (opts.method || 'GET').toUpperCase();
   const path = (url.replace(/^https?:\/\/[^/]+/, '').split('?')[0].replace(/\/+$/, '')) || '/';
+
+  if (method === 'PATCH' && path === '/api/auth/theme') {
+    const { theme } = JSON.parse(opts.body || '{}');
+    if (!themes.includes(theme)) return Promise.resolve(json({ error: 'Invalid theme' }, 400));
+    routes['/api/auth/me'].user.theme = theme;
+    return Promise.resolve(json({ theme }));
+  }
 
   if (method === 'GET' && routes[path]) {
     let data = routes[path];

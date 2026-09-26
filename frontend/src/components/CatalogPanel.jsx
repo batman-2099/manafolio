@@ -202,7 +202,7 @@ function BuildPicker({ game, lang, disabled, onBuild, showToast, label }) {
     ]).then(([tree, sc]) => {
       setSets(tree);
       setCounts(sc?.sets || null);
-    }).catch(() => showToast?.(t('catalog.errListSets')))
+    }).catch(() => showToast?.(t('catalog.errListSets'), 'error'))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -310,7 +310,7 @@ export default function CatalogPanel({ showToast }) {
         if (e.ok) setEngine(await e.json());
       } catch { /* the panel still lists catalogs without it */ }
     } catch (e) {
-      showToast?.(t('catalog.errLoadCatalogs', { message: e.message }));
+      showToast?.(t('catalog.errLoadCatalogs', { message: e.message }), 'error');
     } finally {
       setLoading(false);
     }
@@ -363,10 +363,10 @@ export default function CatalogPanel({ showToast }) {
         body: JSON.stringify({ what }),
       });
       const j = await r.json();
-      if (!r.ok) return showToast?.(j.error || t('catalog.errStartDownloadGeneric'));
+      if (!r.ok) return showToast?.(j.error || t('catalog.errStartDownloadGeneric'), 'error');
       setEngine(prev => ({ ...(prev || {}), progress: j.progress }));
     } catch (e) {
-      showToast?.(t('catalog.errStartDownload', { message: e.message }));
+      showToast?.(t('catalog.errStartDownload', { message: e.message }), 'error');
     }
   };
 
@@ -381,10 +381,10 @@ export default function CatalogPanel({ showToast }) {
         body: JSON.stringify({ game, lang, sets }),
       });
       const j = await r.json();
-      if (!r.ok) return showToast?.(j.error || t('catalog.errStartBuildGeneric'));
+      if (!r.ok) return showToast?.(j.error || t('catalog.errStartBuildGeneric'), 'error');
       setProgress(j.progress);
     } catch (e) {
-      showToast?.(t('catalog.errStartBuild', { message: e.message }));
+      showToast?.(t('catalog.errStartBuild', { message: e.message }), 'error');
     }
   };
 
@@ -393,9 +393,9 @@ export default function CatalogPanel({ showToast }) {
       const r = await fetch('/api/admin/catalogs/stop', { method: 'POST' });
       const j = await r.json();
       setProgress(j.progress);
-      showToast?.(t('catalog.stoppingToast'));
+      showToast?.(t('catalog.stoppingToast'), 'status');
     } catch (e) {
-      showToast?.(t('catalog.errStop', { message: e.message }));
+      showToast?.(t('catalog.errStop', { message: e.message }), 'error');
     }
   };
 

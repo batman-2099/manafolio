@@ -66,7 +66,7 @@ function ManaCounts({ deck }) {
           <svg aria-hidden="true" width="16" height="16" viewBox={`${x - 50} 0 100 100`}>
             <image href="/mana.svg" x="-945" y="-210.002" width="1045" height="730.002" />
           </svg>
-          <span style={{ fontSize: 'var(--deck-mana-count-size, 0.7rem)', fontWeight: 700, color: 'var(--text-secondary)' }}>{deck[field]}</span>
+          <span style={{ fontSize: 'var(--deck-mana-count-size, 0.875rem)', fontWeight: 700, color: 'var(--text-secondary)' }}>{deck[field]}</span>
         </span>
       ))}
     </span>
@@ -170,7 +170,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
   const confirmLeaveEditor = () => {
     if (activeDeck && (editorBusy || savingRecord)) {
-      showToast(t('deck.waitForOperation'));
+      showToast(t('deck.waitForOperation'), 'status');
       return false;
     }
     return !hasUnsavedChanges || window.confirm(t('deck.confirmDiscard'));
@@ -228,7 +228,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errLoadDecks'));
+      showToast(t('deck.errLoadDecks'), 'error');
     } finally {
       setLoading(false);
     }
@@ -259,7 +259,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
       const data = await response.json();
       if (response.ok) {
-        showToast(data.message || t('deck.created'));
+        showToast(data.message || t('deck.created'), 'success');
         setNewDeckName('');
         setNewDeckDesc('');
         setNewDeckGame(defaultGame());
@@ -275,11 +275,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
         setShowImportDecklistArea(false);
         fetchDecks();
       } else {
-        showToast(data.error || t('deck.errCreate'));
+        showToast(data.error || t('deck.errCreate'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errCreateGeneric'));
+      showToast(t('deck.errCreateGeneric'), 'error');
     }
   };
 
@@ -292,14 +292,14 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       setNewDeckImportFormat('manabox');
       setNewDeckPreconFile('');
     } catch {
-      showToast(t('settings.errReadFile'));
+      showToast(t('settings.errReadFile'), 'error');
     }
   };
 
   const handleApplyDeckProperties = async () => {
     if (!activeDeck || !deckDraft?.name.trim() || editorBusy) return;
     if (activeDeck.checked_out && deckDraft.inventory_type !== activeDeck.inventory_type) {
-      showToast(t('deck.returnBeforeEditing'));
+      showToast(t('deck.returnBeforeEditing'), 'error');
       return;
     }
     let cards = activeDeck.cards;
@@ -313,7 +313,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
         setImportComparison(null);
         setDeckCardLocations({});
       } catch (error) {
-        showToast(error.message);
+        showToast(error.message, 'error');
         return;
       } finally {
         setRefreshingInventory(false);
@@ -337,11 +337,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || t('deck.errSave'));
-      if (await loadDeckDetails(activeDeck.id)) showToast(data.message);
+      if (await loadDeckDetails(activeDeck.id)) showToast(data.message, 'success');
       await fetchDecks();
     } catch (error) {
       console.error(error);
-      showToast(error.message);
+      showToast(error.message, 'error');
     } finally {
       setSavingDeck(false);
     }
@@ -368,7 +368,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       return true;
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errLoadDetails'));
+      showToast(t('deck.errLoadDetails'), 'error');
       return false;
     } finally {
       setLoading(false);
@@ -394,7 +394,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       setDecks(current => current.map(deck => deck.id === deckId ? { ...deck, ...record } : deck));
     } catch (error) {
       console.error(error);
-      showToast(t('deck.errRecord'));
+      showToast(t('deck.errRecord'), 'error');
     } finally {
       setSavingRecord(false);
     }
@@ -422,7 +422,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const handleUpdateCardQty = (cardId, newQty, newCard = null) => {
     if (!activeDeck || editorBusy || !Number.isSafeInteger(newQty)) return;
     if (activeDeck.checked_out) {
-      showToast(t('deck.returnBeforeEditing'));
+      showToast(t('deck.returnBeforeEditing'), 'error');
       return;
     }
     if (newQty <= 0) {
@@ -438,11 +438,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     if (!card) return;
     if (newQty > (existing?.quantity || 0)) {
       if (newQty > (card.owned_qty || 0)) {
-        showToast(t('deck.errOwnedLimit', { count: card.owned_qty || 0, name: displayName(card) }));
+        showToast(t('deck.errOwnedLimit', { count: card.owned_qty || 0, name: displayName(card) }), 'error');
         return;
       }
       if (!isBasicLand(card, activeDeck.game) && deckCountByName(activeDeck.cards, card.name) - (existing?.quantity || 0) + newQty > 4) {
-        showToast(t('deck.errCopyLimit', { count: 4, name: displayName(card) }));
+        showToast(t('deck.errCopyLimit', { count: 4, name: displayName(card) }), 'error');
         return;
       }
     }
@@ -463,12 +463,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       });
 
       if (response.ok) {
-        showToast(t('deck.deleted'));
+        showToast(t('deck.deleted'), 'success');
         fetchDecks();
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errDelete'));
+      showToast(t('deck.errDelete'), 'error');
     }
   };
 
@@ -476,13 +476,13 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     try {
       const response = await fetch(`/api/decks/${deckId}/duplicate`, { method: 'POST' });
       const data = await response.json();
-      if (!response.ok) return showToast(data.error || t('deck.errDuplicate'));
-      showToast(t('deck.duplicated'));
+      if (!response.ok) return showToast(data.error || t('deck.errDuplicate'), 'error');
+      showToast(t('deck.duplicated'), 'success');
       await fetchDecks();
       loadDeckDetails(data.id);
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errDuplicate'));
+      showToast(t('deck.errDuplicate'), 'error');
     }
   };
 
@@ -516,12 +516,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
           const data = await response.json();
           setSearchResults(data);
         } else {
-          showToast(t(response.status === 429 ? 'deck.errRateLimit' : 'deck.errSearch'));
+          showToast(t(response.status === 429 ? 'deck.errRateLimit' : 'deck.errSearch'), 'error');
         }
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errSearch'));
+      showToast(t('deck.errSearch'), 'error');
     } finally {
       setSearching(false);
     }
@@ -532,12 +532,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     const targetDeck = deck || activeDeck;
     if (!targetDeck) return;
     if (editorBusy) return;
-    if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'));
+    if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
     try {
       setCheckingOut(true);
       const res = await fetch(`/api/decks/${targetDeck.id}/checkout`, { method: 'PUT' });
       if (res.ok) {
-        showToast(t('deck.checkedOut', { name: targetDeck.name }));
+        showToast(t('deck.checkedOut', { name: targetDeck.name }), 'success');
         if (activeDeck && activeDeck.id === targetDeck.id) {
           setActiveDeck(prev => ({ ...prev, checked_out: 1, checked_out_at: new Date().toISOString() }));
         }
@@ -554,14 +554,14 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       } else {
         const errData = await res.json().catch(() => null);
         if (errData && errData.details && errData.details.length > 0) {
-          showToast(t('deck.errCheckout', { detail: errData.details[0], extra: errData.details.length > 1 ? t('deck.andMore', { count: errData.details.length - 1 }) : '' }));
+          showToast(t('deck.errCheckout', { detail: errData.details[0], extra: errData.details.length > 1 ? t('deck.andMore', { count: errData.details.length - 1 }) : '' }), 'error');
         } else {
-          showToast(errData?.error || 'Failed to check out deck.');
+          showToast(errData?.error || 'Failed to check out deck.', 'error');
         }
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errCheckoutGeneric'));
+      showToast(t('deck.errCheckoutGeneric'), 'error');
     } finally {
       setCheckingOut(false);
     }
@@ -571,7 +571,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     const targetDeck = deck || activeDeck;
     if (!targetDeck) return;
     if (editorBusy) return;
-    if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'));
+    if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
     try {
       setCheckingOut(true);
       // Capture where each card lives before flipping the flag, so the check-in
@@ -581,7 +581,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       const locData = locRes.ok ? await locRes.json() : null;
       const res = await fetch(`/api/decks/${targetDeck.id}/return`, { method: 'PUT' });
       if (res.ok) {
-        showToast(t('deck.returned', { name: targetDeck.name }));
+        showToast(t('deck.returned', { name: targetDeck.name }), 'success');
         if (activeDeck && activeDeck.id === targetDeck.id) {
           setActiveDeck(prev => ({ ...prev, checked_out: 0, checked_out_at: null }));
         }
@@ -593,11 +593,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
           setShowCheckoutModal(true);
         }
       } else {
-        showToast(t('deck.errReturn'));
+        showToast(t('deck.errReturn'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errReturnGeneric'));
+      showToast(t('deck.errReturnGeneric'), 'error');
     } finally {
       setCheckingOut(false);
     }
@@ -612,23 +612,23 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     const undo = checkoutMode === 'checkout' ? 'return' : 'checkout';
     try {
       const res = await fetch(`/api/decks/${id}/${undo}`, { method: 'PUT' });
-      if (!res.ok) { showToast(t('deck.errUndo')); return; }
+      if (!res.ok) { showToast(t('deck.errUndo'), 'error'); return; }
       if (activeDeck && activeDeck.id === id) {
         const back = checkoutMode === 'checkout';
         setActiveDeck(prev => ({ ...prev, checked_out: back ? 0 : 1, checked_out_at: back ? null : new Date().toISOString() }));
       }
       fetchDecks();
-      showToast(t(checkoutMode === 'checkout' ? 'deck.checkoutCanceled' : 'deck.returnCanceled'));
+      showToast(t(checkoutMode === 'checkout' ? 'deck.checkoutCanceled' : 'deck.returnCanceled'), 'success');
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errUndo'));
+      showToast(t('deck.errUndo'), 'error');
     }
   };
 
   // --- DRAW SIMULATOR LOGIC ---
   const startSimulator = () => {
     if (!activeDeck || activeDeck.cards.length === 0) {
-      showToast(t('deck.errEmptyDeck'));
+      showToast(t('deck.errEmptyDeck'), 'error');
       return;
     }
 
@@ -659,7 +659,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const handleDrawCard = () => {
     const nextIndex = hand.length;
     if (nextIndex >= simulatorDeck.length) {
-      showToast(t('deck.errNoCardsLeft'));
+      showToast(t('deck.errNoCardsLeft'), 'error');
       return;
     }
     setHand([...hand, simulatorDeck[nextIndex]]);
@@ -676,8 +676,8 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const handleCopyExportText = () => {
     const text = handleExportDeckText();
     navigator.clipboard.writeText(text)
-      .then(() => showToast(t('deck.copied')))
-      .catch(() => showToast(t('deck.errCopy')));
+      .then(() => showToast(t('deck.copied'), 'success'))
+      .catch(() => showToast(t('deck.errCopy'), 'error'));
   };
 
   // Copy the buylist and open TCGplayer Mass Entry — user pastes (their mass
@@ -685,11 +685,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   // reliable path).
   const handleOpenMassEntry = () => {
     const text = buildDeckExport(activeDeck?.cards, 'buylist');
-    if (!text) { showToast(t('deck.nothingToBuy')); return; }
+    if (!text) { showToast(t('deck.nothingToBuy'), 'status'); return; }
     const line = (activeDeck?.game === 'mtg') ? 'Magic' : 'Lorcana';
     navigator.clipboard.writeText(text).catch(() => {});
     window.open(`https://www.tcgplayer.com/massentry?productline=${line}`, '_blank', 'noopener');
-    showToast(t('deck.buylistCopied'));
+    showToast(t('deck.buylistCopied'), 'success');
   };
 
   const loadArenaImportCards = async () => {
@@ -730,7 +730,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     } catch (err) {
       console.error(err);
       setComparingImport(false);
-      showToast(t('deck.errSearch'));
+      showToast(t('deck.errSearch'), 'error');
       return;
     }
 
@@ -774,7 +774,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const handleImportDeck = () => {
     if (!activeDeck || !importComparison || editorBusy) return;
     if (activeDeck.checked_out) {
-      showToast(t('deck.returnBeforeEditing'));
+      showToast(t('deck.returnBeforeEditing'), 'error');
       return;
     }
     let cards = [...activeDeck.cards];
@@ -967,7 +967,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
           onClose={closeAiBuilder}
           onSaved={async id => {
             closeAiBuilder();
-            showToast(t(id === aiSourceDeck?.id ? 'aiDeck.saved' : 'deck.created'));
+            showToast(t(id === aiSourceDeck?.id ? 'aiDeck.saved' : 'deck.created'), 'success');
             await fetchDecks();
             await loadDeckDetails(id);
           }}
@@ -984,9 +984,6 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 <Layers size={22} style={{ color: 'var(--accent-yellow)' }} />
                 {t('deck.vaultTitle')}
               </h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-                {t('deck.vaultSubtitle')}
-              </p>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
               {isGameEnabled('mtg') && <button className="btn btn-secondary" onClick={() => { setAiSourceDeck(null); setShowAiBuilder(true); }}>
@@ -1013,6 +1010,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   type="text"
                   className="input-control"
                   placeholder={t('deck.filterPlaceholder')}
+                  aria-label={t('deck.filterPlaceholder')}
                   value={deckSearchTerm}
                   onChange={e => setDeckSearchTerm(e.target.value)}
                   style={{ paddingLeft: '2.25rem', width: '100%', fontSize: '0.85rem' }}
@@ -1039,6 +1037,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   <Filter size={14} style={{ color: 'var(--text-muted)' }} />
                   <select
                     className="select-control"
+                    aria-label={t('admin.colStatus')}
                     value={deckStatusFilter}
                     onChange={e => setDeckStatusFilter(e.target.value)}
                     style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', height: 'auto' }}
@@ -1046,7 +1045,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     <option value="all">{t('deck.allStatuses')}</option>
                     <option value="ready">{t('deck.statusBattleReady')}</option>
                     <option value="in_progress">{t('deck.statusBuildingCount')}</option>
-                    <option value="in_play">{t('deck.statusInPlayEmoji')}</option>
+                    <option value="in_play">{t('deck.inPlay')}</option>
                   </select>
                 </div>
 
@@ -1055,6 +1054,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   <SlidersHorizontal size={14} style={{ color: 'var(--text-muted)' }} />
                   <select
                     className="select-control"
+                    aria-label={t('collection.sortBy')}
                     value={deckSortBy}
                     onChange={e => setDeckSortBy(e.target.value)}
                     style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', height: 'auto' }}
@@ -1074,18 +1074,18 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   className={`btn ${deckSelectionViewMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                   onClick={() => setDeckSelectionViewMode('grid')}
-                  title={t('deck.gridView')}
+                  aria-pressed={deckSelectionViewMode === 'grid'} title={t('deck.gridView')}
                 >
-                  <LayoutGrid size={13} /> Grid
+                  <LayoutGrid size={13} /> {t('deck.gridView')}
                 </button>
                 <button
                   type="button"
                   className={`btn ${deckSelectionViewMode === 'table' ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                   onClick={() => setDeckSelectionViewMode('table')}
-                  title={t('deck.tableView')}
+                  aria-pressed={deckSelectionViewMode === 'table'} title={t('deck.tableView')}
                 >
-                  <List size={13} /> Table
+                  <List size={13} /> {t('deck.tableView')}
                 </button>
               </div>
 
@@ -1347,7 +1347,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           className="btn btn-danger btn-icon-only"
                           style={{ padding: '0.3rem' }}
                           onClick={(e) => { e.stopPropagation(); handleDeleteDeck(deck.id, deck.name); }}
-                          title={t('deck.deleteDeck')}
+                          aria-label={t('deck.deleteDeck')} title={t('deck.deleteDeck')}
                         >
                           <Trash2 size={12} />
                         </button>
@@ -1462,10 +1462,10 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                             <button className="btn btn-primary" style={{ padding: '0.25rem 0.6rem', fontSize: 'inherit' }} onClick={() => loadDeckDetails(deck.id)}>
                               {t('deck.open')}
                             </button>
-                            <button className="btn btn-secondary btn-icon-only" style={{ padding: '0.25rem' }} onClick={() => handleDuplicateDeck(deck.id)} title={t('deck.duplicateDeck')}>
+                            <button className="btn btn-secondary btn-icon-only" style={{ padding: '0.25rem' }} onClick={() => handleDuplicateDeck(deck.id)} aria-label={t('deck.duplicateDeck')} title={t('deck.duplicateDeck')}>
                               <Copy size={12} />
                             </button>
-                            <button className="btn btn-danger btn-icon-only" style={{ padding: '0.25rem' }} onClick={() => handleDeleteDeck(deck.id, deck.name)} title={t('deck.deleteDeck')}>
+                            <button className="btn btn-danger btn-icon-only" style={{ padding: '0.25rem' }} onClick={() => handleDeleteDeck(deck.id, deck.name)} aria-label={t('deck.deleteDeck')} title={t('deck.deleteDeck')}>
                               <Trash2 size={12} />
                             </button>
                           </div>
@@ -1480,6 +1480,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
         </div>
       )}
+
 
       {/* 2. DECK EDITOR / DETAIL VIEW */}
       {viewMode === 'detail' && activeDeck && !showAiBuilder && (
@@ -1599,7 +1600,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 <button
                   className="btn btn-secondary"
                   onClick={() => {
-                    if (hasUnsavedChanges) return showToast(t('deck.saveFirst'));
+                    if (hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
                     setAiSourceDeck(activeDeck);
                     setShowAiBuilder(true);
                   }}
@@ -2101,7 +2102,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 {manaCurveData.some(d => d.count > 0) && (
                   <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <BarChart2 size={14} style={{ color: '#3b82f6' }} /> Mana / Ink Cost Curve
+                      <BarChart2 size={14} style={{ color: 'var(--accent-blue)' }} /> Mana / Ink Cost Curve
                     </h3>
                     <div style={{ width: '100%', height: '180px' }}>
                       <ResponsiveContainer width="100%" height="100%">
@@ -2109,7 +2110,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           <XAxis dataKey="cost" stroke="var(--text-muted)" fontSize={10} tickLine={false} />
                           <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} />
                           <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.8)', border: '1px solid var(--border-glass)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-strong)' }} />
-                          <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="count" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>

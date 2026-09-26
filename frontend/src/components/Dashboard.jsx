@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area } from 'recharts';
-import { TrendingUp, Coins, Library, Trophy, Plus, ArrowUpRight } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import { getCardDisplayName } from '../utils/langHelper';
 import { priceText, currencySymbol } from '../utils/formatPrice';
 import { getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
@@ -103,17 +103,22 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
   }, [timePeriod, stats, loading, gameFilter, inventoryFilter]);
 
   const renderFilters = () => (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+    <>
+      <header className="page-heading">
+        <h1 className="page-title">{t('nav.dashboard')}</h1>
+      </header>
+      <div className="view-toolbar">
       <div className="sub-nav-tabs dashboard-filters" style={{ margin: 0 }}>
         {[['all', t('dash.allCards')], ['collection', t('dash.physical')], ['arena', t('dash.arena')], ['graveyard', t('collection.graveyard')]].map(([value, label]) => (
           <button key={value} type="button" className={`sub-nav-tab ${inventoryFilter === value ? 'active' : ''}`}
             aria-pressed={inventoryFilter === value}
-            style={{ padding: '0.35rem 0.85rem', fontSize: '0.75rem' }} onClick={() => setInventoryFilter(value)}>
+            onClick={() => setInventoryFilter(value)}>
             {label}
           </button>
         ))}
       </div>
     </div>
+    </>
   );
 
   if (loading) {
@@ -124,7 +129,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
     return (
       <div className="dashboard-page">
         {renderFilters()}
-        <div className="glass-panel" style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+        <div className="dashboard-empty" style={{ color: 'var(--text-secondary)' }}>
           <p role="alert">{t('dash.errLoad', { error })}</p>
           <button className="btn btn-primary" onClick={() => setStatsRefresh(value => value + 1)} style={{ marginTop: '1rem' }}>{t('dash.retry')}</button>
         </div>
@@ -138,21 +143,23 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
     return (
       <div className="dashboard-page">
         {renderFilters()}
-        <div className="glass-panel" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-secondary)' }}>
-          <TrendingUp size={48} style={{ color: 'var(--accent-red)', marginBottom: '1.5rem', opacity: 0.8 }} />
+        <div className="dashboard-empty" style={{ padding: '1.5rem 0', color: 'var(--text-secondary)' }}>
           <h2 style={{ color: 'var(--text-strong)', marginBottom: '0.5rem' }}>
             {isArchive ? t('dash.emptyArchiveTitle') : isFiltered ? t('dash.emptyFilteredTitle', { game: gameName }) : t('dash.emptyTitle')}
           </h2>
-          <p style={{ maxWidth: '400px', margin: '0 auto 1.5rem auto' }}>
+          <p style={{ maxWidth: '400px', margin: '0 0 1.5rem' }}>
             {isArchive ? (isFiltered ? t('dash.emptyArchiveFilteredBody', { game: gameName }) : t('dash.emptyArchiveBody')) : isFiltered ? t('dash.emptyFilteredBody', { game: gameName }) : t('dash.emptyBody')}
           </p>
-          {!isArchive && <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+          {!isArchive && <div style={{ display: 'flex', gap: '1rem' }}>
             <div style={{ display: 'inline-block' }}>
               <button className="btn btn-primary" onClick={() => onNavigate && onNavigate('add-cards')}>{t('dash.goToAddCards')}</button>
             </div>
           </div>}
         </div>
-        <DashboardAnalytics analytics={stats?.analytics} inventory={inventoryFilter} />
+        <section className="dashboard-analytics view-section" aria-labelledby="dashboard-analytics-title">
+          <h2 id="dashboard-analytics-title" className="section-heading">{t('dash.analytics')}</h2>
+          <DashboardAnalytics analytics={stats?.analytics} inventory={inventoryFilter} />
+        </section>
       </div>
     );
   }
@@ -169,167 +176,82 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
     return { name: t.name, value: t.value, color: fill, fill };
   });
   const rarityChartData = rarities.map((r, i) => ({ ...r, fill: COLORS[i % COLORS.length] }));
+  const cardCount = inventoryFilter === 'collection' ? summary.physicalCards
+    : inventoryFilter === 'arena' ? summary.digitalCards
+    : isArchive ? summary.archivedCards : summary.totalCards;
+  const cardLabel = inventoryFilter === 'collection' ? 'dash.physicalCards'
+    : inventoryFilter === 'arena' ? 'dash.digitalCards'
+    : isArchive ? 'dash.archivedCards' : 'dash.totalCards';
+  const cardNote = inventoryFilter === 'collection'
+    ? (summary.unsortedCount > 0 ? t('dash.unsortedCount', { count: summary.unsortedCount }) : t('dash.physicalCards'))
+    : inventoryFilter === 'arena' ? t('collection.arena') : t('dash.uniqueCount', { count: summary.uniqueCards });
+  const roi = summary.roi || { abs: 0, pct: null };
+  const isPositive = (roi.abs || 0) >= 0;
+  // Only Cardmarket's 7/30-day averages provide real price comparisons.
+  const change = timePeriod === '7d' ? summary.change7d
+    : timePeriod === '30d' ? summary.change30d
+    : timePeriod === '1y' ? summary.change1y : summary.change5y;
 
   return (
     <div className="dashboard-page">
       {renderFilters()}
       {isArchive && <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.5 }}>{t('dash.archiveValueNote')}</p>}
 
-      {/* Metrics Summary Grid */}
-      <div className="metrics-grid">
-        {/* Net Worth Card with historical switcher */}
-        <div className="glass-panel metric-card accent-networth">
-          <div className="metric-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className="metric-icon" style={{ width: '28px', height: '28px' }}><TrendingUp size={16} /></span>
-              {t(isArchive ? 'dash.archivedValue' : 'dash.netWorth')}
-            </span>
-            <div className="dashboard-periods" style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.05)', padding: '2px', borderRadius: '4px' }}>
-              {['7d', '30d', '1y', '5y'].map(p => (
-                <button 
-                  key={p} 
-                  type="button" 
-                  aria-pressed={timePeriod === p}
-                  onClick={() => setTimePeriod(p)}
-                  style={{
-                    padding: '2px 6px',
-                    fontSize: '0.65rem',
-                    border: 'none',
-                    borderRadius: '3px',
-                    background: timePeriod === p ? valueColor : 'transparent',
-                    color: 'var(--text-strong)',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  {p.toUpperCase()}
-                </button>
-              ))}
-            </div>
+      <div className="dashboard-summary">
+        <dl className="dashboard-summary-primary">
+          <div>
+            <dt>{t(cardLabel)}</dt>
+            <dd className="dashboard-summary-value">{cardCount.toLocaleString(locale)}</dd>
+            <dd className="dashboard-summary-note">{cardNote}</dd>
           </div>
-          <div className="metric-value">{currencySymbol()}{money(summary.totalValue)}</div>
-          {(() => {
-            const change = timePeriod === '7d' ? summary.change7d :
-                           timePeriod === '30d' ? summary.change30d :
-                           timePeriod === '1y' ? summary.change1y : summary.change5y;
-            // change7d/30d use Cardmarket's real avg7/avg30 (only real source
-            // available); change1y/5y have no real historical price source
-            // anywhere, so they're marked unavailable rather than faked.
-            if (!change || !change.available) {
-              return (
-                <div className="metric-footer" style={{ color: 'var(--text-muted)' }}>
-                  <span>{t('dash.noPriceHistory')}</span>
-                </div>
-              );
-            }
-            const isPositive = change.abs >= 0;
-            return (
-              <div className={`metric-footer ${isPositive ? 'positive' : 'negative'}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <TrendingUp size={12} style={{ transform: isPositive ? 'none' : 'rotate(180deg)' }} />
-                <span>
-                  {isPositive ? '+' : ''}{currencySymbol()}{money(change.abs)} ({isPositive ? '+' : ''}{change.pct}%)
-                </span>
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* Total Invested (cost basis) */}
-        <div className="glass-panel metric-card accent-invested">
-          <div className="metric-header">
-            <span>{t(isArchive ? 'dash.archivedCost' : 'dash.totalInvested')}</span>
-            <span className="metric-icon"><Coins size={18} /></span>
+          <div>
+            <dt>{t(isArchive ? 'dash.archivedValue' : 'dash.netWorth')}</dt>
+            <dd className="dashboard-summary-value">{currencySymbol()}{money(summary.totalValue)}</dd>
           </div>
-          <div className="metric-value">{currencySymbol()}{money(summary.totalSpent)}</div>
-          <div className="metric-footer">
-            <span>{t('dash.avgPerCard', { price: priceText(summary.avgCardValue) })}</span>
+        </dl>
+        <dl className="dashboard-summary-secondary">
+          <div>
+            <dt>{t(isArchive ? 'dash.archivedCost' : 'dash.totalInvested')}</dt>
+            <dd className="dashboard-summary-value">{currencySymbol()}{money(summary.totalSpent)}</dd>
+            <dd className="dashboard-summary-note">{t('dash.avgPerCard', { price: priceText(summary.avgCardValue) })}</dd>
           </div>
-        </div>
-
-        {/* Unrealized Gain / ROI */}
-        {(() => {
-          const roi = summary.roi || { abs: 0, pct: null };
-          const isPositive = (roi.abs || 0) >= 0;
-          return (
-            <div className={`glass-panel metric-card ${isPositive ? 'accent-gain-up' : 'accent-gain-down'}`}>
-              <div className="metric-header">
-                <span>{t(isArchive ? 'dash.archivedValueDifference' : 'dash.unrealizedGain')}</span>
-                <span className="metric-icon"><ArrowUpRight size={18} style={{ transform: isPositive ? 'none' : 'rotate(90deg)' }} /></span>
-              </div>
-              <div className="metric-value" style={{ color: isPositive ? '#22c55e' : '#ef4444' }}>
-                {isPositive ? '+' : '−'}{currencySymbol()}{money(Math.abs(roi.abs || 0))}
-              </div>
-              <div className="metric-footer">
-                <span>{roi.pct === null ? t(isArchive ? 'dash.archivedCostUnset' : 'dash.roiUnset') : t('dash.roiVsCost', { pct: `${isPositive ? '+' : ''}${roi.pct}` })}</span>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Each focused inventory view shows only its own total. */}
-        {inventoryFilter === 'all' && (
-          <div className="glass-panel metric-card accent-cards">
-            <div className="metric-header">
-              <span>{t('dash.totalCards')}</span>
-              <span className="metric-icon"><Library size={18} /></span>
-            </div>
-            <div className="metric-value">{summary.totalCards}</div>
-            <div className="metric-footer">
-              <span>{t('dash.uniqueCount', { count: summary.uniqueCards })}</span>
-            </div>
+          <div>
+            <dt>{t(isArchive ? 'dash.archivedValueDifference' : 'dash.unrealizedGain')}</dt>
+            <dd className={`dashboard-summary-value ${isPositive ? 'positive' : 'negative'}`}>
+              {isPositive ? '+' : '−'}{currencySymbol()}{money(Math.abs(roi.abs || 0))}
+            </dd>
+            <dd className="dashboard-summary-note">
+              {roi.pct === null ? t(isArchive ? 'dash.archivedCostUnset' : 'dash.roiUnset') : t('dash.roiVsCost', { pct: `${isPositive ? '+' : ''}${roi.pct}` })}
+            </dd>
           </div>
-        )}
-        {inventoryFilter === 'collection' && (
-          <div className="glass-panel metric-card accent-cards">
-            <div className="metric-header">
-              <span>{t('dash.physicalCards')}</span>
-              <span className="metric-icon"><Library size={18} /></span>
-            </div>
-            <div className="metric-value">{summary.physicalCards}</div>
-            <div className="metric-footer">
-              <span>{summary.unsortedCount > 0 ? t('dash.unsortedCount', { count: summary.unsortedCount }) : t('dash.physicalCards')}</span>
-            </div>
-          </div>
-        )}
-        {inventoryFilter === 'arena' && (
-          <div className="glass-panel metric-card accent-cards">
-            <div className="metric-header">
-              <span>{t('dash.digitalCards')}</span>
-              <span className="metric-icon"><Library size={18} /></span>
-            </div>
-            <div className="metric-value">{summary.digitalCards}</div>
-            <div className="metric-footer">
-              <span>{t('collection.arena')}</span>
-            </div>
-          </div>
-        )}
-        {isArchive && (
-          <div className="glass-panel metric-card accent-cards">
-            <div className="metric-header">
-              <span>{t('dash.archivedCards')}</span>
-              <span className="metric-icon"><Library size={18} /></span>
-            </div>
-            <div className="metric-value">{summary.archivedCards}</div>
-            <div className="metric-footer">
-              <span>{t('dash.uniqueCount', { count: summary.uniqueCards })}</span>
-            </div>
-          </div>
-        )}
+        </dl>
       </div>
 
-      {/* Net Worth History Timeline Chart */}
-      <div className="glass-panel dashboard-timeline" style={{ marginBottom: '1.5rem', padding: '1.5rem 1.75rem' }}>
-        <div className="dashboard-timeline-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 className="chart-title" style={{ margin: 0 }}>{t(isArchive ? 'dash.archiveTimelineTitle' : 'dash.timelineTitle')}</h3>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-            {t(isArchive ? 'dash.archiveTimelineRange' : 'dash.timelineRange', { range: timePeriod.toUpperCase() })}
-          </span>
+      <section className="dashboard-timeline view-section" aria-labelledby="dashboard-timeline-title">
+        <div className="dashboard-timeline-header">
+          <h2 id="dashboard-timeline-title" className="section-heading">{t(isArchive ? 'dash.archiveTimelineTitle' : 'dash.timelineTitle')}</h2>
+          <div className="sub-nav-tabs dashboard-periods" style={{ margin: 0 }}>
+            {['7d', '30d', '1y', '5y'].map(period => (
+              <button key={period} type="button" className={`sub-nav-tab ${timePeriod === period ? 'active' : ''}`}
+                aria-pressed={timePeriod === period} onClick={() => setTimePeriod(period)}>
+                {period.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="dashboard-history-context">
+          <span>{t(isArchive ? 'dash.archiveTimelineRange' : 'dash.timelineRange', { range: timePeriod.toUpperCase() })}</span>
+          {!change?.available ? <span>{t('dash.noPriceHistory')}</span> : (
+            <span className={change.abs >= 0 ? 'positive' : 'negative'}>
+              <TrendingUp aria-hidden="true" size={14} style={{ transform: change.abs >= 0 ? 'none' : 'rotate(180deg)' }} />
+              {change.abs >= 0 ? '+' : ''}{currencySymbol()}{money(change.abs)} ({change.abs >= 0 ? '+' : ''}{change.pct}%)
+            </span>
+          )}
         </div>
         {isArchive && <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>{t('dash.archiveTimelineNote')}</p>}
         <div className="chart-container" style={{ height: '240px', position: 'relative' }}>
           {loadingHistory ? (
-            <div className="spinner" style={{ position: 'absolute', top: '45%', left: '45%' }}></div>
+            <div role="status" aria-label={t('dash.loading')} className="spinner" style={{ position: 'absolute', top: '45%', left: '45%' }}></div>
           ) : historyData.length < 2 ? (
             <div className="chart-empty">{t('dash.notEnoughHistory')}</div>
           ) : (
@@ -353,18 +275,18 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
             </ResponsiveContainer>
           )}
         </div>
-      </div>
+      </section>
 
-      <DashboardAnalytics analytics={stats.analytics} inventory={inventoryFilter} />
-
-      {/* Main Charts & Analytics Details */}
-      <div className="dashboard-details">
+      <section className="dashboard-analytics view-section" aria-labelledby="dashboard-analytics-title">
+        <h2 id="dashboard-analytics-title" className="section-heading">{t('dash.analytics')}</h2>
+        <DashboardAnalytics analytics={stats.analytics} inventory={inventoryFilter} />
+        <div className="dashboard-details">
         {/* Left Column: Charts */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
           {/* Card Value by Set Chart */}
-          <div className="glass-panel">
-            <h3 className="chart-title">{t(isArchive ? 'dash.archiveValueBySet' : 'dash.valueBySet')}</h3>
+          <div className="dashboard-subsection view-section">
+            <h3 className="section-heading">{t(isArchive ? 'dash.archiveValueBySet' : 'dash.valueBySet')}</h3>
             <div className="chart-container dashboard-set-chart" role="region" aria-label={t(isArchive ? 'dash.archiveValueBySet' : 'dash.valueBySet')} tabIndex={0}>
               {sets.length === 0 ? (
                 <div className="chart-empty">{t('dash.noSetData')}</div>
@@ -389,8 +311,8 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
             {/* Type Distribution Donut Chart */}
-            <div className="glass-panel">
-              <h3 className="chart-title">{t(gameFilter === 'mtg' ? 'dash.colorDistribution' : 'dash.typeDistribution')}</h3>
+            <div className="dashboard-subsection view-section">
+              <h3 className="section-heading">{t(gameFilter === 'mtg' ? 'dash.colorDistribution' : 'dash.typeDistribution')}</h3>
               <div className="chart-container dashboard-donut" style={{ height: '220px' }}>
                 {typeChartData.length === 0 ? (
                   <div className="chart-empty">{t('dash.noTypeData')}</div>
@@ -430,8 +352,8 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
             </div>
 
             {/* Rarity Distribution Chart */}
-            <div className="glass-panel">
-              <h3 className="chart-title">{t('dash.rarityDistribution')}</h3>
+            <div className="dashboard-subsection view-section">
+              <h3 className="section-heading">{t('dash.rarityDistribution')}</h3>
               <div className="chart-container dashboard-donut" style={{ height: '220px' }}>
                 {rarityChartData.length === 0 ? (
                   <div className="chart-empty">{t('dash.noRarityData')}</div>
@@ -476,28 +398,23 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
           {/* Top Valuable Cards */}
-          <div className="glass-panel" style={{ flex: 1 }}>
-            <h3 className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Trophy size={18} style={{ color: 'var(--accent-yellow)' }} />
+          <div className="dashboard-subsection view-section" style={{ flex: 1 }}>
+            <h3 className="section-heading">
               {t(isArchive ? 'dash.archiveTopValuable' : 'dash.topValuable')}
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.25rem' }}>
               {topValuable.map((card, idx) => (
-                <div 
-                  key={idx} 
+                <button
+                  type="button" key={idx}
                   onClick={() => setInspectorCard(card)}
                   style={{ 
                     display: 'flex', 
                     gap: '0.75rem', 
                     alignItems: 'center', 
-                    background: 'rgba(255, 255, 255, 0.02)', 
-                    padding: '0.5rem', 
-                    borderRadius: 'var(--radius-sm)', 
-                    border: '1px solid var(--border-glass)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
+                    padding: '0.5rem 0',
+                    cursor: 'pointer'
                   }}
-                  className="dashboard-card-clickable"
+                  className="dashboard-card-clickable dashboard-card-row"
                 >
                   <CardImage card={card} style={{ width: '56px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }} />
                   <div className="dashboard-card-description" style={{ flex: 1, overflow: 'hidden' }}>
@@ -519,25 +436,24 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                       {card.quantity > 1 ? t('dash.qtyTotal', { qty: card.quantity, price: priceText(card.price_trend * card.quantity) }) : t('dash.qty', { qty: 1 })}
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
 
           {/* Recent Additions */}
           {recentAdditions.length > 0 && (
-            <div className="glass-panel" style={{ flex: 1 }}>
-              <h3 className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Plus size={18} style={{ color: 'var(--accent-blue)' }} />
+            <div className="dashboard-subsection view-section" style={{ flex: 1 }}>
+              <h3 className="section-heading">
                 {t(isArchive ? 'dash.archiveRecentAdditions' : 'dash.recentAdditions')}
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '1.25rem' }}>
                 {recentAdditions.map((card, idx) => (
-                  <div
-                    key={idx}
+                  <button
+                    type="button" key={idx}
                     onClick={() => setInspectorCard(card)}
-                    style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: 'rgba(255, 255, 255, 0.02)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', cursor: 'pointer', transition: 'all 0.2s ease' }}
-                    className="dashboard-card-clickable"
+                    style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', padding: '0.5rem 0', cursor: 'pointer' }}
+                    className="dashboard-card-clickable dashboard-card-row"
                   >
                     <CardImage card={card} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }} />
                     <div className="dashboard-card-description" style={{ flex: 1, overflow: 'hidden' }}>
@@ -557,7 +473,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                       <div style={{ fontWeight: 700, color: 'var(--accent-yellow)', fontSize: '0.8rem' }}>{priceText(card.price_trend)}<span style={{ fontSize: '0.55rem', fontWeight: 500, color: 'var(--text-muted)' }}> {t('dash.each')}</span></div>
                       <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{card.quantity > 1 ? t('dash.qty', { qty: card.quantity }) : (card.added_at ? new Date(card.added_at).toLocaleDateString(locale) : '')}</div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -565,8 +481,8 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
 
           {/* Set Completion progress tracker */}
           {setProgress.length > 0 && (
-            <div className="glass-panel">
-              <h3 className="chart-title">{t(isArchive ? 'dash.archiveSetProgress' : 'dash.setProgress')}</h3>
+            <div className="dashboard-subsection view-section">
+              <h3 className="section-heading">{t(isArchive ? 'dash.archiveSetProgress' : 'dash.setProgress')}</h3>
               <div className="set-progress-grid" style={{ marginTop: '1rem' }}>
                 {setProgress.map((set, idx) => (
                   <div key={idx} className="set-progress-item">
@@ -585,6 +501,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
 
         </div>
       </div>
+      </section>
 
       {/* Card Inspector Modal Overlay */}
       <CardInspectorModal

@@ -4,7 +4,7 @@
 
 # Manafolio
 
-**Your collection. Every card accounted for. Build something awesome.**
+**Magic collection, storage, and decks on your own server.**
 
 Self-hosted collection, storage, and deck manager for Magic: The Gathering.
 
@@ -26,7 +26,7 @@ Manafolio was originally forked from [Bindarr](https://github.com/thenotoriousJe
 - **Import, export, and backup.** Review CSV and ManaBox imports, export the current collection view or decklists, and move an account with a complete JSON backup. Automatic SQLite snapshots support server-level recovery.
 - **Optional AI.** Use your own ChatGPT/Codex account or an Ollama service for inventory-aware suggestions and deck improvements. Review and edit drafts before saving; the collection and deck workflows do not require AI.
 - **Your own server.** Multi-user accounts, roles, invite-only registration by default, read-only API keys, optional public shares, account themes, and translated interfaces. Access the same server from desktop and phone browsers.
-- **Arcane Blue design.** A responsive, midnight-blue interface with metallic branding, readable card galleries, and desktop/mobile navigation. Other account themes remain available.
+- **Mana-inspired themes.** Arcane Blue and Jenny remain available alongside Plains, Island, Swamp, Mountain, Forest, and Wastes palettes. Each retains layered surfaces, metallic branding, and desktop/mobile navigation. Choose your account theme in Settings; removed Light, Magic, and LCARS selections fall back to Arcane Blue.
 - **Camera scanning · Beta.** Identify candidates from card artwork with local models and catalog data, with footer OCR and automatic-add safety checks. Review uncertain printings manually; scanning needs additional server assets and HTTPS on phones.
 
 ## At a glance

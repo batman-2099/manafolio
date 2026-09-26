@@ -21,6 +21,8 @@
   
   /* Shared interface accent colors */
   --accent-green: #4ade80;
+  --text-positive: #4ade80;
+  --text-negative: #f87171;
 
   /* Semantic surface/foreground tokens. These back the values components used
      to hardcode (#fff text, white overlay fills, dark input bg) so themes can
@@ -47,10 +49,17 @@
   /* Shadows and Transitions */
   --shadow-glow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   --shadow-accent: 0 0 15px var(--accent-red-glow);
-  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --transition-smooth: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease, transform 160ms var(--ease-out), scale 120ms var(--ease-out);
   --radius-sm: 8px;
   --radius-md: 16px;
   --radius-lg: 24px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
 }
 
 /* ------------------------------------------------------------------ THEMES */
@@ -96,479 +105,164 @@
   box-shadow: 0 6px 20px var(--accent-red-glow);
 }
 
-/* Light */
-:root[data-theme="light"] {
-  --bg-primary: #eef2f7;
-  --bg-secondary: #ffffff;
-  --bg-glass: rgba(255, 255, 255, 0.75);
-  --border-glass: rgba(15, 23, 42, 0.1);
-  --border-glass-hover: rgba(15, 23, 42, 0.22);
-
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
-  --text-strong: #0f172a;
-  --text-on-accent: #ffffff;
-
-  --logo-spine: #dc2626;
-  --logo-ring-stroke: #1e293b;
-  --logo-ring-inner: #ffffff;
-
-  --surface-1: rgba(15, 23, 42, 0.03);
-  --surface-2: rgba(15, 23, 42, 0.06);
-  --surface-3: rgba(15, 23, 42, 0.09);
-  --input-bg: rgba(15, 23, 42, 0.04);
-  --input-bg-focus: rgba(15, 23, 42, 0.07);
-
-  --shadow-glow: 0 8px 32px 0 rgba(15, 23, 42, 0.12);
-  --bg-gradient:
-    radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(239, 68, 68, 0.07) 0px, transparent 50%),
-    radial-gradient(at 50% 50%, #ffffff 0px, var(--bg-primary) 100%);
+/* Mana palettes retain the Arcane layout, with dark surfaces for card artwork. */
+:root[data-theme="mana-white"] {
+  --bg-primary: #191710;
+  --bg-secondary: #272319;
+  --bg-glass: #302b20;
+  --border-glass: #5c5139;
+  --border-glass-hover: #9d8960;
+  --text-primary: #faf4e4;
+  --text-secondary: #d7ccb3;
+  --text-muted: #c0b394;
+  --text-strong: #fff9ea;
+  --accent-red: #edcf8c;
+  --accent-blue: #e6dbbb;
+  --accent-yellow: #f4dfa9;
+  --surface-1: #302b20;
+  --surface-2: #3a3325;
+  --surface-3: #4b412d;
+  --input-bg: #1d1a12;
+  --input-bg-focus: #2b261b;
 }
 
-/* Magic: The Gathering (MTG) — Planeswalker & Arcane Mana obsidian/slate with mythic gold & mana glows */
-:root[data-theme="mtg"] {
-  --font-main: 'Crimson Pro', 'Outfit', Georgia, serif;
-
-  --bg-primary: #0a0b10;
-  --bg-secondary: #121520;
-  --bg-glass: rgba(18, 21, 32, 0.82);
-  --border-glass: rgba(217, 119, 6, 0.3);
-  --border-glass-hover: #f59e0b;
-
-  --text-primary: #f8fafc;
-  --text-secondary: #9cb0c9;
-  --text-muted: #627288;
-  --text-strong: #fef3c7;
-  --text-on-accent: #ffffff;
-
-  --accent-red: #ea580c;
-  --accent-red-glow: rgba(234, 88, 12, 0.5);
-  --accent-blue: #0284c7;
-  --accent-blue-glow: rgba(2, 132, 199, 0.5);
-  --accent-yellow: #f59e0b;
-  --accent-yellow-glow: rgba(245, 158, 11, 0.5);
-
-  --logo-spine: #92400e;
-  --logo-ring-stroke: #18181b;
-  --logo-ring-inner: #f59e0b;
-
-  --surface-1: rgba(245, 158, 11, 0.05);
-  --surface-2: rgba(245, 158, 11, 0.09);
-  --surface-3: rgba(245, 158, 11, 0.16);
-  --input-bg: rgba(10, 11, 16, 0.75);
-  --input-bg-focus: rgba(18, 21, 32, 0.95);
-
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-
-  --shadow-glow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
-  --bg-gradient:
-    radial-gradient(circle at 15% 15%, rgba(147, 51, 234, 0.15) 0px, transparent 50%),
-    radial-gradient(circle at 85% 85%, rgba(217, 119, 6, 0.18) 0px, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(18, 21, 32, 0.95) 0px, var(--bg-primary) 100%);
+:root[data-theme="mana-blue"] {
+  --bg-primary: #071c25;
+  --bg-secondary: #0d2b37;
+  --bg-glass: #123543;
+  --border-glass: #285567;
+  --border-glass-hover: #5794ac;
+  --text-primary: #e7f8ff;
+  --text-secondary: #b4d9e5;
+  --text-muted: #9cc3d2;
+  --text-strong: #f1fcff;
+  --accent-red: #71d9f2;
+  --accent-blue: #85bfff;
+  --accent-yellow: #b9e9f5;
+  --surface-1: #123543;
+  --surface-2: #194354;
+  --surface-3: #225469;
+  --input-bg: #091f2a;
+  --input-bg-focus: #103440;
 }
 
-
-
-:root[data-theme="mtg"] h1,
-:root[data-theme="mtg"] h2,
-:root[data-theme="mtg"] h3,
-:root[data-theme="mtg"] h4 {
-  font-family: 'Cinzel Decorative', 'Cinzel', serif;
-  letter-spacing: 0.05em;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #fef3c7;
-  text-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+:root[data-theme="mana-black"] {
+  --bg-primary: #15111b;
+  --bg-secondary: #241c2f;
+  --bg-glass: #2d2339;
+  --border-glass: #52415f;
+  --border-glass-hover: #927ca4;
+  --text-primary: #f2edf7;
+  --text-secondary: #d0bfdc;
+  --text-muted: #bda9cc;
+  --text-strong: #fbf4ff;
+  --accent-red: #c4a3e8;
+  --accent-blue: #a5b6e8;
+  --accent-yellow: #ded0eb;
+  --surface-1: #2d2339;
+  --surface-2: #3a2d47;
+  --surface-3: #4a385c;
+  --input-bg: #191320;
+  --input-bg-focus: #291f34;
 }
 
-:root[data-theme="mtg"] .chart-title::before {
-  background: linear-gradient(180deg, #f59e0b 0%, #ea580c 100%);
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+:root[data-theme="mana-red"] {
+  --bg-primary: #260b10;
+  --bg-secondary: #3b1019;
+  --bg-glass: #491420;
+  --border-glass: #823447;
+  --border-glass-hover: #d97589;
+  --text-primary: #fff0f2;
+  --text-secondary: #f0c2cc;
+  --text-muted: #dfa6b3;
+  --text-strong: #fff7f8;
+  --accent-red: #ff8198;
+  --accent-blue: #ff657d;
+  --accent-yellow: #ffb5c2;
+  --surface-1: #491420;
+  --surface-2: #601c2b;
+  --surface-3: #792337;
+  --input-bg: #300c15;
+  --input-bg-focus: #48131f;
 }
 
-:root[data-theme="mtg"] select,
-:root[data-theme="mtg"] .select-control {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  font-family: var(--font-main);
-  font-weight: 600;
-  font-size: 1.05rem;
-  color: var(--text-primary);
-  background-color: var(--bg-secondary);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23f59e0b' d='M0 0l6 8 6-8z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  padding-right: 2.2rem !important;
-  border: 1.5px solid var(--border-glass);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 0 8px rgba(217, 119, 6, 0.15);
-  transition: all 0.2s ease;
+:root[data-theme="mana-green"] {
+  --bg-primary: #101c16;
+  --bg-secondary: #1b2d22;
+  --bg-glass: #233a2b;
+  --border-glass: #3e6048;
+  --border-glass-hover: #7d9e70;
+  --text-primary: #edf7e9;
+  --text-secondary: #c3d9b9;
+  --text-muted: #abc39f;
+  --text-strong: #f5ffec;
+  --accent-red: #add58c;
+  --accent-blue: #7fcbb2;
+  --accent-yellow: #d7dea3;
+  --surface-1: #233a2b;
+  --surface-2: #2d4934;
+  --surface-3: #3b5c3f;
+  --input-bg: #14231a;
+  --input-bg-focus: #203727;
 }
 
-:root[data-theme="mtg"] select:focus,
-:root[data-theme="mtg"] .select-control:focus {
-  border-color: #f59e0b;
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.45);
-  background-color: var(--bg-primary);
+:root[data-theme="mana-colorless"] {
+  --bg-primary: #171b20;
+  --bg-secondary: #252c34;
+  --bg-glass: #2d3640;
+  --border-glass: #505e6c;
+  --border-glass-hover: #8d9cab;
+  --text-primary: #f0f3f6;
+  --text-secondary: #ccd4dc;
+  --text-muted: #b1bdc9;
+  --text-strong: #fbfdff;
+  --accent-red: #d3dce5;
+  --accent-blue: #aebfd0;
+  --accent-yellow: #e2ded3;
+  --surface-1: #2d3640;
+  --surface-2: #3a4551;
+  --surface-3: #495766;
+  --input-bg: #1c2229;
+  --input-bg-focus: #2b343e;
 }
 
-:root[data-theme="mtg"] .input-control:focus {
-  border-color: #f59e0b;
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
-}
+:root:is([data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) {
+  color-scheme: dark;
+  --text-on-accent: var(--bg-primary);
+  --accent-red-glow: color-mix(in srgb, var(--accent-red) 22%, transparent);
+  --accent-blue-glow: color-mix(in srgb, var(--accent-blue) 18%, transparent);
+  --accent-yellow-glow: color-mix(in srgb, var(--accent-yellow) 18%, transparent);
+  --accent-green: #a3dab3;
+  --text-positive: #a3dab3;
+  --text-negative: #ffaaa1;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --shadow-glow: 0 12px 28px rgba(0, 0, 0, 0.32), inset 0 1px 0 color-mix(in srgb, var(--text-strong) 8%, transparent);
+  --shadow-accent: 0 3px 14px var(--accent-blue-glow);
+  --bg-gradient: radial-gradient(ellipse at 12% 0%, color-mix(in srgb, var(--accent-red) 12%, transparent), transparent 55%), radial-gradient(ellipse at 95% 70%, color-mix(in srgb, var(--accent-blue) 8%, transparent), transparent 55%);
 
-:root[data-theme="mtg"] select option,
-:root[data-theme="mtg"] .select-control option {
-  background-color: #121520;
-  color: #fef3c7;
-  font-family: var(--font-main);
-  padding: 0.5rem;
-}
-
-:root[data-theme="mtg"] .btn-primary {
-  background: linear-gradient(135deg, #ea580c 0%, #d97706 50%, #b45309 100%);
-  border: 1px solid #f59e0b;
-  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.4), inset 0 1px 1px rgba(254, 243, 199, 0.4);
-  font-family: 'Cinzel', serif;
-  letter-spacing: 0.06em;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #ffffff;
-}
-
-:root[data-theme="mtg"] .btn-primary:hover {
-  background: linear-gradient(135deg, #f97316 0%, #f59e0b 50%, #d97706 100%);
-  box-shadow: 0 6px 24px rgba(245, 158, 11, 0.6), 0 0 14px rgba(234, 88, 12, 0.4);
-  border-color: #fef3c7;
-}
-
-:root[data-theme="mtg"] .kebab-dropdown,
-:root[data-theme="mtg"] .dropdown-menu {
-  background-color: #121520;
-  border: 1.5px solid #d97706;
-  border-radius: var(--radius-sm);
-  box-shadow: 0 0 18px rgba(217, 119, 6, 0.35);
-}
-
-:root[data-theme="mtg"] .kebab-item,
-:root[data-theme="mtg"] .dropdown-item {
-  font-family: var(--font-main);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-:root[data-theme="mtg"] .kebab-item:hover,
-:root[data-theme="mtg"] .dropdown-item:hover {
-  background: rgba(217, 119, 6, 0.2);
-  color: #fef3c7;
-}
-
-:root[data-theme="mtg"] .glass-panel,
-:root[data-theme="mtg"] .metric-card {
-  border: 1px solid rgba(217, 119, 6, 0.3);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(245, 158, 11, 0.1);
-  border-radius: var(--radius-md);
-}
-
-:root[data-theme="mtg"] .nav-tab.active,
-:root[data-theme="mtg"] .sub-nav-tab.active {
-  background: linear-gradient(135deg, #161926 0%, #231b2e 100%);
-  border-color: #f59e0b;
-  box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
-  color: #fef3c7;
-}
-
-:root[data-theme="mtg"] .tcg-card:hover .tcg-card-inner {
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.7), 0 0 20px rgba(245, 158, 11, 0.45);
-  border-color: #f59e0b;
-}
-
-:root[data-theme="mtg"] .set-progress-bar-fill {
-  background: linear-gradient(90deg, #ea580c 0%, #f59e0b 100%);
-}
-
-
-/* Disney Lorcana — Inkwell & Glimmer midnight royal indigo with glowing amber lore & amethyst ink */
-:root[data-theme="lorcana"] {
-  --font-main: 'Philosopher', 'Outfit', Georgia, serif;
-
-  --bg-primary: #070514;
-  --bg-secondary: #110d24;
-  --bg-glass: rgba(17, 13, 36, 0.82);
-  --border-glass: rgba(168, 85, 247, 0.28);
-  --border-glass-hover: #fbbf24;
-
-  --text-primary: #f5f3ff;
-  --text-secondary: #c4b5fd;
-  --text-muted: #8574a7;
-  --text-strong: #faf5ff;
-  --text-on-accent: #ffffff;
-
-  --accent-red: #ec4899;
-  --accent-red-glow: rgba(236, 72, 153, 0.5);
-  --accent-blue: #06b6d4;
-  --accent-blue-glow: rgba(6, 182, 212, 0.5);
-  --accent-yellow: #fbbf24;
-  --accent-yellow-glow: rgba(251, 191, 36, 0.5);
-
-  --logo-spine: #5b21b6;
-  --logo-ring-stroke: #120f24;
-  --logo-ring-inner: #fbbf24;
-
-  --surface-1: rgba(168, 85, 247, 0.05);
-  --surface-2: rgba(168, 85, 247, 0.09);
-  --surface-3: rgba(168, 85, 247, 0.16);
-  --input-bg: rgba(7, 5, 20, 0.75);
-  --input-bg-focus: rgba(17, 13, 36, 0.95);
-
-  --radius-sm: 10px;
-  --radius-md: 18px;
-  --radius-lg: 28px;
-
-  --shadow-glow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
-  --bg-gradient:
-    radial-gradient(circle at 10% 10%, rgba(124, 58, 237, 0.22) 0px, transparent 50%),
-    radial-gradient(circle at 90% 90%, rgba(251, 191, 36, 0.16) 0px, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(17, 13, 36, 0.95) 0px, var(--bg-primary) 100%);
-}
-
-
-
-:root[data-theme="lorcana"] h1,
-:root[data-theme="lorcana"] h2,
-:root[data-theme="lorcana"] h3,
-:root[data-theme="lorcana"] h4 {
-  font-family: 'Philosopher', 'Cinzel Decorative', serif;
-  letter-spacing: 0.02em;
-  font-weight: 700;
-  color: #faf5ff;
-  text-shadow: 0 0 16px rgba(168, 85, 247, 0.5), 0 0 30px rgba(251, 191, 36, 0.25);
-}
-
-:root[data-theme="lorcana"] .chart-title::before {
-  background: linear-gradient(180deg, #fbbf24 0%, #7c3aed 100%);
-  box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
-}
-
-:root[data-theme="lorcana"] select,
-:root[data-theme="lorcana"] .select-control {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  font-family: var(--font-main);
-  font-weight: 600;
-  font-size: 1.05rem;
-  color: var(--text-primary);
-  background-color: var(--bg-secondary);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23fbbf24' d='M0 0l6 8 6-8z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  padding-right: 2.2rem !important;
-  border: 1.5px solid var(--border-glass);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 0 8px rgba(168, 85, 247, 0.15);
-  transition: all 0.2s ease;
-}
-
-:root[data-theme="lorcana"] select:focus,
-:root[data-theme="lorcana"] .select-control:focus {
-  border-color: #fbbf24;
-  box-shadow: 0 0 14px rgba(251, 191, 36, 0.4), 0 0 8px rgba(168, 85, 247, 0.3);
-  background-color: var(--bg-primary);
-}
-
-:root[data-theme="lorcana"] .input-control:focus {
-  border-color: #a855f7;
-  box-shadow: 0 0 12px rgba(168, 85, 247, 0.4);
-}
-
-:root[data-theme="lorcana"] select option,
-:root[data-theme="lorcana"] .select-control option {
-  background-color: #110d24;
-  color: #faf5ff;
-  font-family: var(--font-main);
-  padding: 0.5rem;
-}
-
-:root[data-theme="lorcana"] .btn-primary {
-  background: linear-gradient(135deg, #7c3aed 0%, #9333ea 50%, #d97706 100%);
-  border: 1px solid rgba(251, 191, 36, 0.5);
-  box-shadow: 0 4px 18px rgba(124, 58, 237, 0.45), 0 0 12px rgba(251, 191, 36, 0.2);
-  font-family: 'Philosopher', 'Cinzel', serif;
-  letter-spacing: 0.04em;
-  font-weight: 700;
-  border-radius: var(--radius-md);
-  color: #ffffff;
-}
-
-:root[data-theme="lorcana"] .btn-primary:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 50%, #f59e0b 100%);
-  box-shadow: 0 6px 26px rgba(168, 85, 247, 0.6), 0 0 16px rgba(251, 191, 36, 0.4);
-  border-color: #fbbf24;
-}
-
-:root[data-theme="lorcana"] .kebab-dropdown,
-:root[data-theme="lorcana"] .dropdown-menu {
-  background-color: #110d24;
-  border: 1.5px solid #a855f7;
-  border-radius: var(--radius-md);
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.35), 0 0 10px rgba(251, 191, 36, 0.2);
-}
-
-:root[data-theme="lorcana"] .kebab-item,
-:root[data-theme="lorcana"] .dropdown-item {
-  font-family: var(--font-main);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-:root[data-theme="lorcana"] .kebab-item:hover,
-:root[data-theme="lorcana"] .dropdown-item:hover {
-  background: rgba(168, 85, 247, 0.2);
-  color: #faf5ff;
-}
-
-:root[data-theme="lorcana"] .glass-panel,
-:root[data-theme="lorcana"] .metric-card {
-  border: 1px solid rgba(168, 85, 247, 0.25);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(251, 191, 36, 0.08);
-  border-radius: var(--radius-md);
-}
-
-:root[data-theme="lorcana"] .nav-tab.active,
-:root[data-theme="lorcana"] .sub-nav-tab.active {
-  background: linear-gradient(135deg, #1a1236 0%, #2d184d 100%);
-  border-color: #a855f7;
-  box-shadow: 0 0 16px rgba(168, 85, 247, 0.4), 0 0 8px rgba(251, 191, 36, 0.2);
-  color: #faf5ff;
-  border-radius: var(--radius-md);
-}
-
-:root[data-theme="lorcana"] .tcg-card:hover .tcg-card-inner {
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.7), 0 0 20px rgba(168, 85, 247, 0.5), 0 0 10px rgba(251, 191, 36, 0.3);
-  border-color: #fbbf24;
-}
-
-:root[data-theme="lorcana"] .set-progress-bar-fill {
-  background: linear-gradient(90deg, #7c3aed 0%, #fbbf24 100%);
-}
-
-
-/* LCARS (Star Trek) — palette + font reskin on the current layout. Amber text
-   on black, colored accents, condensed uppercase headings, pill radii. */
-:root[data-theme="lcars"] {
-  --font-main: 'Antonio', 'Outfit', system-ui, sans-serif;
-
-  --bg-primary: #000000;
-  --bg-secondary: #0d0d0d;
-  --bg-glass: rgba(18, 18, 18, 0.72);
-  --border-glass: rgba(255, 153, 0, 0.35);
-  --border-glass-hover: #ff9900;
-
-  --text-primary: #ff9900;
-  --text-secondary: #cc99cc;
-  --text-muted: #9999cc;
-  --text-strong: #ffcc99;
-  --text-on-accent: #000000;
-
-  --accent-red: #cc6666;
-  --accent-red-glow: rgba(204, 102, 102, 0.4);
-  --accent-blue: #9999ff;
-  --accent-blue-glow: rgba(153, 153, 255, 0.4);
-  --accent-yellow: #ffcc00;
-  --accent-yellow-glow: rgba(255, 204, 0, 0.4);
-
-  --logo-spine: #cc6633;
-  --logo-ring-stroke: #000000;
-  --logo-ring-inner: #ffcc00;
-
-  --surface-1: rgba(255, 153, 0, 0.06);
-  --surface-2: rgba(255, 153, 0, 0.1);
-  --surface-3: rgba(255, 153, 0, 0.16);
-  --input-bg: rgba(255, 153, 0, 0.06);
-  --input-bg-focus: rgba(255, 153, 0, 0.12);
-
-  --shadow-glow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
-  --radius-sm: 4px;
-  --radius-md: 10px;
-  --radius-lg: 999px;
-  --bg-gradient: none;
-}
-
-
-
-:root[data-theme="lcars"] h1,
-:root[data-theme="lcars"] h2,
-:root[data-theme="lcars"] h3 {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-:root[data-theme="lcars"] select,
-:root[data-theme="lcars"] .select-control {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  font-family: var(--font-main);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-primary);
-  background-color: var(--bg-secondary);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23ff9900' d='M0 0l6 8 6-8z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  padding-right: 2.2rem !important;
-  border: 1.5px solid var(--border-glass);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 0 8px rgba(255, 153, 0, 0.15);
-  transition: all 0.2s ease;
-}
-
-:root[data-theme="lcars"] select:focus,
-:root[data-theme="lcars"] .select-control:focus {
-  border-color: var(--border-glass-hover);
-  box-shadow: 0 0 12px rgba(255, 153, 0, 0.4);
-  background-color: var(--bg-primary);
-}
-
-:root[data-theme="lcars"] select option,
-:root[data-theme="lcars"] .select-control option {
-  background-color: #0d0d0d;
-  color: #ff9900;
-  font-family: var(--font-main);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.5rem;
-}
-
-:root[data-theme="lcars"] .kebab-dropdown,
-:root[data-theme="lcars"] .dropdown-menu {
-  background-color: #0d0d0d;
-  border: 1.5px solid var(--border-glass-hover);
-  border-radius: var(--radius-md);
-  box-shadow: 0 0 16px rgba(255, 153, 0, 0.35);
-}
-
-:root[data-theme="lcars"] .kebab-item,
-:root[data-theme="lcars"] .dropdown-item {
-  font-family: var(--font-main);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-primary);
-}
-
-:root[data-theme="lcars"] .kebab-item:hover,
-:root[data-theme="lcars"] .dropdown-item:hover {
-  background: rgba(255, 153, 0, 0.2);
-  color: var(--text-strong);
+  /* Layered controls share geometry with Arcane Blue, not its blue literals. */
+  --arcane-nav-bg: linear-gradient(180deg, var(--surface-3), var(--surface-2));
+  --arcane-nav-border: var(--border-glass-hover);
+  --arcane-highlight: color-mix(in srgb, var(--text-strong) 20%, transparent);
+  --arcane-panel-start: var(--surface-2);
+  --arcane-primary-bg: linear-gradient(180deg, var(--accent-yellow), var(--accent-red));
+  --arcane-primary-hover-bg: linear-gradient(180deg, var(--text-strong), var(--accent-yellow));
+  --arcane-primary-text: var(--text-on-accent);
+  --arcane-primary-border: var(--accent-yellow);
+  --arcane-primary-hover-border: var(--text-strong);
+  --arcane-secondary-bg: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  --arcane-control-border: var(--border-glass-hover);
+  --arcane-secondary-text: var(--text-primary);
+  --arcane-focus: var(--accent-yellow);
+  --arcane-shadow-rgb: 0, 0, 0;
+  --arcane-table-bg: var(--surface-1);
+  --arcane-table-text: var(--text-secondary);
+  --arcane-active-bg: var(--surface-3);
+  --arcane-active-border: var(--accent-red);
+  --arcane-dashboard-start: var(--surface-2);
+  --arcane-dashboard-end: var(--bg-secondary);
 }
 
 
@@ -621,6 +315,17 @@ button, input, select, textarea {
   color: inherit;
 }
 
+:is(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .btn:not(:disabled):not([aria-disabled="true"]):not(:focus-visible):active {
+    scale: 0.98;
+  }
+}
+
 /* App Containers */
 .app-container {
   display: flex;
@@ -642,6 +347,104 @@ button, input, select, textarea {
     padding: 1.5rem 2rem;
   }
 }
+/* Shared task layout: headings and tools sit on the page, not inside cards. */
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.page-title { font-size: 1.5rem; line-height: 1.3; margin: 0; }
+.section-heading { font-size: 1.125rem; line-height: 1.4; margin: 0 0 var(--space-3); }
+.view-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  min-width: 0;
+}
+.view-toolbar > .sub-nav-tabs { width: auto; max-width: 100%; overflow-x: auto; }
+.view-toolbar .sub-nav-tab { padding: 0.5rem 0.75rem; min-height: 44px; white-space: nowrap; }
+.view-section {
+  display: block;
+  min-width: 0;
+  border-top: 1px solid var(--border-glass);
+  padding-top: var(--space-6);
+  margin-top: var(--space-6);
+}
+.view-section > p { max-width: 75ch; }
+.settings-page { width: 100%; }
+.settings-page .form-group label,
+.login-form .form-group label { text-transform: none; letter-spacing: 0; }
+.view-toolbar :is(.btn, select, input),
+.page-heading .btn { min-height: 44px; }
+.collection-inventory-nav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.collection-inventory-nav .sub-nav-tab { flex: 0 0 auto; white-space: nowrap; min-height: 44px; }
+.collection-filter-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 2.5fr) minmax(150px, 1fr) auto;
+  gap: var(--space-3);
+  align-items: end;
+}
+.ci-storage-link[role="button"]:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
+.dashboard-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--space-8);
+  margin-bottom: var(--space-6);
+}
+.dashboard-summary-primary,
+.dashboard-summary-secondary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+.dashboard-summary dl > div { min-width: 0; }
+.dashboard-summary dt { color: var(--text-secondary); font-size: 0.875rem; }
+.dashboard-summary dd { margin: 0; }
+.dashboard-summary-value {
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.dashboard-summary-secondary .dashboard-summary-value { font-size: 1.25rem; }
+.dashboard-summary-note { color: var(--text-secondary); font-size: 0.875rem; line-height: 1.4; margin-top: var(--space-2); }
+.dashboard-timeline-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.sub-nav-tabs.dashboard-periods { display: flex; gap: var(--space-1); width: auto; max-width: 100%; }
+.dashboard-periods button { min-height: 44px; min-width: 44px; padding: 0.5rem 0.75rem; }
+.dashboard-history-context { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: 0.875rem; color: var(--text-secondary); margin: var(--space-3) 0; }
+.dashboard-history-context > span { display: inline-flex; align-items: center; gap: var(--space-1); }
+.dashboard-summary .positive,
+.dashboard-history-context .positive { color: var(--text-positive); }
+.dashboard-summary .negative,
+.dashboard-history-context .negative { color: var(--text-negative); }
+.dashboard-analytics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6); margin: var(--space-4) 0; min-width: 0; }
+.dashboard-subsection { min-width: 0; }
+.dashboard-card-row { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--border-glass); border-radius: 0; color: inherit; font: inherit; text-align: left; }
+.deck-overview-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.deck-overview-actions .btn { font-size: 0.875rem; padding: 0.5rem; min-height: 44px; }
+.deck-overview-actions .btn-icon-only { min-width: 44px; }
+@media (max-width: 768px) {
+  .dashboard-summary { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+  .dashboard-summary-value { font-size: 1.75rem; }
+  .dashboard-analytics-grid { grid-template-columns: minmax(0, 1fr); }
+  .view-toolbar :is(input, select), .login-form input { font-size: 1rem; }
+}
+@media (max-width: 600px) {
+  .collection-filter-toolbar { grid-template-columns: minmax(0, 1fr) auto; }
+  .collection-filter-toolbar > :first-child { grid-column: 1 / -1; }
+}
+
 
 /* Shared full-screen modal backdrop. Safe-area padding keeps the centered
    dialog clear of display cutouts and home indicators. Each modal keeps its own
@@ -654,6 +457,66 @@ button, input, select, textarea {
     max(1rem, env(safe-area-inset-right, 0px))
     max(1rem, env(safe-area-inset-bottom, 0px))
     max(1rem, env(safe-area-inset-left, 0px));
+}
+
+dialog.modal-overlay {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  color: inherit;
+}
+
+dialog.modal-overlay:not([open]) {
+  display: none !important;
+}
+
+dialog.modal-overlay::backdrop {
+  background: transparent;
+}
+
+button.tcg-card,
+button.ci-image-wrap,
+button.collection-card-trigger {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.collection-export {
+  position: relative;
+}
+
+.collection-export > summary {
+  list-style: none;
+}
+
+.collection-export > summary::-webkit-details-marker {
+  display: none;
+}
+
+.collection-export-options {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 12rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-glass-hover);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-glow);
+  z-index: 30;
 }
 
 /* Glassmorphic Panel Component */
@@ -743,19 +606,6 @@ button, input, select, textarea {
   text-shadow: none;
 }
 
-.logo-tagline span {
-  background-image: linear-gradient(180deg, #f0f8ff 10%, #d8efff 42%, #89b4d4 52%, #c5e5ff 90%);
-  background-clip: text;
-  -webkit-background-clip: text;
-}
-
-.logo-tagline span:nth-child(2) {
-  background-image: linear-gradient(180deg, #c5edff 10%, #89c6f2 42%, #438bc2 52%, #8fd3ff 90%);
-}
-
-.logo-tagline span:nth-child(3) {
-  background-image: linear-gradient(180deg, #96cdff 10%, #5eacfa 42%, #3274c3 52%, #6aaeff 90%);
-}
 
 /* Premium Buttons */
 .btn {
@@ -779,10 +629,11 @@ button, input, select, textarea {
   box-shadow: 0 4px 15px rgba(255, 71, 71, 0.3);
 }
 
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 71, 71, 0.5);
-  background: linear-gradient(135deg, #ff5757 0%, var(--accent-red) 100%);
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .btn-primary:not(:disabled):not([aria-disabled="true"]):hover {
+    box-shadow: 0 6px 20px rgba(255, 71, 71, 0.5);
+    background: linear-gradient(135deg, #ff5757 0%, var(--accent-red) 100%);
+  }
 }
 
 .btn-secondary {
@@ -791,10 +642,11 @@ button, input, select, textarea {
   color: var(--text-primary);
 }
 
-.btn-secondary:hover {
-  background: var(--surface-2);
-  border-color: var(--border-glass-hover);
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .btn-secondary:not(:disabled):not([aria-disabled="true"]):hover {
+    background: var(--surface-2);
+    border-color: var(--border-glass-hover);
+  }
 }
 
 .btn-danger {
@@ -803,9 +655,10 @@ button, input, select, textarea {
   color: #f87171;
 }
 
-.btn-danger:hover {
-  background: rgba(239, 68, 68, 0.3);
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .btn-danger:not(:disabled):not([aria-disabled="true"]):hover {
+    background: rgba(239, 68, 68, 0.3);
+  }
 }
 
 .btn-icon-only {
@@ -901,6 +754,7 @@ button, input, select, textarea {
 
 /* Custom Navigation Tabs (Responsive Bottom Bar on mobile, Top Tab Bar on Desktop) */
 .nav-tabs {
+  position: relative;
   display: flex;
   background: var(--bg-glass);
   border: 1px solid var(--border-glass);
@@ -908,6 +762,14 @@ button, input, select, textarea {
   border-radius: var(--radius-md);
   margin-bottom: 2rem;
   gap: 0.25rem;
+}
+
+.nav-tab.nav-more-trigger {
+  display: none;
+}
+
+.nav-secondary {
+  display: contents;
 }
 
 .nav-tab {
@@ -936,7 +798,7 @@ button, input, select, textarea {
 /* hover:hover guard: on touch devices a tap leaves the button in :hover until
    the next tap, so a back-gesture would leave the tapped tab looking selected.
    Restrict the hover style to real pointers. */
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .nav-tab:hover {
     color: var(--text-primary);
     background: var(--surface-1);
@@ -1016,11 +878,11 @@ button, input, select, textarea {
     min-height: 44px;
   }
   .app-container {
-    padding-bottom: calc(10rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
   }
   .nav-tabs {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     position: fixed;
     bottom: 0;
     left: 0;
@@ -1037,7 +899,7 @@ button, input, select, textarea {
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     /* Clear the home indicator / gesture bar under the pinned tab bar. */
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
   }
   .nav-tab {
     min-width: 0;
@@ -1045,6 +907,37 @@ button, input, select, textarea {
     padding: 0.35rem 0.2rem;
     font-size: 0.65rem;
     overflow-wrap: anywhere;
+  }
+  .nav-tab.nav-more-trigger {
+    display: flex;
+  }
+  .nav-secondary {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 0.5rem);
+    right: max(0.5rem, env(safe-area-inset-right, 0px));
+    width: min(20rem, calc(100vw - 1rem));
+    max-height: calc(100dvh - 8rem - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    padding: 0.5rem;
+    gap: 0.25rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-glass-hover);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-glow);
+  }
+  .nav-secondary.is-open {
+    display: flex;
+    flex-direction: column;
+  }
+  .nav-secondary .nav-tab {
+    flex-direction: row;
+    justify-content: flex-start;
+    flex: none;
+    gap: 0.75rem;
+    min-height: 44px;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.9rem;
   }
 }
 
@@ -1072,39 +965,6 @@ button, input, select, textarea {
   padding: 1.25rem 1.5rem;
 }
 
-/* Each card carries a semantic accent color via --card-accent */
-.metric-card {
-  --card-accent: var(--accent-red);
-}
-.metric-card.accent-networth { --card-accent: var(--accent-green); }
-.metric-card.accent-invested { --card-accent: var(--accent-yellow); }
-.metric-card.accent-gain-up  { --card-accent: var(--accent-green); }
-.metric-card.accent-gain-down{ --card-accent: var(--accent-red); }
-.metric-card.accent-cards    { --card-accent: var(--accent-blue); }
-
-.metric-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-glass-hover);
-}
-
-/* Tinted rounded chip holding each metric's icon */
-.metric-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  flex-shrink: 0;
-  color: var(--card-accent);
-  background: color-mix(in srgb, var(--card-accent) 16%, transparent);
-}
-.metric-icon svg { color: inherit; }
-
-/* Net Worth is the headline metric: larger value */
-.metric-card.accent-networth .metric-value {
-  font-size: 2.15rem;
-}
 
 .metric-header {
   display: flex;
@@ -1140,13 +1000,11 @@ button, input, select, textarea {
 .dashboard-card-clickable {
   position: relative;
 }
-.dashboard-card-clickable:hover {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border-color: var(--border-glass-hover) !important;
-  transform: translateX(3px);
-}
-.dashboard-card-clickable:active {
-  transform: translateX(1px) scale(0.995);
+@media (hover: hover) and (pointer: fine) {
+  .dashboard-card-clickable:hover {
+    background: var(--surface-2);
+    border-color: var(--border-glass-hover);
+  }
 }
 
 /* Empty-state message inside a chart/panel area */
@@ -1204,6 +1062,7 @@ button, input, select, textarea {
 /* Card Grid Styles */
 .card-grid {
   display: grid;
+  align-items: start;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 0.75rem;
 }
@@ -1215,28 +1074,28 @@ button, input, select, textarea {
   }
 }
 
-/* TCG Card Flip/Hover Premium Look */
+/* Artwork is the card surface; metadata stays outside its frame. */
 .tcg-card {
-  perspective: 1000px;
+  position: relative;
   cursor: pointer;
 }
 
 .tcg-card-inner {
+  display: block;
   position: relative;
   width: 100%;
   aspect-ratio: 0.718;
-  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  transform-style: preserve-3d;
-  border-radius: var(--radius-sm);
+  transition: border-color 160ms ease;
+  border-radius: 6px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-glass);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  box-shadow: none;
 }
 
-.tcg-card:hover .tcg-card-inner {
-  transform: translateY(-5px) scale(1.03);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5), 0 0 15px rgba(255,255,255,0.1);
-  border-color: var(--border-glass-hover);
+@media (hover: hover) and (pointer: fine) {
+  .tcg-card:hover .tcg-card-inner {
+    border-color: var(--border-glass-hover);
+  }
 }
 
 .tcg-card-image {
@@ -1246,7 +1105,7 @@ button, input, select, textarea {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: var(--radius-sm);
+  border-radius: 5px;
 }
 
 /* Suppress the OS long-press callout/save-image popup on card art so
@@ -1285,7 +1144,7 @@ button, input, select, textarea {
 
 .tcg-card-price {
   font-weight: 600;
-  color: var(--accent-yellow);
+  color: var(--text-strong);
 }
 
 .tcg-card-quantity-tag {
@@ -1539,7 +1398,7 @@ button, input, select, textarea {
   overflow-x: hidden;
   box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
   transform: translateY(100%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 250ms cubic-bezier(0.32, 0.72, 0, 1);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -1560,7 +1419,7 @@ button, input, select, textarea {
     max-height: 90vh;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    transition: opacity 200ms ease, transform 200ms var(--ease-out);
   }
   
   .quick-add-drawer.open {
@@ -1690,37 +1549,63 @@ button, input, select, textarea {
 
 .toast {
   position: fixed;
-  bottom: 80px;
+  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(16, 185, 129, 0.95);
-  color: white;
-  padding: 0.75rem 1.5rem;
-  border-radius: 50px;
-  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 2rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-glass-hover);
+  padding: 0.65rem 0.75rem 0.65rem 1rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-glow);
   font-weight: 600;
   z-index: 2000;
-  pointer-events: none;
-  animation: slide-up-fade 2s forwards;
+  transition: opacity 180ms ease, transform 180ms var(--ease-out);
 }
 
-@keyframes slide-up-fade {
-  0% { opacity: 0; bottom: 60px; }
-  15% { opacity: 1; bottom: 80px; }
-  85% { opacity: 1; bottom: 80px; }
-  100% { opacity: 0; bottom: 90px; }
+.toast-status { border-left: 4px solid var(--accent-blue); }
+.toast-success { border-left: 4px solid var(--accent-green); }
+.toast-error { border-left: 4px solid var(--accent-red); }
+
+.toast-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.toast-dismiss:hover {
+  background: var(--surface-2);
+}
+
+@starting-style {
+  .toast {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
 }
 
 @media (min-width: 769px) {
-  .toast {
-    bottom: 2rem;
-  }
-  @keyframes slide-up-fade {
-    0% { opacity: 0; bottom: 1rem; }
-    15% { opacity: 1; bottom: 2rem; }
-    85% { opacity: 1; bottom: 2rem; }
-    100% { opacity: 0; bottom: 3rem; }
-  }
+  .toast { bottom: 2rem; }
 }
 
 /* Responsive Split Layout for Storage Locations Page */
@@ -2141,11 +2026,12 @@ button, input, select, textarea {
   transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.binder-pocket:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8), 0 8px 15px rgba(0, 0, 0, 0.5);
-  border-color: rgba(255, 255, 255, 0.3);
-  z-index: 10;
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .binder-pocket:hover {
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8), 0 8px 15px rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.3);
+    z-index: 10;
+  }
 }
 
 /* Subtle plastic glare overlay for the pocket */
@@ -2346,10 +2232,11 @@ button, input, select, textarea {
   background: rgba(255,255,255,0.1);
 }
 
-.draggable-box-card:hover {
-  transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-  filter: brightness(1.1);
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .draggable-box-card:hover {
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    filter: brightness(1.1);
+  }
 }
 
 .dropzone-box-row:hover {
@@ -2394,7 +2281,7 @@ button, input, select, textarea {
   border-radius: var(--radius-md);
   cursor: pointer;
   transform-style: preserve-3d;
-  transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s ease, border-color 0.3s ease;
+  transition: transform 180ms var(--ease-out), opacity 180ms ease, border-color 160ms ease;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -2426,13 +2313,15 @@ button, input, select, textarea {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: var(--transition-smooth);
 }
 
-.coverflow-nav-btn:hover {
-  background: rgba(255, 71, 71, 0.8);
-  border-color: var(--accent-red);
-  transform: translateY(-50%) scale(1.1);
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .coverflow-nav-btn:not(:disabled):hover {
+    background: rgba(255, 71, 71, 0.8);
+    border-color: var(--accent-red);
+    transform: translateY(-50%);
+  }
 }
 
 .coverflow-nav-btn.left-btn {
@@ -2507,7 +2396,7 @@ button, input, select, textarea {
   background: rgba(234, 179, 8, 0.08) !important;
   cursor: pointer !important;
   transform: scale(1.02);
-  transition: all 0.2s ease;
+  transition: var(--transition-smooth);
 }
 
 .slot-move-targetable:hover {
@@ -2564,7 +2453,7 @@ button, input, select, textarea {
   font-size: 0.75rem;
   color: var(--text-secondary);
   font-weight: 700;
-  transition: all 0.2s ease;
+  transition: var(--transition-smooth);
   user-select: none;
 }
 
@@ -2622,91 +2511,17 @@ button, input, select, textarea {
   .view-transition { animation: none; }
 }
 
-/* ==========================================================================
-   FOIL FINISHES — full rainbow prism that drifts continuously (screen blend).
-   The continuous motion lives on ::after pseudo-elements so it never fights
-   the JS tilt handler, which drives the element's own background-position.
-   ========================================================================== */
-
-@keyframes holoDrift {
-  to { transform: rotate(360deg); }
-}
-
+/* Static foil finish identifies the printing without moving over the artwork. */
 .holo-shine-overlay {
-  /* Default center so the rainbow sits still until a pointer drives --px/--py
-     (set by the delegated handler in App.jsx). */
-  --px: 50%;
-  --py: 50%;
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  overflow: hidden;
+  inset: 0;
   border-radius: inherit;
-  background:
-    /* specular glare that follows the pointer */
-    radial-gradient(circle at var(--px) var(--py),
-      rgba(255, 255, 255, 0.55) 0%,
-      rgba(255, 255, 255, 0) 45%),
-    /* rainbow prism, panned by pointer position */
-    linear-gradient(115deg,
-      rgba(255, 0, 128, 0.30) 0%,
-      rgba(128, 0, 255, 0.34) 20%,
-      rgba(0, 128, 255, 0.34) 40%,
-      rgba(0, 255, 170, 0.28) 58%,
-      rgba(255, 238, 0, 0.30) 78%,
-      rgba(255, 90, 0, 0.30) 100%
-    );
-  background-size: 160% 160%, 220% 220%;
-  background-position: var(--px) var(--py), calc(100% - var(--px)) var(--py);
+  background: linear-gradient(115deg,
+    rgba(136, 116, 214, 0.12),
+    rgba(116, 192, 214, 0.08) 40%,
+    rgba(219, 201, 144, 0.12));
   pointer-events: none;
   z-index: 5;
-  mix-blend-mode: screen;
-  opacity: 0.5;
-  transition: opacity 0.3s ease, background-position 0.08s ease-out;
-}
-.holo-shine-overlay.foil-active,
-.foil-active .holo-shine-overlay { opacity: 0.85; }
-.holo-shine-overlay::after {
-  content: '';
-  position: absolute;
-  inset: -60%;
-  background: conic-gradient(from 0deg,
-    #ff0080, #8b00ff, #0080ff, #00ffcc, #ffee00, #ff6a00, #ff0080);
-  mix-blend-mode: color-dodge;
-  opacity: 0.22;
-  animation: holoDrift 7s linear infinite;
-}
-
-
-@media (prefers-reduced-motion: reduce) {
-  .holo-shine-overlay::after { animation: none; }
-}
-
-/* 3D Card Hover Tilt Effects */
-.tilt-card-wrapper {
-  position: relative;
-  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
-  transform-style: preserve-3d;
-  will-change: transform;
-}
-
-.tilt-card-wrapper:hover {
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), 0 0 25px rgba(239, 83, 80, 0.25);
-  z-index: 15;
-}
-
-.tilt-card-wrapper:hover .holo-shine-overlay {
-  opacity: 0.8 !important;
-}
-
-/* iPod coverflow-style focus: hovering a box row shrinks its other cards
-   slightly, and the hovered card pops forward and grows. */
-.box-row-strip:hover .tilt-card-wrapper {
-  transform: scale(0.88) !important;
-}
-
-.box-row-strip .tilt-card-wrapper:hover {
-  transform: scale(1.25) !important;
-  z-index: 20;
 }
 
 
@@ -2795,7 +2610,7 @@ button, input, select, textarea {
   cursor: pointer;
   font-size: 0.75rem;
   font-weight: 600;
-  transition: all 0.2s ease;
+  transition: var(--transition-smooth);
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -2847,7 +2662,7 @@ button, input, select, textarea {
   height: 202px;
   border-radius: 8px;
   box-shadow: 0 15px 35px rgba(0,0,0,0.6);
-  transition: transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.45s ease, filter 0.45s ease;
+  transition: transform 180ms var(--ease-out), opacity 180ms ease;
   cursor: pointer;
   overflow: hidden;
   transform-style: preserve-3d;
@@ -2884,13 +2699,15 @@ button, input, select, textarea {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: var(--transition-smooth);
 }
 
-.box-coverflow-nav:hover {
-  background: rgba(255, 71, 71, 0.85);
-  border-color: var(--accent-red);
-  transform: translateY(-50%) scale(1.1);
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .box-coverflow-nav:not(:disabled):hover {
+    background: rgba(255, 71, 71, 0.85);
+    border-color: var(--accent-red);
+    transform: translateY(-50%);
+  }
 }
 
 .box-coverflow-nav:disabled {
@@ -3052,7 +2869,46 @@ button, input, select, textarea {
   z-index: 100 !important;
 }
 
-/* Recharts Tooltip styling across all themes (Dark, LCARS, Light, Cyberpunk) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition-property: color, background-color, border-color, opacity !important;
+    scroll-behavior: auto !important;
+  }
+
+  .card-move-selecting,
+  .slot-move-targetable {
+    transform: none !important;
+  }
+
+  .quick-add-drawer {
+    transform: none;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .quick-add-drawer.open {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .row-flash {
+    background-color: color-mix(in srgb, var(--accent-yellow) 25%, var(--bg-secondary));
+  }
+
+  @starting-style {
+    .toast { transform: translateX(-50%); }
+  }
+}
+
+@media (min-width: 769px) and (prefers-reduced-motion: reduce) {
+  .quick-add-drawer,
+  .quick-add-drawer.open {
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Recharts tooltip colors follow the active theme. */
 .recharts-default-tooltip {
   background-color: var(--bg-secondary) !important;
   border-color: var(--border-glass) !important;
@@ -3073,14 +2929,8 @@ button, input, select, textarea {
 /* Phone layouts keep chart/table contents reachable without widening the page. */
 @media (max-width: 600px) {
   .dashboard-page { min-width: 0; }
-  .dashboard-page .metrics-grid { grid-template-columns: minmax(0, 1fr); }
-  .dashboard-page .metric-header { flex-wrap: wrap; gap: 0.75rem; }
-  .dashboard-page .metric-value { overflow-wrap: anywhere; }
-  .dashboard-page .dashboard-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dashboard-page .dashboard-filters button { min-height: 44px; }
   .dashboard-periods { max-width: 100%; flex-wrap: wrap; }
   .dashboard-periods button { min-width: 44px; min-height: 44px; }
-  .dashboard-page .dashboard-timeline { padding: 1rem !important; }
   .dashboard-timeline-header { flex-wrap: wrap; gap: 0.5rem; }
   .dashboard-page .dashboard-details { grid-template-columns: minmax(0, 1fr); }
   .dashboard-details > div, .dashboard-details .glass-panel { min-width: 0; }

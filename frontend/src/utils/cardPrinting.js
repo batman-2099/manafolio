@@ -17,14 +17,13 @@ export function getPrintingBadgeLabel(printing) {
 export function getPrintingBadgeStyle(printing) {
   switch (printing) {
     case 'Holofoil':
-      return { background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', color: '#1a1206' };
+      return { background: '#d3ba89', color: '#1a1206' };
     default:
       return { background: 'rgba(148, 163, 184, 0.85)', color: '#0a0f1d' };
   }
 }
 
-// Returns the CSS class for the animated foil overlay, or null for finishes
-// that get no shine. Holofoil uses the rainbow prism.
+// Returns the static foil overlay class, or null for finishes without shine.
 export function getFoilOverlayClass(printing) {
   if (printing === 'Holofoil') return 'holo-shine-overlay';
   return null;

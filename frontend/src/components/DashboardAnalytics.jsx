@@ -41,10 +41,10 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
   const decks = analytics?.deckPerformance;
 
   return (
-    <div style={{ display: 'grid', gap: '1.5rem', margin: '1.5rem 0', minWidth: 0 }}>
+    <div className="dashboard-analytics-grid">
       {charts.map(chart => (
-        <section key={chart.key} className="glass-panel" aria-labelledby={`analytics-${chart.key}`} style={{ minWidth: 0 }}>
-          <h3 id={`analytics-${chart.key}`} className="chart-title">{chart.title}</h3>
+        <section key={chart.key} className="dashboard-subsection view-section" aria-labelledby={`analytics-${chart.key}`}>
+          <h3 id={`analytics-${chart.key}`} className="section-heading">{chart.title}</h3>
           <p style={noteStyle}>{chart.note}</p>
           {chart.key !== 'growth' && !isArchive && <p style={noteStyle}>{t('dash.deckSlotsNote')}</p>}
           {!chart.rows ? <p style={noteStyle}>{t('dash.analyticsUnavailable')}</p> : (
@@ -85,8 +85,8 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
           )}
         </section>
       ))}
-      {!isArchive && <section className="glass-panel" aria-labelledby="analytics-decks" style={{ minWidth: 0 }}>
-        <h3 id="analytics-decks" className="chart-title">{t('dash.deckPerformance')}</h3>
+      {!isArchive && <section className="dashboard-subsection view-section" aria-labelledby="analytics-decks">
+        <h3 id="analytics-decks" className="section-heading">{t('dash.deckPerformance')}</h3>
         <p style={noteStyle}>{t('dash.deckPerformanceNote')}</p>
         {decks?.length > 0 && <p style={noteStyle}>{t('dash.lowSampleNote')}</p>}
         {!decks ? <p style={noteStyle}>{t('dash.analyticsUnavailable')}</p> : decks.length === 0 ? <p style={noteStyle}>{t('dash.noDeckPerformance')}</p> : (

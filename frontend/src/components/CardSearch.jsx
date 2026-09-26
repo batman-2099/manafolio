@@ -251,11 +251,11 @@ function CardSearch({ onAddSuccess, showToast }) {
         } else if (response.status === 503) {
           setSearchError('upstream');
         }
-        showToast(errData.error || t('search.errRequest'));
+        showToast(errData.error || t('search.errRequest'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('search.errApi'));
+      showToast(t('search.errApi'), 'error');
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -342,7 +342,7 @@ function CardSearch({ onAddSuccess, showToast }) {
 
   const handleBulkAdd = async () => {
     const ids = filteredAndSortedCards.filter(c => selectedIds.has(c.id)).map(c => c.id);
-    if (ids.length === 0) { showToast(t('search.errNoneSelected')); return; }
+    if (ids.length === 0) { showToast(t('search.errNoneSelected'), 'error'); return; }
     setBulkAdding(true);
     try {
       const response = await fetch('/api/collection/bulk-add', {
@@ -360,7 +360,7 @@ function CardSearch({ onAddSuccess, showToast }) {
       });
       const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        showToast(data.message || t('search.addedCards', { count: ids.length }));
+        showToast(data.message || t('search.addedCards', { count: ids.length }), 'success');
         // Reflect the new owned counts without re-running the search.
         const added = parseInt(quantity, 10) || 1;
         setCards(prev => prev.map(c => (selectedIds.has(c.id)
@@ -369,11 +369,11 @@ function CardSearch({ onAddSuccess, showToast }) {
         exitSelectMode();
         onAddSuccess();
       } else {
-        showToast(data.error || t('search.errBulkAdd'));
+        showToast(data.error || t('search.errBulkAdd'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('search.errAddCards'));
+      showToast(t('search.errAddCards'), 'error');
     } finally {
       setBulkAdding(false);
     }
@@ -409,7 +409,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   const handleRapidAdd = async () => {
     const number = rapidNumber.trim();
     if (!number || rapidBusy) return;
-    if (!setCodeQuery.trim()) { showToast(t('search.errNoSetCode')); return; }
+    if (!setCodeQuery.trim()) { showToast(t('search.errNoSetCode'), 'error'); return; }
     setRapidBusy(true);
     try {
       const params = new URLSearchParams({
@@ -418,7 +418,7 @@ function CardSearch({ onAddSuccess, showToast }) {
       const res = await fetch(`/api/search?${params.toString()}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        showToast(err.error || t('search.errLookup'));
+        showToast(err.error || t('search.errLookup'), 'error');
         return;
       }
       const matches = await res.json();
@@ -427,12 +427,12 @@ function CardSearch({ onAddSuccess, showToast }) {
 
       if (!hit) {
         if (matches.length === 0) {
-          showToast(t('search.errNoSuchNumber', { number, set: setCodeQuery.toUpperCase() }));
+          showToast(t('search.errNoSuchNumber', { number, set: setCodeQuery.toUpperCase() }), 'error');
         } else {
           // Ambiguous: show them and let the user pick, keeping the number typed.
           setCards(matches);
           setSearching(true);
-          showToast(t('search.pickPrinting', { count: matches.length, number }));
+          showToast(t('search.pickPrinting', { count: matches.length, number }), 'status');
         }
         return;
       }
@@ -449,7 +449,7 @@ function CardSearch({ onAddSuccess, showToast }) {
       onAddSuccess();
     } catch (err) {
       console.error(err);
-      showToast(err.message || t('search.errAddCardGeneric'));
+      showToast(err.message || t('search.errAddCardGeneric'), 'error');
     } finally {
       setRapidBusy(false);
       // Focus never leaves the field, so the next number can just be typed.
@@ -460,16 +460,16 @@ function CardSearch({ onAddSuccess, showToast }) {
   const undoRapidAdd = async (entry) => {
     try {
       const res = await fetch(`/api/collection/${entry.entryId}`, { method: 'DELETE' });
-      if (!res.ok) { showToast(t('search.errUndo')); return; }
+      if (!res.ok) { showToast(t('search.errUndo'), 'error'); return; }
       setRapidLog(prev => prev.filter(e => e.entryId !== entry.entryId));
       setCards(prev => prev.map(c => (c.id === entry.card.id
         ? { ...c, owned_qty: Math.max(0, (c.owned_qty || 0) - entry.qty) }
         : c)));
-      showToast(t('search.removed', { name: displayName(entry.card) }));
+      showToast(t('search.removed', { name: displayName(entry.card) }), 'success');
       onAddSuccess();
     } catch (err) {
       console.error(err);
-      showToast(t('search.errUndoGeneric'));
+      showToast(t('search.errUndoGeneric'), 'error');
     }
   };
 
@@ -546,7 +546,7 @@ function CardSearch({ onAddSuccess, showToast }) {
       });
 
       if (response.ok) {
-        showToast(t('search.addedToCollection', { name: displayName(selectedCard) }));
+        showToast(t('search.addedToCollection', { name: displayName(selectedCard) }), 'success');
         
         // Trigger confetti for rare/valuable cards!
         const rarity = (selectedCard.rarity || '').toLowerCase();
@@ -565,11 +565,11 @@ function CardSearch({ onAddSuccess, showToast }) {
         // A rejected cert number (already in the collection) explains itself; the
         // generic message would send the user back to re-type a correct number.
         const body = await response.json().catch(() => null);
-        showToast(body?.error || t('search.errAddDb'));
+        showToast(body?.error || t('search.errAddDb'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('search.errSave'));
+      showToast(t('search.errSave'), 'error');
     }
   };
 
@@ -606,7 +606,7 @@ function CardSearch({ onAddSuccess, showToast }) {
           setManaBoxPreview(preview);
         }
       } catch (error) {
-        if (!controller.signal.aborted) showToast(error.message || t('settings.importFailed', { error: '' }));
+        if (!controller.signal.aborted) showToast(error.message || t('settings.importFailed', { error: '' }), 'error');
       } finally {
         if (!controller.signal.aborted) setImportingText(false);
         if (importRequest.current === controller) importRequest.current = null;
@@ -615,7 +615,7 @@ function CardSearch({ onAddSuccess, showToast }) {
     };
     reader.onerror = () => {
       if (!controller.signal.aborted) {
-        showToast(t('settings.errReadFile'));
+        showToast(t('settings.errReadFile'), 'error');
         setImportingText(false);
       }
       if (importRequest.current === controller) importRequest.current = null;
@@ -645,7 +645,7 @@ function CardSearch({ onAddSuccess, showToast }) {
         errors: response.ok ? summary.errors || [] : [summary.error || t('settings.importFailed', { error: '' })]
       }));
     } catch (error) {
-      if (!controller.signal.aborted) showToast(error.message || t('settings.importFailed', { error: '' }));
+      if (!controller.signal.aborted) showToast(error.message || t('settings.importFailed', { error: '' }), 'error');
     } finally {
       if (!controller.signal.aborted) setImportingText(false);
       if (importRequest.current === controller) importRequest.current = null;

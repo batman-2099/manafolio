@@ -54,7 +54,7 @@ export function useMultiSelect({ showToast, onChanged, guard } = {}) {
   // long-press elsewhere (CompartmentView) can arm the same state.
   const arm = (entryId) => {
     const blocked = guard && guard();
-    if (blocked) { showToast(blocked); return; }
+    if (blocked) { showToast(blocked, 'error'); return; }
     setSelectMode(true);
     anchorId.current = entryId;
     setSelectedIds(prev => new Set(prev).add(entryId));
@@ -66,9 +66,9 @@ export function useMultiSelect({ showToast, onChanged, guard } = {}) {
   // Runs one bulk action against every selected entry via the bulk endpoint.
   const runBulk = async (action, value, confirmMsg) => {
     const blocked = guard && guard();
-    if (blocked) { showToast(blocked); return; }
+    if (blocked) { showToast(blocked, 'error'); return; }
     const ids = Array.from(selectedIds);
-    if (ids.length === 0) { showToast('No cards selected.'); return; }
+    if (ids.length === 0) { showToast('No cards selected.', 'error'); return; }
     if (confirmMsg && !window.confirm(confirmMsg)) return;
     try {
       const res = await fetch('/api/collection/bulk', {
@@ -78,15 +78,15 @@ export function useMultiSelect({ showToast, onChanged, guard } = {}) {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        showToast(data.message || 'Done.');
+        showToast(data.message || 'Done.', 'success');
         clearSelection();
         onChanged && onChanged({ ids, action, value });
       } else {
-        showToast(data.error || 'Bulk action failed.');
+        showToast(data.error || 'Bulk action failed.', 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Error performing bulk action.');
+      showToast('Error performing bulk action.', 'error');
     }
   };
 

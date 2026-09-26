@@ -4,6 +4,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { BASIC_LAND_COLORS } = require('./utils/mtgColors');
 const { AsyncLocalStorage } = require('async_hooks');
+const themes = require('../../shared/themes.json');
 
 const DB_FILENAME = 'manafolio.db';
 // Ensure database directory exists
@@ -560,6 +561,7 @@ async function initDb() {
   if (!usersCols.some(c => c.name === 'theme')) {
     await run(`ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'dark'`);
   }
+  await run(`UPDATE users SET theme = 'dark' WHERE theme IS NULL OR theme NOT IN (${themes.map(() => '?').join(',')})`, themes);
   if (!usersCols.some(c => c.name === 'ai_provider')) {
     await run(`ALTER TABLE users ADD COLUMN ai_provider TEXT NOT NULL DEFAULT 'chatgpt'`);
   }

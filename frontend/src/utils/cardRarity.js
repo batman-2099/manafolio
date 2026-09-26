@@ -1,5 +1,5 @@
 // Single source of truth for the rarity tiers used across LocationManager's
-// visualizers (card border glow, badge color, badge label).
+// visualizers (card border, badge color, badge label).
 export function getRarityTier(rarity) {
   const r = (rarity || '').toLowerCase();
   if (r.includes('mythic') || r.includes('enchanted') || r.includes('legendary') || r.includes('super rare')) {
@@ -38,18 +38,18 @@ export function getCardRarityBorder(rarity) {
   switch (getRarityTier(rarity)) {
     case 'top':
       return {
-        border: '2.5px solid #f59e0b',
-        boxShadow: '0 0 12px rgba(245, 158, 11, 0.95), inset 0 0 6px rgba(245, 158, 11, 0.5)'
+        border: '1px solid #b89153',
+        boxShadow: 'none'
       };
     case 'rare':
       return {
-        border: '2px solid #e2e8f0',
-        boxShadow: '0 0 8px rgba(255, 255, 255, 0.85), inset 0 0 4px rgba(255, 255, 255, 0.4)'
+        border: '1px solid #8899ad',
+        boxShadow: 'none'
       };
     case 'uncommon':
       return {
-        border: '1.5px solid #3b82f6',
-        boxShadow: '0 0 6px rgba(59, 130, 246, 0.8)'
+        border: '1px solid #6086ae',
+        boxShadow: 'none'
       };
     default:
       return {
@@ -61,10 +61,10 @@ export function getCardRarityBorder(rarity) {
 
 export function getRarityBadgeStyle(rarity) {
   const tier = getRarityTier(rarity);
-  const background = tier === 'top' ? '#f59e0b'
+  const background = tier === 'top' ? '#78551f'
     : tier === 'rare' ? '#e2e8f0'
-    : tier === 'uncommon' ? '#3b82f6'
-    : 'rgba(156, 163, 175, 0.75)';
+    : tier === 'uncommon' ? '#31557c'
+    : '#4b5563';
   const color = tier === 'rare' ? '#000' : '#fff';
   return { background, color };
 }

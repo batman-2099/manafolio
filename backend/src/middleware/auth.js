@@ -1,5 +1,6 @@
 const rateLimit = require('express-rate-limit');
 const db = require('../db');
+const themes = require('../../../shared/themes.json');
 
 async function authenticateToken(req, res, next) {
   let token = null;
@@ -44,7 +45,7 @@ async function authenticateToken(req, res, next) {
       id: session.user_id,
       username: session.username,
       role: session.role,
-      theme: session.theme,
+      theme: themes.includes(session.theme) ? session.theme : 'dark',
       share_token: session.share_token,
       share_enabled: session.share_enabled,
       share_locations: session.share_locations,

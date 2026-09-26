@@ -4,6 +4,7 @@ const db = require('../db');
 const { authenticateToken, authLimiter } = require('../middleware/auth');
 const { verifyPassword, generateSession, sanitizeUser } = require('../utils/authHelpers');
 const oidc = require('../utils/oidc');
+const themes = require('../../../shared/themes.json');
 
 const router = express.Router();
 
@@ -316,7 +317,7 @@ router.get('/me', authenticateToken, (req, res) => {
 
 router.patch('/theme', authenticateToken, async (req, res) => {
   const theme = req.body?.theme;
-  if (!['dark', 'light', 'jenny', 'mtg', 'lcars'].includes(theme)) {
+  if (!themes.includes(theme)) {
     return res.status(400).json({ error: 'Invalid theme' });
   }
 

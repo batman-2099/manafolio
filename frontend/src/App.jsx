@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
-import { LayoutDashboard, Database, MapPin, Sparkles, Settings as SettingsIcon, LogOut, ShieldAlert, Plus, Swords, StickyNote } from 'lucide-react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import { LayoutDashboard, Database, MapPin, Settings as SettingsIcon, LogOut, ShieldAlert, Plus, Swords, StickyNote, MoreHorizontal, X } from 'lucide-react';
 import Login from './components/Login';
 import Logo from './components/Logo';
 import { pushBackGuard } from './utils/useBackGuard';
 import { useT } from './utils/i18n';
+import themes from '../../shared/themes.json';
 
 // View components are code-split so heavy deps (recharts in the chart views)
 // load on demand instead of in the initial bundle.
@@ -86,8 +87,9 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('manafolio_token'));
   const [user, setUser] = useState(() => {
     try {
-      const u = localStorage.getItem('manafolio_user');
-      return u ? JSON.parse(u) : null;
+      const u = JSON.parse(localStorage.getItem('manafolio_user') || 'null');
+      if (u) u.theme = themes.includes(u.theme) ? u.theme : 'dark';
+      return u;
     } catch {
       return null;
     }
@@ -96,6 +98,9 @@ function App() {
   const sessionRevision = useRef(0);
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [moreOpen, setMoreOpen] = useState(false);
+  const navRef = useRef(null);
+  const moreTriggerRef = useRef(null);
   // First-run scanning setup. Asked once per session, only for an admin, and only
   // while it is genuinely incomplete — setupNeeded() reads the same endpoints the
   // wizard does so there is one definition of 'set up'.
@@ -107,6 +112,8 @@ function App() {
   const [deckViewKey, setDeckViewKey] = useState(0);
   const [selectedCardFilter, setSelectedCardFilter] = useState('');
   const [toast, setToast] = useState(null);
+  const toastIdRef = useRef(0);
+  const toastRef = useRef(null);
   const [statsTrigger, setStatsTrigger] = useState(0);
 
   const tabGuardRef = useRef(null);
@@ -120,12 +127,15 @@ function App() {
   // the browser past the app origin into about:blank.
   const goTab = (tab, inventoryType = 'collection') => {
     if (tab !== activeTab && navigationGuardRef.current?.() === false) return false;
+    if (moreOpen) moreTriggerRef.current?.focus();
+    setMoreOpen(false);
     if (tab === 'storage') setStorageInventoryType(inventoryType);
     if (tab === activeTab) return true;
     const prev = activeTab;
     const prevStorageInventoryType = storageInventoryType;
     tabGuardRef.current = pushBackGuard(() => {
       if (navigationGuardRef.current?.() === false) return false;
+      setMoreOpen(false);
       tabGuardRef.current = null;
       setActiveTab(prev);
       setStorageInventoryType(prevStorageInventoryType);
@@ -147,10 +157,14 @@ function App() {
 
   // The browser value is only a first-paint cache; the account owns the theme.
   useLayoutEffect(() => {
-    if (shareToken) return;
-    const theme = token && ['dark', 'light', 'jenny', 'mtg', 'lcars'].includes(user?.theme) ? user.theme : 'dark';
+    const selected = shareToken
+      ? new URLSearchParams(window.location.search).get('theme')
+      : token && user?.theme;
+    const theme = themes.includes(selected) ? selected : 'dark';
     document.documentElement.setAttribute('data-theme', theme);
-    try { localStorage.setItem('theme', theme); } catch { /* storage may be blocked */ }
+    if (!shareToken) {
+      try { localStorage.setItem('theme', theme); } catch { /* storage may be blocked */ }
+    }
   }, [token, user?.theme, shareToken]);
 
   // Reload the account on session restoration, including changes made on another device.
@@ -169,9 +183,9 @@ function App() {
     return () => { cancelled = true; };
   }, [token, shareToken]);
 
-  const showToast = (message) => {
-    setToast(message);
-  };
+  const showToast = useCallback((message, kind = 'status') => {
+    setToast({ id: ++toastIdRef.current, message, kind });
+  }, []);
 
   // Handle OIDC / SSO token in URL redirect
   useEffect(() => {
@@ -196,26 +210,79 @@ function App() {
               setUser(data.user);
               localStorage.setItem('manafolio_token', oidcToken);
               localStorage.setItem('manafolio_user', JSON.stringify(data.user));
-              showToast(t('toast.welcomeBack', { name: data.user.username }));
+              showToast(t('toast.welcomeBack', { name: data.user.username }), 'success');
               setActiveTab('dashboard');
             }
           })
           .catch(err => {
             console.error('OIDC token verification failed:', err);
-            showToast(t('login.errOidcFailed'));
+            showToast(t('login.errOidcFailed'), 'error');
           });
       }
     } catch { /* ignore URL parse error */ }
-  }, [t, token]);
+  }, [t, token, showToast]);
 
   useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => {
-        setToast(null);
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
+    if (!toast) return;
+    let remaining = Math.max(6000, Math.min(15000, (toast.message?.length || 0) * 60));
+    let startedAt;
+    let timer;
+    let hovered = false;
+    let focused = false;
+    const updateTimer = () => {
+      if (timer) {
+        clearTimeout(timer);
+        remaining -= performance.now() - startedAt;
+        timer = null;
+      }
+      if (document.hidden || hovered || focused) return;
+      startedAt = performance.now();
+      timer = setTimeout(() => setToast(current => current?.id === toast.id ? null : current), remaining);
+    };
+    const onEnter = (event) => { if (event.pointerType === 'mouse') { hovered = true; updateTimer(); } };
+    const onLeave = () => { hovered = false; updateTimer(); };
+    const onFocus = () => { focused = true; updateTimer(); };
+    const onBlur = (event) => {
+      if (!element?.contains(event.relatedTarget)) { focused = false; updateTimer(); }
+    };
+    const element = toastRef.current;
+    element?.addEventListener('pointerenter', onEnter);
+    element?.addEventListener('pointerleave', onLeave);
+    element?.addEventListener('focusin', onFocus);
+    element?.addEventListener('focusout', onBlur);
+    document.addEventListener('visibilitychange', updateTimer);
+    updateTimer();
+    return () => {
+      clearTimeout(timer);
+      element?.removeEventListener('pointerenter', onEnter);
+      element?.removeEventListener('pointerleave', onLeave);
+      element?.removeEventListener('focusin', onFocus);
+      element?.removeEventListener('focusout', onBlur);
+      document.removeEventListener('visibilitychange', updateTimer);
+    };
   }, [toast]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onOutside = (event) => {
+      if (!navRef.current?.contains(event.target)) setMoreOpen(false);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMoreOpen(false);
+        moreTriggerRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', onOutside);
+    document.addEventListener('focusin', onOutside);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onOutside);
+      document.removeEventListener('focusin', onOutside);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [moreOpen]);
 
   // Offer first-run setup to an admin until it is finished or skipped. The flag
   // lives on the server, so closing the wizard halfway resumes it at the next
@@ -240,35 +307,12 @@ function App() {
       setUser(null);
       localStorage.removeItem('manafolio_token');
       localStorage.removeItem('manafolio_user');
-      showToast(t('toast.sessionExpired'));
+      showToast(t('toast.sessionExpired'), 'error');
     };
     window.addEventListener('manafolio_logout', handleAutoLogout);
     return () => window.removeEventListener('manafolio_logout', handleAutoLogout);
-  }, [t]);
+  }, [t, showToast]);
 
-  // Pointer-reactive foil: one delegated listener drives --px/--py (0-100%) on
-  // whichever card the pointer is over, so the foil rainbow tracks
-  // the cursor (MTG-style). CSS custom props inherit down to the overlay div.
-  useEffect(() => {
-    const onMove = (e) => {
-      const card = e.target.closest && e.target.closest('.tilt-card-wrapper');
-      if (!card) return;
-      const r = card.getBoundingClientRect();
-      card.style.setProperty('--px', `${((e.clientX - r.left) / r.width) * 100}%`);
-      card.style.setProperty('--py', `${((e.clientY - r.top) / r.height) * 100}%`);
-      card.classList.add('foil-active');
-    };
-    const onLeave = (e) => {
-      const card = e.target.closest && e.target.closest('.tilt-card-wrapper');
-      if (card) card.classList.remove('foil-active');
-    };
-    document.addEventListener('pointermove', onMove, { passive: true });
-    document.addEventListener('pointerout', onLeave, { passive: true });
-    return () => {
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerout', onLeave);
-    };
-  }, []);
 
   const handleLoginSuccess = (newToken, newUser) => {
     sessionRevision.current += 1;
@@ -276,7 +320,7 @@ function App() {
     setUser(newUser);
     localStorage.setItem('manafolio_token', newToken);
     localStorage.setItem('manafolio_user', JSON.stringify(newUser));
-    showToast(t('toast.welcomeBack', { name: newUser.username }));
+    showToast(t('toast.welcomeBack', { name: newUser.username }), 'success');
     setActiveTab('dashboard');
   };
 
@@ -290,7 +334,7 @@ function App() {
     setUser(null);
     localStorage.removeItem('manafolio_token');
     localStorage.removeItem('manafolio_user');
-    showToast(t('toast.loggedOut'));
+    showToast(t('toast.loggedOut'), 'success');
   };
 
   const handleUpdateUser = (changes) => {
@@ -333,9 +377,25 @@ function App() {
     );
   }
 
+  const toastNotification = toast && (
+    <div
+      key={toast.id}
+      ref={toastRef}
+      className={`toast toast-${toast.kind}`}
+      role={toast.kind === 'error' ? 'alert' : 'status'}
+      aria-live={toast.kind === 'error' ? 'assertive' : 'polite'}
+      aria-atomic="true"
+    >
+      <span className="toast-message">{toast.message}</span>
+      <button type="button" className="toast-dismiss" aria-label={t('common.close')} onClick={() => setToast(null)}>
+        <X size={18} aria-hidden="true" />
+      </button>
+    </div>
+  );
+
   // Render login screen if unauthenticated
   if (!token || !user) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+    return <><Login onLoginSuccess={handleLoginSuccess} />{toastNotification}</>;
   }
 
   const renderContent = () => {
@@ -408,9 +468,10 @@ function App() {
         </div>
 
         {/* Navigation Tabs (Nested inside header for unified layout) */}
-        <nav className="nav-tabs" style={{ margin: 0 }}>
+        <nav ref={navRef} className="nav-tabs" style={{ margin: 0 }}>
           <button 
             className={`nav-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
+            aria-current={activeTab === 'dashboard' ? 'page' : undefined}
             onClick={() => goTab('dashboard')}
           >
             <LayoutDashboard size={18} />
@@ -418,6 +479,7 @@ function App() {
           </button>
           <button
             className={`nav-tab ${activeTab === 'add-cards' ? 'active' : ''}`}
+            aria-current={activeTab === 'add-cards' ? 'page' : undefined}
             onClick={() => goTab('add-cards')}
           >
             <Plus size={18} />
@@ -425,6 +487,7 @@ function App() {
           </button>
           <button
             className={`nav-tab ${activeTab === 'collection' ? 'active' : ''}`}
+            aria-current={activeTab === 'collection' ? 'page' : undefined}
             onClick={() => goTab('collection')}
           >
             <Database size={18} />
@@ -432,56 +495,73 @@ function App() {
           </button>
           <button
             className={`nav-tab ${activeTab === 'storage' ? 'active' : ''}`}
+            aria-current={activeTab === 'storage' ? 'page' : undefined}
             onClick={() => {
+              if (!goTab('storage')) return;
               setSelectedLocationId(null);
               setFocusEntryId(null);
               setStorageViewKey(key => key + 1);
-              goTab('storage');
             }}
           >
             <MapPin size={18} />
             <span>{t('nav.storage')}</span>
           </button>
           <button
-            className={`nav-tab ${activeTab === 'deckbuilder' ? 'active' : ''}`}
-            onClick={() => {
-              if (activeTab === 'deckbuilder' && navigationGuardRef.current?.() === false) return;
-              if (goTab('deckbuilder')) setDeckViewKey(key => key + 1);
-            }}
+            ref={moreTriggerRef}
+            type="button"
+            className={`nav-tab nav-more-trigger ${['deckbuilder', 'notes', 'settings', 'admin'].includes(activeTab) ? 'active' : ''}`}
+            aria-expanded={moreOpen}
+            aria-controls="nav-secondary"
+            onClick={() => setMoreOpen(open => !open)}
           >
-            <Swords size={18} />
-            <span>{t('nav.deckBuilder')}</span>
+            <MoreHorizontal size={18} aria-hidden="true" />
+            <span>{t('nav.more')}</span>
           </button>
-
-          <button
-            className={`nav-tab ${activeTab === 'notes' ? 'active' : ''}`}
-            onClick={() => goTab('notes')}
-          >
-            <StickyNote size={18} />
-            <span>{t('nav.notes')}</span>
-          </button>
-
-          <button
-            className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => goTab('settings')}
-          >
-            <SettingsIcon size={18} />
-            <span>{t('nav.settings')}</span>
-          </button>
-          {user.role === 'admin' && (
-            <button 
-              className={`nav-tab ${activeTab === 'admin' ? 'active' : ''}`}
-              onClick={() => goTab('admin')}
+          <div id="nav-secondary" className={`nav-secondary ${moreOpen ? 'is-open' : ''}`}>
+            <button
+              className={`nav-tab ${activeTab === 'deckbuilder' ? 'active' : ''}`}
+              aria-current={activeTab === 'deckbuilder' ? 'page' : undefined}
+              onClick={() => {
+                if (activeTab === 'deckbuilder' && navigationGuardRef.current?.() === false) return;
+                if (goTab('deckbuilder')) setDeckViewKey(key => key + 1);
+              }}
             >
-              <ShieldAlert size={18} style={{ color: 'var(--accent-red)' }} />
-              <span>{t('nav.admin')}</span>
+              <Swords size={18} />
+              <span>{t('nav.deckBuilder')}</span>
             </button>
-          )}
+
+            <button
+              className={`nav-tab ${activeTab === 'notes' ? 'active' : ''}`}
+              aria-current={activeTab === 'notes' ? 'page' : undefined}
+              onClick={() => goTab('notes')}
+            >
+              <StickyNote size={18} />
+              <span>{t('nav.notes')}</span>
+            </button>
+
+            <button
+              className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
+              aria-current={activeTab === 'settings' ? 'page' : undefined}
+              onClick={() => goTab('settings')}
+            >
+              <SettingsIcon size={18} />
+              <span>{t('nav.settings')}</span>
+            </button>
+            {user.role === 'admin' && (
+              <button
+                className={`nav-tab ${activeTab === 'admin' ? 'active' : ''}`}
+                aria-current={activeTab === 'admin' ? 'page' : undefined}
+                onClick={() => goTab('admin')}
+              >
+                <ShieldAlert size={18} style={{ color: 'var(--accent-red)' }} />
+                <span>{t('nav.admin')}</span>
+              </button>
+            )}
+          </div>
         </nav>
 
         <div className="header-account" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div className="header-greeting" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            <Sparkles size={14} style={{ color: 'var(--accent-yellow)' }} />
             <span>{t('header.greeting')} <strong style={{ color: 'var(--text-strong)' }}>{user.username}</strong> ({t(`role.${user.role}`)})</span>
           </div>
           <button
@@ -510,12 +590,7 @@ function App() {
         </ErrorBoundary>
       </main>
 
-      {/* Toast Notification */}
-      {toast && (
-        <div className="toast">
-          {toast}
-        </div>
-      )}
+      {toastNotification}
     </div>
   );
 }

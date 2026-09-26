@@ -74,14 +74,14 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
-        showToast && showToast(body?.error || t('slab.errAdd'));
+        showToast && showToast(body?.error || t('slab.errAdd'), 'error');
         return;
       }
       showToast && showToast(t('slab.added', {
         grader: result.cert.grader,
         grade: result.cert.grade ?? '',
         name: card.name,
-      }));
+      }), 'success');
       onAddSuccess && onAddSuccess();
       // Cleared so the next slab starts from an empty box. The cert is cached
       // server-side, so re-entering this one costs nothing if they want it back.
@@ -89,7 +89,7 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
       setResult(null);
     } catch (err) {
       console.error(err);
-      showToast && showToast(t('slab.errAdd'));
+      showToast && showToast(t('slab.errAdd'), 'error');
     } finally {
       setAdding(null);
     }

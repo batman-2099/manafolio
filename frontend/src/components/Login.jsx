@@ -125,47 +125,29 @@ function Login({ onLoginSuccess }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: '100vh',
+      minHeight: '100dvh',
       boxSizing: 'border-box',
       padding: 'calc(1rem + env(safe-area-inset-top, 0px)) 1rem calc(1rem + env(safe-area-inset-bottom, 0px)) 1rem'
     }}>
-      <div className="glass-panel" style={{
-        maxWidth: '420px',
-        width: '100%',
-        padding: '2.5rem 2rem',
-        boxShadow: 'var(--shadow-glow), var(--shadow-accent)',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid rgba(255, 71, 71, 0.2)'
-      }}>
-        {/* Logo/Icon */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <h2 className="logo-text">Manafolio</h2>
+      <div className="login-form" style={{ maxWidth: '420px', width: '100%' }}>
+        <header style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            <div style={{ width: '48px', height: '48px', flexShrink: 0 }}><Logo /></div>
+            <span style={{ fontSize: '1.25rem', fontWeight: 700 }} translate="no">Manafolio</span>
             <span className="app-version">v{import.meta.env.VITE_APP_VERSION}</span>
           </div>
-          <div style={{ width: '84px', height: '84px', margin: '0 auto 1rem auto' }}>
-            <Logo />
-          </div>
-          <p className="logo-text logo-tagline" style={{ fontSize: '1rem', lineHeight: 1.5, marginTop: '0.5rem', marginBottom: '0.5rem', textWrap: 'balance' }}>
-            {t('common.tagline').split(/(?<=\.)\s+/).map((sentence, index) => (
-              <span key={index} style={{ display: 'block' }}>{sentence}</span>
-            ))}
+          <h1 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem' }}>
+            {t(setupRequired ? 'login.setupSubmit' : isRegister ? 'login.register' : 'login.signIn')}
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+            {t(setupRequired ? 'login.setupTagline' : isRegister ? 'login.taglineRegister' : 'login.taglineLogin')}
           </p>
-          {(setupRequired || isRegister) && (
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-              {t(setupRequired ? 'login.setupTagline' : 'login.taglineRegister')}
-            </p>
-          )}
-        </div>
+        </header>
 
         {setupRequired && (
           <div style={{
-            padding: '0.75rem 1rem',
             marginBottom: '1.5rem',
-            borderLeft: '3px solid var(--accent-red)',
-            background: 'rgba(255,255,255,0.03)',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '0.8rem',
+            fontSize: '0.875rem',
             color: 'var(--text-secondary)',
             lineHeight: 1.5
           }}>
@@ -174,12 +156,11 @@ function Login({ onLoginSuccess }) {
         )}
 
         {error && (
-          <div className="glass-panel" style={{
+          <div role="alert" style={{
             padding: '0.75rem 1rem',
-            borderLeft: '3px solid var(--accent-red)',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            color: '#f87171',
-            fontSize: '0.85rem',
+            border: '1px solid var(--accent-red)',
+            color: 'var(--accent-red)',
+            fontSize: '0.875rem',
             marginBottom: '1.5rem',
             borderRadius: 'var(--radius-sm)'
           }}>
@@ -191,7 +172,7 @@ function Login({ onLoginSuccess }) {
           <div style={{ marginBottom: '1.25rem' }}>
             <a
               href="/api/auth/oidc/login"
-              className="btn"
+              className="btn btn-secondary"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -200,14 +181,10 @@ function Login({ onLoginSuccess }) {
                 padding: '0.75rem 1rem',
                 width: '100%',
                 boxSizing: 'border-box',
-                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: 'var(--text-strong)',
                 fontSize: '0.95rem',
                 fontWeight: 600,
                 borderRadius: 'var(--radius-sm)',
                 textDecoration: 'none',
-                transition: 'all 0.2s ease',
                 cursor: 'pointer'
               }}
             >
@@ -216,24 +193,26 @@ function Login({ onLoginSuccess }) {
             </a>
 
             <div style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0 0.25rem 0', gap: '0.75rem' }}>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }} />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-glass)' }} />
+              <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                 {t('login.orDivider')}
               </span>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }} />
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-glass)' }} />
             </div>
           </div>
         )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label htmlFor="login-username" style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('login.username')}</label>
+            <label htmlFor="login-username">{t('login.username')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 id="login-username"
                 type="text"
                 name="username"
                 autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
                 className="input-control"
                 style={{ width: '100%', paddingLeft: '2.5rem' }}
                 placeholder={t('login.usernamePlaceholder')}
@@ -250,7 +229,7 @@ function Login({ onLoginSuccess }) {
           </div>
 
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label htmlFor="login-password" style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('login.password')}</label>
+            <label htmlFor="login-password">{t('login.password')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 id="login-password"
@@ -270,18 +249,21 @@ function Login({ onLoginSuccess }) {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={t(showPassword ? 'login.hidePassword' : 'login.showPassword')}
+                aria-pressed={showPassword}
                 style={{
                   position: 'absolute',
-                  right: '0.75rem',
+                  right: 0,
                   top: '50%',
                   transform: 'translateY(-50%)',
                   background: 'none',
                   border: 'none',
                   color: 'var(--text-muted)',
                   cursor: 'pointer',
-                  padding: '8px',
+                  minWidth: '44px',
+                  minHeight: '44px',
                   display: 'flex',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -291,7 +273,7 @@ function Login({ onLoginSuccess }) {
 
           {creating && (
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label htmlFor="login-confirm-password" style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('login.confirmPassword')}</label>
+              <label htmlFor="login-confirm-password">{t('login.confirmPassword')}</label>
               <div style={{ position: 'relative' }}>
                 <input
                   id="login-confirm-password"
@@ -321,19 +303,14 @@ function Login({ onLoginSuccess }) {
               justifyContent: 'center',
               gap: '0.5rem',
               fontSize: '1rem',
-              fontWeight: 700,
-              boxShadow: 'var(--shadow-accent)'
+              fontWeight: 700
             }}
             disabled={loading}
           >
-            {loading ? (
-              <div className="spinner" style={{ width: '16px', height: '16px', margin: 0, borderWidth: '2px' }}></div>
-            ) : (
-              <>
-                <span>{t(setupRequired ? 'login.setupSubmit' : isRegister ? 'login.register' : 'login.login')}</span>
-                <ArrowRight size={16} />
-              </>
-            )}
+            <span>{t(setupRequired ? 'login.setupSubmit' : isRegister ? 'login.register' : 'login.login')}</span>
+            {loading
+              ? <span className="spinner" aria-hidden="true" style={{ width: '16px', height: '16px', margin: 0, borderWidth: '2px' }} />
+              : <ArrowRight size={16} aria-hidden="true" />}
           </button>
         </form>
 

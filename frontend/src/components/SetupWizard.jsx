@@ -106,7 +106,7 @@ export default function SetupWizard({ user, onClose, showToast }) {
     try {
       const j = await post('/api/admin/models/download', { what });
       setEngine(prev => ({ ...(prev || {}), progress: j.progress }));
-    } catch (e) { showToast?.(e.message); }
+    } catch (e) { showToast?.(e.message, 'error'); }
   };
 
 
@@ -117,7 +117,7 @@ export default function SetupWizard({ user, onClose, showToast }) {
       await post('/api/locations', { name, type: newType });
       setNewName('');
       await loadLocations();
-    } catch (e) { showToast?.(e.message); }
+    } catch (e) { showToast?.(e.message, 'error'); }
   };
 
   const renameLocation = async (id) => {
@@ -131,7 +131,7 @@ export default function SetupWizard({ user, onClose, showToast }) {
       if (!r.ok) throw new Error(j.error || t('setup.storage.errRename'));
       setEditingId(null);
       await loadLocations();
-    } catch (e) { showToast?.(e.message); }
+    } catch (e) { showToast?.(e.message, 'error'); }
   };
 
   const deleteLocation = async (loc) => {
@@ -145,7 +145,7 @@ export default function SetupWizard({ user, onClose, showToast }) {
       const r = await fetch(`/api/locations/${loc.id}`, { method: 'DELETE' });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || t('setup.storage.errDelete'));
       await loadLocations();
-    } catch (e) { showToast?.(e.message); }
+    } catch (e) { showToast?.(e.message, 'error'); }
   };
 
   const finish = async () => {
@@ -236,7 +236,6 @@ export default function SetupWizard({ user, onClose, showToast }) {
         title={t('setup.language.title', { name: user?.username || t('setup.language.fallbackName') })}
         sub={t('setup.language.sub')}
       />
-      <p style={{ color: 'var(--text-secondary)', margin: 0 }}>{t('common.tagline')}</p>
       {LOCALES.length > 1 && (
         <div>
           <label htmlFor="setup-ui-lang" style={{ ...label, display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.3rem' }}>

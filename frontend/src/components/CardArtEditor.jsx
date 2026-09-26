@@ -54,8 +54,8 @@ export default function CardArtEditor({ card, hasProviderArt, showToast, onChang
     const file = e.target.files?.[0];
     e.target.value = ''; // so re-picking the same file fires change again
     if (!file) return;
-    if (!file.type.startsWith('image/')) return showToast?.(t('art.notAnImage'));
-    if (file.size > MAX_BYTES) return showToast?.(t('art.tooLarge'));
+    if (!file.type.startsWith('image/')) return showToast?.(t('art.notAnImage'), 'error');
+    if (file.size > MAX_BYTES) return showToast?.(t('art.tooLarge'), 'error');
 
     setBusy(true);
     try {
@@ -73,9 +73,9 @@ export default function CardArtEditor({ card, hasProviderArt, showToast, onChang
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'upload failed');
       noteArtChanged(cardId, true);
       onChanged?.();
-      showToast?.(t('art.saved'));
+      showToast?.(t('art.saved'), 'success');
     } catch (err) {
-      showToast?.(t('art.saveFailed', { message: err.message }));
+      showToast?.(t('art.saveFailed', { message: err.message }), 'error');
     } finally {
       setBusy(false);
     }
@@ -91,9 +91,9 @@ export default function CardArtEditor({ card, hasProviderArt, showToast, onChang
       // instance's copy, and art contributed upstream lives in the image.
       noteArtChanged(cardId, !!data.hasBundled);
       onChanged?.();
-      showToast?.(t('art.removed'));
+      showToast?.(t('art.removed'), 'success');
     } catch (err) {
-      showToast?.(t('art.removeFailed', { message: err.message }));
+      showToast?.(t('art.removeFailed', { message: err.message }), 'error');
     } finally {
       setBusy(false);
     }
@@ -138,7 +138,7 @@ export default function CardArtEditor({ card, hasProviderArt, showToast, onChang
         body,
       }), '_blank', 'noopener');
     } catch (err) {
-      showToast?.(t('art.shareFailed', { message: err.message }));
+      showToast?.(t('art.shareFailed', { message: err.message }), 'error');
     } finally {
       setBusy(false);
     }

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useT } from '../utils/i18n';
 
@@ -10,6 +10,8 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const triggerRef = useRef(null);
+  const groupId = useId();
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -34,13 +36,21 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
       : t('bulk.selected', { count: value.length });
 
   return (
-    <div ref={ref} style={{ position: 'relative', zIndex: open ? 100 : 0 }}>
+    <div ref={ref} style={{ position: 'relative', zIndex: open ? 100 : 0 }} onKeyDown={(event) => {
+      if (open && event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }}>
       <button
+        ref={triggerRef}
         type="button"
         className="select-control"
         onClick={() => setOpen(o => !o)}
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', textAlign: 'left' }}
-        aria-haspopup="listbox"
+        aria-controls={open ? groupId : undefined}
         aria-expanded={open}
         aria-label={label}
       >
@@ -50,6 +60,9 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
 
       {open && (
         <div
+          id={groupId}
+          role="group"
+          aria-label={label}
           style={{
             position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 101,
             minWidth: '100%', maxHeight: '260px', overflowY: 'auto',

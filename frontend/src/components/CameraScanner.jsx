@@ -901,7 +901,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
       if (Math.abs(actual - next) > 0.000001) throw new Error(t('scan.zoomNotApplied'));
     } catch (err) {
       if (track === zoomTrackRef.current && track.readyState !== 'ended') {
-        showToast(t('scan.errZoom', { error: err.message || err.name || t('scan.unknownError') }));
+        showToast(t('scan.errZoom', { error: err.message || err.name || t('scan.unknownError') }), 'error');
       }
     } finally {
       if (track === zoomTrackRef.current) {
@@ -917,10 +917,10 @@ function CameraScanner({ onAddSuccess, showToast }) {
   // so those users get a clear "not supported" instead of a dead button.
   const toggleTorch = async () => {
     const track = stream?.getVideoTracks()[0];
-    if (!track) { showToast(t('scan.errCameraNotReady')); return; }
+    if (!track) { showToast(t('scan.errCameraNotReady'), 'error'); return; }
     const caps = typeof track.getCapabilities === 'function' ? track.getCapabilities() : {};
     if (!caps.torch) {
-      showToast(t('scan.errNoTorch'));
+      showToast(t('scan.errNoTorch'), 'error');
       return;
     }
     const next = !isTorchOn;
@@ -928,7 +928,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
       await track.applyConstraints({ advanced: [{ torch: next }] });
       setIsTorchOn(next);
     } catch (err) {
-      showToast(t('scan.errTorch', { error: err.name || err.message || t('scan.unknownError') }));
+      showToast(t('scan.errTorch', { error: err.name || err.message || t('scan.unknownError') }), 'error');
     }
   };
 
@@ -963,7 +963,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     // "check your permissions" sends people hunting for a setting that is fine.
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
       setCameraErrorKey('scan.errCameraInsecure');
-      showToast(t('scan.errCameraInsecure', { origin: window.location.origin, port: window.location.port || '80' }));
+      showToast(t('scan.errCameraInsecure', { origin: window.location.origin, port: window.location.port || '80' }), 'error');
       return;
     }
     try {
@@ -988,7 +988,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     } catch (err) {
       console.error('Error opening camera:', err);
       setCameraErrorKey('scan.errCameraPermissions');
-      showToast(t('scan.errCameraAccess'));
+      showToast(t('scan.errCameraAccess'), 'error');
     }
   };
 
@@ -1030,11 +1030,11 @@ function CameraScanner({ onAddSuccess, showToast }) {
         const placementLabel = data.placement?.label || null;
         const cardDisplayName = getCardDisplayName(card.name, autoLanguage, card.printed_name);
         if (placementLabel) {
-          showToast(t('scan.addedTo', { qty: qtyLabel, name: cardDisplayName, place: placementLabel }));
+          showToast(t('scan.addedTo', { qty: qtyLabel, name: cardDisplayName, place: placementLabel }), 'success');
         } else if (data.container_full) {
-          showToast(t('scan.addedFull', { qty: qtyLabel, name: cardDisplayName }));
+          showToast(t('scan.addedFull', { qty: qtyLabel, name: cardDisplayName }), 'success');
         } else {
-          showToast(t('scan.autoAdded', { qty: qtyLabel, name: cardDisplayName, set: card.set_name }));
+          showToast(t('scan.autoAdded', { qty: qtyLabel, name: cardDisplayName, set: card.set_name }), 'success');
         }
 
         // Append to recent scans history log. entry_id (the last inserted row)
@@ -1054,12 +1054,12 @@ function CameraScanner({ onAddSuccess, showToast }) {
         
         onAddSuccess(); // Refresh stats
       } else {
-        showToast(t('scan.errAutoAdd', { name: getCardDisplayName(card.name, autoLanguage, card.printed_name) }));
+        showToast(t('scan.errAutoAdd', { name: getCardDisplayName(card.name, autoLanguage, card.printed_name) }), 'error');
         signal('error');
       }
     } catch (err) {
       console.error('Auto-add error:', err);
-      showToast(t('scan.errAutoAddGeneric'));
+      showToast(t('scan.errAutoAddGeneric'), 'error');
       signal('error');
     }
   };
@@ -1493,7 +1493,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
         return (b.image_url ? 1 : 0) - (a.image_url ? 1 : 0);
       });
       if (found.length <= 1) {
-        showToast(t('scan.noOtherPrintings'));
+        showToast(t('scan.noOtherPrintings'), 'status');
         return;
       }
       setLastMatches(found);
@@ -1501,7 +1501,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
       setScanMatches(found);
       setShowAllMatches(true);
     } catch {
-      showToast(t('scan.noOtherPrintings'));
+      showToast(t('scan.noOtherPrintings'), 'status');
     } finally {
       setFindingPrintings(false);
     }
@@ -1547,13 +1547,13 @@ function CameraScanner({ onAddSuccess, showToast }) {
           setScanMatches(sorted);
           setShowAllMatches(true);
         } else {
-          showToast(t('scan.errManualSearch'));
+          showToast(t('scan.errManualSearch'), 'error');
         }
       } else {
-        showToast(t('scan.errManualSearch'));
+        showToast(t('scan.errManualSearch'), 'error');
       }
     } catch {
-      showToast(t('scan.errManualSearch'));
+      showToast(t('scan.errManualSearch'), 'error');
     } finally {
       setManualSearching(false);
     }
@@ -1610,11 +1610,11 @@ function CameraScanner({ onAddSuccess, showToast }) {
         const placementLabel = data.placement?.label || null;
         const cardDisplayName = getCardDisplayName(selectedCard.name, language, selectedCard.printed_name);
         if (placementLabel) {
-          showToast(t('scan.addedToPlain', { name: cardDisplayName, place: placementLabel }));
+          showToast(t('scan.addedToPlain', { name: cardDisplayName, place: placementLabel }), 'success');
         } else if (data.container_full) {
-          showToast(t('scan.addedFullPlain', { name: cardDisplayName }));
+          showToast(t('scan.addedFullPlain', { name: cardDisplayName }), 'success');
         } else {
-          showToast(t('search.addedToCollection', { name: cardDisplayName }));
+          showToast(t('search.addedToCollection', { name: cardDisplayName }), 'success');
         }
 
         // Append to recent scans history. Carry entry_id + saved fields so the
@@ -1638,11 +1638,11 @@ function CameraScanner({ onAddSuccess, showToast }) {
         onAddSuccess();
         closeDrawer();
       } else {
-        showToast(t('search.errAddCard'));
+        showToast(t('search.errAddCard'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('scan.errSaveCard'));
+      showToast(t('scan.errSaveCard'), 'error');
     }
   };
 
@@ -2325,7 +2325,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                       autoArmed.current = true;
                       capturedQuad.current = null;
                       resolvedDupIdRef.current = null;
-                      showToast(t('scan.autoAddCancelled'));
+                      showToast(t('scan.autoAddCancelled'), 'status');
                     }}
                     style={{ flex: 1, fontSize: '0.75rem', padding: '0.45rem 0' }}
                   >
@@ -2362,7 +2362,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                       autoArmed.current = true;
                       capturedQuad.current = null;
                       resolvedDupIdRef.current = null;
-                      showToast(t('scan.autoAddCancelled'));
+                      showToast(t('scan.autoAddCancelled'), 'status');
                     }}
                     style={{ flex: 1, fontSize: '0.75rem', padding: '0.45rem 0' }}
                   >
@@ -2503,7 +2503,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 onClick={() => {
                   resolvedDupIdRef.current = dupConfirmCard.id;
                   setDupConfirmCard(null);
-                  showToast(t('scan.discardedRepeat'));
+                  showToast(t('scan.discardedRepeat'), 'status');
                 }}
                 style={{ width: '100%', fontSize: '0.8rem', padding: '0.45rem 0' }}
               >
@@ -2516,7 +2516,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                   resolvedDupIdRef.current = dupConfirmCard.id;
                   setDupConfirmCard(null);
                   setAutoScan(false);
-                  showToast(t('scan.secondPhoto'));
+                  showToast(t('scan.secondPhoto'), 'status');
                 }}
                 style={{ width: '100%', fontSize: '0.8rem', padding: '0.45rem 0' }}
               >

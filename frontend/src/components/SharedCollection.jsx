@@ -10,6 +10,7 @@ import { sortCardsByOrder } from '../utils/cardSort';
 import { displayName } from '../utils/languages';
 import CardImage from './CardImage';
 import { useT } from '../utils/i18n';
+import themes from '../../../shared/themes.json';
 
 const COLORS = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
@@ -67,13 +68,6 @@ function SharedCollection({ shareToken }) {
 
   const [activeCard, setActiveCard] = useState(null);
   useBackGuard(!!activeCard, () => setActiveCard(null));
-
-  useEffect(() => {
-    const urlTheme = new URLSearchParams(window.location.search).get('theme');
-    if (urlTheme) {
-      document.documentElement.setAttribute('data-theme', urlTheme);
-    }
-  }, []);
 
   useEffect(() => {
     const fetchSharedData = async () => {
@@ -180,7 +174,7 @@ function SharedCollection({ shareToken }) {
   const handleTabChange = (type) => {
     setListType(type);
     const themeParam = new URLSearchParams(window.location.search).get('theme');
-    const qTheme = themeParam ? `&theme=${encodeURIComponent(themeParam)}` : '';
+    const qTheme = themes.includes(themeParam) && themeParam !== 'dark' ? `&theme=${encodeURIComponent(themeParam)}` : '';
     const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?list=${type}${qTheme}`;
     window.history.pushState({ path: newUrl }, '', newUrl);
   };
@@ -398,7 +392,7 @@ function SharedCollection({ shareToken }) {
         <div className="card-grid">
           {processedCollection.map(card => {
             return (
-              <div key={card.entry_id} className="tcg-card tilt-card-wrapper" onClick={() => setActiveCard(card)}>
+              <div key={card.entry_id} className="tcg-card" onClick={() => setActiveCard(card)}>
                 <div className="tcg-card-inner">
                   <CardImage card={card} className="tcg-card-image" loading="lazy" />
                   {getFoilOverlayClass(card.printing) && (
