@@ -1,0 +1,74 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+web_modules/
+
+# Production builds
+dist/
+build/
+out/
+
+# Database files
+*.db
+*.db-journal
+*.sqlite
+backend/database/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+logs/
+*.log
+
+# Agent instructions
+CLAUDE.md
+
+# One-off dev scratch (ad-hoc patch scripts and scratch test runners).
+# The real test suite lives in backend/test/ and is NOT matched by these.
+patch*.py
+/backend/test.js
+/backend/test[0-9].js
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# AI/Agent directories
+.agents/
+.claude/
+.codegraph/
+.gemini/
+.cursor/
+.aider/
+
+# Per-user Codex credentials and account caches, including custom DB_PATH locations
+codex/
+
+# Agent-workflow scratch docs (regenerated per run; not shipped)
+TEST_INFRA.md
+TEST_READY.md
+
+# Prebuilt scan-match data (embeddings, ORB indexes, per-set caches) — large, regenerable
+backend/data/
+
+# CollectorVision models and onnxruntime-web wasm (fetched, not authored)
+frontend/public/ort/
+
+# Local wiki clone
+wiki/

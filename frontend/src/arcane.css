@@ -1,0 +1,311 @@
+/* Arcane Blue is the default dark design; other account themes keep their styling. */
+/* Arcane Blue: a quiet, moonlit vault. Keep all behavior in the existing views. */
+:root[data-theme="dark"],
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --font-main: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --bg-primary: #07101f;
+  --bg-secondary: #101f35;
+  --bg-glass: rgba(15, 31, 53, 0.94);
+  --border-glass: rgba(148, 191, 229, 0.22);
+  --border-glass-hover: rgba(164, 215, 255, 0.5);
+  --text-primary: #eaf4ff;
+  --text-secondary: #b1c4db;
+  --text-muted: #91a9c3;
+  --text-strong: #f4f9ff;
+  --text-on-accent: #071526;
+  --accent-red: #94d5ff;
+  --accent-red-glow: rgba(117, 193, 255, 0.16);
+  --accent-blue: #7bbaff;
+  --accent-blue-glow: rgba(92, 162, 248, 0.16);
+  --accent-yellow: #c4deed;
+  --accent-yellow-glow: rgba(196, 222, 237, 0.12);
+  --surface-1: rgba(153, 200, 244, 0.045);
+  --surface-2: rgba(153, 200, 244, 0.085);
+  --surface-3: rgba(153, 200, 244, 0.14);
+  --input-bg: #091629;
+  --input-bg-focus: #0c1c32;
+  --radius-sm: 10px;
+  --radius-md: 20px;
+  --radius-lg: 26px;
+  --shadow-glow: 0 16px 36px rgba(0, 4, 15, 0.25);
+  --shadow-accent: 0 4px 18px rgba(67, 144, 213, 0.16);
+  --transition-smooth: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  --bg-gradient:
+    radial-gradient(ellipse at 12% 0%, rgba(57, 116, 179, 0.22), transparent 48%),
+    radial-gradient(ellipse at 95% 35%, rgba(45, 77, 142, 0.14), transparent 48%),
+    radial-gradient(ellipse at 50% 110%, rgba(48, 116, 147, 0.10), transparent 55%);
+}
+:root[data-theme="dark"] body {
+  background-attachment: fixed;
+}
+:root[data-theme="dark"] :is(h1, h2, h3, h4, h5):not(.logo-text) {
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  text-transform: none;
+  text-shadow: none;
+  color: var(--text-strong);
+}
+:root[data-theme="dark"] .app-container {
+  max-width: 1600px;
+}
+:root[data-theme="dark"] .app-header {
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  padding-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
+  border-bottom-color: rgba(150, 197, 237, 0.2);
+}
+:root[data-theme="dark"] .app-header > div:last-child {
+  margin-left: auto;
+}
+:root[data-theme="dark"] .app-header .logo-section {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.2rem 0.75rem;
+}
+:root[data-theme="dark"] .nav-tabs {
+  order: 3;
+  width: 100%;
+  border-radius: 999px;
+  padding: 0.4rem;
+  gap: 0.35rem;
+  background: #0b192c;
+  border: 1px solid var(--border-glass);
+  box-shadow: inset 0 1px rgba(220, 240, 255, 0.035);
+}
+:root[data-theme="dark"] :is(.nav-tab, .sub-nav-tab) {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+:root[data-theme="dark"] :is(.nav-tab.active, .sub-nav-tab.active) {
+  background: linear-gradient(135deg, #24476b, #16314f);
+  border-color: #547b9e;
+  color: #e3f4ff;
+  box-shadow: inset 0 1px rgba(216, 238, 255, 0.13), 0 4px 12px #050c182e;
+}
+:root[data-theme="dark"] .sub-nav-tabs {
+  border-radius: 24px;
+  background: #0a182a;
+}
+:root[data-theme="dark"] :is(.glass-panel, .metric-card) {
+  background: linear-gradient(145deg, rgba(24, 44, 70, 0.97), rgba(12, 27, 48, 0.98));
+  border: 1px solid var(--border-glass);
+  border-top-color: rgba(188, 218, 243, 0.34);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 0 rgba(231, 247, 255, 0.035), var(--shadow-glow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-theme="dark"] .glass-panel .glass-panel {
+  background: #0d1c30;
+  box-shadow: inset 0 1px rgba(216, 239, 255, 0.025);
+}
+:root[data-theme="dark"] .metric-card {
+  min-height: 165px;
+  padding: 1.4rem 1.5rem;
+}
+:root[data-theme="dark"] .metric-card::after {
+  content: '';
+  position: absolute;
+  height: 2px;
+  bottom: 0;
+  left: 1.5rem;
+  right: 1.5rem;
+  background: linear-gradient(90deg, var(--card-accent), transparent);
+  opacity: 0.55;
+}
+:root[data-theme="dark"] .metric-card.accent-networth {
+  background: radial-gradient(ellipse at top right, #234c71, transparent 85%), #10233b;
+  border-color: #4b7292;
+  --card-accent: #a6dcff;
+}
+:root[data-theme="dark"] .metric-card.accent-gain-down {
+  --card-accent: #f79da6;
+}
+:root[data-theme="dark"] .metric-header {
+  letter-spacing: 0.09em;
+  font-size: 0.72rem;
+}
+:root[data-theme="dark"] .metric-value {
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+:root[data-theme="dark"] .metric-icon {
+  border: 1px solid color-mix(in srgb, var(--card-accent) 25%, transparent);
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+}
+:root[data-theme="dark"] .chart-title {
+  padding-left: 1rem;
+  font-size: 1rem;
+}
+:root[data-theme="dark"] .chart-title::before {
+  width: 4px;
+  background: linear-gradient(#c8e9ff, #4e87bd);
+  box-shadow: none;
+}
+:root[data-theme="dark"] .btn {
+  border-radius: 999px;
+  font-family: var(--font-main);
+  letter-spacing: 0.01em;
+  text-transform: none;
+  font-weight: 600;
+  text-shadow: none;
+}
+:root[data-theme="dark"] .btn-primary {
+  background: linear-gradient(150deg, #c2e6ff, #84bbeb);
+  color: #091b30;
+  border: 1px solid #c0e4ff;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.5), 0 4px 14px #030b1933;
+}
+:root[data-theme="dark"] .btn-primary:hover {
+  background: linear-gradient(150deg, #d5efff, #a1d4fc);
+  border-color: #e0f3ff;
+  box-shadow: 0 4px 16px #4c93c326;
+  transform: none;
+}
+:root[data-theme="dark"] .btn-secondary {
+  background: #12263f;
+  border-color: #38526e;
+  color: #d5e8fa;
+}
+:root[data-theme="dark"] :is(.btn-secondary:hover, .btn-danger:hover, .metric-card:hover) {
+  transform: none;
+}
+:root[data-theme="dark"] :is(.input-control, .select-control, select) {
+  background-color: var(--input-bg);
+  border: 1px solid #3a526e;
+  color: var(--text-primary);
+  border-radius: 10px;
+  font-family: var(--font-main);
+  box-shadow: inset 0 2px 5px #03091333;
+}
+:root[data-theme="dark"] :is(.input-control, .select-control):focus {
+  background-color: var(--input-bg-focus);
+  border-color: #a6d9ff;
+  box-shadow: 0 0 0 3px #85c2f421;
+}
+:root[data-theme="dark"] select option {
+  background: #102139;
+  color: #eaf4ff;
+  font-family: var(--font-main);
+}
+:root[data-theme="dark"] input::placeholder, :root[data-theme="dark"] textarea::placeholder {
+  color: #8da5bf;
+  opacity: 1;
+}
+:root[data-theme="dark"] :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #b5e0ff;
+  outline-offset: 3px;
+}
+:root[data-theme="dark"] button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+:root[data-theme="dark"] :is(.kebab-dropdown, .dropdown-menu, .quick-add-drawer, .stack-inspector-drawer) {
+  background: #102139;
+  border-color: #56738f;
+  box-shadow: 0 20px 50px #01071480;
+}
+:root[data-theme="dark"] :is(.kebab-item, .dropdown-item) {
+  font-family: var(--font-main);
+  text-transform: none;
+  color: var(--text-primary);
+}
+:root[data-theme="dark"] :is(.kebab-item:hover, .dropdown-item:hover) {
+  background: #203b59;
+  color: #f4f9ff;
+}
+:root[data-theme="dark"] .tcg-card {
+  padding: 0.55rem;
+  border-radius: 15px;
+  background: linear-gradient(150deg, #19314c, #0d1c31);
+  border: 1px solid #314b66;
+  box-shadow: 0 9px 18px #02071433;
+}
+:root[data-theme="dark"] .tcg-card:hover .tcg-card-inner {
+  transform: none;
+  border-color: #98c5e7;
+  box-shadow: 0 4px 12px #01091666;
+}
+:root[data-theme="dark"] .tcg-card-info {
+  padding: 0.2rem 0.15rem;
+  gap: 0.3rem;
+}
+:root[data-theme="dark"] .tcg-card-price {
+  color: #b8e3ff;
+}
+:root[data-theme="dark"] .collection-table-wrapper {
+  border: 1px solid var(--border-glass);
+  border-radius: 15px;
+  background: #0d1b2e;
+}
+:root[data-theme="dark"] .collection-table th {
+  background: #172c45;
+  color: #c6def4;
+  letter-spacing: 0.07em;
+}
+:root[data-theme="dark"] .collection-table tr:hover td {
+  background: #172d47;
+}
+:root[data-theme="dark"] .set-progress-bar-fill {
+  background: linear-gradient(90deg, #5f99d6, #b9e2ff);
+}
+:root[data-theme="dark"] .row-tab-btn.active {
+  background: #234666;
+  border-color: #9fceef;
+}
+:root[data-theme="dark"] .coverflow-card.active {
+  border-color: #9fceef;
+  box-shadow: 0 12px 30px #02091680;
+}
+:root[data-theme="dark"] :is(.coverflow-nav-btn, .box-coverflow-nav):hover {
+  background: #2a547d;
+}
+:root[data-theme="dark"] .view-transition {
+  animation: none;
+}
+@media (min-width: 769px) {
+  :root[data-theme="dark"] .app-container { padding: 2rem 2.5rem; }
+  :root[data-theme="dark"] .nav-tab { padding: 0.8rem 1rem; }
+  :root[data-theme="dark"] .card-grid { gap: 1.2rem; }
+}
+@media (max-width: 768px) {
+  :root[data-theme="dark"] .app-header { gap: 0.5rem; }
+  :root[data-theme="dark"] .app-header > div:last-child { max-width: 48%; }
+  :root[data-theme="dark"] .app-header > div:last-child > div { font-size: 0.7rem !important; }
+  :root[data-theme="dark"] .nav-tabs {
+    width: auto;
+    border-radius: 20px 20px 0 0;
+    gap: 0.1rem;
+    padding: 0.4rem 0.3rem max(0.5rem, env(safe-area-inset-bottom, 0px));
+    overflow-x: auto;
+    background: #0d1c30;
+    box-shadow: 0 -8px 24px #02091655;
+  }
+  :root[data-theme="dark"] .nav-tab {
+    flex: 1 0 54px;
+    font-size: 0.61rem;
+    padding: 0.55rem 0.3rem;
+    border-radius: 15px;
+  }
+  :root[data-theme="dark"] .metric-card {
+    padding: 1rem;
+    min-height: 145px;
+  }
+  :root[data-theme="dark"] .metrics-grid { gap: 0.65rem; margin-bottom: 1.25rem; }
+  :root[data-theme="dark"] .metric-value, :root[data-theme="dark"] .metric-card.accent-networth .metric-value { font-size: 1.7rem; }
+  :root[data-theme="dark"] .metric-header { font-size: 0.62rem; letter-spacing: 0.025em; gap: 0.4rem; }
+  :root[data-theme="dark"] .metric-icon { width: 30px; height: 30px; }
+  :root[data-theme="dark"] .glass-panel { padding: 1rem; border-radius: 16px; }
+  :root[data-theme="dark"] .collection-filter-toolbar { grid-template-columns: minmax(0, 1fr) auto !important; }
+  :root[data-theme="dark"] .collection-filter-toolbar > :first-child { grid-column: 1 / -1; }
+  :root[data-theme="dark"] .tcg-card { padding: 0.4rem; border-radius: 12px; }
+  :root[data-theme="dark"] .card-grid { gap: 0.65rem; }
+  :root[data-theme="dark"] .sub-nav-tab { padding: 0.65rem 0.5rem; }
+}

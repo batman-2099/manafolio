@@ -1,0 +1,24 @@
+{
+  "_comment": "Canonical category orderings shared by backend/src/utils/compartmentSort.js (filing) and frontend/src/utils/cardSort.js (display) so placement and display never drift. WUBRG is the universal MTG color order. Unknown/absent keys fall back to a high rank in code (sort last).",
+  "type": {
+    "White": 1, "Blue": 2, "Black": 3, "Red": 4, "Green": 5,
+    "Multicolor": 6, "Colorless": 7,
+    "Amber": 8, "Amethyst": 9, "Emerald": 10, "Ruby": 11, "Sapphire": 12, "Steel": 13,
+    "Unknown": 100
+  },
+  "printingNormalsFirst": {
+    "Normal": 1, "Holofoil": 2
+  },
+  "printingFoilsFirst": {
+    "Holofoil": 1, "Normal": 2
+  },
+  "language": {
+    "English": 1, "Japanese": 2, "German": 3, "French": 4, "Spanish": 5, "Italian": 6,
+    "Portuguese": 7, "Korean": 8, "Russian": 9,
+    "Chinese (Traditional)": 10, "Chinese (Simplified)": 11
+  },
+  "wubrg": {
+    "White": 1, "W": 1, "Blue": 2, "U": 2, "Black": 3, "B": 3,
+    "Red": 4, "R": 4, "Green": 5, "G": 5, "Multicolor": 6, "Colorless": 7
+  }
+}

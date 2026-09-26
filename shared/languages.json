@@ -1,0 +1,13 @@
+[
+  { "code": "en", "name": "English", "scryfall": "en", "games": ["mtg", "lorcana"] },
+  { "code": "ja", "name": "Japanese", "scryfall": "ja", "games": ["mtg", "lorcana"] },
+  { "code": "de", "name": "German", "scryfall": "de", "games": ["mtg", "lorcana"] },
+  { "code": "fr", "name": "French", "scryfall": "fr", "games": ["mtg", "lorcana"] },
+  { "code": "es", "name": "Spanish", "scryfall": "es", "games": ["mtg"] },
+  { "code": "it", "name": "Italian", "scryfall": "it", "games": ["mtg", "lorcana"] },
+  { "code": "pt", "name": "Portuguese", "scryfall": "pt", "games": ["mtg"] },
+  { "code": "ko", "name": "Korean", "scryfall": "ko", "games": ["mtg"] },
+  { "code": "ru", "name": "Russian", "scryfall": "ru", "games": ["mtg"] },
+  { "code": "zh-tw", "name": "Chinese (Traditional)", "scryfall": "zht", "games": ["mtg"] },
+  { "code": "zh-cn", "name": "Chinese (Simplified)", "scryfall": "zhs", "games": ["mtg", "lorcana"] }
+]

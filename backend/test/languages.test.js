@@ -1,0 +1,138 @@
+// Runnable checks for multi-language card support (issue #25).
+//
+// The bug this exists to prevent regressing: Scryfall has NO `lang` query
+// parameter, so the old `&lang=ja` was silently ignored and every "Japanese"
+// search came back in English. Language has to be a `lang:` search KEYWORD plus
+// include_multilingual=true. Verified against the live API:
+//   q=!"Lightning Bolt" unique:prints&lang=ja        -> 64 results, all English
+//   q=!"Lightning Bolt" lang:ja unique:prints
+//     &include_multilingual=true                     -> 18 results, all Japanese
+// No framework — plain node + assert. Run: `node test/languages.test.js`
+const assert = require('assert');
+const os = require('os');
+const path = require('path');
+
+process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-languages-${process.pid}.db`);
+const languages = require('../src/utils/languages');
+const scryfallApi = require('../src/scryfallApi');
+
+// --- 1. Language registry resolves every form callers use ---------------------
+assert.strictEqual(languages.toCode('Japanese'), 'ja', 'display name -> code');
+assert.strictEqual(languages.toCode('JA'), 'ja', 'code is case-insensitive');
+assert.strictEqual(languages.toCode('zht'), 'zh-tw', "Scryfall's own spelling resolves");
+assert.strictEqual(languages.toName('ja'), 'Japanese', 'code -> display name');
+assert.strictEqual(languages.toName('de'), 'German');
+// collection.language has held these exact strings since v1.0 — changing them
+// would orphan every existing row.
+for (const name of ['English', 'Japanese', 'German', 'French', 'Spanish', 'Italian']) {
+  assert.strictEqual(languages.toName(name), name, `${name} must survive a round trip`);
+}
+assert.strictEqual(languages.toCode('klingon'), 'en', 'unknown input degrades to English');
+assert.ok(languages.isEnglish(''), 'no language means English');
+assert.ok(languages.isEnglish('English') && languages.isEnglish('en'));
+assert.ok(!languages.isEnglish('ja'));
+
+// --- 1b. Game-scoped language filtering ---------------------------------------
+assert.strictEqual(languages.getLanguagesForGame('lorcana').length, 6, 'Lorcana supports 6 languages');
+assert.ok(languages.isLanguageSupported('lorcana', 'fr'), 'Lorcana supports French');
+assert.ok(languages.isLanguageSupported('lorcana', 'de'), 'Lorcana supports German');
+assert.ok(languages.isLanguageSupported('lorcana', 'French'), 'Lorcana supports French by name');
+assert.ok(!languages.isLanguageSupported('lorcana', 'es'), 'Lorcana does not support Spanish');
+assert.ok(!languages.isLanguageSupported('lorcana', 'pt'), 'Lorcana does not support Portuguese');
+assert.ok(!languages.isLanguageSupported('lorcana', 'ko'), 'Lorcana does not support Korean');
+assert.strictEqual(languages.getLanguagesForGame('mtg').length, 11, 'MTG supports 11 languages');
+
+// --- 2. Scryfall query construction -----------------------------------------
+// Capture the URLs fetchWindow actually requests.
+let urls = [];
+scryfallApi.client.defaults.adapter = async (config) => {
+  urls.push(config.url);
+  return {
+    status: 200, statusText: 'OK', headers: {}, config,
+    data: { data: [{ id: 'x', lang: 'ja', printed_name: '稲妻', name: 'Lightning Bolt', image_uris: { normal: 'i' } }], has_more: false, total_cards: 1 },
+  };
+};
+
+async function scryfallChecks() {
+  urls = [];
+  await scryfallApi.fetchWindow('!"Lightning Bolt" unique:prints', 'ja', 0, 10);
+  const jaUrl = urls[0];
+  assert.ok(jaUrl.includes(encodeURIComponent('lang:ja')), `language must be a search keyword: ${jaUrl}`);
+  assert.ok(jaUrl.includes('include_multilingual=true'), 'non-English needs include_multilingual');
+  assert.ok(!/[?&]lang=/.test(jaUrl), 'a bare lang= parameter is ignored by Scryfall — must not be sent');
+
+  // Chinese has to go out as Scryfall's spelling, not ours.
+  urls = [];
+  await scryfallApi.fetchWindow('set:tst', 'zh-tw', 0, 10);
+  assert.ok(urls[0].includes(encodeURIComponent('lang:zht')), `zh-tw must map to zht: ${urls[0]}`);
+
+  // English must stay byte-identical to the pre-language behaviour.
+  urls = [];
+  await scryfallApi.fetchWindow('set:tst', null, 0, 10);
+  assert.ok(!urls[0].includes('lang'), `English adds nothing: ${urls[0]}`);
+  assert.ok(!urls[0].includes('include_multilingual'), 'English must not request multilingual');
+
+  urls = [];
+  await scryfallApi.fetchWindow('set:tst', 'en', 0, 10);
+  assert.ok(!urls[0].includes('include_multilingual'), "'en' behaves like no language");
+}
+
+// --- 3. normalizeCard records the printing, not the request -------------------
+function normalizeChecks() {
+  const ja = scryfallApi.normalizeCard(
+    { id: 'u1', name: 'Lightning Bolt', printed_name: '稲妻', lang: 'ja', set: 'msc', collector_number: '806', image_uris: { normal: 'i' }, rarity: 'common' },
+    'ja'
+  );
+  assert.strictEqual(ja.language, 'Japanese');
+  assert.strictEqual(ja.printed_name, '稲妻', 'localized name is kept for display');
+  assert.strictEqual(ja.name, 'Lightning Bolt', 'name stays English for search/deck lists/links');
+
+  // Scryfall answers in English when a card was never printed in the language
+  // asked for. Trusting the REQUEST would mislabel that row as Japanese.
+  const fallback = scryfallApi.normalizeCard(
+    { id: 'u2', name: 'Sol Ring', lang: 'en', set: 'c21', collector_number: '1', image_uris: { normal: 'i' } },
+    'ja'
+  );
+  assert.strictEqual(fallback.language, 'English', "the response's own lang wins");
+  assert.strictEqual(fallback.printed_name, null, 'English printings have no printed name');
+
+  // Prices: USD is TCGplayer's number, EUR is Cardmarket's, and a non-English
+  // printing usually has only the second. Reading usd alone left whole languages at
+  // 0.00 — 241 of 1,205 Spanish rows priced, 53 of 194 Italian.
+  const priced = (prices) => scryfallApi.normalizeCard(
+    { id: 'u3', name: 'Lightning Bolt', lang: 'ja', set: 'msc', collector_number: '806', image_uris: { normal: 'i' }, prices },
+    'ja'
+  );
+
+  const eur = priced({ usd: null, usd_foil: null, eur: '4.50', eur_foil: '9.00' });
+  assert.strictEqual(eur.price_currency, 'EUR', 'a EUR-only printing is recorded as EUR');
+  assert.strictEqual(eur.price_normal, 4.5);
+  assert.strictEqual(eur.price_holofoil, 9);
+  assert.strictEqual(eur.price_trend, 4.5);
+
+  // USD wins when present, and the row must never mix the two: a USD normal price
+  // beside a EUR foil price is a pair of numbers that cannot be compared.
+  const both = priced({ usd: '3.00', usd_foil: null, eur: '4.50', eur_foil: '9.00' });
+  assert.strictEqual(both.price_currency, 'USD');
+  assert.strictEqual(both.price_normal, 3);
+  assert.strictEqual(both.price_holofoil, null, 'no EUR foil price on a USD row');
+
+  // A foil-only USD listing still counts as USD, EUR notwithstanding.
+  const foilOnly = priced({ usd: null, usd_foil: '7.00', eur: '4.50' });
+  assert.strictEqual(foilOnly.price_currency, 'USD');
+  assert.strictEqual(foilOnly.price_trend, 7, 'trend falls back to the foil price');
+
+  // Nothing anywhere: unpriced, and still labelled USD, which is what every
+  // consumer defaults to.
+  const none = priced({});
+  assert.strictEqual(none.price_currency, 'USD');
+  assert.strictEqual(none.price_trend, 0);
+}
+
+async function main() {
+  await scryfallChecks();
+  normalizeChecks();
+  console.log('languages.test.js: all assertions passed');
+}
+
+main().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });

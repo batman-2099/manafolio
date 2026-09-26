@@ -1,0 +1,168 @@
+name: Build Server Binaries
+
+# push a v* tag -> build the self-hosted server binary for Windows, Linux and
+# macOS and attach each archive to the GitHub Release. workflow_dispatch ->
+# build only, uploaded as workflow artifacts (test). Each binary is a Node
+# Single Executable App (stdlib, no third-party packager) whose blob is just
+# backend/launch.js; the real server ships beside it under app/ (backend src +
+# node_modules + frontend build). Scan indexes (backend/data) and .env are
+# gitignored, so they are NOT bundled: the server runs, and code-free card-image
+# matching stays inert until the operator builds the indexes and drops a .env in
+# app/backend.
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  server:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows-x64
+            exe: manafolio-server.exe
+            archive: zip
+          - os: ubuntu-latest
+            target: linux-x64
+            exe: manafolio-server
+            archive: tar
+          - os: macos-latest
+            target: macos-arm64
+            exe: manafolio-server
+            archive: tar
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # Prod deps only, compiled natively for this runner's OS/arch.
+      - name: Install backend deps (prod)
+        working-directory: backend
+        run: npm ci --omit=dev
+
+      - name: Build SEA blob
+        run: |
+          echo '{ "main": "backend/launch.js", "output": "sea-prep.blob" }' > sea-config.json
+          node --experimental-sea-config sea-config.json
+
+      # Copy this runner's node binary, inject the SEA blob. macOS must strip the
+      # existing signature before injection and re-sign (ad-hoc) after.
+      - name: Assemble binary + release tree
+        run: |
+          ROOT=build/manafolio-server
+          mkdir -p "$ROOT/app/backend" "$ROOT/app/frontend"
+          EXE="$ROOT/${{ matrix.exe }}"
+          node -e "require('fs').copyFileSync(process.execPath, process.argv[1])" "$EXE"
+          FUSE=NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            codesign --remove-signature "$EXE"
+            npx --yes postject "$EXE" NODE_SEA_BLOB sea-prep.blob --sentinel-fuse "$FUSE" --macho-segment-name NODE_SEA
+            codesign --sign - "$EXE"
+          else
+            npx --yes postject "$EXE" NODE_SEA_BLOB sea-prep.blob --sentinel-fuse "$FUSE"
+          fi
+          chmod +x "$EXE" || true
+          cp -r backend/src          "$ROOT/app/backend/src"
+          cp -r backend/node_modules "$ROOT/app/backend/node_modules"
+          cp    backend/package.json "$ROOT/app/backend/package.json"
+          # backend/src/utils/compartmentSort.js requires ../../../shared/*.json,
+          # which lands at app/shared here. Omitting it crashed the binary at
+          # startup with MODULE_NOT_FOUND before it could even listen.
+          cp -r shared               "$ROOT/app/shared"
+          cp -r frontend/dist        "$ROOT/app/frontend/dist"
+          cp    .env.example         "$ROOT/app/backend/.env.example"
+
+      # Boot the assembled tree for real. A packaged binary that cannot start is
+      # invisible to every other test in this repo — they all run from source,
+      # where ../../../shared resolves and node_modules is hoisted differently.
+      #
+      # Runs against a COPY: starting the server creates a database (with a
+      # generated admin user) and a log beside the exe, and on Windows it holds
+      # those files open. Testing the tree we are about to ship would both
+      # package that database and break the archive step on a locked file.
+      - name: Smoke test the packaged binary
+        run: |
+          cp -r build/manafolio-server build/smoketest
+          cd build/smoketest
+          ./${{ matrix.exe }} > boot.log 2>&1 &
+          SRV=$!
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3001/api/health > /dev/null 2>&1; then
+              echo "Server answered /api/health."
+              ok=1
+              break
+            fi
+            # Died on startup — exactly the failure this step exists to catch.
+            if ! kill -0 "$SRV" 2>/dev/null; then
+              echo "::error::Packaged server exited before serving a request."
+              break
+            fi
+            sleep 2
+          done
+          [ "$ok" = 1 ] || echo "::error::Packaged server never answered /api/health."
+          echo '--- server output ---'
+          cat boot.log || true
+          kill "$SRV" 2>/dev/null || true
+          wait "$SRV" 2>/dev/null || true
+          [ "$ok" = 1 ]
+
+      - name: Write README
+        run: |
+          ROOT=build/manafolio-server
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            RUN='Run: double-click manafolio-server.exe'
+          else
+            RUN='Run: ./manafolio-server (chmod +x first if needed)'
+          fi
+          cat > "$ROOT/README.txt" <<EOF
+          Manafolio self-hosted server (${{ matrix.target }}).
+
+          $RUN
+          Then open http://localhost:3001
+          Config: copy app/backend/.env.example to app/backend/.env and edit.
+          Code-free card-image scan matching needs the whole-game indexes in
+          app/backend/data (built from Admin -> Global Scan Indexes); without
+          them, set-scoped scanning still works and code-free returns nothing.
+          EOF
+
+      # Archive the tree contents at the root (no wrapping folder), matching the
+      # original layout server.js expects.
+      - name: Package
+        run: |
+          NAME="Manafolio-Server-${{ matrix.target }}"
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            ( cd build/manafolio-server && 7z a "$GITHUB_WORKSPACE/$NAME.zip" ./* >/dev/null )
+            echo "ASSET=$NAME.zip" >> "$GITHUB_ENV"
+          else
+            tar czf "$NAME.tar.gz" -C build/manafolio-server .
+            echo "ASSET=$NAME.tar.gz" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manafolio-server-${{ matrix.target }}
+          path: ${{ env.ASSET }}
+
+      - name: Attach to release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET }}

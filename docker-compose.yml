@@ -1,0 +1,32 @@
+services:
+  manafolio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: manafolio
+    restart: unless-stopped
+    # Same app on both ports — only the transport differs. 3001 is what you point a
+    # reverse proxy at; 3443 is what you use directly when there is no proxy (card
+    # scanning needs a secure context, so phones must use https://<host>:3443).
+    # Publish only the one you actually use, or both.
+    ports:
+      - "3001:3001"                     # HTTP
+      - "3443:3443"                     # HTTPS (self-signed cert unless SSL_CERT_PATH is set)
+    environment: {}
+      # All optional. Uncomment and set as needed.
+      # - HTTPS_PORT=3443               # Image default. Set to "" to serve plain HTTP only (no camera scanning off-localhost)
+      # - SSL_CERT_PATH=                # Your own certificate, e.g. /app/database/certs/fullchain.pem. Omit for an auto-generated self-signed one
+      # - SSL_KEY_PATH=                 # Its private key
+      # - PUBLIC_BASE_URL=              # External URL behind a reverse proxy, e.g. https://cards.example.com. Used for share links AND auto-allowed as a CORS origin (so proxied logins work with just this set)
+      # - DEFAULT_ADMIN_PASSWORD=       # Create the admin account with this password instead of creating the owner account on first visit
+      # - ALLOW_REGISTRATION=           # "true" = open self-registration. Unset = invite-only
+      # - TRUST_PROXY=                  # "1" behind a TLS-terminating reverse proxy so rate limiting sees the real client IP
+      # - OLLAMA_BASE_URL=http://host.docker.internal:11434  # Host Ollama; see README for Ollama binding/firewall setup
+    # For host Ollama on Linux, also uncomment:
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+    volumes:
+      - manafolio-data:/app/database
+
+volumes:
+  manafolio-data:

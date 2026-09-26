@@ -1,0 +1,46 @@
+3 Llanowar Elves (FDN) 227
+4 Druid of the Cowl (FDN) 554
+3 Nessian Hornbeetle (FDN) 229
+2 Beast-Kin Ranger (FDN) 100
+2 Eager Trufflesnout (FDN) 102
+2 Needletooth Pack (FDN) 108
+2 Magnigoth Sentry (FDN) 556
+1 Scavenging Ooze (FDN) 232
+1 Ashroot Animist (FDN) 117
+1 Loot, Exuberant Explorer (FDN) 106
+1 Mossborn Hydra (FDN) 107
+1 Spinner of Souls (FDN) 112
+1 Vizier of the Menagerie (FDN) 769
+1 Quilled Greatwurm (FDN) 111
+1 Rampaging Baloths (FDN) 645
+1 Rip, Spawn Hunter (DSK) 228
+2 Snakeskin Veil (FDN) 233
+2 Snakeskin Veil (TDM) 159
+2 Giant Growth (FDN) 223
+1 Giant Growth (MSH) 167
+1 Garruk's Uprising (FDN) 220
+1 Primeval Bounty (FDN) 644
+1 Bushwhack (FDN) 215
+1 Over the Edge (LCI) 205
+1 Forest (AFR) 278
+1 Forest (AFR) 279
+1 Forest (AFR) 280
+1 Forest (AFR) 281
+1 Forest (DFT) 289
+1 Forest (DFT) 290
+1 Forest (DFT) 291
+1 Forest (DMU) 274
+1 Forest (DMU) 275
+1 Forest (DMU) 276
+1 Forest (SIR) 289
+1 Forest (SIR) 290
+1 Forest (SIR) 291
+1 Forest (STX) 374
+1 Forest (STX) 375
+1 Forest (WOE) 275
+1 Forest (WOE) 276
+1 Forest (DSK) 285
+1 Forest (DSK) 286
+1 Forest (OTJ) 285
+1 Forest (OTJ) 286
+1 Forest (FDN) 280
