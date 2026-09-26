@@ -823,14 +823,14 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                     <span className="tcg-card-price">{priceText(item.price_trend, item.price_currency)}</span>
                   </span>
                   <span style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                    <span style={getRarityBadgeStyle(item.rarity)}>{getRarityBadgeLabel(item.rarity)}</span>
+                    <span className="collection-card-tag" style={getRarityBadgeStyle(item.rarity)}>{getRarityBadgeLabel(item.rarity)}</span>
                     <span>
                       {item.grader && item.grader !== 'Raw'
                         ? `${item.grader}${item.grade != null ? ` ${item.grade}` : ''}`
                         : item.condition}
                     </span>
                     {item.printing !== 'Normal' && (
-                      <span style={getPrintingBadgeStyle(item.printing)}>{getPrintingBadgeLabel(item.printing)}</span>
+                      <span className="collection-card-tag collection-card-tag--foil" style={{ ...getPrintingBadgeStyle(item.printing), backgroundImage: 'var(--foil-tag-sheen)' }}>{getPrintingBadgeLabel(item.printing)}</span>
                     )}
                   </span>
                 </span>
