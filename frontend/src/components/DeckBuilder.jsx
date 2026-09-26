@@ -959,7 +959,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   });
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
       {showAiBuilder && (
         <AiDeckBuilder
@@ -976,7 +976,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       )}
       {/* 1. SELECTION MENU VIEW OF ALL DECKS */}
       {viewMode === 'list' && !showAiBuilder && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="deck-overview" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
           {/* Top Banner Header & Primary Action */}
           <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', padding: '1.25rem 1.5rem', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
@@ -1004,11 +1004,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
           </div>
 
           {/* Search, Filters, Sorting & View Toolbar */}
-          <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem 1.25rem' }}>
+          <div className="glass-panel deck-overview-toolbar" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem 1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
               
               {/* Search input */}
-              <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px' }}>
+              <div className="deck-overview-search" style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px' }}>
                 <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type="text"
@@ -1022,6 +1022,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   <button
                     className="btn btn-secondary btn-icon-only"
                     onClick={() => setDeckSearchTerm('')}
+                    aria-label={t('deck.clearFilters')}
                     style={{ position: 'absolute', right: '0.4rem', top: '50%', transform: 'translateY(-50%)', width: '20px', height: '20px', padding: 0, fontSize: '0.7rem' }}
                   >
                     <X size={12} />
@@ -1112,7 +1113,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             </div>
           ) : deckSelectionViewMode === 'grid' ? (
             /* --- GRID VIEW --- */
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
+            <div className="deck-overview-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(320px, 100%), 1fr))', gap: '1.25rem' }}>
               {filteredDecks.map(deck => {
                 const deckGameVal = deck.game || 'mtg';
                 const isMtg = deckGameVal === 'mtg';
@@ -1188,7 +1189,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     ) : null}
 
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                      <div className="deck-overview-card-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                             <h3 style={{ color: 'var(--text-strong)', fontSize: '1.15rem', fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>
@@ -1301,12 +1302,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     </div>
 
                     {/* Card Footer Actions */}
-                    <div style={{ borderTop: '1px solid var(--border-glass)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="deck-overview-card-footer" style={{ borderTop: '1px solid var(--border-glass)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                         Created {new Date(deck.created_at).toLocaleDateString()}
                       </span>
 
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <div className="deck-overview-actions" style={{ display: 'flex', gap: '0.4rem' }}>
                         {deck.checked_out ? (
                           <button
                             className="btn btn-secondary"
@@ -1390,17 +1391,17 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                       >
-                        <td style={{ padding: '0.75rem 1rem' }}>
+                        <td data-label={t('deck.deckName')} style={{ padding: '0.75rem 1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{deck.name}</span>
                           </div>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
+                        <td data-label={t('deck.format')} style={{ padding: '0.75rem 1rem' }}>
                           <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
                             {deck.format}
                           </span>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
+                        <td data-label={t('deck.inventoryType')} style={{ padding: '0.75rem 1rem' }}>
                           <span style={{
                             fontSize: 'inherit',
                             fontWeight: 700,
@@ -1413,17 +1414,17 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                             {deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}
                           </span>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
+                        <td data-label={t('filter.field.color_identity')} style={{ padding: '0.75rem 1rem' }}>
                           {isMtg && <ManaCounts deck={deck} />}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
+                        <td data-label={t('deck.category')} style={{ padding: '0.75rem 1rem' }}>
                           {deck.category && (
                             <span style={{ fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.25)' }}>
                               {deck.category}
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', width: '160px' }}>
+                        <td data-label={t('deck.colCapacity')} style={{ padding: '0.75rem 1rem', width: '160px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                             <div style={{ fontWeight: 700, color: isComplete ? '#4ade80' : 'var(--text-strong)' }}>
                               {totalCards} / {targetSize} Cards
@@ -1433,7 +1434,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
+                        <td data-label={t('admin.colStatus')} style={{ padding: '0.75rem 1rem' }}>
                           {deck.checked_out ? (
                             <span style={{ fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid rgba(234,179,8,0.4)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <Gamepad2 size={11} /> {t('deck.inPlay')}
@@ -1448,8 +1449,8 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                        <td data-label={t('admin.colActions')} style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                          <div className="deck-overview-actions" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                             {deck.checked_out ? (
                               <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: 'inherit', color: '#eab308' }} onClick={() => handleReturn(deck)} disabled={checkingOut}>
                                 {t('deck.return')}
@@ -1465,7 +1466,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                             <button className="btn btn-secondary btn-icon-only" style={{ padding: '0.25rem' }} onClick={() => handleDuplicateDeck(deck.id)} title={t('deck.duplicateDeck')}>
                               <Copy size={12} />
                             </button>
-                            <button className="btn btn-danger btn-icon-only" style={{ padding: '0.25rem' }} onClick={() => handleDeleteDeck(deck.id, deck.name)}>
+                            <button className="btn btn-danger btn-icon-only" style={{ padding: '0.25rem' }} onClick={() => handleDeleteDeck(deck.id, deck.name)} title={t('deck.deleteDeck')}>
                               <Trash2 size={12} />
                             </button>
                           </div>

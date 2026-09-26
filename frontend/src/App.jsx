@@ -479,8 +479,8 @@ function App() {
           )}
         </nav>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+        <div className="header-account" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="header-greeting" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
             <Sparkles size={14} style={{ color: 'var(--accent-yellow)' }} />
             <span>{t('header.greeting')} <strong style={{ color: 'var(--text-strong)' }}>{user.username}</strong> ({t(`role.${user.role}`)})</span>
           </div>

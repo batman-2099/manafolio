@@ -47,9 +47,6 @@
   text-shadow: none;
   color: var(--text-strong);
 }
-:root[data-theme="dark"] .app-container {
-  max-width: 1600px;
-}
 :root[data-theme="dark"] .app-header {
   flex-wrap: wrap;
   gap: 1.2rem;
@@ -277,19 +274,18 @@
 }
 @media (max-width: 768px) {
   :root[data-theme="dark"] .app-header { gap: 0.5rem; }
-  :root[data-theme="dark"] .app-header > div:last-child { max-width: 48%; }
+  :root[data-theme="dark"] .app-header > div:last-child { max-width: 100%; }
   :root[data-theme="dark"] .app-header > div:last-child > div { font-size: 0.7rem !important; }
   :root[data-theme="dark"] .nav-tabs {
     width: auto;
     border-radius: 20px 20px 0 0;
     gap: 0.1rem;
     padding: 0.4rem 0.3rem max(0.5rem, env(safe-area-inset-bottom, 0px));
-    overflow-x: auto;
+    overflow-x: visible;
     background: #0d1c30;
     box-shadow: 0 -8px 24px #02091655;
   }
   :root[data-theme="dark"] .nav-tab {
-    flex: 1 0 54px;
     font-size: 0.61rem;
     padding: 0.55rem 0.3rem;
     border-radius: 15px;
