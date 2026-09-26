@@ -139,7 +139,10 @@ function Login({ onLoginSuccess }) {
       }}>
         {/* Logo/Icon */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h2 className="logo-text" style={{ marginBottom: '1rem' }}>Manafolio</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+            <h2 className="logo-text">Manafolio</h2>
+            <span className="app-version">v{import.meta.env.VITE_APP_VERSION}</span>
+          </div>
           <div style={{ width: '84px', height: '84px', margin: '0 auto 1rem auto' }}>
             <Logo />
           </div>

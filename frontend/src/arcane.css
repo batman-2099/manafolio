@@ -62,7 +62,7 @@
 }
 :root[data-theme="dark"] .app-header .logo-section {
   display: grid;
-  grid-template-columns: auto auto;
+  grid-template-columns: auto auto auto;
   gap: 0.2rem 0.75rem;
 }
 :root[data-theme="dark"] .nav-tabs {

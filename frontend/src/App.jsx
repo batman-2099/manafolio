@@ -404,6 +404,7 @@ function App() {
           <div className="logo-icon">
             <Logo />
           </div>
+          <span className="app-version">v{import.meta.env.VITE_APP_VERSION}</span>
         </div>
 
         {/* Navigation Tabs (Nested inside header for unified layout) */}

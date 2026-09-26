@@ -4,6 +4,8 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Show the application version beside the branding on the login screen and app header.
+- Use theme-appropriate dark text on light card-count badges.
 - Fixed CI import tests that depended on local collection exports.
 - Enabled GitHub Pages for the existing demo deployment workflow.
 

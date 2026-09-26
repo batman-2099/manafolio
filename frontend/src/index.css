@@ -697,6 +697,13 @@ button, input, select, textarea {
   gap: 0.75rem;
 }
 
+.app-version {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 /* Manafolio's stacked-card mark. SVG lives in components/Logo.jsx. */
 .logo-icon {
   width: 48px;
@@ -1243,7 +1250,7 @@ button, input, select, textarea {
   top: -5px;
   right: -5px;
   background: var(--accent-red);
-  color: white;
+  color: var(--text-on-accent);
   width: 24px;
   height: 24px;
   border-radius: 50%;
