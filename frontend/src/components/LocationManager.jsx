@@ -1444,11 +1444,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 ? <CardImage card={location.cover} src={location.cover.image_url.replace(/^(https:\/\/cards\.scryfall\.io\/)(?:small|normal|large|png)\/([^?]+)(.*)$/, (_, host, path, query) => `${host}art_crop/${path.replace(/\.png$/, '.jpg')}${query}`)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : <Layers size={56} style={{ color: 'var(--text-muted)' }} />}
             </div>
-            <div style={{ padding: '0.75rem 1rem' }}>
-              <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>{!!location.locked && <Lock size={14} />}{location.name}</strong>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{location.type} · {location.total_cards || 0} {t('collection.cardUnit', { count: location.total_cards || 0 })}</span>
+            <div style={{ padding: '0.75rem 1rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '0.75rem' }}>
+              <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflowWrap: 'anywhere' }}>{!!location.locked && <Lock size={14} />}{location.name}</strong>
+              <span style={{ gridColumn: 1, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{location.type}</span>
               {!!location.mana_symbols?.length && (
-                <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem', marginTop: '0.5rem' }}>
+                <span style={{ gridColumn: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem', marginTop: '0.5rem' }}>
                   {MANA_SYMBOLS.filter(([symbol]) => location.mana_symbols.includes(symbol)).map(([symbol, name, x]) => (
                     <span key={symbol} title={t(`dash.color.${name}`)} style={{ display: 'inline-flex' }}>
                       <svg role="img" aria-label={t(`dash.color.${name}`)} focusable="false" width="20" height="20" viewBox={`${x === null ? 0 : x - 50} 0 100 100`}>
@@ -1461,6 +1461,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   ))}
                 </span>
               )}
+              <span style={{ gridColumn: 2, gridRow: '1 / 4', alignSelf: 'center', textAlign: 'right', minWidth: '3.75rem', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', background: 'var(--surface-1)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 2px rgba(0,0,0,0.2)' }}>
+                <strong style={{ display: 'block', fontSize: '2rem', fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{location.total_cards || 0}</strong>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.3 }}>{t('collection.cardUnit', { count: location.total_cards || 0 })}</span>
+              </span>
             </div>
           </button>
           </div>

@@ -2,6 +2,11 @@
 
 Release history starts with Manafolio 2.0.
 
+## 2.0.4
+
+- Enlarged container tile card counts and aligned them on the right in subtly raised plaques with shared spacing/radius tokens and readable unit labels, keeping names and mana symbols on the left.
+- Fixed container mana badges to use actual card colors instead of Commander color identity, so off-color abilities do not add misleading symbols.
+
 ## 2.0.3
 
 - Added Gemini and OpenRouter to AI deck settings with per-user API keys, explicit model selection, and existing inventory/draft validation. Provider keys stay server-side and are excluded from account exports; database backups include them.

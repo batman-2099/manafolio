@@ -27,7 +27,7 @@ let server;
     const foreign = await location('Foreign', 2);
     const compartment = (await db.run('INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 9)', [mixed])).lastID;
     const card = (id, identity, game = 'mtg') => db.run(
-      'INSERT INTO card_cache (id, name, game, color_identity) VALUES (?, ?, ?, ?)', [id, id, game, identity]
+      'INSERT INTO card_cache (id, name, game, types, color_identity) VALUES (?, ?, ?, ?, ?)', [id, id, game, identity, '["Green","Red","White"]']
     );
     for (const [id, identity, game] of [
       ['multi', '["G","U","W","U"]'], ['named', '["Red","Black"]'], ['artifact', '[]'],

@@ -91,7 +91,7 @@ window.fetch = (input, opts = {}) => {
           const card = choices.find(card => card.card_id === location.cover_card_id) || choices[0];
           const colors = { W: 'W', White: 'W', U: 'U', Blue: 'U', B: 'B', Black: 'B', R: 'R', Red: 'R', G: 'G', Green: 'G' };
           const symbols = new Set(contents.flatMap(card => {
-            const identity = card.color_identity;
+            const identity = card.types;
             if (card.game !== 'mtg' || !Array.isArray(identity) || !identity.every(color => Object.hasOwn(colors, color))) return [];
             return identity.length ? identity.map(color => colors[color]) : ['C'];
           }));

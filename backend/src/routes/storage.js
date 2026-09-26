@@ -87,7 +87,7 @@ router.get('/locations', async (req, res) => {
       WHERE l.user_id = ? AND l.inventory_type = ?
     `, [req.user.id, inventoryType, req.user.id, inventoryType]);
     const identities = await db.all(`
-      SELECT DISTINCT c.location_id, cc.color_identity
+      SELECT DISTINCT c.location_id, cc.types AS card_colors
       FROM collection c
       JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
         AND l.inventory_type = COALESCE(c.list_type, 'collection')
@@ -95,12 +95,12 @@ router.get('/locations', async (req, res) => {
       WHERE l.user_id = ? AND l.inventory_type = ? AND cc.game = 'mtg' AND c.quantity > 0
     `, [req.user.id, inventoryType]);
     const manaByLocation = new Map();
-    for (const { location_id, color_identity } of identities) {
+    for (const { location_id, card_colors } of identities) {
       let identity;
-      try { identity = JSON.parse(color_identity); } catch { continue; }
+      try { identity = JSON.parse(card_colors); } catch { continue; }
       if (!Array.isArray(identity) || identity.some(color => typeof color !== 'string')) continue;
       const colors = manaByLocation.get(location_id) || new Set();
-      // Only a known empty identity means colorless; never infer colors from art or rules.
+      // MTG types stores card colors, not Commander identity (which includes rules text).
       if (!identity.length) colors.add('C');
       for (const color of normalizeMtgColorIdentity(identity)) {
         if (color !== 'Colorless' && MANA_SYMBOLS[color]) colors.add(MANA_SYMBOLS[color]);
