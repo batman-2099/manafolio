@@ -2,6 +2,11 @@
 
 Release history starts with Manafolio 2.0.
 
+## 2.0.5
+
+- Pointed Settings support, contribution, source, and update checks to the Manafolio repository instead of Bindarr.
+- Prevented the Settings footer Source link from using a stale backend release URL.
+
 ## 2.0.4
 
 - Enlarged container tile card counts and aligned them on the right in subtly raised plaques with shared spacing/radius tokens and readable unit labels, keeping names and mana symbols on the left.

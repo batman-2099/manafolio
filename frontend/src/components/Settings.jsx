@@ -1096,7 +1096,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
 
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
             {t('settings.updateChecksNote')}{' '}
-            {repoUrl && <a href={versionInfo?.releases_url || `${repoUrl}/releases`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-yellow)' }}>
+            {repoUrl && <a href={`${repoUrl}/releases`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-yellow)' }}>
               {t('settings.source')}
             </a>}
           </div>
