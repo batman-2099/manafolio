@@ -1,4 +1,4 @@
-// The card detector — ONE implementation, server and browser alike.
+// Contour fallback for the browser's card detector.
 //
 // It runs on shared/imgproc.mjs rather than OpenCV. Every prebuilt OpenCV.js is
 // 11-22 MB and phones could not instantiate it at all, which pinned detection to
@@ -16,13 +16,11 @@
 import {
   rgbaToGray, gaussianBlur5, otsuThreshold, morphClose, dilate, canny,
   connectedRegions, arcLength, convexHull, approxPolyDP,
-  isContourConvex, minAreaRect, getPerspectiveTransform, warpPerspective,
-  orderQuad,
+  isContourConvex, minAreaRect, orderQuad,
 } from './imgproc.mjs';
 
 export function createDetector() {
   const CARD_ASPECT = 2.5 / 3.5;
-  const WARP_W = 500, WARP_H = Math.round(500 / CARD_ASPECT); // rectified card size
   
   // Geometry of an ordered quad, or null if it is too small to judge. Used to throw
   // out candidates that are not plausibly a card seen at an angle.
@@ -146,19 +144,14 @@ export function createDetector() {
       p.x <= edgeTol || p.y <= edgeTol || p.x >= w - 1 - edgeTol || p.y >= h - 1 - edgeTol;
 
     const masks = segmentations(blur, w, h);
-    // Order matches segmentations(): two OTSU polarities, then the fixed and
-    // median-derived Canny passes. These names land in the debug dump, so a bad
-    // crop says which strategy produced it.
-    const MASK_NAMES = ['otsu-inv', 'otsu', 'canny', 'canny-auto'];
-    for (let mi = 0; mi < masks.length; mi++) {
-      const maskName = MASK_NAMES[mi] || `mask${mi}`;
+    for (const mask of masks) {
       // Regions INCLUDING holes: the card is not always the outermost thing in
       // the frame. On a playmat or binder page the whole surface is one region
       // and the card's outline is a hole inside it.
       //
       // `area` is an exact pixel count rather than the polygon area of a traced
       // boundary — the same quantity, measured directly.
-      for (const region of connectedRegions(masks[mi], w, h, MIN_AREA_FRAC * imgArea)) {
+      for (const region of connectedRegions(mask, w, h, MIN_AREA_FRAC * imgArea)) {
         const area = region.area;
         if (area > MAX_AREA_FRAC * imgArea) continue;
         // The region hands back its convex hull, not raw boundary pixels: both
@@ -207,26 +200,16 @@ export function createDetector() {
           // is L-shaped, so the quad drawn around it is mostly empty.
           const fill = Math.min(1, area / Math.max(1, cand.m.w * cand.m.h));
           const score = (area / imgArea) * (aspectFit * aspectFit) * (0.4 + 0.6 * centrality) * cand.bonus * (0.5 + 0.5 * cand.par) * fill;
-          if (!best || score > best.score) best = { score, pts: cand.pts, source: maskName, fill, par: cand.par, ar };
+          if (!best || score > best.score) best = { score, pts: cand.pts };
         }
       }
     }
 
     if (!best || !best.pts) return null;
-    const [tl, tr, brc, bl] = orderQuad(best.pts);
-    const coeffs = getPerspectiveTransform(
-      [tl, tr, brc, bl],
-      [{ x: 0, y: 0 }, { x: WARP_W, y: 0 }, { x: WARP_W, y: WARP_H }, { x: 0, y: WARP_H }],
-    );
-    // `quad`/`pick` are diagnostics (preprocessCard ignores them); they make a bad
-    // crop debuggable — which segmentation won, and where it thought the card was.
     return {
-      data: warpPerspective(rgbaData, w, h, coeffs, WARP_W, WARP_H),
-      width: WARP_W, height: WARP_H, channels: 4,
-      quad: [tl, tr, brc, bl].map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })),
-      pick: { source: best.source, score: +best.score.toFixed(4), fill: +best.fill.toFixed(2), par: +best.par.toFixed(2), ar: +best.ar.toFixed(3) },
+      quad: orderQuad(best.pts).map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })),
     };
   }
 
-  return { detectCard, CARD_ASPECT, WARP_W, WARP_H, MIN_AREA_FRAC, MAX_AREA_FRAC };
+  return { detectCard };
 }

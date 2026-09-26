@@ -76,10 +76,7 @@ RUN npm rebuild sqlite3 --build-from-source
 # Copy backend source files
 COPY backend/src/ ./src/
 
-# Nothing here is on a runtime path — the whole index build lives in src/ — but
-# these are the operator's escape hatches inside a running container:
-# eval-global-index.mjs measures what the index actually identifies, and
-# cardSources.js is what it resolves reference images through.
+# Operator maintenance tools; runtime catalog building lives in src/.
 COPY backend/scripts/ ./scripts/
 
 # Shared JSON tables required at runtime by backend/src/utils/compartmentSort.js

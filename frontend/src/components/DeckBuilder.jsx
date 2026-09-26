@@ -283,18 +283,17 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     }
   };
 
-  const handleManaBoxDeckFile = (event) => {
+  const handleManaBoxDeckFile = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setNewDeckImportText(String(reader.result || ''));
+    event.target.value = '';
+    try {
+      setNewDeckImportText(await file.text());
       setNewDeckImportFormat('manabox');
       setNewDeckPreconFile('');
-    };
-    reader.onerror = () => showToast(t('settings.errReadFile'));
-    reader.readAsText(file);
-    event.target.value = '';
+    } catch {
+      showToast(t('settings.errReadFile'));
+    }
   };
 
   const handleApplyDeckProperties = async () => {

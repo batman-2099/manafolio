@@ -4,6 +4,7 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Removed unused indexing/name helpers, game-setting exports, and an inactive build override; reused shared scanner geometry, stopped generating unused detector images, and simplified text-file imports with the browser's native API.
 - Let the desktop app and Deck Builder use the available screen width while retaining edge padding and bounded dialogs.
 - Improved phone layouts: dashboard charts and controls stay within the viewport, deck tables become labeled stacked rows, all navigation tabs remain visible, and the demo notice no longer covers navigation. Desktop layouts retain their existing grids and tables.
 - Show the application version beside the branding on the login screen and app header.

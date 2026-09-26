@@ -35,8 +35,5 @@
     "eslint-plugin-react-refresh": "^0.4.7",
     "espree": "^10.4.0",
     "vite": "^8.1.3"
-  },
-  "overrides": {
-    "esbuild": "^0.25.0"
   }
 }

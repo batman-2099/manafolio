@@ -193,51 +193,49 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
     return issueUrl(repoUrl, { labels: 'enhancement', title: '[Feature] ', body });
   };
 
-  const handleImportFile = (e) => {
+  const handleImportFile = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    const filename = file.name.toLowerCase();
-    reader.onload = async (event) => {
-      try {
-        const fileData = event.target.result;
-        let format = filename.endsWith('.json') ? 'json' : (filename.endsWith('.txt') ? 'manabox' : 'csv');
-        let completeBackup = false;
-        if (format === 'json') {
-          try {
-            const parsed = JSON.parse(fileData);
-            completeBackup = parsed?.format === 'manafolio-backup' && parsed.version === 1;
-          } catch { /* The server returns the normal JSON-import error. */ }
-        }
-        if (!window.confirm(t(completeBackup ? 'settings.confirmRestore' : 'settings.confirmImport', { file: file.name }))) return;
-        if (completeBackup) format = 'backup';
-
-        showToast(t('settings.importing'));
-        const response = await fetch('/api/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ format, data: fileData })
-        });
-
-        const result = await response.json();
-        if (response.ok) {
-          showToast(result.message || t('settings.importOk'));
-        } else {
-          showToast(t('settings.importFailed', { error: result.error || t('settings.unknownError') }));
-        }
-      } catch (err) {
-        console.error(err);
-        showToast(t('settings.importFailed', { error: err.message }));
-      }
-    };
-
-    reader.onerror = () => {
-      showToast(t('settings.errReadFile'));
-    };
-
-    reader.readAsText(file);
     e.target.value = null;
+
+    let fileData;
+    try {
+      fileData = await file.text();
+    } catch {
+      showToast(t('settings.errReadFile'));
+      return;
+    }
+
+    const filename = file.name.toLowerCase();
+    try {
+      let format = filename.endsWith('.json') ? 'json' : (filename.endsWith('.txt') ? 'manabox' : 'csv');
+      let completeBackup = false;
+      if (format === 'json') {
+        try {
+          const parsed = JSON.parse(fileData);
+          completeBackup = parsed?.format === 'manafolio-backup' && parsed.version === 1;
+        } catch { /* The server returns the normal JSON-import error. */ }
+      }
+      if (!window.confirm(t(completeBackup ? 'settings.confirmRestore' : 'settings.confirmImport', { file: file.name }))) return;
+      if (completeBackup) format = 'backup';
+
+      showToast(t('settings.importing'));
+      const response = await fetch('/api/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format, data: fileData })
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        showToast(result.message || t('settings.importOk'));
+      } else {
+        showToast(t('settings.importFailed', { error: result.error || t('settings.unknownError') }));
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(t('settings.importFailed', { error: err.message }));
+    }
   };
 
   // Containers to offer share links for. Only fetched once both share toggles are
