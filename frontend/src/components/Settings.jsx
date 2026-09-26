@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useScrollReveal } from '../utils/useScrollReveal';
 import { ShieldAlert, Share2, Clipboard, RefreshCw, KeyRound, Check, Database, Download, Upload, Eye, EyeOff, SlidersHorizontal, Info, Bug, Lightbulb, MessagesSquare, ScrollText, Github, Languages } from 'lucide-react';
 import { CURRENCIES, getCurrency, setCurrency } from '../utils/formatPrice';
 import { LOCALES, localeName, useT } from '../utils/i18n';
@@ -9,6 +10,7 @@ import themes from '../../../shared/themes.json';
 
 function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
   const { locale, setLocale, t } = useT();
+  const revealRef = useScrollReveal();
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -449,7 +451,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
   };
 
   return (
-    <div className="settings-page" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div ref={revealRef} className="settings-page" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <header className="page-heading">
         <div>
           <h2 className="page-title">{t('settings.title')}</h2>

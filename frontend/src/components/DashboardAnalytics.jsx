@@ -1,5 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useT } from '../utils/i18n';
+import { useScrollReveal } from '../utils/useScrollReveal';
 
 const cellStyle = { padding: '0.65rem', borderBottom: '1px solid var(--border-glass)', textAlign: 'left' };
 const tableStyle = { width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' };
@@ -7,6 +8,7 @@ const noteStyle = { color: 'var(--text-secondary)', fontSize: '0.85rem', lineHei
 
 export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
   const { t, locale } = useT();
+  const revealRef = useScrollReveal();
   const isArchive = inventory === 'graveyard';
   const number = (value) => value.toLocaleString(locale);
   const distributionSeries = isArchive ? [
@@ -41,7 +43,7 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
   const decks = analytics?.deckPerformance;
 
   return (
-    <div className="dashboard-analytics-grid">
+    <div ref={revealRef} className="dashboard-analytics-grid">
       {charts.map(chart => (
         <section key={chart.key} className="dashboard-subsection view-section" aria-labelledby={`analytics-${chart.key}`}>
           <h3 id={`analytics-${chart.key}`} className="section-heading">{chart.title}</h3>
