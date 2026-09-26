@@ -85,10 +85,17 @@ window.fetch = (input, opts = {}) => {
       data = data.filter(item => (item[field] || 'collection') === inventory);
       if (path === '/api/locations') {
         data = data.map(location => {
-          const choices = routes['/api/collection'].filter(card => card.location_id === location.id
-            && (card.list_type || 'collection') === inventory && card.image_url);
+          const contents = routes['/api/collection'].filter(card => card.location_id === location.id
+            && (card.list_type || 'collection') === inventory && card.quantity > 0);
+          const choices = contents.filter(card => card.image_url);
           const card = choices.find(card => card.card_id === location.cover_card_id) || choices[0];
-          return { ...location, cover: card ? {
+          const colors = { W: 'W', White: 'W', U: 'U', Blue: 'U', B: 'B', Black: 'B', R: 'R', Red: 'R', G: 'G', Green: 'G' };
+          const symbols = new Set(contents.flatMap(card => {
+            const identity = card.color_identity;
+            if (card.game !== 'mtg' || !Array.isArray(identity) || !identity.every(color => Object.hasOwn(colors, color))) return [];
+            return identity.length ? identity.map(color => colors[color]) : ['C'];
+          }));
+          return { ...location, mana_symbols: ['W', 'U', 'B', 'R', 'G', 'C'].filter(symbol => symbols.has(symbol)), cover: card ? {
             card_id: card.card_id, name: card.name, game: card.game, image_url: card.image_url,
           } : null };
         });

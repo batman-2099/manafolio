@@ -11,6 +11,9 @@ const {
   STACK_KEY_SQL
 } = require('../utils/compartmentSort');
 const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, checkedOutAllocation } = require('../utils/collectionHelpers');
+const { normalizeMtgColorIdentity } = require('../utils/mtgColors');
+
+const MANA_SYMBOLS = { White: 'W', Blue: 'U', Black: 'B', Red: 'R', Green: 'G', Colorless: 'C' };
 
 const router = express.Router();
 
@@ -83,8 +86,30 @@ router.get('/locations', async (req, res) => {
       LEFT JOIN card_cache cover ON cover.id = rc.card_id
       WHERE l.user_id = ? AND l.inventory_type = ?
     `, [req.user.id, inventoryType, req.user.id, inventoryType]);
+    const identities = await db.all(`
+      SELECT DISTINCT c.location_id, cc.color_identity
+      FROM collection c
+      JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
+        AND l.inventory_type = COALESCE(c.list_type, 'collection')
+      JOIN card_cache cc ON cc.id = c.card_id
+      WHERE l.user_id = ? AND l.inventory_type = ? AND cc.game = 'mtg' AND c.quantity > 0
+    `, [req.user.id, inventoryType]);
+    const manaByLocation = new Map();
+    for (const { location_id, color_identity } of identities) {
+      let identity;
+      try { identity = JSON.parse(color_identity); } catch { continue; }
+      if (!Array.isArray(identity) || identity.some(color => typeof color !== 'string')) continue;
+      const colors = manaByLocation.get(location_id) || new Set();
+      // Only a known empty identity means colorless; never infer colors from art or rules.
+      if (!identity.length) colors.add('C');
+      for (const color of normalizeMtgColorIdentity(identity)) {
+        if (color !== 'Colorless' && MANA_SYMBOLS[color]) colors.add(MANA_SYMBOLS[color]);
+      }
+      manaByLocation.set(location_id, colors);
+    }
     res.json(locations.map(({ resolved_cover_card_id, cover_name, cover_game, cover_image_url, ...location }) => ({
       ...location,
+      mana_symbols: Object.values(MANA_SYMBOLS).filter(symbol => manaByLocation.get(location.id)?.has(symbol)),
       cover: resolved_cover_card_id ? {
         card_id: resolved_cover_card_id, name: cover_name, game: cover_game, image_url: cover_image_url,
       } : null,

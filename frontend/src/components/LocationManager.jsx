@@ -16,6 +16,11 @@ import CardImage from './CardImage';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
 
+const MANA_SYMBOLS = [
+  ['W', 'White', -475], ['U', 'Blue', -370], ['B', 'Black', -265],
+  ['R', 'Red', -160], ['G', 'Green', -55], ['C', 'Colorless', null],
+];
+
 const CONTAINER_LIST_SORTS = {
   'name-asc': [{ by: 'name', dir: 'asc' }, { by: 'number', dir: 'asc' }],
   'name-desc': [{ by: 'name', dir: 'desc' }],
@@ -1442,6 +1447,20 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             <div style={{ padding: '0.75rem 1rem' }}>
               <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>{!!location.locked && <Lock size={14} />}{location.name}</strong>
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{location.type} · {location.total_cards || 0} {t('collection.cardUnit', { count: location.total_cards || 0 })}</span>
+              {!!location.mana_symbols?.length && (
+                <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem', marginTop: '0.5rem' }}>
+                  {MANA_SYMBOLS.filter(([symbol]) => location.mana_symbols.includes(symbol)).map(([symbol, name, x]) => (
+                    <span key={symbol} title={t(`dash.color.${name}`)} style={{ display: 'inline-flex' }}>
+                      <svg role="img" aria-label={t(`dash.color.${name}`)} focusable="false" width="20" height="20" viewBox={`${x === null ? 0 : x - 50} 0 100 100`}>
+                        {symbol === 'C' ? <>
+                          <circle cx="50" cy="50" r="50" fill="#CAC5C0" />
+                          <path fill="#0D0F0F" fillRule="evenodd" d="M50 10 90 50 50 90 10 50Z M50 30 30 50 50 70 70 50Z" />
+                        </> : <image href={`${import.meta.env.BASE_URL}mana.svg`} x="-945" y="-210.002" width="1045" height="730.002" />}
+                      </svg>
+                    </span>
+                  ))}
+                </span>
+              )}
             </div>
           </button>
           </div>
