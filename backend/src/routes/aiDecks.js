@@ -3,6 +3,7 @@ const { rateLimit } = require('express-rate-limit');
 const db = require('../db');
 const codex = require('../codexDeckClient');
 const ollama = require('../ollamaDeckClient');
+const hosted = require('../hostedDeckClient');
 const { validateDeckAddition } = require('../utils/deckRules');
 const {
   FORMATS, REVIEW_WARNING, fail, inventoryType, containerIds, sourceDeckId, sourceDeck, preferencesRequest, suggestionRequest, suggestionResponse, draftRequest,
@@ -50,8 +51,8 @@ router.use((req, res, next) => {
 });
 
 function client(provider) {
-  if (!['chatgpt', 'ollama'].includes(provider)) fail('Choose ChatGPT or Ollama as the AI provider.');
-  return provider === 'ollama' ? ollama : codex;
+  if (!['chatgpt', 'ollama', 'gemini', 'openrouter'].includes(provider)) fail('Choose ChatGPT, Ollama, Gemini or OpenRouter as the AI provider.');
+  return provider === 'chatgpt' ? codex : provider === 'ollama' ? ollama : hosted[provider];
 }
 
 async function selectedProvider(req) {
@@ -74,6 +75,14 @@ router.post('/account/login', sessionOnly, loginLimit, endpoint(async (req, res)
 }));
 router.delete('/account', sessionOnly, endpoint(async (req, res) => {
   await codex.logout(req.user.id);
+  res.json({ ok: true });
+}));
+router.put('/credentials', sessionOnly, loginLimit, endpoint(async (req, res) => {
+  await hosted.saveCredentials(req.user.id, req.body);
+  res.json({ ok: true });
+}));
+router.delete('/credentials', sessionOnly, endpoint(async (req, res) => {
+  await hosted.deleteCredentials(req.user.id, req.query.provider);
   res.json({ ok: true });
 }));
 router.get('/models', sessionOnly, endpoint(async (req, res) => {

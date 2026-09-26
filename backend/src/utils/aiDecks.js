@@ -95,12 +95,15 @@ function settings(body) {
 function preferencesRequest(body) {
   object(body, ['provider', 'model', 'reasoning_effort', 'ollama_url'], 'AI preferences');
   const { provider } = body;
-  if (!['chatgpt', 'ollama'].includes(provider)) fail('Choose ChatGPT or Ollama as the AI provider.');
+  if (!['chatgpt', 'ollama', 'gemini', 'openrouter'].includes(provider)) fail('Choose ChatGPT, Ollama, Gemini or OpenRouter as the AI provider.');
   const model = body.model === null ? null : text(body.model, 'Model', 200, true);
   const reasoning_effort = body.reasoning_effort === null ? null : text(body.reasoning_effort, 'Thinking level', 40, true);
   if (model === null && reasoning_effort !== null) fail('Choose an AI model before choosing a thinking level.');
   if (provider === 'ollama' && (model === null || reasoning_effort !== null)) {
     fail('Choose an installed Ollama model with no thinking level override.');
+  }
+  if (['gemini', 'openrouter'].includes(provider) && (model === null || reasoning_effort !== null)) {
+    fail('Choose an explicit hosted AI model with no thinking level override.');
   }
   return { provider, model, reasoning_effort, ollama_url: normalizeBaseUrl(body.ollama_url) };
 }

@@ -574,6 +574,9 @@ async function initDb() {
   if (!usersCols.some(c => c.name === 'ai_ollama_url')) {
     await run(`ALTER TABLE users ADD COLUMN ai_ollama_url TEXT`);
   }
+  for (const column of ['ai_gemini_api_key', 'ai_openrouter_api_key']) {
+    if (!usersCols.some(c => c.name === column)) await run(`ALTER TABLE users ADD COLUMN ${column} TEXT`);
+  }
   if (!usersCols.some(c => c.name === 'share_locations')) {
     await run(`ALTER TABLE users ADD COLUMN share_locations INTEGER DEFAULT 0`);
   }

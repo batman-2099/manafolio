@@ -29,7 +29,7 @@ This guide describes the current implementation and the contracts to preserve wh
 | Persistence | SQLite via `sqlite3`; one collection database, plus a separate rebuildable Scryfall bulk database |
 | Magic data | Scryfall cards, sets, images, languages, prices, and token relations; MTGJSON preconstructed decklists |
 | Scanning | `onnxruntime-node` and `sharp` for artwork matching; native Tesseract footer OCR |
-| Optional AI | OpenAI Codex app-server or a user-selected Ollama service |
+| Optional AI | OpenAI Codex app-server, Gemini, OpenRouter, or a user-selected Ollama service |
 | Delivery | One container serves API and built frontend to desktop and phone browsers |
 
 The active search, scan, sets, statistics, and deck surfaces are Magic-focused. Lorcana data and provider tooling remain available. Preserve stored game and provider identities when maintaining shared code; removing an integration must not delete existing records or relabel them as Magic.
@@ -51,7 +51,7 @@ Paths below are relative to the repository root.
 | `backend/src/utils/collectionHelpers.js` | Shared placement, stack quantity, and checkout-allocation helpers |
 | `backend/src/utils/compartmentSort.js` | Storage eligibility, sorting, stacking, and slot recommendations |
 | `backend/src/utils/deckRules.js`, `aiDecks.js` | Deck validation and inventory-aware AI request/save rules |
-| `backend/src/codexDeckClient.js`, `ollamaDeckClient.js` | Provider-specific AI transport and lifecycle |
+| `backend/src/codexDeckClient.js`, `ollamaDeckClient.js`, `hostedDeckClient.js` | Provider-specific AI transport and lifecycle |
 | `backend/src/cvScan.js`, `catalog.js`, `cardSets.js` | Scan inference, resumable artwork catalogs, and set caching |
 | `backend/src/utils/scanOcr.js`, `modelAssets.js`, `npz.js` | Footer OCR, optional model downloads, published catalog reader |
 | `backend/src/utils/priceHelpers.js` | Price precedence, timestamps, price-history recording, sweep gates |
@@ -293,6 +293,8 @@ Inventory is scoped to the signed-in user and selected Physical/Arena destinatio
 ChatGPT integration uses the pinned official Codex app-server package and device login, with per-user data under `<database-directory>/codex/<user-id>/`. The client disables model host-file, command, and external-tool access, rejects unsupported app-server actions, and requires a Unix server. Administrators can still read persisted credentials. Disconnect removes the user's local Codex data; account JSON backups exclude it, but volume backups include it.
 
 Ollama uses the selected HTTP(S) address or `OLLAMA_BASE_URL`, defaults to server loopback, requires an installed structured-output model, and does not silently fall back to ChatGPT. Requests originate from the **server**. URL syntax validation is not a destination allowlist: signed-in users can reach server-accessible private/LAN services. Use trusted accounts and outbound firewall controls, and do not expose an unauthenticated Ollama port publicly.
+
+Gemini and OpenRouter use fixed official API endpoints and per-user/provider keys stored in the users table. Browser-session-only credential endpoints never return keys; account JSON exports omit them, while SQLite/volume backups include them. Users explicitly select a model; hosted requests do not fall back to a different model/provider. Structured responses still pass the shared inventory and draft validation before review or saving.
 
 Requests contain eligible card metadata/counts, conversation, and the current draft. Keep storage identities, saved private notes, other users' records, and saved source-deck descriptions out of provider context. User-edited draft descriptions are part of the sent draft. Suggestions are limited by cached rule data and provider output quality; invalid/incomplete or oversized requests are rejected, not silently trimmed into a different deck. See [the AI workflow and security instructions](README.md#get-an-ai-deck-recommendation).
 

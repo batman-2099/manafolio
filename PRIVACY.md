@@ -45,7 +45,7 @@ External services receive the network information needed to serve a request, suc
 | Scan models and supplied catalogs | Installation/admin download actions contact Hugging Face (`huggingface.co`) and its download infrastructure. These download assets, not your camera frames. |
 | Optional PSA certification lookup | The server sends the certificate number and configured PSA API token to `api.psacard.com`; returned card information may be used in provider searches. |
 | Optional SSO | The browser visits the configured OpenID Connect provider; the server exchanges authorization codes and receives identity claims according to that provider and the administrator's configured scopes. The default scopes are `openid profile email`. |
-| Optional AI | The server sends the request context described below to OpenAI or the selected Ollama service. |
+| Optional AI | The server sends the request context described below to OpenAI, Google Gemini, OpenRouter and its upstream provider, or the selected Ollama service. |
 | Links to marketplaces or other sites | Following an external link contacts that site. Card-specific links can include names, identifiers, or search terms. |
 
 Manafolio's current product interface is Magic-focused; retained Lorcana integrations can also contact Lorcast and its artwork hosts. Customized deployments may use additional services and need corresponding disclosures. The table above is not a promise that every deployment contacts only a fixed list of hosts.
@@ -67,11 +67,15 @@ Container filtering is applied on the server. The generated payload excludes con
 
 **Ollama:** Requests originate from the Manafolio server and go to the configured HTTP(S) service. That service may run locally, on a LAN, or remotely; choosing Ollama alone is not a guarantee of local-only processing. Check the service, model, and any upstream provider it uses. Manafolio does not add Ollama authentication. Signed-in users can choose server-reachable addresses, including localhost and private networks, so operators must invite trusted users and enforce outbound network restrictions. Do not expose an unauthenticated Ollama port publicly.
 
+**Gemini and OpenRouter:** You supply your own API key for each provider. Gemini requests go to Google; OpenRouter routes requests to an upstream provider serving the selected model. Free tiers have quotas and may have different data-use terms from paid service; Google lists free-tier content as used to improve its products, subject to its terms. Review the selected provider's retention and training policies. There is no automatic fallback to a different model or provider.
+
 The builder's conversation is session-only in the interface, not a saved Manafolio chat history. This is not a guarantee of deletion from provider infrastructure or operator logs. Saving a draft explicitly stores its resulting deck in Manafolio.
 
 ChatGPT credentials are stored separately for each user under `<database-directory>/codex/<user-id>/`. Server administrators can access those files. **Disconnect** removes that user's local Codex data; it does not erase provider-side records or older backups. Account JSON exports exclude these credentials, while whole-volume backups include them.
 
-See the [AI workflow and deployment guidance](README.md#get-an-ai-deck-recommendation) before enabling either provider.
+Gemini and OpenRouter API keys are stored per user/provider in the server database. They are never returned in account or preferences responses and are excluded from account JSON exports, but database snapshots and whole-volume backups include them. Administrators can access them. Removing a key deletes the current stored copy, not older backups or provider records; revoke the key at its provider when necessary.
+
+See the [AI workflow and deployment guidance](README.md#get-an-ai-deck-recommendation) before enabling a provider.
 
 ## Opt-in public sharing and exports
 

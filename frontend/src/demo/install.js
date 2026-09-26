@@ -22,6 +22,14 @@ localStorage.setItem('manafolio_user', JSON.stringify(routes['/api/auth/me'].use
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
+let aiPreferences = { provider: 'chatgpt', model: null, reasoning_effort: null, ollama_url: null };
+const aiConnections = { chatgpt: false, ollama: true, gemini: false, openrouter: false };
+const aiModels = {
+  chatgpt: [{ id: 'gpt-5.4', name: 'GPT-5.4', isDefault: true, reasoningEfforts: ['low', 'medium', 'high'], defaultReasoningEffort: 'medium' }],
+  ollama: [{ id: 'llama3.2:latest', name: 'llama3.2:latest', reasoningEfforts: [] }],
+  gemini: [{ id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', reasoningEfforts: [] }],
+  openrouter: [{ id: 'openrouter/free', name: 'Free Models Router', reasoningEfforts: [] }],
+};
 const orig = window.fetch.bind(window);
 
 window.fetch = (input, opts = {}) => {
@@ -32,6 +40,32 @@ window.fetch = (input, opts = {}) => {
   const method = (opts.method || 'GET').toUpperCase();
   const path = (url.replace(/^https?:\/\/[^/]+/, '').split('?')[0].replace(/\/+$/, '')) || '/';
 
+  if (path.startsWith('/api/ai-decks/')) {
+    const params = new URL(url, window.location.origin).searchParams;
+    const body = opts.body ? JSON.parse(opts.body) : {};
+    const provider = params.get('provider') || body.provider || aiPreferences.provider;
+    if (!Object.hasOwn(aiConnections, provider)) return Promise.resolve(json({ error: 'Unknown AI provider.' }, 400));
+    if (path === '/api/ai-decks/preferences') {
+      if (method === 'PUT') {
+        if (body.model && !aiModels[provider].some(model => model.id === body.model)) return Promise.resolve(json({ error: 'Choose an available model.' }, 400));
+        if (provider !== 'chatgpt' && !body.model) return Promise.resolve(json({ error: 'Choose a model.' }, 400));
+        aiPreferences = { provider, model: body.model || null, reasoning_effort: provider === 'chatgpt' ? body.reasoning_effort || null : null, ollama_url: body.ollama_url || null };
+      }
+      return Promise.resolve(json(aiPreferences));
+    }
+    if (path === '/api/ai-decks/credentials' && ['PUT', 'DELETE'].includes(method)) {
+      if (!['gemini', 'openrouter'].includes(provider)) return Promise.resolve(json({ error: 'Choose an API-key provider.' }, 400));
+      // Store connection state only: even sample keys never enter fixtures or storage.
+      aiConnections[provider] = method === 'PUT';
+      return Promise.resolve(json({ ok: true }));
+    }
+    if (path === '/api/ai-decks/account') {
+      if (method === 'DELETE') aiConnections.chatgpt = false;
+      return Promise.resolve(json({ provider, connected: aiConnections[provider] }));
+    }
+    if (path === '/api/ai-decks/models') return Promise.resolve(json({ models: aiConnections[provider] ? aiModels[provider] : [] }));
+    return Promise.resolve(json({ error: 'Live AI requests are disabled in the demo.' }, 503));
+  }
   if (method === 'PATCH' && path === '/api/auth/theme') {
     const { theme } = JSON.parse(opts.body || '{}');
     if (!themes.includes(theme)) return Promise.resolve(json({ error: 'Invalid theme' }, 400));
