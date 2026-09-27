@@ -1,13 +1,13 @@
 name: Deploy Demo to GitHub Pages
 
 # Builds the frontend in demo mode (fixture-backed, no backend) and publishes it
-# to GitHub Pages. Manual dispatch, plus any push to main that touches the
-# frontend. Enable Pages -> Source: GitHub Actions in repo settings once.
+# to GitHub Pages. Manual dispatch, plus main updates to the frontend or guide.
+# Enable Pages -> Source: GitHub Actions in repo settings once.
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
-    paths: [ 'frontend/**' ]
+    paths: [ 'frontend/**', 'docs/USER_GUIDE.md' ]
 
 permissions:
   contents: read

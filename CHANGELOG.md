@@ -2,10 +2,12 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.0.8
 
 - Restored Supertype Breakdown, Color & Land Distribution, Deck Health, and the commander card directly below the deck description, before the card editor.
 - Restored beveled edges, a shaded finish, and raised shadows to Commander tags in deck list and grid views.
+- Added a detailed user guide covering first use, inventories, imports, scanning, storage, decks, AI, sharing, preferences, backups, Notes, administration, and troubleshooting; linked it from the README.
+- Added How-to immediately after Notes, including full-guide search, chapter navigation, keyboard-accessible reading controls, and responsive tables; the in-app guide uses the same Markdown source as the repository documentation.
 
 ## 2.0.7
 

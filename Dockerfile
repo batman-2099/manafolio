@@ -13,6 +13,8 @@ RUN npm ci
 COPY frontend/ ./
 # Shared JSON tables imported via ../../../shared/*.json (resolves to /app/shared)
 COPY shared/ /app/shared/
+# The in-app guide is bundled from its Markdown source.
+COPY docs/USER_GUIDE.md /app/docs/USER_GUIDE.md
 # Build production bundles
 RUN npm run build
 

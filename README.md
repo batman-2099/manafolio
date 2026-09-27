@@ -8,11 +8,13 @@
 
 Self-hosted collection, storage, and deck manager for Magic: The Gathering.
 
-[Install](#install) · [Features](#features) · [Workflows](#workflows) · [Architecture](PROJECT.md) · [MIT License](LICENSE)
+[Install](#install) · [User Guide](docs/USER_GUIDE.md) · [Features](#features) · [Workflows](#workflows) · [Architecture](PROJECT.md) · [MIT License](LICENSE)
 
 </div>
 
 Manafolio brings your Magic collection, physical storage, and decks together on a server you control. Keep exact printings and purchase records, find the box holding a copy, reserve cards for a night of play, and manage Arena inventory without mixing it with physical ownership.
+
+For step-by-step instructions, inventory explanations, backup warnings, and troubleshooting, open **How-to** after **Notes** in the app (**More → How-to** on a phone), or read the [Manafolio help and how-to guide](docs/USER_GUIDE.md). The in-app page includes full-guide search and chapter navigation; guide text is currently English.
 
 Manafolio was originally forked from [Bindarr](https://github.com/thenotoriousJeremy/bindarr) version 1.8.5, created by **thenotoriousJeremy and contributors**.
 

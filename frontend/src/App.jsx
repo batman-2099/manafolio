@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from 'react';
-import { LayoutDashboard, Database, MapPin, Settings as SettingsIcon, LogOut, ShieldAlert, Plus, Swords, StickyNote, MoreHorizontal, X } from 'lucide-react';
+import { LayoutDashboard, Database, MapPin, Settings as SettingsIcon, LogOut, ShieldAlert, Plus, Swords, StickyNote, BookOpen, MoreHorizontal, X } from 'lucide-react';
 import Login from './components/Login';
 import Logo from './components/Logo';
 import { pushBackGuard } from './utils/useBackGuard';
@@ -19,6 +19,7 @@ const SharedCollection = lazy(() => import('./components/SharedCollection'));
 const SharedContainer = lazy(() => import('./components/SharedContainer'));
 const DeckBuilder = lazy(() => import('./components/DeckBuilder'));
 const Notes = lazy(() => import('./components/Notes'));
+const HowTo = lazy(() => import('./components/HowTo'));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -441,6 +442,8 @@ function App() {
         return <DeckBuilder key={deckViewKey} showToast={showToast} navigationGuardRef={navigationGuardRef} />;
       case 'notes':
         return <Notes showToast={showToast} />;
+      case 'howto':
+        return <HowTo />;
       case 'settings':
         return <Settings user={user} onUpdateUser={handleUpdateUser} onSaveTheme={handleSaveTheme} showToast={showToast} />;
       case 'admin':
@@ -509,7 +512,7 @@ function App() {
           <button
             ref={moreTriggerRef}
             type="button"
-            className={`nav-tab nav-more-trigger ${['deckbuilder', 'notes', 'settings', 'admin'].includes(activeTab) ? 'active' : ''}`}
+            className={`nav-tab nav-more-trigger ${['deckbuilder', 'notes', 'howto', 'settings', 'admin'].includes(activeTab) ? 'active' : ''}`}
             aria-expanded={moreOpen}
             aria-controls="nav-secondary"
             onClick={() => setMoreOpen(open => !open)}
@@ -537,6 +540,15 @@ function App() {
             >
               <StickyNote size={18} />
               <span>{t('nav.notes')}</span>
+            </button>
+
+            <button
+              className={`nav-tab ${activeTab === 'howto' ? 'active' : ''}`}
+              aria-current={activeTab === 'howto' ? 'page' : undefined}
+              onClick={() => goTab('howto')}
+            >
+              <BookOpen size={18} aria-hidden="true" />
+              <span style={{ whiteSpace: 'nowrap' }}>{t('nav.howto')}</span>
             </button>
 
             <button

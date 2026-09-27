@@ -1,6 +1,6 @@
 {
   "name": "manafolio-backend",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "description": "Backend API for Manafolio",
   "main": "src/server.js",
   "scripts": {

@@ -1,7 +1,7 @@
 {
   "name": "manafolio-frontend",
   "private": true,
-  "version": "2.0.7",
+  "version": "2.0.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,6 +19,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "canvas-confetti": "^1.9.3",
     "lucide-react": "^0.378.0",
+    "marked": "^18.0.14",
     "onnxruntime-web": "^1.27.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
