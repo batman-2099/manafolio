@@ -538,13 +538,23 @@ Switching Physical/Arena does not transfer cards between inventories. The destin
 ### Choose a commander
 
 1. Create or edit the deck to use a Commander/EDH/Brawl format, and apply those properties.
-2. Add the intended commander as a card in **Deck Cards**.
-3. Turn on that card's **Commander** switch. Selecting another card replaces the previous selection; turning the selected switch off clears it.
+2. Add the intended commander creature as a card in **Deck Cards**.
+3. Choose it from the **Commander** dropdown in the overview, beneath the commander artwork when one is selected. The dropdown lists all creatures in the deck, not only legendary creatures, and remains available when no commander is selected. Choose **No commander** to clear the selection.
 4. Select **Save**.
 
 **Expected result:** the card is marked **Commander**, and its artwork appears in the overview below Description, alongside the analytics. Select the artwork to preview it.
 
 The commander is one existing deck-card entry, not an additional copy outside the list. The UI supports a single commander selection; do not assume partner commanders, sideboard zones, or comprehensive Commander legality checks.
+
+### Customize a deck's card back
+
+1. Open the deck and select **Customize card back** beneath its back image.
+2. Choose a **Dragon Shield sleeve** to download and preview its back, or use a solid color, an uploaded image, or a direct image URL.
+3. Review the preview, then select **Save** in the dialog. **Cancel** leaves the saved back unchanged.
+
+The Dragon Shield dropdown is a bundled selection from the [official sleeve collection](https://www.dragonshield.com/collections/card-sleeves), not a live shop inventory. Images with `solo_sleeve` or `sleeves` filenames are selected and cropped to the sleeve back; packaging, custom-design placeholders, and transparent sleeves showing sample cards are excluded. Products without a suitable matching image are not listed.
+
+Selecting a sleeve contacts Dragon Shield's image CDN. If downloading fails, the previous preview stays intact; select the sleeve again to retry. Saving stores a resized image with the deck, so displaying the saved back does not require another Dragon Shield download. Card-back changes do not save other deck drafts.
 
 ### Import while creating a deck
 

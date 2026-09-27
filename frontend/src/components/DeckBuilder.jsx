@@ -1003,6 +1003,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
   const totalDeckCardsCount = activeDeck ? activeDeck.cards.reduce((sum, c) => sum + c.quantity, 0) : 0;
   const commanderCard = activeDeck?.cards.find(card => card.id === activeDeck.commander_card_id);
+  const commanderChoices = activeDeck?.cards
+    .filter(card => cardGroup(card) === 'Creature' || card.id === activeDeck.commander_card_id)
+    .sort((a, b) => displayName(a).localeCompare(displayName(b))) || [];
   const targetDeckCardsCount = activeDeck?.target_size || 60;
   const supertypeData = getSupertypeChartData();
   const colorData = getColorChartData();
@@ -1902,6 +1905,19 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     <CardImage card={commanderCard} style={{ display: 'block', width: '100%', aspectRatio: '0.718', objectFit: 'contain', borderRadius: '7px' }} />
                   </button>
                 )}
+                {/commander|edh|brawl/i.test(activeDeck.format || '') && (
+                  <div className="deck-commander-field">
+                    <label htmlFor="deck-commander">{t('deck.commander')}</label>
+                    <select id="deck-commander" className="input-control" value={activeDeck.commander_card_id || ''} disabled={editorBusy} onChange={e => handleCommanderChange(e.target.value)}>
+                      <option value="">{t('deck.noCommander')}</option>
+                      {commanderChoices.map(card => (
+                        <option key={card.id} value={card.id}>
+                          {displayName(card)}{card.set_name ? ` · ${card.set_name}` : ''}{card.number ? ` #${card.number}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {activeDeck.game === 'mtg' && <DeckCardBack
                   key={activeDeck.id}
                   deck={activeDeck}
@@ -2113,10 +2129,6 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                                       <input type="checkbox" role="switch" className="deck-card-toggle" checked={!!card.checked_out} disabled={editorBusy} onChange={(e) => handlePulledChange(card.id, e.target.checked)} />
                                       {t('deck.pulled')}
                                     </label>
-                                    {/commander|edh|brawl/i.test(activeDeck.format || '') && <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', cursor: 'pointer' }}>
-                                      <input type="checkbox" role="switch" className="deck-card-toggle" checked={activeDeck.commander_card_id === card.id} disabled={editorBusy} onChange={e => handleCommanderChange(e.target.checked ? card.id : null)} />
-                                      {t('deck.commander')}
-                                    </label>}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
                                       <button
                                         className={`btn ${card.quantity === 1 ? 'btn-danger' : 'btn-secondary'} btn-icon-only`}
@@ -2172,10 +2184,6 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                                       <input type="checkbox" role="switch" className="deck-card-toggle" checked={!!card.checked_out} disabled={editorBusy} onChange={(e) => handlePulledChange(card.id, e.target.checked)} />
                                       {t('deck.pulled')}
                                     </label>
-                                    {/commander|edh|brawl/i.test(activeDeck.format || '') && <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', cursor: 'pointer' }}>
-                                      <input type="checkbox" role="switch" className="deck-card-toggle" checked={activeDeck.commander_card_id === card.id} disabled={editorBusy} onChange={e => handleCommanderChange(e.target.checked ? card.id : null)} />
-                                      {t('deck.commander')}
-                                    </label>}
                                     <div style={{ display: 'flex', gap: '2px' }}>
                                       <button aria-label={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')} className={`btn ${card.quantity === 1 ? 'btn-danger' : 'btn-secondary'} btn-icon-only`} style={{ width: '20px', height: '20px', fontSize: '0.7rem', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} disabled={editorBusy} onClick={() => handleUpdateCardQty(card.id, card.quantity - 1)} title={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')}>
                                         {card.quantity === 1 ? <Trash2 size={10} /> : '-'}

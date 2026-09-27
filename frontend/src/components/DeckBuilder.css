@@ -6,6 +6,13 @@
   justify-self: center;
 }
 
+.deck-commander-field {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 0.875rem;
+}
+
 .deck-back-button {
   display: grid;
   gap: 0.5rem;
@@ -68,9 +75,18 @@
   border: 0;
 }
 
-.deck-back-panel input {
+.deck-back-panel :is(input, select) {
   min-width: 0;
   max-width: 100%;
+}
+
+.deck-back-panel select {
+  min-height: 44px;
+}
+
+.deck-back-panel a {
+  color: var(--text-primary);
+  text-underline-offset: 0.2em;
 }
 
 .deck-back-panel input[type="color"] {
@@ -261,12 +277,14 @@
   line-height: 1.5;
 }
 
+.deck-commander-field label,
 .deck-source-field label,
 .deck-sleeved-field label {
   color: var(--text-strong);
   font-weight: 600;
 }
 
+.deck-commander-field select,
 .deck-source-field select,
 .deck-sleeved-field select {
   width: 100%;
