@@ -55,7 +55,8 @@ function normalizeSearchParams({ name = '', number = '', set = '', q = '' }) {
   let cleanSet = String(set || '').trim();
   const rawQuery = String(q || '').trim();
 
-  const input = (!cleanName && !cleanNumber && !cleanSet && rawQuery) ? rawQuery : cleanName;
+  if (!cleanName && !cleanNumber && !cleanSet) cleanName = rawQuery;
+  const input = cleanName;
 
   if (input && !cleanNumber) {
     const pureFrac = input.match(/^#?([A-Z0-9★\-]+)\s*\/\s*[A-Z0-9★\-]+$/i);
@@ -262,6 +263,8 @@ async function applyScanSafety(result, footer, { sets, langName }) {
     }
   }
   const top = result.candidates[0];
+  const name = typeof footer.nameTsv === 'string'
+    ? scanOcr.parseNameTsv(footer.nameTsv) : { status: 'unreadable' };
   const choices = ocr.status === 'matched' ? result.candidates : nearby;
   const identities = new Set(choices.map(scanPrintingId));
   for (const card of artPrintings) {
@@ -284,7 +287,7 @@ async function applyScanSafety(result, footer, { sets, langName }) {
   if (['conflict', 'unavailable', 'error'].includes(ocr.status)) reasons.push(`ocr_${ocr.status}`);
   result.margin = result.candidates.length > 1
     ? top.score - result.candidates[1].score : (top?.score || 0);
-  result.safety = { autoAddSafe: reasons.length === 0, reasons, ocr, quality, context };
+  result.safety = { autoAddSafe: reasons.length === 0, reasons, ocr, name, quality, context };
   result.context = context;
   result.lang = languages.toCode(top?.card?.language || langName);
 }
@@ -336,7 +339,7 @@ router.post('/scan-match', searchLimiter, async (req, res) => {
       try {
         const footer = cropped ? buf : (result.crop ? Buffer.from(result.crop.split(',').pop(), 'base64') : null);
         return footer && result.detected !== false
-          ? await scanOcr.readFooter(footer) : { status: 'unreadable' };
+          ? await scanOcr.readCardText(footer) : { status: 'unreadable' };
       } catch (error) {
         console.warn('scan-match OCR failed:', error.message);
         return { status: 'error' };
@@ -500,7 +503,7 @@ class AddCardError extends Error {
 // and means an ungraded card, not a missing value.
 const GRADERS = ['Raw', 'PSA', 'BGS', 'CGC', 'SGC', 'TAG'];
 
-async function addCardToCollection(user, body) {
+async function addCardToCollection(user, body, preparedCard = null) {
   const {
     card_id,
     quantity = 1,
@@ -562,7 +565,7 @@ async function addCardToCollection(user, body) {
   }
 
   {
-    let card = await db.get(`SELECT * FROM card_cache WHERE id = ?`, [card_id]);
+    let card = preparedCard || await db.get(`SELECT * FROM card_cache WHERE id = ?`, [card_id]);
     if (!card) {
       if (!card_id.startsWith('mtg-')) throw new AddCardError(400, 'Unsupported card ID');
       card = await cardApi.getCardById(card_id, { game });
@@ -571,7 +574,7 @@ async function addCardToCollection(user, body) {
     if (card.game !== 'mtg') throw new AddCardError(400, 'Only Magic: The Gathering cards are supported.');
 
     let cardId = card_id;
-    const localized = await cardApi.printingInLanguage(card, language);
+    const localized = preparedCard ? null : await cardApi.printingInLanguage(card, language);
     if (localized) {
       card = localized;
       cardId = localized.id;
@@ -659,6 +662,177 @@ async function addCardToCollection(user, body) {
     };
   }
 }
+
+const SCAN_DRAFT_SELECT = `
+  SELECT cc.*, d.id AS draft_id, d.card_id, d.quantity, d.condition, d.printing,
+    d.language, d.purchase_price, d.location_id
+  FROM scan_drafts d JOIN card_cache cc ON cc.id = d.card_id
+  WHERE d.user_id = ?`;
+
+async function getScanDraft(userId, id) {
+  const row = await db.get(`${SCAN_DRAFT_SELECT} AND d.id = ?`, [userId, id]);
+  if (!row) throw new AddCardError(404, 'Scan draft not found');
+  return parseCardRow(row);
+}
+
+async function normalizeScanDraft(body, previous = {}) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new AddCardError(400, 'Invalid scan draft');
+  }
+  const draft = {
+    card_id: previous.card_id, quantity: 1, condition: 'Near Mint', printing: 'Normal',
+    language: 'English', purchase_price: 0, location_id: null, ...previous, ...body
+  };
+  if (typeof draft.card_id !== 'string' || !cardApi.isMtgId(draft.card_id)) {
+    throw new AddCardError(400, 'Unsupported card ID');
+  }
+  if (!Number.isInteger(draft.quantity) || draft.quantity < 1 || draft.quantity > 250) {
+    throw new AddCardError(400, 'quantity must be an integer from 1 to 250');
+  }
+  if (!['Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged'].includes(draft.condition)) {
+    throw new AddCardError(400, 'Invalid condition');
+  }
+  if (!['Normal', 'Holofoil'].includes(draft.printing)) {
+    throw new AddCardError(400, 'Invalid printing');
+  }
+  const language = typeof draft.language === 'string' && languages.LANGUAGES.find(l =>
+    [l.name.toLowerCase(), l.code, l.scryfall].includes(draft.language.trim().toLowerCase()));
+  if (!language) throw new AddCardError(400, 'Invalid language');
+  draft.language = language.name;
+  if (!Number.isFinite(draft.purchase_price) || draft.purchase_price < 0) {
+    throw new AddCardError(400, 'purchase_price must be a nonnegative number');
+  }
+  if (draft.location_id !== null) {
+    if (!['number', 'string'].includes(typeof draft.location_id) ||
+        !Number.isSafeInteger(Number(draft.location_id)) || Number(draft.location_id) < 1) {
+      throw new AddCardError(400, 'Invalid location ID');
+    }
+    draft.location_id = Number(draft.location_id);
+  }
+  // Resolve and cache the reviewed printing before taking a write transaction.
+  let card = await db.get('SELECT * FROM card_cache WHERE id = ?', [draft.card_id]);
+  if (!card) card = await cardApi.getCardById(draft.card_id, { game: 'mtg' });
+  if (!card || card.game !== 'mtg') throw new AddCardError(400, 'Invalid Magic card');
+  card = await cardApi.printingInLanguage(card, draft.language) || card;
+  draft.card_id = card.id;
+  return draft;
+}
+
+async function assertScanDraftLocation(draft, userId) {
+  if (draft.location_id === null) return;
+  const location = await db.get('SELECT inventory_type FROM locations WHERE id = ? AND user_id = ?', [draft.location_id, userId]);
+  if (!location) throw new AddCardError(400, 'Invalid location ID');
+  assertStorageInventory(location, 'collection');
+}
+
+function scanDraftError(res, error) {
+  if (error.status === 400 || error.status === 404) return res.status(error.status).json({ error: error.message });
+  console.error(error);
+  return res.status(500).json({ error: 'Failed to save scan draft' });
+}
+
+router.get('/scan-drafts', async (req, res) => {
+  try {
+    res.json((await db.all(`${SCAN_DRAFT_SELECT} ORDER BY d.id DESC`, [req.user.id])).map(parseCardRow));
+  } catch (error) {
+    scanDraftError(res, error);
+  }
+});
+
+router.post('/scan-drafts', async (req, res) => {
+  try {
+    const draft = await normalizeScanDraft(req.body);
+    const result = await db.withTransaction(async () => {
+      await assertScanDraftLocation(draft, req.user.id);
+      const inserted = await db.run(`INSERT INTO scan_drafts
+        (user_id, card_id, quantity, condition, printing, language, purchase_price, location_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+        req.user.id, draft.card_id, draft.quantity, draft.condition, draft.printing,
+        draft.language, draft.purchase_price, draft.location_id
+      ]);
+      return getScanDraft(req.user.id, inserted.lastID);
+    });
+    res.json(result);
+  } catch (error) {
+    scanDraftError(res, error);
+  }
+});
+
+router.patch('/scan-drafts/:id', async (req, res) => {
+  try {
+    const previous = await getScanDraft(req.user.id, req.params.id);
+    const draft = await normalizeScanDraft(req.body, previous);
+    const result = await db.withTransaction(async () => {
+      await assertScanDraftLocation(draft, req.user.id);
+      const updated = await db.run(`UPDATE scan_drafts SET
+        card_id = ?, quantity = ?, condition = ?, printing = ?, language = ?, purchase_price = ?, location_id = ?
+        WHERE id = ? AND user_id = ?`, [
+        draft.card_id, draft.quantity, draft.condition, draft.printing,
+        draft.language, draft.purchase_price, draft.location_id, req.params.id, req.user.id
+      ]);
+      if (!updated.changes) throw new AddCardError(404, 'Scan draft not found');
+      return getScanDraft(req.user.id, req.params.id);
+    });
+    res.json(result);
+  } catch (error) {
+    scanDraftError(res, error);
+  }
+});
+
+function scanDraftIds(body) {
+  const ids = body?.draft_ids;
+  if (!Array.isArray(ids) || !ids.length ||
+      ids.some(id => !Number.isSafeInteger(id) || id < 1) || new Set(ids).size !== ids.length) {
+    throw new AddCardError(400, 'draft_ids must be a nonempty array of unique positive integer IDs');
+  }
+  return ids;
+}
+
+router.delete('/scan-drafts', async (req, res) => {
+  try {
+    const ids = scanDraftIds(req.body);
+    await db.withTransaction(async () => {
+      for (const id of ids) await getScanDraft(req.user.id, id);
+      for (const id of ids) {
+        await db.run('DELETE FROM scan_drafts WHERE id = ? AND user_id = ?', [id, req.user.id]);
+      }
+    });
+    res.json({ drafts: ids.length });
+  } catch (error) {
+    scanDraftError(res, error);
+  }
+});
+
+router.delete('/scan-drafts/:id', async (req, res) => {
+  try {
+    const deleted = await db.run('DELETE FROM scan_drafts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    if (!deleted.changes) throw new AddCardError(404, 'Scan draft not found');
+    res.json({ message: 'Scan draft discarded' });
+  } catch (error) {
+    scanDraftError(res, error);
+  }
+});
+
+router.post('/scan-drafts/commit', async (req, res) => {
+  try {
+    const ids = scanDraftIds(req.body);
+    const result = await db.withTransaction(async () => {
+      const drafts = [];
+      for (const id of ids) drafts.push(await getScanDraft(req.user.id, id));
+      let added = 0;
+      for (const draft of drafts) {
+        // Reviewed printings are cached; committing never needs the provider.
+        await addCardToCollection(req.user, draft, draft);
+        await db.run('DELETE FROM scan_drafts WHERE id = ? AND user_id = ?', [draft.draft_id, req.user.id]);
+        added += draft.quantity;
+      }
+      return { added, drafts: drafts.length };
+    });
+    res.json(result);
+  } catch (error) {
+    scanDraftError(res, error);
+  }
+});
 
 router.post('/cards/related-tokens', async (req, res) => {
   try {

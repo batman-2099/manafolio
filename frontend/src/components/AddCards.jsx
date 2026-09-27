@@ -58,7 +58,6 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, initialMode = 'search
           >
             <Camera size={18} />
             <span>{t('addCards.scan')}</span>
-            <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '0.1rem 0.3rem', borderRadius: 'var(--radius-sm)', border: '1px solid currentColor', color: 'var(--accent-yellow)' }}>{t('addCards.beta')}</span>
           </button>
         </div>
       </div>

@@ -322,22 +322,17 @@ async function detectAndDewarp(session, imageBuffer) {
 
 // Which set each catalog row belongs to, aligned with `ids`.
 //
-// Built lazily and only when a set filter is first used: it is one pass over
-// card_cache, and a user who never scopes a scan should not pay for it. Rows the
-// cache does not know get null, which the filter treats as "not in your sets" —
-// the user asked for specific sets, and an unknown set is not one of them.
+// Read current metadata for each scoped scan: card lookups and catalog builds
+// populate card_cache while the models stay loaded. Unknown sets remain excluded.
 async function rowSets(s, game) {
-  if (s.setOf) return s.setOf;
+  // ponytail: a fresh query avoids a second cache invalidation lifecycle.
   const db = require('./db');
   const rows = await db.all(`SELECT id, set_id FROM card_cache WHERE game = ?`, [game]);
   const byId = new Map(rows.map(r => [r.id, (r.set_id || '').toLowerCase()]));
-  s.setOf = s.ids.map((raw) => {
+  return s.ids.map((raw) => {
     const id = String(raw).replace(/_back$/, '');
     return byId.get(s.local ? id : `${game}-${id}`) ?? null;
   });
-  const known = s.setOf.filter(Boolean).length;
-  console.log(`cvScan: ${game} set index built, ${known}/${s.n} rows have a known set`);
-  return s.setOf;
 }
 
 // Brute-force cosine. Both sides are L2-normalised, so the dot product IS the

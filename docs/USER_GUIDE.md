@@ -191,34 +191,51 @@ This workflow adds the published main-board, commander, and sideboard cards to *
 
 PSA lookup requires a configured PSA integration. The certificate number is sent to PSA through your server. If lookup is unavailable or no matching candidate appears, use **Search & Add** and enter grading details manually. A raw-card market estimate is not an appraisal of the slab.
 
-### Scan physical cards with a camera (Beta)
+### Scan physical cards with a camera
 
 Scanning helps identify a printing; it does **not** determine condition, foil/finish, or a slab's grade. Exact-printing verification is heuristic, so check cards with reprinted artwork, difficult footers, sleeves, glare, or unusual treatments particularly carefully.
 
-1. Open **Add Cards → Scan Cards · Beta** and choose **Activate Camera**. Allow browser camera access.
-2. Open **Scan settings** with the gear button. For a first session, turn **Auto-add matches** off so you can review each result before it saves. This preference may already be on.
-3. Choose **Card language** and, when you know the sets, use **Filter by set**. Set families can include related subsets; expand the choices when you need to narrow them further.
-4. Place one card within the guide in even lighting. Keep the artwork and footer readable, reduce sleeve reflections, and hold the card still while identification and verification run. The camera begins scanning automatically; there is no separate manual shutter button.
-5. Check the identified card's name, set, number, artwork, and language. If shown a candidate list, select the correct card. Use its manual search field or **Rescan / Try Again** when the suggestions are wrong.
-6. In **Add Scanned Card**, set quantity, purchase price, condition, and printing, then choose **Add to Collection**.
-7. Remove the saved card before presenting the next one. Check **Recent Scans** and tap a saved card to inspect or edit it.
+The scanner displays upper-left title OCR separately from artwork candidates, including low-confidence text marked **uncertain**, or “No readable name” when no title text is available. This reading is informational: it is never compared against artwork candidates or used to allow or block automatic queuing. Artwork, footer, reprint, image-quality, catalog, and two-photo safety checks still apply. The English OCR engine may not reliably read non-English names or unusual title layouts.
+
+1. Open **Add Cards → Scan Cards** and choose **Activate Camera**. Allow browser camera access.
+2. Use the **Auto-queue matches** toggle below the camera, above **Filter by set**. It is available before camera activation and remembers your choice. Green means on: qualifying matches are saved to Scan review. Off lets you review a single confirmed match before queuing. Choosing from **Identified Cards Found** always queues the selected card immediately. Neither setting adds cards directly to your collection.
+3. Open **Scan settings** with the gear button to choose **Card language**. When you know the sets, use **Filter by set** below the camera on the main scan page. Set symbols appear beside set names when available. The filter is available before activating the camera; the gear menu is not needed. Set families can include related subsets; expand the choices when you need to narrow them further.
+   Using a set filter is highly recommended when you know the sets you are scanning.
+4. Place one card within the guide in even lighting. Keep the name, artwork, and footer readable, reduce sleeve reflections, and hold the card still while identification and verification run. The camera begins scanning automatically; there is no separate manual shutter button.
+5. Check the identified card's name, set, number, artwork, and language. In **Identified Cards Found**, select the correct card to queue it immediately without a second details screen. This queues one Near Mint, non-foil copy with the resolved language and market price as purchase price. Use the manual search field or **Rescan / Try Again** when the suggestions are wrong. A failed save keeps the candidate list open for retry.
+6. If the scanner opens **Review scanned card** for a single confirmed match, set quantity, purchase price, condition, printing, and language, then choose **Queue for review**. Candidate selections skip this form.
+7. Remove the queued card before presenting the next one. Each card in **Scan review** has a **Foil** toggle and **Discard** button. Foil switches the whole draft's quantity between foil and non-foil without changing its card identity or other details; the highlighted button means foil. Discard a wrong match and scan it again. Discarding a draft does not touch your collection.
+   To discard the whole reviewed batch, choose **Clear** and confirm. This removes only the drafts shown when you clicked Clear, not owned collection cards or newly queued scans.
 8. Tap **Scanning** to switch to **Paused** whenever you need to stop identification. Leaving the scanning view releases its camera stream.
 
-**Expected result:** saved scans add physical Collection entries to Unassigned Pile. The **Clear History** action only clears the recent-scan strip; it does not delete the saved collection cards.
+**Expected result:** scans wait in your account's saved **Scan review** grid, including after a refresh or leaving the scanner. They do not count toward owned totals, valuation, storage occupancy, or available deck copies. Review the cards, then choose the single **Add to Collection** button to add the entire displayed batch to physical Collection. The batch is atomic: a failure adds none of its cards and retains all drafts for correction or retry. Cards queued after submission stay in Scan review for the next batch. Temporary scan drafts are not part of collection exports or account JSON backups; full database backups retain them.
 
-#### When you enable auto-add
+#### Scan review actions
 
-- **Auto-add matches** saves qualifying matches without the ordinary review form. **Scan preset** shows the fallback-upload resolution and automatic-add confirmation delay. Fast uses a one-second delay; Balanced and High resolution use two seconds. Tap the countdown card to adjust condition/foil, choose an alternative, use **Add Now**, or **Cancel**.
+| Control | What it does |
+| --- | --- |
+| **Foil** | Toggles all copies in that draft between foil and non-foil. The highlighted state means foil; the choice survives reloads. |
+| **Discard** | Removes one draft after confirmation, without removing any owned cards. |
+| **Clear** | Removes the currently displayed batch after confirmation. Drafts queued after the click stay in review; owned cards are unchanged. |
+| **Add to Collection** | Adds the displayed batch to physical Collection in one transaction and removes those drafts from review. Newly queued drafts remain for the next batch. |
+
+There is no **Edit** button in Scan review. Check the printing before choosing a candidate, then use Foil or Discard as needed. Other copy details can be adjusted when a details form is shown, or after adding the card to Collection.
+
+If saving or clearing reports a connection error, reload Scan review before retrying: the server may have completed the operation even if its response was lost. Do not rescan or queue extra copies until you have checked the saved queue and Collection.
+
+#### When you enable automatic queuing
+
+- **Auto-queue matches** saves qualifying matches to Scan review without the ordinary edit form. **Scan preset** shows the fallback-upload resolution and queuing confirmation delay. Fast uses a one-second delay; Balanced and High resolution use two seconds. Tap the countdown card to adjust condition/foil, choose an alternative, use **Queue now**, or **Cancel**.
 - **Turbo** removes that countdown; it does not remove the requirement for two fresh photos to agree and pass safety checks.
 - Hold the same card still through verification. Changing settings, pausing, or leaving cancels pending verification.
 - A set/language fallback, missing catalog coverage, or conflicting verification can require manual selection. Do not treat a confident artwork candidate as proof of the printing.
-- Auto-add initially uses Near Mint/Normal settings and records the resolved market price as purchase price. Review those records if they do not describe your cards or what you paid.
+- Automatic queuing initially uses Near Mint/Normal settings and the resolved market price as purchase price. Use **Foil** in Scan review to change the finish. Set other copy details when the details form is shown, or edit the owned card after adding the reviewed batch to Collection.
 
-If **Same card scanned again** appears, decide whether it is genuinely another physical copy. Choose **Add … more copy/copies** only for additional inventory. **Discard — same card, keep scanning** ignores the repeat and continues; **Done — that was another photo of the same card** ignores it and pauses scanning.
+If **Same card scanned again** appears, decide whether it is genuinely another physical copy. Choose **Queue … more** only for additional copies. **Discard — same card, keep scanning** ignores the repeat and continues; **Done — that was another photo of the same card** ignores it and pauses scanning.
 
 #### Scan speed and diagnostics
 
-Use **Show scan diagnostics** in Scan settings to inspect per-frame capture, request, and candidate-resolution durations. Server stages show artwork matching, metadata lookup, footer OCR, safety checks, and total request processing. OCR and metadata run concurrently: do not add their times together. Request time includes server processing and network transfer, while the confirmation countdown is separate.
+Use **Show scan diagnostics** in Scan settings to inspect per-frame capture, request, and candidate-resolution durations. Server stages show artwork matching, metadata lookup, title/footer OCR, safety checks, and total request processing. OCR and metadata run concurrently: do not add their times together. Request time includes server processing and network transfer, while the confirmation countdown is separate.
 
 Presets do not reduce recognition checks. Client-rectified images stay at 896×896 pixels; the preset's upload limit applies only when client rectification is unavailable. Choose a known set and language, keep the footer readable, and use a stable server connection. A downloaded Scryfall bulk catalog can supply uncached candidate details locally instead of waiting for provider requests.
 
@@ -229,13 +246,13 @@ For a comfortable scanning rhythm, wait for the saved-card confirmation, lift th
 | Symptom | What to do |
 | --- | --- |
 | Camera access is denied or unavailable | Check the browser/site and phone camera permissions. A remote plain-HTTP address is not a secure camera context; use the server's HTTPS address. Localhost is a browser exception. |
-| Recognition cannot start or reports missing scan resources | Ask the server administrator to check the models, a usable language catalog, and footer OCR. The static demo does not support scanning. |
+| Recognition cannot start or reports missing scan resources | Ask the server administrator to check the models, a usable language catalog, and card-text OCR. The static demo does not support scanning. |
 | It stays at “Hold still” or “Move closer” | Improve lighting and focus, remove glare, and make the whole card large enough in the guide. Scan settings include detection/steadiness controls and diagnostics if you need to investigate. |
-| Wrong set or language | Check **Card language** and **Filter by set**, compare the printed footer, and select manually. Do not auto-add a fallback printing just to continue. |
+| Wrong set or language | Check **Card language** and **Filter by set**, compare the printed footer, and select manually. Correct the draft before adding it to your collection. |
 | Zoom or torch fails | Those features depend on the device/browser. Move the camera instead of relying on unsupported native zoom; not every browser supports a torch. |
 | A scan request seems stuck | Switch to **Paused**, then resume or rescan. Check the connection and server if it continues. |
 
-Camera frames/crops are sent to **your Manafolio server** for artwork matching and local footer OCR, not to a cloud image-recognition service or the project's maintainers. Normal scanning processes them in memory, but your server operator or proxy may have separate logging policies. Card identification and artwork can still involve external card-data services. Use a server you trust; self-hosted does not mean offline.
+Camera frames/crops are sent to **your Manafolio server** for artwork matching and local title/footer OCR, not to a cloud image-recognition service or the project's maintainers. Normal scanning processes them in memory, but your server operator or proxy may have separate logging policies. Card identification and artwork can still involve external card-data services. Use a server you trust; self-hosted does not mean offline.
 
 ## Collection: find, inspect, and export cards
 
@@ -857,9 +874,9 @@ Check the source and destination inventory, container/compartment locks, capacit
 
 Camera permission does not install server assets. A missing catalog must be built or installed; repeated scanning cannot make an absent catalog produce matches.
 
-### The scanner finds the wrong printing or will not auto-add
+### The scanner finds the wrong printing or will not auto-queue
 
-Reduce glare, steady the card, improve focus, and keep the footer visible. Set the correct language and narrow the set when known. Compare set and collector number against the result manually. Near-identical artwork, foil reflections, older layouts, and incomplete catalogs can require manual selection. Do not weaken verification just to obtain an automatic add; use Search & Add when uncertain.
+Reduce glare, steady the card, improve focus, and keep the footer visible. Set the correct language and narrow the set when known. Compare set and collector number against the result manually. Near-identical artwork, foil reflections, older layouts, and incomplete catalogs can require manual selection. Do not weaken verification just to obtain an automatic match; discard a wrong match from Scan review and scan it again before confirming the batch.
 
 ### A shared link works only on the administrator's computer
 

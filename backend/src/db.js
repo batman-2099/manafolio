@@ -243,6 +243,21 @@ async function initDb() {
   `);
 
   await run(`
+    CREATE TABLE IF NOT EXISTS scan_drafts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES card_cache(id),
+      quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity BETWEEN 1 AND 250 AND quantity = CAST(quantity AS INTEGER)),
+      condition TEXT NOT NULL DEFAULT 'Near Mint' CHECK(condition IN ('Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged')),
+      printing TEXT NOT NULL DEFAULT 'Normal' CHECK(printing IN ('Normal', 'Holofoil')),
+      language TEXT NOT NULL DEFAULT 'English',
+      purchase_price REAL NOT NULL DEFAULT 0 CHECK(purchase_price >= 0),
+      location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL
+    )
+  `);
+  await run(`CREATE INDEX IF NOT EXISTS idx_scan_drafts_user ON scan_drafts(user_id)`);
+
+  await run(`
     CREATE TABLE IF NOT EXISTS price_history (
       card_id TEXT NOT NULL,
       price REAL NOT NULL,

@@ -29,7 +29,7 @@ Manafolio was originally forked from [Bindarr](https://github.com/thenotoriousJe
 - **Optional AI.** Use your own ChatGPT/Codex account, Gemini or OpenRouter API key, or an Ollama service for inventory-aware suggestions and deck improvements. Review and edit drafts before saving; the collection and deck workflows do not require AI.
 - **Your own server.** Multi-user accounts, roles, invite-only registration by default, read-only API keys, optional public shares, account themes, and translated interfaces. Access the same server from desktop and phone browsers.
 - **Mana-inspired themes.** Arcane Blue and Jenny remain available alongside Plains, Island, Swamp, Mountain, Forest, and Wastes palettes. Each retains layered surfaces, metallic branding, and desktop/mobile navigation. Choose your account theme in Settings; removed Light, Magic, and LCARS selections fall back to Arcane Blue.
-- **Camera scanning · Beta.** Identify candidates from card artwork with local models and catalog data, with footer OCR and automatic-add safety checks. Review uncertain printings manually; scanning needs additional server assets and HTTPS on phones.
+- **Camera scanning.** Identify artwork candidates with local models and title/footer OCR, then save them to an account-scoped Scan review queue. Toggle foil or discard drafts before explicitly adding them to your collection; scanning needs additional server assets and HTTPS on phones.
 
 ## At a glance
 
@@ -248,7 +248,7 @@ For server recovery, preserve the persistent volume and keep protected backups o
 
 ## Card scanning
 
-**Add Cards → Scan Cards · Beta** uses local ONNX artwork matching and footer OCR to verify set code and collector number. It requires a server installation, models, a catalog, and native Tesseract with English data.
+**Add Cards → Scan Cards** uses local ONNX artwork matching, informational title OCR, and footer OCR to verify set code and collector number. It requires a server installation, models, a catalog, and native Tesseract with English data.
 
 1. Fetch models after deployment:
 
@@ -260,9 +260,13 @@ For server recovery, preserve the persistent volume and keep protected backups o
 2. Build the relevant language catalog under **Admin → Catalogs**. Downloading data and fingerprinting artwork can take hours; stopped builds retain completed work for resuming.
 3. Source installations need Tesseract at `/usr/bin/tesseract`, the path used by the scanner, with `eng` trained data (`/usr/bin/tesseract --list-langs`). On Debian/Ubuntu, install `tesseract-ocr tesseract-ocr-eng`. Source-built Docker images include both.
 
-Hold the card still until verification finishes. Auto-add, including Turbo, requires two fresh photos to agree on the printing and pass safety checks. Settings changes, pausing, or leaving cancel pending verification. Native camera zoom is available only when supported by the browser/device; no simulated digital crop is applied.
+Hold the card still until verification finishes. Auto-queue, including Turbo, requires two fresh photos to agree on the printing and pass safety checks. Settings changes, pausing, or leaving cancel pending verification. Native camera zoom is available only when supported by the browser/device; no simulated digital crop is applied.
 
-Similar printings, glare, blur, catalog gaps, and conflicting OCR can require manual review. Set/language filters narrow candidates but do not prove a match. Missing or failed OCR blocks auto-add; an unreadable footer supplies no corroborating OCR evidence but is not, by itself, an unconditional block—the artwork and ambiguity checks still apply. OCR reads the footer, not the name; sleeves and older layouts may remain unreadable. These checks do not detect condition or foil, and accuracy depends on lighting and focus.
+Automatic and manually selected scans go to **Scan review**, not directly to owned inventory. Drafts survive refreshes and remain outside collection totals, storage, and decks until you choose **Add to Collection**. Selecting a candidate queues one Near Mint, non-foil copy immediately, using the resolved language and market price as purchase price; no second details screen appears. Use **Foil** to toggle a draft's finish, or **Discard** to remove a mistaken match and scan it again. Collection exports and account JSON backups omit these temporary drafts; full database backups retain them.
+
+Similar printings, glare, blur, catalog gaps, and conflicting footer OCR can require manual review. Set/language filters narrow candidates but do not prove a match. Missing or failed footer OCR blocks automatic queuing; unreadable footer text supplies no corroborating evidence but is not, by itself, an unconditional block—the artwork and ambiguity checks still apply. Title OCR is informational: it is never compared against artwork candidates or used to allow or block automatic queuing. Title recognition uses the existing English OCR engine; non-English text, long names, sleeves, and unusual layouts may remain unreadable. These checks do not detect condition or foil, and accuracy depends on lighting and focus.
+
+The results dialog shows the actual OCR reading, including low-confidence text marked **uncertain**. “No readable name” means OCR supplied no title text, not merely that its confidence was low. All title readings are informational.
 
 Phones require HTTPS. See [the image-identification pipeline](PROJECT.md#image-identification-pipeline) for details and limitations.
 

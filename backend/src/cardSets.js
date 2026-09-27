@@ -84,6 +84,7 @@ function childAllowed(s, exclusions, excludeChildCodes = []) {
 const childBrief = (s) => ({
   code: s.code,
   name: s.name,
+  symbol_url: s.icon_svg_uri || null,
   cardCount: s.card_count || 0,
   type: s.set_type || 'subset',
 });

@@ -15,6 +15,7 @@ Depending on the features you use, Manafolio handles:
 - Storage and decks: container layouts, placements, reservations, decklists, descriptions, private notes, commander choices, and recorded wins/losses.
 - Imported files, exported files, backups, catalog caches, and uploaded replacement card artwork.
 - Camera images sent for identification, and optional AI prompts, draft context, and responses processed during a request.
+- Pending scan drafts and their reviewed copy details. These remain in your account on the server until you discard them or confirm their addition to Collection; they are separate from the transient camera image.
 
 The server administrator controls the database, persistent files, and access to them. Account separation is not encryption against that administrator. Use a server you trust, especially before entering provider credentials or connecting a ChatGPT account.
 
@@ -26,7 +27,7 @@ Signing out removes the application's saved sign-in token and user object, but i
 
 ## Camera and card identification
 
-Camera use requires permission. The client detects and prepares card frames locally, then sends captured images or crops to your Manafolio server for ONNX artwork matching and local Tesseract footer OCR. This scan flow does not send the photographs to a cloud image-recognition service or to Manafolio's maintainers.
+Camera use requires permission. The client detects and prepares card frames locally, then sends captured images or crops to your Manafolio server for ONNX artwork matching and local Tesseract title and footer OCR. This scan flow does not send the photographs to a cloud image-recognition service or to Manafolio's maintainers.
 
 The normal scan path processes images in memory rather than adding them to your collection as stored photos. Identification can still trigger external card-data lookups by printing ID, set, or collector number. Building scan catalogs downloads reference card artwork, and model installation downloads model assets. An operator's reverse proxy, diagnostics, or modified deployment may have its own retention behavior; do not assume every installation discards request bodies.
 

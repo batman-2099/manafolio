@@ -1280,13 +1280,18 @@ button.collection-card-trigger {
 }
 
 /* Camera Scanner UI Layout */
-.scanner-container {
+.scanner-container,
+.scanner-capture {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.85rem;
-  max-width: 600px;
+  width: 100%;
   margin: 0 auto;
+}
+
+.scanner-capture {
+  max-width: 600px;
 }
 
 .camera-preview-wrapper {
@@ -1521,6 +1526,56 @@ button.collection-card-trigger {
 .drawer-backdrop.open {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* Persistent scanner review: collection actions stay explicit, even on mobile. */
+.scan-review {
+  width: 100%;
+  min-width: 0;
+  margin-top: 1rem;
+}
+.scan-review h3, .scan-review h4 { color: var(--text-strong); margin: 0; }
+.scan-review p { color: var(--text-secondary); margin: 0.4rem 0; overflow-wrap: anywhere; }
+.scan-review-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+.scan-review-header > div { flex: 1 1 24rem; min-width: 0; }
+.scan-review-commit { flex: 1 1 auto; white-space: normal; }
+.scan-review-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+  gap: 1.5rem 1rem;
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0 0;
+}
+.scan-review-card { display: flex; flex-direction: column; min-width: 0; gap: 0.75rem; }
+.scan-review-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 5 / 7;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+.scan-review-details { min-width: 0; overflow-wrap: anywhere; }
+.scan-review-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: auto; }
+.scan-review-actions .btn { flex: 1 1 auto; white-space: normal; }
+.scan-review .btn,
+.scanner-container .quick-add-drawer .btn,
+.scanner-container .scan-suggestions-modal .btn,
+.scanner-container .scan-confirm-modal .btn { min-height: 44px; min-width: 44px; }
+.scan-draft-fields { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.scanner-container .quick-add-footer-tools { flex-wrap: wrap; }
+.scanner-container .quick-add-footer .btn { white-space: normal; }
+.scanner-container .quick-add-drawer :is(input, select) { min-height: 44px; }
+.scanner-container .scan-suggestions-modal form > div { min-width: 0; }
+@media (max-width: 599px) {
+  .scanner-container .scan-suggestions-modal form { flex-wrap: wrap; }
+  .scanner-container .scan-suggestions-modal form > div { min-width: 100%; }
+  .scanner-container .scan-suggestions-modal form > button { width: 100%; }
+}
+.scanner-container :is(button, input, select):focus-visible { outline: 2px solid var(--text-strong); outline-offset: 3px; }
+@media (min-width: 600px) {
+  .scan-review-commit { flex: 0 1 auto; }
 }
 
 /* Table Style for Collection Browse and Admin/Deck lists */

@@ -28,7 +28,7 @@ This guide describes the current implementation and the contracts to preserve wh
 | Server | Node.js, Express, Helmet, rate limiting, compressed API/static responses |
 | Persistence | SQLite via `sqlite3`; one collection database, plus a separate rebuildable Scryfall bulk database |
 | Magic data | Scryfall cards, sets, images, languages, prices, and token relations; MTGJSON preconstructed decklists |
-| Scanning | `onnxruntime-node` and `sharp` for artwork matching; native Tesseract footer OCR |
+| Scanning | `onnxruntime-node` and `sharp` for artwork matching; native Tesseract title and footer OCR |
 | Optional AI | OpenAI Codex app-server, Gemini, OpenRouter, or a user-selected Ollama service |
 | Delivery | One container serves API and built frontend to desktop and phone browsers |
 
@@ -53,7 +53,7 @@ Paths below are relative to the repository root.
 | `backend/src/utils/deckRules.js`, `aiDecks.js` | Deck validation and inventory-aware AI request/save rules |
 | `backend/src/codexDeckClient.js`, `ollamaDeckClient.js`, `hostedDeckClient.js` | Provider-specific AI transport and lifecycle |
 | `backend/src/cvScan.js`, `catalog.js`, `cardSets.js` | Scan inference, resumable artwork catalogs, and set caching |
-| `backend/src/utils/scanOcr.js`, `modelAssets.js`, `npz.js` | Footer OCR, optional model downloads, published catalog reader |
+| `backend/src/utils/scanOcr.js`, `modelAssets.js`, `npz.js` | Card-name/footer OCR, optional model downloads, published catalog reader |
 | `backend/src/utils/priceHelpers.js` | Price precedence, timestamps, price-history recording, sweep gates |
 | `backend/src/psaApi.js` | Certification lookup |
 | `backend/src/cardArt.js`, `backup.js` | Artwork overrides and server-level SQLite snapshots |
@@ -242,17 +242,23 @@ Return clears the deck-level reservation state. Checkout/check-in use the same s
 
 ## Image identification pipeline
 
-Scanning is a beta artwork-matching workflow with footer verification, not general card OCR or condition/foil detection. It needs the optional models, a usable catalog, and native OCR. Source and Docker setup steps are in [README.md](README.md#card-scanning).
+Scanning is a beta artwork-matching workflow with informational title OCR and footer verification, not general card OCR or condition/foil detection. It needs the optional models, a usable catalog, and native OCR. Source and Docker setup steps are in [README.md](README.md#card-scanning).
 
 ### Capture and match
 
 1. `frontend/src/utils/detectWorker.js` runs **cornelius** in a worker via `onnxruntime-web`, drawing the live corner outline. `CameraScanner.localDewarp` uses shared geometry to rectify the captured card to 896×896 pixels, retaining footer detail for OCR.
 2. `cvScan.match` accepts a rectified upload (`cropped: true`) without repeating corner detection. A whole frame instead goes through server-side detection/dewarping. The embedder receives a 448×448 image.
 3. **milo** produces a 128-dimensional normalized embedding. The server sweeps normalized catalog vectors with dot products (cosine similarity), merges/deduplicates hits, and returns ranked candidates.
-4. `/api/scan-match` overlaps native footer OCR with Scryfall candidate hydration and requested-language resolution. OCR text is interpreted only after hydrated candidate set codes are available, preserving exact-printing checks. ID lookups reuse `card_cache`, then the existing local Scryfall bulk snapshot, before the rate-limited provider fallback.
-5. The client requires **two fresh decoded video frames** to agree on the resolved printing and pass safety checks before auto-add, including Turbo. Changes to settings, pause, and unmount cancel verification; network failure is not agreement.
+4. `/api/scan-match` overlaps native title/footer OCR with Scryfall candidate hydration and requested-language resolution. Footer text is interpreted after hydrated candidate set codes are available, preserving exact-printing checks; title text is parsed independently of candidates. ID lookups reuse `card_cache`, then the existing local Scryfall bulk snapshot, before the rate-limited provider fallback.
+5. The client requires **two fresh decoded video frames** to agree on the resolved printing and pass safety checks before automatic queuing, including Turbo. Changes to settings, pause, and unmount cancel verification; network failure is not agreement.
 
 The shared image geometry lives in `shared/imgproc.mjs` and `shared/cardDetectPure.mjs`. Do not create a different preview crop from the one used for matching.
+
+Automatic and manual scan saves use account-scoped `/api/scan-drafts` CRUD, stored in `scan_drafts` rather than `collection`. The scanner loads a saved review grid with per-card foil toggling and discard, plus one batch confirmation. The Foil toggle patches only `printing` (`Normal` or `Holofoil`), preserving card identity and copy details. `POST /api/scan-drafts/commit` accepts `{draft_ids: [...]}`, validates unique account-owned draft IDs, reuses `addCardToCollection`, and consumes the submitted drafts in one transaction. A failure retains the entire batch; repeat or overlapping commits cannot duplicate copies. The client snapshots displayed draft IDs so newly queued cards remain for the next batch. Drafts supply no owned totals, storage occupancy, or deck availability. Collection exports/account JSON backups omit this temporary queue; database backups include it. Existing `autoAddSafe` and related internal gate names now govern automatic queuing, not collection writes.
+
+Selecting an identified candidate reuses the direct draft-queuing path and skips the details drawer. The picker blocks repeat submissions while saving, closes on success, and retains its candidates with an error on failure. Automatic recognition safety gates and final batch confirmation are unchanged.
+
+`DELETE /api/scan-drafts` accepts the same draft-ID snapshot to clear a reviewed batch after confirmation. Ownership is checked before deletion and the batch is transactional; collection rows are never touched.
 
 Scan responses expose millisecond `timings` for matching, metadata, OCR, safety, and total processing. OCR/metadata overlap, so stages are not additive. The frontend's optional diagnostics also record capture (including fresh-frame wait), request/JSON, and candidate-resolution time per verification frame. Presets control fallback-upload limits and auto-add confirmation delay, not model recall/ORB settings; client rectification remains 896×896.
 
@@ -262,11 +268,11 @@ A nearest-neighbor search always returns a nearest row, even when the real card 
 
 Set scope filters rows before scoring, separately for each catalog. A catalog with no in-scope rows is not silently searched unscoped as if it satisfied the filter. Global fallback is reported as `set_fallback` and requires manual selection. Requested-language and English fallback catalogs may both contribute; unresolved printing language reports `language_fallback` and also blocks auto-add.
 
-The response's `safety` object contains `autoAddSafe`, reason codes, OCR status, quality flags, and context. Near ties/same-artwork printings remain ambiguous unless corroborating evidence narrows them. OCR only corroborates visually plausible candidates: an exact cached footer match outside that shortlist can be shown manually but cannot acquire an invented visual score.
+The response's `safety` object contains `autoAddSafe`, reason codes, footer `ocr` status, informational title `name` data, quality flags, and context. `readCardText` reads bounded title and footer crops; `parseNameTsv(tsv)` returns `read` with text and confidence for one confident title line, or `unreadable` while retaining uncertain text. Title OCR is never compared against artwork candidates or used to allow or block auto-add. Near ties/same-artwork printings remain ambiguous unless printing evidence narrows them. An exact cached footer match outside the visual shortlist can be shown manually but cannot acquire an invented visual score.
 
-`scanOcr.js` spawns **`/usr/bin/tesseract`**, without a shell, using `eng` data. The Docker runtime installs it there; a source installation must provide that path, not merely a differently located executable on PATH. Processing has bounded image/output sizes, a five-second subprocess timeout, and at most two concurrent jobs. Missing OCR, execution errors, and conflicting readings block auto-add while preserving manual candidates. An `unreadable` result supplies no corroborating evidence but is **not by itself** an auto-add rejection in the current gate; artwork, ambiguity, quality, and context checks still apply.
+`scanOcr.js` spawns **`/usr/bin/tesseract`**, without a shell, using `eng` data. The Docker runtime installs it there; a source installation must provide that path, not merely a differently located executable on PATH. Processing has bounded image/output sizes, a five-second timeout per subprocess, and at most two concurrent requests, each running its footer and title subprocesses sequentially. Missing footer OCR, footer execution errors, and conflicting footer readings block auto-add while preserving manual candidates. An `unreadable` footer result supplies no corroborating evidence but is **not by itself** an auto-add rejection; artwork, ambiguity, quality, and context checks still apply.
 
-These checks are heuristics, not guaranteed printing accuracy. Older footers, sleeves, glare, focus, and reprinted artwork require care. No gate detects condition or finish.
+These checks are heuristics, not guaranteed printing accuracy. The title crop targets standard upper-left names; long names, non-English scripts (the engine uses English data), alternate title positions, older footers, sleeves, glare, focus, and reprinted artwork may require manual review. No gate detects condition or finish.
 
 ### Models and catalogs
 

@@ -2,6 +2,24 @@
 
 Release history starts with Manafolio 2.0.
 
+## 2.1.0
+
+- Refined the dashboard's card total, net worth, invested cost, and unrealized gain summary with clearer typography, theme-aware solid surfaces, and responsive grouping. Moved average market value per card beneath Net Worth; calculations and inventory filters are unchanged.
+- Added informational local card-name OCR. Removed name comparison against artwork candidates and name-conflict auto-add gates; footer, reprint, image-quality, catalog, and two-frame safeguards remain unchanged.
+- Fixed plain card-name searches from the scanner's Identified Cards Found dialog. The shared search parser now preserves names supplied through `q` for both GET and image-assisted POST requests, while retaining explicit-field precedence and collector-number parsing.
+- The Identified Cards Found dialog now shows the name read by OCR separately from artwork candidates, or “No readable name.” Manual searches retain that reading; new scans and scanner-setting changes clear it.
+- Expanded upper-left title OCR coverage, restored portrait text proportions after square rectification, and switched to block text recognition. Low-confidence readings remain visible as “uncertain” rather than disappearing; title OCR never allows or blocks auto-add.
+- Fixed stale scanner set membership after card metadata is cached or corrected. Set-filtered scans now read current metadata without reloading models; unknown and out-of-set printings remain excluded.
+- Scanned cards now enter a persistent, account-scoped Scan review grid instead of owned inventory. Each draft has a saved Foil toggle in place of Edit, plus Discard; use one Add to Collection button for the entire reviewed batch. Finish changes preserve card identity and copy details. Batch confirmation is atomic and consumes each draft once; drafts do not affect collection totals, storage, or decks.
+- Let Scan review use the available page width with automatically fitting columns, while keeping the camera and capture controls capped at 600px.
+- Removed the ready-made catalog advisory from the scanner, including its dismissal state and unused translations.
+- Moved Filter by set below the camera on the main scan page, available before camera activation rather than inside the gear menu. Set and subset symbols appear beside their names when supplied by the provider.
+- Made the scanner's set-filter recommendation more prominent with larger, semibold, theme-accent text when no filter is selected. Increased its heading, search text, and set/subset names to 16px without changing set pickers elsewhere.
+- Added a confirmed Clear action for Scan review. Clearing is atomic and account-scoped; owned cards and drafts queued after the selected batch remain untouched.
+- Selecting a card in Identified Cards Found now queues it directly in Scan review without a second details screen. Pending requests block duplicate submissions; failed saves keep the candidates available for retry.
+- Moved Auto-queue matches out of Scan settings to a keyboard-accessible on/off switch below the camera, available before activation and green when enabled. The saved preference and existing scan-safety behavior are preserved.
+- Removed the Beta badge from Scan Cards and updated the in-app How-to with the current scanner controls, direct candidate queuing, review actions, persistence, and connection-error recovery.
+
 ## 2.0.9
 
 - Combined deck composition, health, and source containers into a responsive, color-coded summary with exact counts and accessible controls.
@@ -14,7 +32,6 @@ Release history starts with Manafolio 2.0.
 - Made List-view card artwork grow slightly faster than the surrounding row when zooming in, while keeping its default size unchanged.
 - Made the scanner's card-shaped placement guide visible before detection, with a white border and dark outline; capture geometry and recognition behavior are unchanged.
 - Overlapped scan footer OCR with candidate metadata lookup, reused the local Scryfall bulk snapshot for uncached card-ID lookups, and exposed per-frame timing diagnostics. Scanner presets now describe their actual upload/confirmation controls; unused ORB parameters were removed without weakening verification.
-- Refined the dashboard's card total, net worth, invested cost, and unrealized gain summary with clearer typography, theme-aware solid surfaces, and responsive grouping. Moved average market value per card beneath Net Worth; calculations and inventory filters are unchanged.
 
 ## 2.0.8
 

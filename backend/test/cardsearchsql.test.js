@@ -60,6 +60,10 @@ async function main() {
   assert.deepStrictEqual(normalizeSearchParams({ name: 'Lightning Bolt #5' }), { name: 'Lightning Bolt', number: '5', set: '' });
   assert.deepStrictEqual(normalizeSearchParams({ name: 'Lightning Bolt 5' }), { name: 'Lightning Bolt', number: '5', set: '' });
   assert.deepStrictEqual(normalizeSearchParams({ name: 'Lightning Bolt' }), { name: 'Lightning Bolt', number: '', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ q: '  Lightning Bolt  ' }), { name: 'Lightning Bolt', number: '', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ q: '稲妻' }), { name: '稲妻', number: '', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ q: 'Lightning Bolt', name: 'Island' }), { name: 'Island', number: '', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ q: 'Lightning Bolt', set: 'lea', number: '5' }), { name: '', number: '5', set: 'lea' });
   assert.deepStrictEqual(normalizeSearchParams({ q: 'Lightning Bolt 5/64' }), { name: 'Lightning Bolt', number: '5', set: '' });
   assert.deepStrictEqual(normalizeSearchParams({ q: '5/64' }), { name: '', number: '5', set: '' });
   assert.deepStrictEqual(normalizeSearchParams({ name: 'Promo Card A107/A122' }), { name: 'Promo Card', number: 'A107', set: '' });

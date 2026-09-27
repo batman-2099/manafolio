@@ -1,14 +1,12 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Camera, RefreshCw, AlertTriangle, X, Zap, ZapOff, Settings, ScanLine, ListFilter, Layers, Search } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { getCardDisplayName } from '../utils/langHelper';
 import { priceText } from '../utils/formatPrice';
 import { resolveCardPrice } from '../utils/resolveCardPrice';
 import { CONDITIONS, getPrintings } from '../utils/cardOptions';
 import CardEntryFields from './CardEntryFields';
-import CardInspectorModal from './CardInspectorModal';
+import Modal from './Modal';
 import { useBackGuard } from '../utils/useBackGuard';
-import { useMultiSelect } from '../utils/useMultiSelect';
 import { langName, langCode, getLanguagesForGame } from '../utils/languages';
 import { requestDetect, stopDetect, smoothQuad, meanCornerDrift, DETECT_W } from '../utils/cardDetector';
 import { getPerspectiveTransform, warpPerspective } from '../../../shared/imgproc.mjs';
@@ -59,7 +57,7 @@ const STEADY_FRAMES_NEEDED = 3;   // default; adjustable in scan settings
 // Measured: card small in the frame scores 0.076, so this still rejects that by
 // a wide margin. The real "there is no card" case is handled by `none`, not here.
 const MIN_FILL = 0.55;            // default; adjustable in scan settings
-// Presets change fallback-upload width and the auto-add confirmation window only.
+// Presets change fallback-upload width and the auto-queue confirmation window only.
 // Client-dewarped images retain RECTIFIED_SIZE for footer OCR in every preset.
 const SCAN_PROFILES = [
   // Keep fallback uploads at least 720px wide to preserve exact-printing detail.
@@ -93,22 +91,37 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const [scanStatus, setScanStatus] = useState('');
   const [verificationFrame, setVerificationFrame] = useState(null);
   const [scanMatches, setScanMatches] = useState([]);
+  const [scanName, setScanName] = useState(null);
   
-  // UX scan history & effects states
-  const [recentScans, setRecentScans] = useState([]);
-  // Tap a recent scan to view/edit it; long-press to delete. Inspector reuses the
-  // shared collection edit/delete modal (needs an entry-shaped object with entry_id).
-  const [inspectorEntry, setInspectorEntry] = useState(null);
-  // Long-press multi-select + bulk actions, same as the collection page.
-  const recentSelect = useMultiSelect({
-    showToast,
-    onChanged: ({ ids, action }) => {
-      onAddSuccess();
-      // Recent scans is a local list: prune deleted tiles. Moves leave the tile
-      // (its placement label just goes stale until the next scan).
-      if (action === 'delete') setRecentScans(prev => prev.filter(s => !ids.includes(s.entry_id)));
-    },
-  });
+  // Drafts are account-owned review items, never collection entries.
+  const [scanDrafts, setScanDrafts] = useState([]);
+  const [draftsLoading, setDraftsLoading] = useState(true);
+  const [draftsError, setDraftsError] = useState(false);
+  const [draftError, setDraftError] = useState('');
+  const [draftBusy, setDraftBusy] = useState(false);
+  const draftBusyRef = useRef(false);
+  const [draftAction, setDraftAction] = useState(null);
+  const draftActionRef = useRef(null);
+
+  const loadDrafts = useCallback(async (signal) => {
+    setDraftsLoading(true);
+    setDraftsError(false);
+    try {
+      const response = await fetch('/api/scan-drafts', { signal });
+      if (!response.ok) throw new Error('Could not load scan drafts');
+      const drafts = await response.json();
+      if (!signal?.aborted) setScanDrafts(drafts);
+    } catch {
+      if (!signal?.aborted) setDraftsError(true);
+    } finally {
+      if (!signal?.aborted) setDraftsLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    loadDrafts(controller.signal);
+    return () => controller.abort();
+  }, [loadDrafts]);
   const [scanFlash, setScanFlash] = useState(null); // 'capture', 'error', or null
   // What auto-scan is waiting for, shown as a small pill. Without the old
   // countdown ring there is otherwise no feedback at all when it declines to
@@ -159,9 +172,8 @@ function CameraScanner({ onAddSuccess, showToast }) {
   // NOT persisted: every session starts scanning, so a pause is a pause and not a
   // setting the user has to remember undoing.
   const [autoScan, setAutoScan] = useState(true);
-  // Auto-add is a SEPARATE decision from auto-scan: scanning identifies the card,
-  // auto-add files it without asking. Off, a confident match opens the add drawer
-  // so condition/printing/quantity can be set before it is saved.
+  // Auto-queue is separate from recognition: confident matches become drafts.
+  // Off, open the form before staging. Collection changes always need confirmation.
   const [autoAdd, setAutoAdd] = useState(() => localStorage.getItem('scan_auto_add') !== '0');
   // Crop + candidate diagnostics. Useful when a scan misidentifies a card and
   // nowhere near useful enough to occupy the screen the rest of the time.
@@ -225,7 +237,6 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const [setList, setSetList] = useState([]);        // {id,name,children[],...} for the active game
   // Per-set catalog coverage: { local, published, sets: { <setId>: {cached,embedded} } }.
   const [scanSets, setScanSets] = useState(null);
-  const [localHintOff, setLocalHintOff] = useState(() => localStorage.getItem('scan_local_hint') === 'off');
   // Hide sets the scanner holds nothing for. On by default: a filter that lists
   // 523 sets when 40 are built is a menu of mostly wrong answers.
   const [onlyBuiltSets, setOnlyBuiltSets] = useState(true);
@@ -255,13 +266,6 @@ function CameraScanner({ onAddSuccess, showToast }) {
   // Which languages this game has a catalog of its own in. Empty until /scan-sets
   // answers, and every check below treats empty as "do not claim anything".
   const scanBuiltLangs = scanSets?.builtLangs || [];
-  // A published catalog may need a provider lookup. A local catalog uses this
-  // install's card ids, so the same answer is a primary-key read.
-  //
-  // Shown only when it is true for what is being scanned right now: a published
-  // catalog is answering and no local one exists. Dismissal sticks, because this is
-  // information, not a nag, and it is the same sentence every time.
-  const showLocalHint = !!scanSets && !scanSets.local && !!scanSets.published && !localHintOff;
   const currentGameSets = setList.filter(s => !s.game || s.game === scanGame);
   const strayCatalogSets = (scanSets?.game === scanGame ? Object.entries(scanSets?.sets || {}) : [])
     .filter(([sid, v]) => v.embedded > 0
@@ -290,7 +294,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const lastScanCroppedRef = useRef(false);
 
   // Auto-capture duplicate guard: a physical card lingers in frame across the
-  // 3s auto-scan cycle. lastAddedId = the card just auto-added; a repeat match
+  // 3s auto-scan cycle. lastAddedId = the card just queued; a repeat match
   // of it means "same card again" — confirm a real 2nd copy vs a re-scan.
   // resolvedDupId = a repeat we already settled; skip it silently until a
   // different card appears (stops a re-prompt loop while it stays in view).
@@ -440,16 +444,17 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const [findingPrintings, setFindingPrintings] = useState(false);
   const [manualSearchText, setManualSearchText] = useState('');
   const [manualSearching, setManualSearching] = useState(false);
-  // Tap the countdown popup to pause auto-add and tweak these before adding
-  // (slower tiers only — Turbo adds instantly with no overlay).
+  // Tap the countdown popup to pause auto-queue and tweak these before staging.
+  // Slower tiers only — Turbo queues instantly with no overlay.
   const [autoAddEditing, setAutoAddEditing] = useState(false);
   const [autoAddCond, setAutoAddCond] = useState('Near Mint');
   const [autoAddPrint, setAutoAddPrint] = useState('Normal');
-  // Duplicate-scan confirm: set to the repeat-matched card; dupQty = copies to add.
+  // Duplicate-scan confirm: set to the repeat-matched card; dupQty = copies to queue.
   const [dupConfirmCard, setDupConfirmCard] = useState(null);
   const [dupQty, setDupQty] = useState(1);
 
   useBackGuard(scanMatches.length > 0, () => {
+    if (draftBusyRef.current) return;
     setScanMatches([]);
     setDebugTimings([]);
     autoArmed.current = true;
@@ -461,8 +466,6 @@ function CameraScanner({ onAddSuccess, showToast }) {
     setDebugTimings([]);
     resolvedDupIdRef.current = null;
   });
-  useBackGuard(!!inspectorEntry, () => setInspectorEntry(null));
-  useBackGuard(recentSelect.selectMode, recentSelect.exitSelectMode);
   
   // Form states
   const [quantity, setQuantity] = useState(1);
@@ -472,6 +475,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   // Japanese run does not have to be corrected card by card.
   const [language, setLanguage] = useState(() => langName(localStorage.getItem('scanner_lang') || 'en'));
   const [purchasePrice, setPurchasePrice] = useState(0);
+  const [languageChanging, setLanguageChanging] = useState(false);
 
   // Keep a ref mirroring the latest stream so the unmount cleanup below (whose
   // closure is fixed from the first render) can always stop the live tracks.
@@ -489,7 +493,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     };
   }, []);
 
-  // A new context needs new evidence, including while an auto-add countdown runs.
+  // A new context needs new evidence, including while an auto-queue countdown runs.
   useLayoutEffect(() => {
     currentScanId.current += 1;
     scanAbortRef.current?.abort();
@@ -500,6 +504,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     setScanStatus('');
     setScanMatches([]);
     setLastMatches([]);
+    setScanName(null);
     lastScanImgRef.current = null;
     lastScanCroppedRef.current = false;
     setAutoAddTargetCard(null);
@@ -939,6 +944,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     setCameraErrorKey('');
     setScanMatches([]);
     setScanStatus('');
+    setScanName(null);
     setDebugHashImg('');
     setDebugCandidates([]);
     setDebugScoped(null);
@@ -987,69 +993,47 @@ function CameraScanner({ onAddSuccess, showToast }) {
   // above stops the tracks (which also kills the torch).
 
   const autoAddCard = async (card, qty = 1, overrides = null) => {
-    // Mark the duplicate guard before awaiting the save, so a replaced card
-    // cannot trigger a second automatic add while this request is in flight.
+    if (draftBusyRef.current || draftActionRef.current !== null || manualSearching || draftsLoading || draftsError) return;
+    draftBusyRef.current = true;
+    setDraftBusy(true);
+    setDraftError('');
+    // Preserve the duplicate guard while the staging request is in flight.
     lastAddedIdRef.current = card.id;
     try {
       const autoPrinting = overrides?.printing || 'Normal';
-      const autoCondition = overrides?.condition || 'Near Mint';
-      // See addLanguage: a localized printing files as itself, an English row files
-      // as the language being scanned. Auto-add used to hard-code English, and then
-      // to take the row's language unconditionally — which filed every fallback
-      // match as an English copy no matter what the user was scanning.
-      const autoLanguage = overrides?.language || addLanguage(card);
-      const response = await fetch('/api/collection', {
+      const response = await fetch('/api/scan-drafts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_id: card.id,
           quantity: qty,
-          condition: autoCondition,
+          condition: overrides?.condition || 'Near Mint',
           printing: autoPrinting,
-          language: autoLanguage,
-          // Resolve the price against the printing actually being recorded.
+          language: overrides?.language || addLanguage(card),
           purchase_price: resolveCardPrice(card, autoPrinting),
-          location_id: null
-        })
+          location_id: null,
+        }),
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        const qtyLabel = qty > 1 ? `${qty}× ` : '';
-        const placementLabel = data.placement?.label || null;
-        const cardDisplayName = getCardDisplayName(card.name, card.printed_name);
-        if (placementLabel) {
-          showToast(t('scan.addedTo', { qty: qtyLabel, name: cardDisplayName, place: placementLabel }), 'success');
-        } else if (data.container_full) {
-          showToast(t('scan.addedFull', { qty: qtyLabel, name: cardDisplayName }), 'success');
-        } else {
-          showToast(t('scan.autoAdded', { qty: qtyLabel, name: cardDisplayName, set: card.set_name }), 'success');
-        }
-
-        // Append to recent scans history log. entry_id (the last inserted row)
-        // lets the recent-scans price splitter target these exact entries and the
-        // inspector edit/delete the entry. Carry the entry fields it was saved with.
-        setRecentScans(prev => [{
-          ...card, card_id: card.id, placementLabel, entry_id: data.id,
-          quantity: qty, condition: autoCondition, printing: autoPrinting,
-          language: autoLanguage, purchase_price: resolveCardPrice(card, autoPrinting), location_id: null,
-        }, ...prev].slice(0, 10));
-
-        // Brief confetti blast for ultra-rares
-        const rarity = (card.rarity || '').toLowerCase();
-        if (rarity.includes('secret') || rarity.includes('ultra') || (card.price_trend || 0) > 15) {
-          confetti({ particleCount: 50, spread: 40, origin: { y: 0.8 } });
-        }
-        
-        onAddSuccess(); // Refresh stats
-      } else {
-        showToast(t('scan.errAutoAdd', { name: getCardDisplayName(card.name, card.printed_name) }), 'error');
-        signal('error');
-      }
-    } catch (err) {
-      console.error('Auto-add error:', err);
-      showToast(t('scan.errAutoAddGeneric'), 'error');
+      if (!response.ok) throw new Error('Could not queue card');
+      const draft = await response.json();
+      setScanDrafts(prev => [draft, ...prev]);
+      showToast(t('scan.queued', { name: getCardDisplayName(card.name, card.printed_name) }), 'success');
+      draftBusyRef.current = false;
+      if (scanMatches.length) closeDrawer();
+    } catch {
+      showToast(t('scan.errSaveCard'), 'error');
       signal('error');
+      setDraftError(t('scan.errSaveCard'));
+      // Keep manual candidates available for retry; automatic captures retain their editable fallback.
+      if (!scanMatches.length) {
+        openQuickAdd(card);
+        setQuantity(qty);
+        if (overrides?.condition) setCondition(overrides.condition);
+        if (overrides?.printing) setPrinting(overrides.printing);
+      }
+    } finally {
+      draftBusyRef.current = false;
+      setDraftBusy(false);
     }
   };
 
@@ -1242,8 +1226,8 @@ function CameraScanner({ onAddSuccess, showToast }) {
     }
     setScanStatus('');
     if (matches.length === 1 && autoSingle) {
-      // Auto-add, not auto-scan: scanning found the card either way. This decides
-      // whether it is filed straight away or handed to the add drawer first.
+      // Recognition found the card either way. Auto-queue decides whether to
+      // stage the draft immediately or open its fields first.
       if (autoAdd) {
         const id = matches[0].id;
         if (id === resolvedDupIdRef.current) {
@@ -1254,7 +1238,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
           return;
         }
         if (id === lastAddedIdRef.current) {
-          // Repeat of the card just auto-added: could be a real second copy or
+          // Repeat of the card just queued: could be a real second copy or
           // just the same card lingering. Make the user decide.
           setDupConfirmCard(matches[0]);
           setDupQty(1);
@@ -1292,6 +1276,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     scanAbortRef.current = controller;
     setScanMatches([]);
     setLastMatches([]);
+    setScanName(null);
     setAutoAddAlternatives([]);
     setDebugTimings([]);
     const video = videoRef.current;
@@ -1345,6 +1330,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
           if (data?.notBuilt) throw new Error('catalogNotBuilt');
           throw new Error('scanFailed');
         }
+        setScanName(data?.safety?.name || null);
         const { game: matchGame, verified, candidates = [], alternatives = [], crop, scoped } = data;
         if (crop) setDebugHashImg(crop);
         setDebugScoped(scoped ? scanSetParam : false);
@@ -1402,7 +1388,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   handleCaptureRef.current = handleCapture;
   frameWorthCaptureRef.current = frameWorthCapturing;
   // A modal/picker/drawer pauses capture without restarting detection.
-  captureBlockedRef.current = isDrawerOpen || scanMatches.length > 0 || !!autoAddTargetCard || !!dupConfirmCard;
+  captureBlockedRef.current = isDrawerOpen || scanMatches.length > 0 || !!autoAddTargetCard || !!dupConfirmCard || draftBusy || !!draftAction || draftsLoading || draftsError || manualSearching;
   loadingRef.current = loading;
   autoScanRef.current = autoScan;
   minFillRef.current = minFill;
@@ -1425,6 +1411,8 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const openQuickAdd = (card) => {
     setScanMatches([]);
     setSelectedCard(card);
+    setQuantity(1);
+    setCondition('Near Mint');
     setPurchasePrice(0);
     setPrinting('Normal');
     setLanguage(addLanguage(card));
@@ -1432,22 +1420,23 @@ function CameraScanner({ onAddSuccess, showToast }) {
   };
 
   const handleLanguageChange = async (newLang) => {
+    if (!selectedCard || languageChanging) return;
     setLanguage(newLang);
-    if (!selectedCard) return;
+    setLanguageChanging(true);
     try {
       const targetGame = selectedCard.game || scanGame;
       const resp = await fetch(`/api/cards/${encodeURIComponent(selectedCard.id)}/printing?lang=${encodeURIComponent(newLang)}&game=${encodeURIComponent(targetGame)}`);
       if (resp.ok) {
         const localized = await resp.json();
         if (localized && localized.id) {
-          setSelectedCard(prev => (prev ? { ...prev, ...localized, language: newLang } : { ...localized, language: newLang }));
-          return;
+          setSelectedCard(prev => ({ ...prev, ...localized, language: newLang }));
         }
       }
     } catch (e) {
       console.warn('Could not switch to localized printing:', e);
+    } finally {
+      setLanguageChanging(false);
     }
-    setSelectedCard(prev => (prev ? { ...prev, language: newLang } : prev));
   };
 
   // "Change printing"
@@ -1495,7 +1484,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
         return;
       }
       setLastMatches(found);
-      closeDrawer();
+      setIsDrawerOpen(false);
       setScanMatches(found);
       setShowAllMatches(true);
     } catch {
@@ -1508,7 +1497,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const handleManualSearch = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     const q = manualSearchText.trim();
-    if (!q || manualSearching) return;
+    if (!q || manualSearching || draftBusyRef.current) return;
     if (loadingRef.current) handleCancelScan();
     setManualSearching(true);
     try {
@@ -1543,6 +1532,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
             return (b.image_url ? 1 : 0) - (a.image_url ? 1 : 0);
           });
           setScanMatches(sorted);
+          setIsDrawerOpen(false);
           setShowAllMatches(true);
         } else {
           showToast(t('scan.errManualSearch'), 'error');
@@ -1558,6 +1548,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   };
 
   const closeDrawer = () => {
+    if (draftBusyRef.current || languageChanging || findingPrintings || manualSearching) return;
     setIsDrawerOpen(false);
     setSelectedCard(null);
     setScanMatches([]);
@@ -1569,83 +1560,120 @@ function CameraScanner({ onAddSuccess, showToast }) {
     autoArmed.current = true;
     capturedQuad.current = null;
     resolvedDupIdRef.current = null;
-    // Restart camera on close only if stream was stopped
-    if (!stream || !cameraActive) {
-      startCamera();
+  };
+
+  const toggleDraftFoil = async (draft) => {
+    if (draftBusyRef.current || draftActionRef.current !== null) return;
+    const action = `foil-${draft.draft_id}`;
+    draftActionRef.current = action;
+    setDraftAction(action);
+    setDraftError('');
+    try {
+      const response = await fetch(`/api/scan-drafts/${draft.draft_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ printing: draft.printing === 'Holofoil' ? 'Normal' : 'Holofoil' }),
+      });
+      if (!response.ok) throw new Error('Could not update scan draft finish');
+      const updated = await response.json();
+      setScanDrafts(prev => prev.map(item => item.draft_id === updated.draft_id ? updated : item));
+    } catch {
+      showToast(t('scan.errDraftAction'), 'error');
+      setDraftError(t('scan.errDraftAction'));
+    } finally {
+      draftActionRef.current = null;
+      setDraftAction(null);
     }
   };
 
-  const removeRecentTile = (entryId) => setRecentScans(prev => prev.filter(s => s.entry_id !== entryId));
-  // Tap: open the inspector, unless a long-press just armed selection or we're
-  // already selecting (then toggle). Long-press + bulk actions come from the hook.
-  const activateRecent = (item) => {
-    if (recentSelect.longPressFired.current) { recentSelect.longPressFired.current = false; return; }
-    if (recentSelect.selectMode) recentSelect.toggleSelect(item.entry_id);
-    else setInspectorEntry(item);
+  const discardDraft = async (draft) => {
+    if (draftActionRef.current !== null || draftBusyRef.current) return;
+    if (!window.confirm(t('scan.confirmDiscard', { name: getCardDisplayName(draft.name, draft.printed_name) }))) return;
+    draftActionRef.current = draft.draft_id;
+    setDraftAction(draft.draft_id);
+    setDraftError('');
+    try {
+      const response = await fetch(`/api/scan-drafts/${draft.draft_id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Draft action failed');
+      setScanDrafts(prev => prev.filter(item => item.draft_id !== draft.draft_id));
+    } catch {
+      showToast(t('scan.errDraftAction'), 'error');
+      setDraftError(t('scan.errDraftAction'));
+    } finally {
+      draftActionRef.current = null;
+      setDraftAction(null);
+    }
+  };
+
+  const actOnDrafts = async (action) => {
+    if (draftActionRef.current !== null || draftBusyRef.current || draftsLoading || draftsError || !scanDrafts.length || isDrawerOpen) return;
+    const draftIds = scanDrafts.map(draft => draft.draft_id);
+    if (action === 'clear' && !window.confirm(t('scan.confirmClear'))) return;
+    draftActionRef.current = action;
+    setDraftAction(action);
+    setDraftError('');
+    try {
+      const response = await fetch(action === 'clear' ? '/api/scan-drafts' : '/api/scan-drafts/commit', {
+        method: action === 'clear' ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draft_ids: draftIds }),
+      });
+      if (!response.ok) throw new Error('Could not update review batch');
+      const result = await response.json();
+      const submittedIds = new Set(draftIds);
+      setScanDrafts(prev => prev.filter(draft => !submittedIds.has(draft.draft_id)));
+      showToast(t(action === 'clear' ? 'scan.reviewCleared' : 'scan.batchAdded', { count: result.added }), 'success');
+      if (action === 'commit') onAddSuccess();
+    } catch {
+      const message = t(action === 'clear' ? 'scan.errClearDrafts' : 'scan.errCommitDrafts');
+      showToast(message, 'error');
+      setDraftError(message);
+    } finally {
+      draftActionRef.current = null;
+      setDraftAction(null);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedCard) return;
-
+    if (!selectedCard || draftBusyRef.current || draftActionRef.current !== null || languageChanging || draftsLoading || draftsError) return;
+    draftBusyRef.current = true;
+    setDraftBusy(true);
+    setDraftError('');
     try {
-      const response = await fetch('/api/collection', {
+      const response = await fetch('/api/scan-drafts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_id: selectedCard.id,
-          quantity: parseInt(quantity, 10),
+          quantity: Number(quantity),
           condition,
           printing,
           language,
-          purchase_price: parseFloat(purchasePrice) || 0,
-          location_id: null
-        })
+          purchase_price: Number(purchasePrice),
+          location_id: null,
+        }),
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        const placementLabel = data.placement?.label || null;
-        const cardDisplayName = getCardDisplayName(selectedCard.name, selectedCard.printed_name);
-        if (placementLabel) {
-          showToast(t('scan.addedToPlain', { name: cardDisplayName, place: placementLabel }), 'success');
-        } else if (data.container_full) {
-          showToast(t('scan.addedFullPlain', { name: cardDisplayName }), 'success');
-        } else {
-          showToast(t('search.addedToCollection', { name: cardDisplayName }), 'success');
-        }
-
-        // Append to recent scans history. Carry entry_id + saved fields so the
-        // strip supports tap-to-edit / long-press-delete like the auto-add path.
-        setRecentScans(prev => [{
-          ...selectedCard, card_id: selectedCard.id, placementLabel, entry_id: data.id,
-          quantity: parseInt(quantity, 10), condition, printing, language,
-          purchase_price: parseFloat(purchasePrice) || 0, location_id: null,
-        }, ...prev].slice(0, 10));
-
-        const rarity = (selectedCard.rarity || '').toLowerCase();
-        const price = selectedCard.price_trend || 0;
-        if (rarity.includes('holo') || rarity.includes('secret') || rarity.includes('ultra') || price > 10) {
-          confetti({
-            particleCount: 150,
-            spread: 80,
-            origin: { y: 0.6 }
-          });
-        }
-
-        onAddSuccess();
-        closeDrawer();
-      } else {
-        showToast(t('search.errAddCard'), 'error');
-      }
-    } catch (err) {
-      console.error(err);
+      if (!response.ok) throw new Error('Could not save scan draft');
+      const draft = await response.json();
+      setScanDrafts(prev => [draft, ...prev]);
+      showToast(t('scan.queued', { name: getCardDisplayName(selectedCard.name, selectedCard.printed_name) }), 'success');
+      draftBusyRef.current = false;
+      closeDrawer();
+    } catch {
       showToast(t('scan.errSaveCard'), 'error');
+      setDraftError(t('scan.errSaveCard'));
+    } finally {
+      draftBusyRef.current = false;
+      setDraftBusy(false);
     }
   };
 
   return (
     <div className="scanner-container">
+      <div className="scanner-capture">
 
 
 
@@ -1796,29 +1824,9 @@ function CameraScanner({ onAddSuccess, showToast }) {
             </div>
           </div>
 
-          {/* Settings panel (toggled by the gear in the action row): set, auto-add,
-              scan detail, exposure, diagnostics. Card type and language are NOT
-              here — they are what the user picks before every run, so they live in
-              the row above the camera. Kept off the camera view so it stays clean. */}
+          {/* Advanced scan settings; auto-queue and the set filter stay on the main page. */}
           {showScanSettings && (
           <div className="glass-panel" style={{ width: '100%', padding: '1rem', background: 'rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem', order: 2, position: 'relative' }}>
-            {/* Auto-add. Separate from scanning on purpose: scanning is how a card
-                is identified, auto-add is whether it is filed without a look. Off,
-                every confident match opens the add drawer first. */}
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>
-              <span style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.autoAdd')}</span>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t('scan.autoAddHint')}</span>
-              </span>
-              <input
-                type="checkbox"
-                checked={autoAdd}
-                onChange={(e) => { setAutoAdd(e.target.checked); localStorage.setItem('scan_auto_add', e.target.checked ? '1' : '0'); }}
-                style={{ accentColor: 'var(--accent-green)', flexShrink: 0 }}
-              />
-            </label>
-
-
             {/* Card art is language-specific, so the language picks which catalog
                 the scan is matched against AND how each added copy is recorded. */}
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -1857,69 +1865,6 @@ function CameraScanner({ onAddSuccess, showToast }) {
               </p>
             )}
 
-            {/* Filter by set. A scan scoped to the sets in front of you is measurably
-                more accurate (91% vs 81% exact printing on MTG), so this is a filter
-                over the catalog, not an index to build — nothing to wait for.
-                Organised as the release family, because that is how the cards
-                physically arrive: ticking Foundations takes its tokens, art cards and
-                promos with it, and expanding it lets you drop the parts you are not
-                feeding in. Each subset is its own set code in the catalog, so an
-                unexpanded parent tick genuinely could not see a token. */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                <label htmlFor="scan-set-filter" style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                  {t('scan.filterBySet')}
-                </label>
-                {scanSetCodes.length > 0 && (
-                  <button type="button" className="btn btn-secondary" style={{ fontSize: '0.6rem', padding: '0.2rem 0.5rem' }} onClick={() => { persistSets([]); setSetInput(''); }}>
-                    {t('bulk.clear')}
-                  </button>
-                )}
-              </div>
-              <p style={{ fontSize: '0.7rem', color: scanSetCodes.length ? 'var(--accent-green)' : 'var(--text-secondary)', margin: 0 }}>
-                {scanSetCodes.length
-                  ? t('scan.setsFiltered', { count: selectedSetCount, codes: scanSetCodes.length })
-                  : t('scan.setsAllHint')}
-              </p>
-              <input
-                id="scan-set-filter"
-                type="text"
-                value={setInput}
-                onChange={(e) => setSetInput(e.target.value)}
-                placeholder={t(scanGame === 'mtg' ? 'scan.setSearchMtg' : 'scan.setSearch')}
-                style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.06)', border: `1px solid ${scanSetCodes.length ? 'var(--accent-green)' : 'var(--border-glass)'}`, borderRadius: 'var(--radius-sm)', color: 'var(--text-strong)' }}
-              />
-              {/* Scoping to a set the catalog does not hold is worse than not
-                  scoping at all: cvScan fails open and scans everything, so the
-                  filter appears to work and silently did nothing. */}
-              {scanSets?.local && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.68rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={onlyBuiltSets}
-                    onChange={(e) => setOnlyBuiltSets(e.target.checked)}
-                    style={{ accentColor: 'var(--accent-green)', flexShrink: 0 }}
-                  />
-                  {t('scan.onlyBuiltSets')}
-                </label>
-              )}
-              {scanSets?.published && (
-                <p style={{ fontSize: '0.66rem', color: 'var(--text-muted)', margin: 0 }}>{t('scan.publishedCatalogNote')}</p>
-              )}
-              {/* Shared with the catalog build picker and the first-run wizard:
-                  one implementation of "which sets?", three things done with the answer. */}
-              <SetTree
-                sets={treeSets}
-                codeOf={setScanCode}
-                selected={scanSetCodes}
-                onToggleCode={toggleCode}
-                onToggleFamily={toggleSetFamily}
-                counts={scanSets?.sets}
-                showCounts={!!scanSets?.local}
-                query={setInput}
-                onlyWithCounts={onlyBuiltSets && !!scanSets?.local}
-              />
-            </div>
             {/* Live outline of what the detector currently sees. On by default:
                 it turns aiming into a feedback loop, and it is the only way a bad
                 crop is visible BEFORE the shutter rather than inferred from a
@@ -2189,41 +2134,88 @@ function CameraScanner({ onAddSuccess, showToast }) {
               style={{ flexShrink: 0, padding: '0 0.7rem', position: 'relative' }}
             >
               <Settings size={16} />
-              {!scanSetCodes.length && <span style={{ position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: '50%', background: 'var(--accent-yellow)' }} />}
             </button>
           </div>
         </div>
       )}
-
-      {/* Top level, NOT inside the scan-settings panel: that panel is behind the
-          gear and closed by default, so a notice about how to make scanning faster
-          would only ever be read by someone already changing settings. Shown while a
-          ready-made catalog is answering and no local one exists for this game and
-          language, which is exactly when the advice applies — it disappears on its
-          own once a local catalog is built, and the X keeps it gone before then. */}
-      {showLocalHint && (
-        <div className="glass-panel" style={{
-          width: '100%', display: 'flex', alignItems: 'flex-start', gap: '0.6rem',
-          padding: '0.75rem 0.9rem', borderLeft: '3px solid var(--accent-blue, #60a5fa)',
-        }}>
-          <Zap size={16} style={{ color: 'var(--accent-blue, #60a5fa)', flexShrink: 0, marginTop: '0.1rem' }} />
-          <p style={{ fontSize: '0.78rem', lineHeight: 1.45, color: 'var(--text-secondary)', margin: 0, flex: 1 }}>
-            {t('scan.localCatalogSpeedHint')}
-          </p>
-          <button
-            type="button"
-            onClick={() => { setLocalHintOff(true); localStorage.setItem('scan_local_hint', 'off'); }}
-            aria-label={t('common.close')}
-            title={t('common.close')}
-            style={{
-              background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
-              padding: 0, lineHeight: 1, flexShrink: 0,
-            }}
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={autoAdd}
+          aria-describedby="scan-auto-queue-hint"
+          className="btn btn-secondary"
+          onClick={() => {
+            const next = !autoAdd;
+            setAutoAdd(next);
+            localStorage.setItem('scan_auto_add', next ? '1' : '0');
+          }}
+          style={{ width: '100%', justifyContent: 'space-between', gap: '0.75rem', textAlign: 'left', ...(autoAdd ? { background: 'var(--accent-green)', borderColor: 'var(--accent-green)', color: 'var(--bg-primary)' } : {}) }}
+        >
+          <span>{t('scan.autoAdd')}</span>
+          <span aria-hidden="true" style={{ width: 36, height: 20, borderRadius: 999, background: autoAdd ? 'var(--bg-primary)' : 'var(--text-muted)', position: 'relative', flexShrink: 0 }}>
+            <span style={{ position: 'absolute', top: 3, left: autoAdd ? 19 : 3, width: 14, height: 14, borderRadius: '50%', background: autoAdd ? 'var(--accent-green)' : 'var(--bg-primary)' }} />
+          </span>
+        </button>
+        <p id="scan-auto-queue-hint" style={{ fontSize: '0.875rem', lineHeight: 1.5, color: 'var(--text-secondary)', margin: 0 }}>
+          {t('scan.autoAddHint')}
+        </p>
+      </div>
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.4rem', '--set-name-font-size': '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                <label htmlFor="scan-set-filter" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  {t('scan.filterBySet')}
+                </label>
+                {scanSetCodes.length > 0 && (
+                  <button type="button" className="btn btn-secondary" style={{ fontSize: '0.6rem', padding: '0.2rem 0.5rem' }} onClick={() => { persistSets([]); setSetInput(''); }}>
+                    {t('bulk.clear')}
+                  </button>
+                )}
+              </div>
+              <p style={{ fontSize: scanSetCodes.length ? '0.7rem' : '1rem', fontWeight: scanSetCodes.length ? 400 : 600, lineHeight: 1.5, color: scanSetCodes.length ? 'var(--accent-green)' : 'var(--accent-blue)', margin: 0 }}>
+                {scanSetCodes.length
+                  ? t('scan.setsFiltered', { count: selectedSetCount, codes: scanSetCodes.length })
+                  : t('scan.setsAllHint')}
+              </p>
+              <input
+                id="scan-set-filter"
+                type="text"
+                value={setInput}
+                onChange={(e) => setSetInput(e.target.value)}
+                placeholder={t(scanGame === 'mtg' ? 'scan.setSearchMtg' : 'scan.setSearch')}
+                style={{ padding: '0.35rem 0.5rem', fontSize: '1rem', background: 'rgba(255,255,255,0.06)', border: `1px solid ${scanSetCodes.length ? 'var(--accent-green)' : 'var(--border-glass)'}`, borderRadius: 'var(--radius-sm)', color: 'var(--text-strong)' }}
+              />
+              {/* Scoping to a set the catalog does not hold is worse than not
+                  scoping at all: cvScan fails open and scans everything, so the
+                  filter appears to work and silently did nothing. */}
+              {scanSets?.local && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.68rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={onlyBuiltSets}
+                    onChange={(e) => setOnlyBuiltSets(e.target.checked)}
+                    style={{ accentColor: 'var(--accent-green)', flexShrink: 0 }}
+                  />
+                  {t('scan.onlyBuiltSets')}
+                </label>
+              )}
+              {scanSets?.published && (
+                <p style={{ fontSize: '0.66rem', color: 'var(--text-muted)', margin: 0 }}>{t('scan.publishedCatalogNote')}</p>
+              )}
+              {/* Shared with the catalog build picker and the first-run wizard:
+                  one implementation of "which sets?", three things done with the answer. */}
+              <SetTree
+                sets={treeSets}
+                codeOf={setScanCode}
+                selected={scanSetCodes}
+                onToggleCode={toggleCode}
+                onToggleFamily={toggleSetFamily}
+                counts={scanSets?.sets}
+                showCounts={!!scanSets?.local}
+                query={setInput}
+                onlyWithCounts={onlyBuiltSets && !!scanSets?.local}
+              />
+            </div>
 
       {/* Scan Status Log */}
       {scanStatus && scanMatches.length === 0 && (
@@ -2233,8 +2225,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
         </div>
       )}
 
-      {/* Auto Add Countdown Overlay. Tap the card (before the countdown ends) to
-          pause auto-add and adjust condition/printing before it's saved. */}
+      {/* Auto-queue countdown. Pause to adjust the draft before staging. */}
       {autoAddTargetCard && (autoAddCountdown !== null || autoAddEditing) && (
         <div
           className="modal-backdrop"
@@ -2261,7 +2252,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
               <LangFallbackNote card={autoAddTargetCard} />
             </div>
 
-            <div
+            <button type="button"
               onClick={() => {
                 if (autoAddEditing) return;
                 // Pause and open the editor with sensible defaults.
@@ -2270,7 +2261,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 setAutoAddEditing(true);
               }}
               style={{ position: 'relative', width: '115px', aspectRatio: 0.718, margin: '0.5rem 0', cursor: autoAddEditing ? 'default' : 'pointer' }}
-              title={autoAddEditing ? undefined : 'Tap to change condition/foil'}
+              aria-label={t('scan.tapToChange')}
             >
               <img src={autoAddTargetCard.image_url} alt={getCardDisplayName(autoAddTargetCard.name, autoAddTargetCard.printed_name)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', boxShadow: 'var(--shadow-glow)' }} />
               {!autoAddEditing && (
@@ -2294,20 +2285,20 @@ function CameraScanner({ onAddSuccess, showToast }) {
                   {autoAddCountdown}
                 </div>
               )}
-            </div>
+            </button>
 
             {autoAddEditing ? (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', gap: '0.6rem' }}>
                   <div className="form-group" style={{ marginBottom: 0, flex: 1, textAlign: 'left' }}>
-                    <label>{t('card.condition')}</label>
-                    <select className="select-control" value={autoAddCond} onChange={(e) => setAutoAddCond(e.target.value)}>
+                    <label htmlFor="scan-countdown-condition">{t('card.condition')}</label>
+                    <select id="scan-countdown-condition" className="select-control" value={autoAddCond} onChange={(e) => setAutoAddCond(e.target.value)}>
                       {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0, flex: 1, textAlign: 'left' }}>
-                    <label>{t('card.printing')}</label>
-                    <select className="select-control" value={autoAddPrint} onChange={(e) => setAutoAddPrint(e.target.value)}>
+                    <label htmlFor="scan-countdown-printing">{t('card.printing')}</label>
+                    <select id="scan-countdown-printing" className="select-control" value={autoAddPrint} onChange={(e) => setAutoAddPrint(e.target.value)}>
                       {getPrintings().map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                     </select>
                   </div>
@@ -2326,7 +2317,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                     }}
                     style={{ flex: 1.5, fontSize: '0.75rem', padding: '0.45rem 0' }}
                   >
-                    {t('search.addToCollection')}
+                    {t('scan.queueCard')}
                   </button>
                   <button
                     type="button"
@@ -2387,12 +2378,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
               </div>
             )}
 
-            {/* The remaining candidates, in match order.
-                Auto-add commits to the strongest match, and within a single set
-                — many cards, one frame, near-identical art — that is regularly
-                not the card in hand. Showing the runners-up here turns a wrong
-                guess into one tap instead of an add-then-undo. Hidden while
-                editing condition/foil, where the choice has already been made. */}
+            {/* Keep alternative matches reachable before staging the draft. */}
             {!autoAddEditing && autoAddAlternatives.length > 0 && (
               <div style={{ width: '100%', borderTop: '1px solid var(--border-glass)', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
@@ -2450,7 +2436,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
         </div>
       )}
 
-      {/* Duplicate-Scan Confirm Overlay: the just-added card was scanned again. */}
+      {/* Duplicate-scan confirm: the just-queued card was scanned again. */}
       {dupConfirmCard && (
         <div
           className="modal-backdrop"
@@ -2479,7 +2465,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
               {t('scan.repeatHint')}
             </p>
 
-            {/* Quantity stepper: number of ADDITIONAL copies to add now. */}
+            {/* Quantity stepper: number of additional copies to queue. */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <button
                 type="button"
@@ -2510,7 +2496,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 }}
                 style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0' }}
               >
-                Add {dupQty} more {dupQty === 1 ? 'copy' : 'copies'}
+                {t('scan.queueMore', { count: dupQty })}
               </button>
               <button
                 type="button"
@@ -2523,7 +2509,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 }}
                 style={{ width: '100%', fontSize: '0.8rem', padding: '0.45rem 0' }}
               >
-                Discard — same card, keep scanning
+                {t('scan.discardRepeat')}
               </button>
               <button
                 type="button"
@@ -2536,7 +2522,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 }}
                 style={{ width: '100%', fontSize: '0.8rem', padding: '0.45rem 0' }}
               >
-                Done — that was another photo of the same card
+                {t('scan.finishRepeat')}
               </button>
             </div>
           </div>
@@ -2545,7 +2531,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
 
       {/* Scan Results Suggestions Popup Modal */}
       {scanMatches.length > 0 && (
-        <div style={{
+        <Modal onClose={closeDrawer} aria-label={t('scan.identifiedTitle')} style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.85)',
@@ -2561,17 +2547,11 @@ function CameraScanner({ onAddSuccess, showToast }) {
               <h3 style={{ fontSize: '1.1rem', color: 'var(--text-strong)', margin: 0 }}>{t('scan.identifiedTitle')}</h3>
               <button 
                 className="btn btn-secondary btn-icon-only" 
-                onClick={() => {
-                  setScanMatches([]);
-                  setDebugTimings([]);
-                  setScanStatus('');
-                  autoArmed.current = true;
-                  capturedQuad.current = null;
-                  resolvedDupIdRef.current = null;
-                  if (!stream || !cameraActive) startCamera();
-                }} 
+                onClick={closeDrawer}
+                disabled={draftBusy}
                 style={{ borderRadius: '50%' }}
                 title={t('scan.closeRescan')}
+                aria-label={t('common.close')}
               >
                 <X size={16} />
               </button>
@@ -2581,27 +2561,42 @@ function CameraScanner({ onAddSuccess, showToast }) {
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
                 {t('scan.selectCorrect')}
               </p>
+              {draftBusy && <p role="status">{t('common.loading')}…</p>}
+              {draftError && <p role="alert">{draftError}</p>}
               {scanStatus && (
                 <p role="status" style={{ color: 'var(--text-strong)', fontSize: '0.85rem', margin: 0, padding: '0.75rem', borderLeft: '3px solid var(--accent-yellow)' }}>
                   {scanStatus}
                 </p>
               )}
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0, overflowWrap: 'anywhere' }}>
+                {t('scan.nameRead')}{' '}
+                <strong style={{ color: 'var(--text-strong)' }}>
+                  {scanName?.text
+                    ? (scanName.status === 'unreadable' ? t('scan.nameUncertain', { name: scanName.text }) : scanName.text)
+                    : t('scan.nameUnreadable')}
+                </strong>
+              </p>
               
               {/* Manual search fallback within the modal */}
+              <label htmlFor="scan-manual-search">{t('scan.manualSearchLabel')}</label>
               <form onSubmit={handleManualSearch} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
                   <input 
+                    id="scan-manual-search"
                     type="text" 
                     placeholder={t('scan.manualSearchPlaceholder')} 
                     className="input-control"
                     value={manualSearchText}
+                    disabled={draftBusy}
                     onChange={(e) => setManualSearchText(e.target.value)}
                     style={{ width: '100%', padding: '0.4rem 2rem 0.4rem 0.6rem', fontSize: '0.8rem' }}
                   />
                   {manualSearchText && (
                     <button
                       type="button"
+                      aria-label={t('scan.clearSearch')}
                       onClick={() => setManualSearchText('')}
+                      disabled={draftBusy}
                       style={{
                         position: 'absolute',
                         right: '0.4rem',
@@ -2621,7 +2616,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 <button
                   type="submit"
                   className="btn btn-secondary btn-sm"
-                  disabled={manualSearching || !manualSearchText.trim()}
+                  disabled={draftBusy || manualSearching || !manualSearchText.trim()}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}
                 >
                   {manualSearching ? <RefreshCw size={14} className="spin" /> : <Search size={14} />}
@@ -2636,7 +2631,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 identify, and the answer is usually near the top. */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.75rem', maxHeight: '350px', overflowY: 'auto', padding: '0.25rem' }}>
               {(showAllMatches ? scanMatches : scanMatches.slice(0, PICKER_PREVIEW)).map(card => (
-                <div key={card.id} className="tcg-card" onClick={() => openQuickAdd(card)} style={{ cursor: 'pointer' }}>
+                <button type="button" key={card.id} className="tcg-card" disabled={draftBusy || manualSearching || draftsLoading || draftsError || draftAction !== null} onClick={() => autoAddCard(card)} style={{ cursor: 'pointer', background: 'none', border: 0, padding: 0, font: 'inherit' }}>
                   <div className="tcg-card-inner" style={{ border: '1px solid var(--border-glass-hover)' }}>
                     <img src={card.image_url} alt={getCardDisplayName(card.name, card.printed_name)} className="tcg-card-image" />
                   </div>
@@ -2651,7 +2646,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                     <LangFallbackNote card={card} />
                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-yellow)', marginTop: '0.2rem' }}>{priceText(card.price_trend, card.price_currency)}</div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
 
@@ -2671,15 +2666,8 @@ function CameraScanner({ onAddSuccess, showToast }) {
             <div style={{ display: 'flex', gap: '0.75rem', borderTop: '1px solid var(--border-glass)', paddingTop: '1rem' }}>
               <button 
                 className="btn btn-primary" 
-                onClick={() => {
-                  setScanMatches([]);
-                  setDebugTimings([]);
-                  setScanStatus('');
-                  autoArmed.current = true;
-                  capturedQuad.current = null;
-                  resolvedDupIdRef.current = null;
-                  if (!stream || !cameraActive) startCamera();
-                }} 
+                onClick={closeDrawer}
+                disabled={draftBusy}
                 style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
               >
                 <RefreshCw size={14} />
@@ -2687,85 +2675,69 @@ function CameraScanner({ onAddSuccess, showToast }) {
               </button>
               <button
                 className="btn btn-secondary"
-                onClick={() => {
-                  setScanMatches([]);
-                  setDebugTimings([]);
-                  setScanStatus('');
-                  setAutoScan(false);
-                  if (!stream || !cameraActive) startCamera();
-                }}
+                onClick={closeDrawer}
+                disabled={draftBusy}
                 style={{ flex: 1 }}
               >
                 {t('common.cancel')}
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
-      {/* Recent Scans History Panel */}
-      {recentScans.length > 0 && (
-        <div className="glass-panel" style={{ width: '100%', marginTop: '1rem' }}>
-          <h3 style={{ fontSize: '1rem', color: 'var(--text-strong)', marginBottom: '0.85rem', borderLeft: '3px solid var(--accent-red)', paddingLeft: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>{t('scan.recentScans')}</span>
-            {recentSelect.selectMode
-              ? <button className="btn btn-secondary" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }} onClick={recentSelect.exitSelectMode}>{t('bulk.done')}</button>
-              : <button className="btn btn-secondary" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }} onClick={() => setRecentScans([])}>{t('scan.clearHistory')}</button>}
-          </h3>
-
-          {/* Bulk action bar (select mode). Same actions/endpoint as the collection page. */}
-          {recentSelect.selectMode && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center', marginBottom: '0.6rem' }}>
-              <span style={{ fontWeight: 800, color: 'var(--text-strong)', fontSize: '0.8rem', marginRight: '0.25rem' }}>{recentSelect.selectedIds.size} selected</span>
-              <button className="btn btn-danger" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} disabled={!recentSelect.selectedIds.size} onClick={() => recentSelect.runBulk('delete', null, t('bulk.confirmDelete', { count: recentSelect.selectedIds.size }))}>{t('bulk.delete')}</button>
-              <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} disabled={!recentSelect.selectedIds.size} onClick={() => recentSelect.runBulk('trade', null)}>{t('bulk.markTrade')}</button>
-              <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} disabled={!recentSelect.selectedIds.size} onClick={() => recentSelect.runBulk('list_type', 'wishlist')}>{t('bulk.moveToWishlist')}</button>
-            </div>
-          )}
-
-          {/* Horizontal strip of recent scans, card-shaped like the box tiles.
-              Tap = edit; long-press = multi-select (shared with collection page). */}
-          <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
-            {recentScans.map((item, idx) => {
-              const selected = recentSelect.selectMode && recentSelect.selectedIds.has(item.entry_id);
-              return (
-              <div
-                key={idx}
-                onClick={() => activateRecent(item)}
-                {...recentSelect.pressHandlers(item.entry_id)}
-                title={t('scan.tapEditHoldSelect')}
-                style={{ flex: '0 0 auto', width: '76px', display: 'flex', flexDirection: 'column', gap: '0.25rem', cursor: 'pointer', userSelect: 'none', WebkitTouchCallout: 'none', opacity: recentSelect.selectMode && !selected ? 0.55 : 1 }}
-              >
-                <img
-                  src={item.image_url}
-                  alt={getCardDisplayName(item.name, item.printed_name)}
-                  draggable={false}
-                  style={{ width: '76px', height: '106px', objectFit: 'cover', borderRadius: '4px', border: selected ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', boxShadow: selected ? '0 0 12px var(--accent-red-glow)' : '0 2px 6px rgba(0,0,0,0.3)', pointerEvents: 'none' }}
-                />
-                <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--accent-yellow)', textAlign: 'center' }}>{priceText(item.price_trend, item.price_currency)}</div>
-                {item.placementLabel && (
-                  <div style={{ fontSize: '0.55rem', color: '#ffc107', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.placementLabel}>{item.placementLabel}</div>
-                )}
-              </div>
-              );
-            })}
+      </div>
+      <section className="glass-panel scan-review" aria-labelledby="scan-review-title">
+        <div className="scan-review-header">
+          <div>
+            <h3 id="scan-review-title">{t('scan.reviewTitle')} ({scanDrafts.length})</h3>
+            <p>{t('scan.reviewHint')}</p>
           </div>
+          <button type="button" className="btn btn-secondary" disabled={!scanDrafts.length || draftsLoading || draftsError || draftBusy || draftAction !== null || isDrawerOpen} onClick={() => actOnDrafts('clear')}>
+            {draftAction === 'clear' && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+            {t('bulk.clear')}
+          </button>
+          <button type="button" className="btn btn-primary scan-review-commit" disabled={!scanDrafts.length || draftsLoading || draftsError || draftBusy || draftAction !== null || isDrawerOpen} onClick={() => actOnDrafts('commit')}>
+            {draftAction === 'commit' && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+            {t('search.addToCollection')}
+          </button>
         </div>
-      )}
-
-      {inspectorEntry && (
-        <CardInspectorModal
-          card={inspectorEntry}
-          onClose={() => setInspectorEntry(null)}
-          onUpdate={onAddSuccess}
-          onDeleted={removeRecentTile}
-          showToast={showToast}
-        />
-      )}
+        {draftAction === 'commit' && <p role="status">{t('scan.addingBatch')}</p>}
+        {draftError && !isDrawerOpen && <p role="alert">{draftError}</p>}
+        {draftsLoading && <p role="status">{t('common.loading')}…</p>}
+        {draftsError && <div role="alert">
+          <p>{t('scan.errLoadDrafts')}</p>
+          <button type="button" className="btn btn-secondary" onClick={() => loadDrafts()}>{t('scan.retryDrafts')}</button>
+        </div>}
+        {!draftsLoading && !draftsError && scanDrafts.length === 0 && <p>{t('scan.reviewEmpty')}</p>}
+        <ul className="scan-review-list">
+          {scanDrafts.map(draft => (
+            <li key={draft.draft_id} className="scan-review-card" aria-busy={draftAction === draft.draft_id || draftAction === `foil-${draft.draft_id}` || draftAction === 'commit'}>
+              <img src={draft.image_url} alt={getCardDisplayName(draft.name, draft.printed_name)} width="250" height="350" loading="lazy" />
+              <div className="scan-review-details">
+                <h4>{getCardDisplayName(draft.name, draft.printed_name)}</h4>
+                <p>{draft.set_name} · #{draft.number}</p>
+                <p>{draft.quantity}× · {draft.condition} · {draft.printing} · {draft.language}</p>
+                <p>{t('card.purchasePrice')}: {priceText(draft.purchase_price, draft.price_currency)}</p>
+              </div>
+              <div className="scan-review-actions">
+                <button type="button" className={`btn ${draft.printing === 'Holofoil' ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={draft.printing === 'Holofoil'} disabled={draftBusy || draftAction !== null} onClick={() => toggleDraftFoil(draft)}>
+                  {draftAction === `foil-${draft.draft_id}` && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+                  {t('scan.foil')}
+                </button>
+                <button type="button" className="btn btn-secondary" disabled={draftBusy || draftAction !== null} onClick={() => discardDraft(draft)}>
+                  {draftAction === draft.draft_id && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+                  {t('scan.discardDraft')}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       {/* Drawer Overlay for Selected Card */}
-      <div className={`drawer-backdrop ${isDrawerOpen ? 'open' : ''}`} onClick={closeDrawer}></div>
-      <div className={`quick-add-drawer ${isDrawerOpen ? 'open' : ''}`}>
+      {isDrawerOpen && <Modal onClose={closeDrawer} aria-labelledby="scan-drawer-title">
+      <div className="quick-add-drawer open">
         {selectedCard && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem', gap: '0.75rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
@@ -2773,20 +2745,22 @@ function CameraScanner({ onAddSuccess, showToast }) {
                   is boilerplate. So they get the size, and the set name (which the
                   number already implies) drops to the small line. */}
               <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                <h3 style={{ color: 'var(--text-muted)', fontSize: '0.7rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}>{t('scan.addScannedTitle')}</h3>
+                <h3 id="scan-drawer-title" style={{ color: 'var(--text-muted)', fontSize: '0.7rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}>{t('scan.addScannedTitle')}</h3>
                 <p style={{ color: 'var(--text-strong)', fontSize: '1.25rem', fontWeight: 800, margin: '0.1rem 0 0 0', lineHeight: 1.2, wordBreak: 'break-word' }}>
                   {getCardDisplayName(selectedCard.name, selectedCard.printed_name)} <span style={{ color: 'var(--text-primary)' }}>#{selectedCard.number}</span>
                 </p>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, wordBreak: 'break-word' }}>{selectedCard.set_name}</p>
                 <LangFallbackNote card={selectedCard} style={{ justifyContent: 'flex-start' }} />
               </div>
-              <button className="btn btn-secondary btn-icon-only" onClick={closeDrawer} style={{ borderRadius: '50%', flexShrink: 0 }}>
+              <button type="button" className="btn btn-secondary btn-icon-only" onClick={closeDrawer} disabled={draftBusy || languageChanging || findingPrintings} aria-label={t('common.close')} style={{ borderRadius: '50%', flexShrink: 0 }}>
                 <X size={18} />
               </button>
             </div>
 
             {/* Three Column Layout (No vertical scroll) */}
+            {draftError && <p role="alert">{draftError}</p>}
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+              <fieldset disabled={draftBusy || languageChanging || findingPrintings} className="scan-draft-fields">
               <div className="quick-add-grid">
                 
                 {/* Column 1: Card Preview (Smaller card: width 150px) */}
@@ -2829,7 +2803,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm"
-                      onClick={() => { closeDrawer(); setScanMatches(lastMatches); setShowAllMatches(true); }}
+                      onClick={() => { setIsDrawerOpen(false); setScanMatches(lastMatches); setShowAllMatches(true); }}
                       style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                     >
                       <ListFilter size={14} /> {t('scan.backToMatches', { n: lastMatches.length })}
@@ -2839,23 +2813,30 @@ function CameraScanner({ onAddSuccess, showToast }) {
                     type="button"
                     className="btn btn-secondary btn-sm"
                     onClick={findOtherPrintings}
-                    disabled={findingPrintings}
+                    disabled={findingPrintings || draftBusy}
                     title={t('scan.otherPrintingsHint')}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                   >
                     {findingPrintings ? <RefreshCw size={14} className="spin" /> : <Layers size={14} />}
                     <span>{findingPrintings ? t('scan.fetchingCandidates') : (t('scan.changePrinting') || t('scan.otherPrintings') || t('scan.rightNameWrongPrinting'))}</span>
                   </button>
+                  <button type="button" className="btn btn-secondary btn-sm" disabled={draftBusy} onClick={() => { setIsDrawerOpen(false); setScanMatches([selectedCard]); setShowAllMatches(true); }}>
+                    <Search size={14} /> {t('scan.changeCard')}
+                  </button>
                 </div>
                 <div className="quick-add-footer-actions">
-                  <button type="button" className="btn btn-secondary" onClick={closeDrawer}>{t('common.cancel')}</button>
-                  <button type="submit" className="btn btn-primary">{t('search.addToCollection')}</button>
+                  <button type="button" className="btn btn-secondary" onClick={closeDrawer} disabled={draftBusy}>{t('common.cancel')}</button>
+                  <button type="submit" className="btn btn-primary" disabled={draftBusy || findingPrintings || draftsLoading || draftsError}>
+                    {draftBusy && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+                    {t('scan.queueCard')}
+                  </button>
                 </div>
               </div>
+              </fieldset>
             </form>
           </div>
         )}
-      </div>
+      </div></Modal>}
     </div>
   );
 }

@@ -61,7 +61,7 @@ process.env.CV_MODEL_DIR = dir;
 
   const scanOcr = require('../src/utils/scanOcr');
   let evidence = { status: 'unreadable' };
-  scanOcr.readFooter = async () => {
+  scanOcr.readCardText = async () => {
     if (evidence instanceof Error) throw evidence;
     return { ...evidence };
   };
@@ -85,6 +85,21 @@ process.env.CV_MODEL_DIR = dir;
 
   match = clean([candidate(0, 0.94), candidate(2, 0.3)]);
   assert.strictEqual((await scan()).safety.autoAddSafe, true, 'unreadable legacy footer alone must not reject an unambiguous card');
+  const nameTsv = text => text.split(' ').map((word, i) =>
+    ['5', '1', '1', '1', '1', i + 1, i * 40, '0', '35', '20', '95', word].join('\t')).join('\n');
+  evidence = { status: 'unreadable', nameTsv: nameTsv('Different Card') };
+  const titled = await scan();
+  assert.strictEqual(titled.safety.autoAddSafe, true, 'title OCR cannot veto unambiguous artwork');
+  assert.deepStrictEqual(titled.safety.name, { status: 'read', text: 'Different Card', confidence: 0.95 });
+  assert.strictEqual(titled.candidates[0].card.id, cards[0].id, 'title OCR cannot promote artwork matches');
+  evidence = { status: 'read', setCode: 'neo', number: '7a', nameTsv: nameTsv('Different Card') };
+  assert.strictEqual((await scan()).safety.autoAddSafe, true, 'title OCR cannot veto matching artwork and footer');
+  match = clean([candidate(0, 0.94), candidate(1, 0.92)]);
+  evidence = { status: 'unreadable', nameTsv: nameTsv('Lightning Bolt') };
+  const reprints = await scan();
+  assert.strictEqual(reprints.safety.autoAddSafe, false);
+  assert.ok(reprints.safety.reasons.includes('ambiguous_printing'), 'title OCR does not resolve reprints');
+  evidence = { status: 'unreadable' };
   match = clean([candidate(0, 0.94), candidate(0, 0.93), candidate(2, 0.92)]);
   assert.ok((await scan()).safety.reasons.includes('ambiguous_printing'), 'distinct third candidate must block even with a different name');
   match = clean([candidate(0, 0.94), candidate(1, 0.92)]);
@@ -137,7 +152,7 @@ process.env.CV_MODEL_DIR = dir;
   // only to its own request; successful TSV waits for the newly hydrated set.
   const scryfall = require('../src/scryfallApi');
   const getCardById = scryfall.getCardById;
-  const readFooter = scanOcr.readFooter;
+  const readCardText = scanOcr.readCardText;
   const pendingMetadata = new Map();
   let allHydrating;
   const hydrating = new Promise(resolve => { allHydrating = resolve; });
@@ -146,7 +161,7 @@ process.env.CV_MODEL_DIR = dir;
     if (pendingMetadata.size === 2) allHydrating();
   });
   let ocrCalls = 0;
-  scanOcr.readFooter = async () => {
+  scanOcr.readCardText = async () => {
     if (++ocrCalls === 2) throw new Error('Early OCR failure');
     const lines = [['007a', 'R'], ['NEW', 'EN']];
     return { tsv: lines.flatMap((words, line) => words.map((word, column) =>
@@ -168,7 +183,7 @@ process.env.CV_MODEL_DIR = dir;
   assert.strictEqual(successfulAnswer.safety.autoAddSafe, true);
   assert.strictEqual(successfulAnswer.candidates[0].card.id, cards[0].id);
   scryfall.getCardById = getCardById;
-  scanOcr.readFooter = readFooter;
+  scanOcr.readCardText = readCardText;
   match = clean([candidate(0, 0.94)]);
 
   // A cached same-art printing need not appear in the model's top K to be a tie.

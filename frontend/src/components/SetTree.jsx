@@ -89,7 +89,8 @@ export default function SetTree({
                   onChange={() => onToggleFamily(s)}
                   style={{ accentColor: 'var(--accent-green)', flexShrink: 0 }}
                 />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                {s.symbol_url && <img src={s.symbol_url} alt="" width="20" height="20" loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+                <span style={{ fontSize: 'var(--set-name-font-size, 0.75rem)', color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
                 <code style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>{code}</code>
               </label>
               {kids.length > 0 && (
@@ -115,7 +116,8 @@ export default function SetTree({
                   onChange={() => onToggleCode(c.code)}
                   style={{ accentColor: 'var(--accent-green)', flexShrink: 0 }}
                 />
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                {c.symbol_url && <img src={c.symbol_url} alt="" width="20" height="20" loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+                <span style={{ fontSize: 'var(--set-name-font-size, 0.72rem)', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
                 <code style={{ fontSize: '0.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>{c.code}</code>
                 <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginLeft: 'auto', flexShrink: 0, textTransform: 'capitalize' }}>{c.type}</span>
               </label>

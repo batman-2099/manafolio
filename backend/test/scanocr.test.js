@@ -1,6 +1,6 @@
 const assert = require('assert');
 const sharp = require('sharp');
-const { parsePrintingTsv, readFooter } = require('../src/utils/scanOcr');
+const { parsePrintingTsv, readCardText, parseNameTsv } = require('../src/utils/scanOcr');
 
 function tsv(lines) {
   return lines.map((line, index) => line.map((word, column) => {
@@ -38,11 +38,21 @@ async function main() {
   assert.deepStrictEqual(parse([['0012', 'R'], ['0013', 'R'], ['MKM', 'EN']]), { status: 'unreadable' });
   assert.deepStrictEqual(parse([['0012', 'R'], ['MKM', 'EN'], ['ELD', 'EN']]), { status: 'unreadable' });
   assert.deepStrictEqual(parsePrintingTsv('not TSV'), { status: 'unreadable' });
-  assert.deepStrictEqual(await readFooter('/etc/passwd'), { status: 'error' });
-  assert.deepStrictEqual(await readFooter(Buffer.alloc(0)), { status: 'error' });
+  assert.deepStrictEqual(await readCardText('/etc/passwd'), { status: 'error' });
+  assert.deepStrictEqual(await readCardText(Buffer.alloc(0)), { status: 'error' });
+  assert.deepStrictEqual(parseNameTsv(tsv([['Urza’s', 'Saga']])),
+    { status: 'read', text: 'Urza’s Saga', confidence: 0.95 });
+  assert.deepStrictEqual(parseNameTsv(tsv([[['Urza’s', 69], 'Saga']])),
+    { status: 'unreadable', text: 'Urza’s Saga', confidence: 0.69 });
+  assert.deepStrictEqual(parseNameTsv(tsv([[['Border', 30]], ['Urza’s', 'Saga']])),
+    { status: 'read', text: 'Urza’s Saga', confidence: 0.95 });
+  assert.equal(parseNameTsv(tsv([['Different', 'Card'], ['Urza’s', 'Saga']])).status, 'unreadable');
+  assert.equal(parseNameTsv(tsv([['Urza’s'], ['Saga']])).status, 'unreadable');
+  assert.deepStrictEqual(parseNameTsv(tsv([['123']])), { status: 'unreadable' });
+  assert.deepStrictEqual(parseNameTsv(''), { status: 'unreadable' });
 
   // Opt-in real native executable smoke: node backend/test/scanocr.test.js --ocr-smoke
-  // No downloaded fixtures or database/model/catalog access; sharp renders the footer.
+  // No downloaded fixtures or database/model/catalog access; sharp renders a sample card.
   if (process.argv.includes('--ocr-smoke')) {
     for (const width of [448, 896]) {
       for (const [first, second, setCode, number] of [
@@ -53,16 +63,21 @@ async function main() {
         const image = await sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${width}">
           <rect width="100%" height="100%" fill="white"/>
           <rect x="20" y="20" width="${width - 40}" height="${width * 0.76}" fill="#777"/>
+          <rect x="0" y="0" width="100%" height="${width * 0.13}" fill="white"/>
+          <text x="${width * 0.09}" y="${width * (setCode === 'eld' ? 0.115 : 0.085)}" font-family="DejaVu Sans" font-size="${width * 0.04}" fill="black">Lightning Bolt</text>
           <g font-family="DejaVu Sans Mono" font-size="${width * 0.04}" fill="black">
             <text x="${width * 0.06}" y="${width * 0.88}">${first}</text>
             <text x="${width * 0.06}" y="${width * 0.94}">${second}</text>
           </g></svg>`)).png().toBuffer();
-        const footer = await readFooter(image);
+        const footer = await readCardText(image);
         const result = footer.tsv ? parsePrintingTsv(footer.tsv, { setCodes: ['mkm', 'eld'] }) : footer;
         assert.equal(result.status, 'read', `${width}px ${first}: ${JSON.stringify(result)}`);
         assert.equal(result.setCode, setCode);
         assert.equal(result.number, number);
-        console.log(`native OCR ${width}px: ${setCode} ${number} (${result.confidence})`);
+        const name = parseNameTsv(footer.nameTsv);
+        assert.equal(name.status, 'read', JSON.stringify(name));
+        assert.equal(name.text, 'Lightning Bolt');
+        console.log(`native OCR ${width}px: ${name.text}, ${setCode} ${number} (${result.confidence})`);
       }
     }
   }
