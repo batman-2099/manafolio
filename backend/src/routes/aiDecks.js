@@ -5,6 +5,7 @@ const codex = require('../codexDeckClient');
 const ollama = require('../ollamaDeckClient');
 const hosted = require('../hostedDeckClient');
 const { validateDeckAddition } = require('../utils/deckRules');
+const { validateDeckSource } = require('../utils/collectionHelpers');
 const {
   FORMATS, REVIEW_WARNING, fail, inventoryType, containerIds, sourceDeckId, sourceDeck, preferencesRequest, suggestionRequest, suggestionResponse, draftRequest,
   inventory, cardRules, filterInventory, validateDraft, modelRequest,
@@ -221,10 +222,10 @@ const saveDeck = endpoint(async (req, res) => {
       const cards = await cardRules((await inventory(req.user.id, draft.inventory_type, { ...draft, sourceDeck: source })).filter(card => selected.has(card.id)));
       validateDraft(draft, cards);
       let deckId = replacementId;
-      let pulled;
+      let saved;
       if (replacementId !== undefined) {
-        pulled = new Map((await db.all('SELECT card_id, checked_out FROM deck_cards WHERE deck_id = ?', [deckId]))
-          .map(card => [card.card_id, card.checked_out]));
+        saved = new Map((await db.all('SELECT card_id, checked_out, source_entry_id FROM deck_cards WHERE deck_id = ?', [deckId]))
+          .map(card => [card.card_id, card]));
         await db.run('UPDATE decks SET name = ?, description = ?, commander_card_id = ? WHERE id = ?',
           [draft.name, draft.description, draft.commander_card_id, deckId]);
         await db.run('DELETE FROM deck_cards WHERE deck_id = ?', [deckId]);
@@ -238,8 +239,10 @@ const saveDeck = endpoint(async (req, res) => {
       for (const card of draft.cards) {
         const check = await validateDeckAddition({ deckId, userId: req.user.id, cardId: card.card_id, newQty: card.quantity });
         if (!check.ok) fail(check.error);
-        await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out) VALUES (?, ?, ?, ?)',
-          [deckId, card.card_id, card.quantity, pulled?.get(card.card_id) || 0]);
+        const sourceEntryId = saved?.get(card.card_id)?.source_entry_id ?? null;
+        await validateDeckSource(req.user.id, deckId, card.card_id, card.quantity, sourceEntryId);
+        await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out, source_entry_id) VALUES (?, ?, ?, ?, ?)',
+          [deckId, card.card_id, card.quantity, saved?.get(card.card_id)?.checked_out || 0, sourceEntryId]);
       }
       return deckId;
     });

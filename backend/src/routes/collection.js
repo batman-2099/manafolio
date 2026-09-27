@@ -12,7 +12,7 @@ const { searchLimiter } = require('../middleware/auth');
 const { resolveCardPrice, parseCardRow, recordPrice } = require('../utils/priceHelpers');
 const { parseSetList } = require('../utils/setQuery');
 const { compartmentLabel, isBinderType, rebalanceCompartmentByScheme, stackKey, STACK_KEY_SQL } = require('../utils/compartmentSort');
-const { checkedOutAllocation, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, setStackQuantity, defaultCompartmentPlan } = require('../utils/collectionHelpers');
+const { checkedOutAllocation, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, setStackQuantity, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { splitPrice } = require('../utils/splitPrice');
 
@@ -905,6 +905,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
     }
 
     if (deckId) {
+      await reserveDeckSources({ id: deckId, game: 'mtg', checked_out: 0 }, req.user.id);
       await db.run('UPDATE decks SET checked_out = 1, checked_out_at = CURRENT_TIMESTAMP WHERE id = ?', [deckId]);
     }
     return { locationId, deckId, added, failed };
@@ -1213,18 +1214,19 @@ router.post('/collection/bulk', async (req, res) => {
       let added = 0;
       const rejected = [];
       for (const row of rows) {
-        const existing = await db.get(`SELECT quantity FROM deck_cards WHERE deck_id = ? AND card_id = ?`, [deckId, row.card_id]);
-        const current = existing ? existing.quantity : 0;
-        const newQty = current + row.total_qty;
-        // Enforce deck rules (owned cap + max 4 per name) so this path can't
-        // bypass the limits the deck builder enforces.
-        const check = await validateDeckAddition({ deckId, userId: req.user.id, cardId: row.card_id, newQty });
+        const check = await db.withTransaction(async () => {
+          const existing = await db.get(`SELECT quantity FROM deck_cards WHERE deck_id = ? AND card_id = ?`, [deckId, row.card_id]);
+          const newQty = (existing?.quantity || 0) + row.total_qty;
+          const validation = await validateDeckAddition({ deckId, userId: req.user.id, cardId: row.card_id, newQty });
+          if (!validation.ok) return validation;
+          await db.run(
+            `INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, ?)
+             ON CONFLICT(deck_id, card_id) DO UPDATE SET quantity = excluded.quantity`,
+            [deckId, row.card_id, newQty]
+          );
+          return validation;
+        });
         if (!check.ok) { rejected.push(check.error); continue; }
-        await db.run(
-          `INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, ?)
-           ON CONFLICT(deck_id, card_id) DO UPDATE SET quantity = excluded.quantity`,
-          [deckId, row.card_id, newQty]
-        );
         added += row.total_qty;
       }
       const msg = rejected.length

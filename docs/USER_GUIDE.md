@@ -472,13 +472,25 @@ In an open deck, the toolbar is followed by **Description**. The analytics and c
 
 **Expected result:** a saved deck profile, initially without cards and not checked out. Creating a deck does not create owned copies.
 
+### Choose where a deck's copies come from
+
+1. Open a Physical deck and click a card in its list or grid.
+2. In the card preview, use **Location to use for this deck** to choose a storage location and compartment, or leave **Automatic — use available copies**.
+3. Check the available count. Copies within the selected location/compartment can be combined, but that source must supply the card's entire deck quantity. Sources with insufficient available copies are disabled.
+4. Changing the location automatically saves the whole deck, including other unsaved changes. If saving fails, your draft remains; close the preview and use **Save** in the toolbar to retry.
+5. Check out the deck normally. The pull checklist uses copies from the selected source; returning the deck releases those exact reservations.
+
+This does not move collection cards or reserve them before checkout. Missing copies, copies reserved by another deck, Arena, Wishlist, and Graveyard do not supply a Physical deck. Return a checked-out deck before changing its source. If the source becomes unavailable, select another source or Automatic and save; checkout does not silently substitute another location.
+
+The selection is anchored to an existing collection copy and follows its current location/compartment if it moves. Deleting that anchor leaves an unavailable selection that you must replace before checkout. Normal saves still work with unowned, missing, reserved, or source-short cards and previously saved unavailable sources; they do not reserve copies or certify that the deck can be checked out. Arena decks do not show this control.
+
 ### Add cards, change quantities, and save
 
 1. Open the deck and scroll below Description and the analytics to **Add Cards to Deck**.
 2. Search by card name using the search button, or select **Browse Collection** to browse the inventory corresponding to the deck's Physical/Arena type. Despite that button's name, an Arena deck uses Arena quantities.
 3. Inspect the set and collector number before adding a printing. Select its add control.
 4. In **Deck Cards**, use **+** and **−** to change quantities. At one copy, the removal control becomes **Remove from deck**. Removing a card here does not delete owned copies.
-5. Choose **List** or **Grid**. The sort menu offers **Card type**, **Location**, and **Pulled status**. Grid view also provides **Decrease card size** and **Increase card size**.
+5. Use the centered display controls to choose **List** or **Grid**, adjust **Decrease card size** / **Increase card size**, and sort by **Card type**, **Location**, or **Pulled status**. Zoom works in both views and carries across view changes; in List it scales the card artwork, text, and row controls.
 6. Select **Save** in the deck toolbar.
 
 **Expected result:** the card changes are persisted together after a successful Save. Until then, **Unsaved changes** means they remain a local draft. Closing the editor or navigating away can discard them after confirmation. If saving fails, the draft remains available to correct and retry.

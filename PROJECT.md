@@ -100,7 +100,8 @@ Missing/Found is a flag on an entry, not deletion or archival. Individual invent
 | `compartments` | Ordered pages/rows within a container, capacity, label, rules, lock |
 | `compartment_assignments` | Filing categories assigned to compartments |
 | `decks` | User-owned definition, inventory, format, target size, commander, metadata, checkout state, wins/losses |
-| `deck_cards` | Printing quantities per deck; `checked_out` here records **Pulled**, not the deck's reservation state |
+| `deck_cards` | Printing quantities and optional source-entry anchor per deck; `checked_out` here records **Pulled**, not the deck's reservation state |
+| `deck_card_allocations` | Exact collection entries and quantities reserved by checked-out decks |
 | `sets` | Provider set metadata and ordering |
 | `price_history` | Changed card prices over time |
 | `notes` | User-owned notes and pinning |
@@ -159,7 +160,7 @@ The built frontend is served from `frontend/dist`. Non-API paths fall back to th
 
 The main SQLite connection enables foreign keys, WAL, and a five-second busy timeout. Promise wrappers `db.run/get/all` pass through a shared queue. `db.withTransaction(fn)` holds that queue across `BEGIN IMMEDIATE`, the callback, and commit/rollback; `AsyncLocalStorage` lets callback queries use the same transaction without deadlocking behind themselves. Nested transactions are rejected.
 
-Use this helper for a multi-statement invariant rather than issuing ad hoc `BEGIN`/`COMMIT` calls. Without the queue boundary, another request's statements can enter the same connection's transaction. Keep domain validation and writes that must agree inside the transaction. Do not describe every mutation as transactional: for example, checkout currently performs its availability read and flag update as separate queries.
+Use this helper for a multi-statement invariant rather than issuing ad hoc `BEGIN`/`COMMIT` calls. Without the queue boundary, another request's statements can enter the same connection's transaction. Keep domain validation and writes that must agree inside the transaction. Checkout validates availability, records exact allocations, and updates its reservation state transactionally.
 
 Current transactional workflows include complete deck editor saves, AI deck saves/replacements, precon import, collection import, account restore, container import/move, and Physical/Graveyard whole-container transfer. Their details differ: a transaction does not imply every unresolved row is fatal. In particular, ordinary collection import can report individual failures while saving valid entries; precon import with deck creation rejects unresolved cards rather than saving a partial deck.
 
@@ -215,13 +216,15 @@ Shared dispatch in `utils/cardApi.js` accepts Magic identities only. Removed int
 
 ## Deck editing, checkout, and check-in
 
-`DeckBuilder` maintains a local draft. `PUT /api/decks/:id/editor` validates and writes properties, quantities, Pulled state, and commander in one transaction; a failure rolls the save back. The UI keeps a failed draft for retry and guards navigation with unsaved changes. Win/loss record updates are separate operations.
+`DeckBuilder` maintains a local draft. `PUT /api/decks/:id/editor` validates and writes properties, quantities, Pulled state, source preferences, and commander in one transaction; a failure rolls the save back. Changing a source automatically saves the complete draft. Normal draft saves permit unavailable inventory and retained unavailable sources; checkout remains strict. The UI keeps a failed draft for retry and guards navigation with unsaved changes. Win/loss record updates are separate operations.
 
-Deck definitions use one inventory. Switching inventory requires destination ownership and an unchecked-out deck. `utils/deckRules.js` owns shared addition/copy-limit checks. Commander selection is a single existing card; the UI's commander workflow is not a promise of full tournament legality, partner commanders, or sideboards.
+Deck definitions use one inventory; checked-out decks cannot switch inventory. `utils/deckRules.js` distinguishes inventory-constrained additions from availability-independent editor drafts while sharing copy-limit checks. Commander selection is a single existing card; the UI's commander workflow is not a promise of full tournament legality, partner commanders, or sideboards.
 
 Physical checkout reserves quantities by setting `decks.checked_out` and `checked_out_at`; it does **not** move collection entries. Availability subtracts copies reserved by other checked-out Physical decks. Arena decks cannot check out.
 
-`GET /api/decks/:id/locations` provides specific entries, containers, compartments, slot positions, and missing counts for the pull list. `checkedOutAllocation` assigns reserved quantities to entries so storage can grey out the same copies. These allocations are derived, not separate permanent reservation rows. **Pulled** is the per-deck-card checklist state (`deck_cards.checked_out`), distinct from the deck-level reservation flag.
+`GET /api/decks/:id/cards/:cardId/sources` groups available Physical copies by location and compartment. The editor saves nullable `source_entry_id`: null selects automatically; an entry anchors the selected location/compartment, which must supply the entire quantity at checkout. New source assignments validate account/card/Physical identity. Existing stale anchors remain saveable but fail checkout explicitly instead of reverting to automatic selection.
+
+`GET /api/decks/:id/locations` provides specific entries, containers, compartments, slot positions, and missing counts for the pull list. Checkout records exact entries in `deck_card_allocations`; `checkedOutAllocation` uses those records so storage reserves the same copies even after other decks return. Startup materializes legacy reservations. Backup restore remaps source and allocation entry references. **Pulled** remains the per-deck-card checklist state (`deck_cards.checked_out`), distinct from the deck-level reservation flag.
 
 Return clears the deck-level reservation state. Checkout/check-in use the same stored location for pulling and re-filing. Return a deck before changing its composition or archiving its reserved copies. Storage reassignment itself need not release a reservation.
 

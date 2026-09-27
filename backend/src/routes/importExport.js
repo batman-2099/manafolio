@@ -6,7 +6,7 @@ const scryfallApi = require('../scryfallApi');
 const { generateExportCSV } = require('../utils/csvExporters');
 const { resolveCardPrice, rebalanceCompartmentPositions } = require('../utils/priceHelpers');
 const { isBinderType } = require('../utils/compartmentSort');
-const { assertStorageInventory } = require('../utils/collectionHelpers');
+const { assertStorageInventory, checkedOutSources } = require('../utils/collectionHelpers');
 
 function parseCsvRows(data) {
   const lines = typeof data === 'string' ? data.split(/\r?\n/).map(line => line.trim()).filter(Boolean) : [];
@@ -63,6 +63,19 @@ function parseCompleteBackup(data) {
   const locationIds = new Set(backup.locations.map(location => location.id));
   const compartmentIds = new Set(backup.compartments.map(compartment => compartment.id));
   const deckIds = new Set(backup.decks.map(deck => deck.id));
+  const entries = new Map(backup.collection.map(entry => [entry.id, entry]));
+  const allocations = backup.deck_card_allocations ?? [];
+  if (!Array.isArray(allocations)
+      || backup.deck_cards.some(card => card.source_entry_id != null && (
+        !Number.isSafeInteger(card.source_entry_id) || card.source_entry_id === 0
+        || (entries.has(card.source_entry_id) && entries.get(card.source_entry_id).card_id !== card.card_id)
+        || backup.decks.find(deck => deck.id === card.deck_id)?.inventory_type === 'arena'))
+      || allocations.some(source => !Number.isSafeInteger(source.entry_id) || source.entry_id === 0
+        || !Number.isSafeInteger(source.quantity) || source.quantity < 1
+        || !backup.deck_cards.some(card => card.deck_id === source.deck_id && card.card_id === source.card_id)
+        || (entries.has(source.entry_id) && entries.get(source.entry_id).card_id !== source.card_id))) {
+    throw new Error('Invalid backup deck sources');
+  }
   if (
     backup.card_cache.some(card => !card.id || !card.name)
     || backup.locations.some(location => !location.id || !location.name || !location.type || !['collection', 'graveyard'].includes(location.inventory_type ?? 'collection'))
@@ -95,6 +108,10 @@ async function restoreCompleteBackup(backup, userId) {
   const locationIds = new Map();
   const compartmentIds = new Map();
   const deckIds = new Map();
+  const entryIds = new Map();
+  // Deleted sources stay invalid even when restoring into a different database
+  // where their old positive ID could belong to somebody else's collection.
+  const restoredEntryId = id => entryIds.get(id) ?? -Math.abs(id);
 
   await db.withTransaction(async () => {
     const unsupported = await db.get(`
@@ -166,7 +183,7 @@ async function restoreCompleteBackup(backup, userId) {
     }
 
     for (const card of backup.collection) {
-      await db.run(`
+      const result = await db.run(`
         INSERT INTO collection (
           card_id, quantity, condition, printing, language, purchase_price, location_id, compartment_id,
           position, favorite, is_trade, list_type, game, added_at, notes, grader, grade, cert_number,
@@ -180,6 +197,7 @@ async function restoreCompleteBackup(backup, userId) {
         card.notes || '', card.grader || 'Raw', card.grade, card.cert_number, card.market_value,
         card.market_value_source, card.market_value_at, card.missing || 0, userId
       ]);
+      entryIds.set(card.id, result.lastID);
     }
 
     for (const deck of backup.decks) {
@@ -197,9 +215,18 @@ async function restoreCompleteBackup(backup, userId) {
     }
 
     for (const card of backup.deck_cards) {
-      await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out) VALUES (?, ?, ?, ?)', [
-        deckIds.get(card.deck_id), card.card_id, card.quantity, card.checked_out || 0
+      await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out, source_entry_id) VALUES (?, ?, ?, ?, ?)', [
+        deckIds.get(card.deck_id), card.card_id, card.quantity, card.checked_out || 0,
+        card.source_entry_id == null ? null : restoredEntryId(card.source_entry_id)
       ]);
+    }
+    for (const source of backup.deck_card_allocations ?? []) {
+      await db.run(`INSERT INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+        [deckIds.get(source.deck_id), source.card_id, restoredEntryId(source.entry_id), source.quantity]);
+    }
+    for (const source of await checkedOutSources(userId)) {
+      await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+        [source.deck_id, source.card_id, source.entry_id, source.quantity]);
     }
   });
 
@@ -240,7 +267,8 @@ router.get('/export', async (req, res) => {
         compartments,
         compartment_assignments: compartmentAssignments,
         decks,
-        deck_cards: deckCards
+        deck_cards: deckCards,
+        deck_card_allocations: await checkedOutSources(req.user.id)
       });
     }
 

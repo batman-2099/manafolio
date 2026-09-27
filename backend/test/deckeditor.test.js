@@ -19,7 +19,8 @@ async function testEditor() {
     await db.run(`INSERT INTO card_cache (id, name, game, supertype, subtypes) VALUES
       ('first', 'First', 'mtg', 'Creature', '[]'), ('alternate', 'First', 'mtg', 'Creature', '[]'),
       ('removed', 'Removed', 'mtg', 'Creature', '[]'), ('added', 'Added', 'mtg', 'Creature', '[]'),
-      ('foreign', 'Foreign', 'mtg', 'Creature', '[]'), ('land', 'Forest', 'mtg', 'Land', '["Basic","Land"]')`);
+      ('foreign', 'Foreign', 'mtg', 'Creature', '[]'), ('land', 'Forest', 'mtg', 'Land', '["Basic","Land"]'),
+      ('wrong-game', 'Wrong game', 'unsupported', 'Creature', '[]')`);
     await db.run(`INSERT INTO collection (card_id, quantity, game, user_id, list_type) VALUES
       ('first', 3, 'mtg', 1, 'collection'), ('alternate', 4, 'mtg', 1, 'collection'),
       ('removed', 1, 'mtg', 1, 'collection'), ('added', 2, 'mtg', 1, 'collection'),
@@ -81,9 +82,8 @@ async function testEditor() {
     }
 
     const invalidDrafts = [
-      { cards: [{ card_id: 'first', quantity: 2, pulled: true }, { card_id: 'added', quantity: 3, pulled: false }] },
       { cards: [...draft.cards, { card_id: 'alternate', quantity: 2, pulled: false }] },
-      { cards: [...draft.cards, { card_id: 'foreign', quantity: 1, pulled: false }] },
+      { cards: [...draft.cards, { card_id: 'wrong-game', quantity: 1, pulled: false }] },
       { cards: [...draft.cards, { card_id: 'missing', quantity: 1, pulled: false }] },
       { cards: [...draft.cards, draft.cards[0]] },
       { cards: null }, { cards: [null] },
@@ -91,7 +91,7 @@ async function testEditor() {
       ...[0, 'true', null].map(pulled => ({ cards: [{ card_id: 'first', quantity: 1, pulled }] })),
       { commander_card_id: 'removed' }, { commander_card_id: 12 }, { commander_card_id: undefined },
       { format: 'Modern' }, { name: ' ' }, { description: {} }, { target_size: 301 }, { target_size: '100' },
-      { inventory_type: 'wishlist' }, { inventory_type: 'arena' }
+      { inventory_type: 'wishlist' }
     ];
     for (const invalid of invalidDrafts) {
       const result = await save({ ...draft, name: 'Must roll back', ...invalid });
@@ -116,9 +116,53 @@ async function testEditor() {
     const arena = { ...draft, inventory_type: 'arena', cards: draft.cards.map(card => ({ ...card, quantity: 1 })) };
     assert.strictEqual((await save(arena)).status, 200);
     assert.strictEqual((await reload()).inventory_type, 'arena');
-    assert.strictEqual((await save({ ...arena, cards: [...arena.cards, { card_id: 'alternate', quantity: 1, pulled: false }] })).status, 400);
+    const arenaUnowned = { ...arena, cards: [...arena.cards, { card_id: 'alternate', quantity: 1, pulled: true }] };
+    assert.strictEqual((await save(arenaUnowned)).status, 200);
+    assert.deepStrictEqual((await reload()).cards.map(card => [card.id, card.quantity, card.checked_out]).sort(),
+      [['added', 1, 1], ['alternate', 1, 1], ['first', 1, 0]]);
     assert.strictEqual((await save(draft)).status, 200);
     assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), inventory, 'saving a definition must not mutate inventory');
+
+    // Draft saves, including source autosave payloads, do not reserve inventory.
+    for (const state of ['unowned', 'missing', 'locked', 'short']) {
+      const cardId = `unavailable-${state}`;
+      await db.run("INSERT INTO card_cache (id, name, game, supertype) VALUES (?, ?, 'mtg', 'Creature')", [cardId, cardId]);
+      const entryId = state === 'unowned' ? null : (await db.run(
+        `INSERT INTO collection (card_id, quantity, game, user_id, list_type, missing)
+         VALUES (?, ?, 'mtg', 1, 'collection', ?)`, [cardId, state === 'short' ? 1 : 2, state === 'missing' ? 1 : 0]
+      )).lastID;
+      if (state === 'locked') {
+        const blocker = (await db.run("INSERT INTO decks (name, user_id) VALUES ('Reserved elsewhere', 1)")).lastID;
+        await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, 2)', [blocker, cardId]);
+        assert.strictEqual((await request('PUT', `${blocker}/checkout`, {})).status, 200);
+      }
+      const unavailableDeck = (await db.run("INSERT INTO decks (name, user_id) VALUES ('Unavailable draft', 1)")).lastID;
+      const initial = { ...draft, commander_card_id: null, cards: [
+        { card_id: 'added', quantity: 1, pulled: false },
+        { card_id: cardId, quantity: 2, pulled: false, source_entry_id: null }
+      ] };
+      assert.strictEqual((await save(initial, unavailableDeck)).status, 200, `${state} cards can be saved`);
+      const changed = { ...initial, name: `Saved ${state}`, description: 'Whole current draft',
+        category: 'Casual', accent_color: '#123456', target_size: 99, commander_card_id: cardId,
+        cards: initial.cards.map(card => ({ ...card, pulled: true,
+          source_entry_id: card.card_id === cardId ? entryId : null })) };
+      assert.strictEqual((await save(changed, unavailableDeck)).status, 200, `${state} must not block properties, pull flags or source changes`);
+      const reloaded = (await request('GET', unavailableDeck)).body;
+      for (const key of ['name', 'description', 'category', 'accent_color', 'target_size', 'commander_card_id']) {
+        assert.strictEqual(reloaded[key], changed[key]);
+      }
+      assert.deepStrictEqual(reloaded.cards.map(card => [card.id, card.quantity, card.checked_out, card.source_entry_id]).sort(),
+        [['added', 1, 1, null], [cardId, 2, 1, entryId]].sort());
+      const snapshot = async () => ({
+        deck: await db.get('SELECT * FROM decks WHERE id = ?', [unavailableDeck]),
+        cards: await db.all('SELECT * FROM deck_cards WHERE deck_id = ? ORDER BY card_id', [unavailableDeck]),
+        allocations: await db.all('SELECT * FROM deck_card_allocations ORDER BY deck_id, card_id, entry_id'),
+        inventory: await db.all('SELECT * FROM collection ORDER BY id')
+      });
+      const beforeCheckout = await snapshot();
+      assert.strictEqual((await request('PUT', `${unavailableDeck}/checkout`, {})).status, 400, `${state} still blocks checkout`);
+      assert.deepStrictEqual(await snapshot(), beforeCheckout, 'failed checkout cannot partially reserve cards or change the saved draft');
+    }
 
     assert.strictEqual((await request('PUT', `${id}/checkout`, {})).status, 200);
     saved = await reload();

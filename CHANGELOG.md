@@ -2,6 +2,13 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Added a source-location dropdown to Deck Builder card previews. Physical decks can save a location/compartment for each card, combine available copies there, and use those exact reservations for checkout and return without moving stored cards.
+- Source-location changes now automatically save the entire deck draft. Normal saves allow unavailable cards and retained unavailable sources; checkout still validates availability. Failed autosaves preserve the draft for manual retry.
+- Enabled zoom in Deck Builder's List view and centered the List/Grid, zoom, and sort controls together. List rows wrap at larger sizes and retain usable touch targets when zoomed out.
+- Made List-view card artwork grow slightly faster than the surrounding row when zooming in, while keeping its default size unchanged.
+
 ## 2.0.8
 
 - Restored Supertype Breakdown, Color & Land Distribution, Deck Health, and the commander card directly below the deck description, before the card editor.

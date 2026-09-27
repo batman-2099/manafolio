@@ -785,9 +785,9 @@ async function main() {
     const afterReplacement = await replacementState();
     assert.deepStrictEqual(afterReplacement.deck, { ...beforeReplacement.deck, name: replacement.name, description: replacement.description,
       commander_card_id: replacement.commander_card_id }, 'records, category, accent, timestamps and inventory settings survive');
-    assert.deepStrictEqual(afterReplacement.cards, replacement.cards.map(card => ({
-      deck_id: source.lastID, ...card, checked_out: card.card_id === ids.forest ? 1 : 0,
-    })).sort((a, b) => a.card_id.localeCompare(b.card_id)), 'cards are fully replaced; retained pulls survive and new cards start unpulled');
+    assert.deepStrictEqual(afterReplacement.cards.map(({ card_id, quantity, checked_out }) => ({ card_id, quantity, checked_out })),
+      replacement.cards.map(card => ({ ...card, checked_out: card.card_id === ids.forest ? 1 : 0 }))
+        .sort((a, b) => a.card_id.localeCompare(b.card_id)), 'cards are fully replaced; retained pulls survive and new cards start unpulled');
     const copiedReplacement = await request('POST', '/ai', replacement, 5);
     assert.strictEqual(copiedReplacement.status, 201);
     assert.notStrictEqual(copiedReplacement.body.id, source.lastID);

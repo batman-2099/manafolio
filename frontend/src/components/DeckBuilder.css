@@ -1,3 +1,39 @@
+.deck-source-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-glass);
+  text-align: left;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.deck-source-field label {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.deck-source-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  background: var(--surface-1);
+  color: var(--text-strong);
+  font-size: 1rem;
+}
+
+.deck-source-field p {
+  margin: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.deck-source-field .deck-source-error {
+  color: var(--accent-red);
+}
+
 .deck-properties-panel {
   width: 480px;
   max-width: 100%;
@@ -129,6 +165,34 @@
   max-width: 100%;
 }
 
+.deck-display-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.deck-card-row,
+.deck-card-actions {
+  flex-wrap: wrap;
+}
+
+.deck-card-actions {
+  max-width: 100%;
+}
+
+.deck-card-actions > span {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+
+.deck-card-list .btn-icon-only,
+.deck-card-list .deck-card-actions > label {
+  min-width: calc(24px / var(--deck-card-scale));
+  min-height: calc(24px / var(--deck-card-scale));
+}
+
 @media (max-width: 768px) {
   .deck-search-form {
     flex-wrap: wrap;
@@ -142,8 +206,10 @@
     width: 100%;
   }
 
-  .deck-card-row {
-    flex-wrap: wrap;
+  .deck-editor .deck-card-list .btn-icon-only,
+  .deck-card-list .deck-card-actions > label {
+    min-width: calc(44px / var(--deck-card-scale));
+    min-height: calc(44px / var(--deck-card-scale));
   }
 
   .deck-card-row > button {
@@ -157,10 +223,6 @@
     justify-content: flex-end;
   }
 
-  .deck-card-actions > span {
-    white-space: normal !important;
-    overflow-wrap: anywhere;
-  }
 
   .deck-editor .btn-icon-only {
     min-width: 44px;

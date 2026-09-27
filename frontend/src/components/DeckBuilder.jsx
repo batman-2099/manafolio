@@ -38,7 +38,10 @@ const deckEditorState = (deck) => ({
   accent_color: deck.accent_color || '#eab308',
   target_size: Number(deck.target_size || NEW_DECK_DEFAULTS.targetSize),
   inventory_type: deck.inventory_type === 'arena' ? 'arena' : 'collection',
-  cards: deck.cards.map(card => ({ card_id: card.id, quantity: card.quantity, pulled: !!card.checked_out }))
+  cards: deck.cards.map(card => ({
+    card_id: card.id, quantity: card.quantity, pulled: !!card.checked_out,
+    source_entry_id: deck.inventory_type === 'arena' ? null : card.source_entry_id ?? null
+  }))
     .sort((a, b) => a.card_id.localeCompare(b.card_id)),
   commander_card_id: deck.commander_card_id || null
 });
@@ -87,7 +90,10 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     const scale = Number(localStorage.getItem('card_default_scale'));
     return scale >= 0.6 && scale <= 2.5 ? scale : 1;
   });
+  const deckListImageScale = 1 + Math.max(0, deckCardScale - 1) * 0.25;
   const [previewCard, setPreviewCard] = useState(null);
+  const [cardSources, setCardSources] = useState(null);
+  const [sourceRetry, setSourceRetry] = useState(0);
 
   // Deck Creation States & Constants
   const DECK_CATEGORIES = ['Competitive', 'Casual', 'Tournament', 'Theorycraft', 'Proxy', 'Trade'];
@@ -120,6 +126,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const [showPreconPicker, setShowPreconPicker] = useState(false);
   const [deckDraft, setDeckDraft] = useState(null);
   const [savingDeck, setSavingDeck] = useState(false);
+  const [saveDeckError, setSaveDeckError] = useState(null);
   const [refreshingInventory, setRefreshingInventory] = useState(false);
   
   // Card Search States inside editor
@@ -164,6 +171,59 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   );
   const [savingRecord, setSavingRecord] = useState(false);
 
+  const previewDeckCard = !showAiBuilder && activeDeck?.inventory_type !== 'arena'
+    ? activeDeck?.cards.find(card => card.id === previewCard?.id)
+    : null;
+  const sourceKey = previewDeckCard ? `${activeDeck.id}/${previewDeckCard.id}` : null;
+  const sourcesReady = cardSources?.key === sourceKey && cardSources?.status === 'ready';
+  const sourcesError = cardSources?.key === sourceKey && cardSources?.status === 'error';
+  const selectedSourceId = previewDeckCard?.source_entry_id ?? null;
+  const selectedSource = sourcesReady
+    ? cardSources.sources.find(source => source.entry_id === selectedSourceId)
+    : null;
+  const selectedSourceUnavailable = sourcesReady && selectedSourceId !== null
+    && (!selectedSource || selectedSource.available < previewDeckCard.quantity);
+
+  useEffect(() => {
+    if (!sourceKey) {
+      setCardSources(null);
+      return;
+    }
+    const controller = new AbortController();
+    setCardSources({ key: sourceKey, status: 'loading' });
+    const loadSources = async () => {
+      try {
+        const [deckId, cardId] = sourceKey.split('/');
+        const response = await fetch(`/api/decks/${deckId}/cards/${encodeURIComponent(cardId)}/sources`, { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data.sources)) throw new Error(data.error || t('deck.errSources'));
+        if (!controller.signal.aborted) setCardSources({ key: sourceKey, status: 'ready', sources: data.sources });
+      } catch (error) {
+        if (!controller.signal.aborted) setCardSources({ key: sourceKey, status: 'error', error: error.message });
+      }
+    };
+    loadSources();
+    return () => controller.abort();
+  }, [sourceKey, sourceRetry, activeDeck?.checked_out, savedEditorState, t]);
+
+  const handleSourceChange = (value) => {
+    if (!previewDeckCard || editorBusy || savingRecord || searching || deckDraft || activeDeck.checked_out || !sourcesReady) return;
+    const sourceId = value === '' ? null : Number(value);
+    if (sourceId !== null && !cardSources.sources.some(source => source.entry_id === sourceId && source.available >= previewDeckCard.quantity)) return;
+    const updatedDeck = {
+      ...activeDeck,
+      cards: activeDeck.cards.map(card => card.id === previewDeckCard.id ? { ...card, source_entry_id: sourceId } : card)
+    };
+    setActiveDeck(updatedDeck);
+    handleSaveDeck(updatedDeck);
+  };
+
+  const sourceLabel = (source) => [
+    source.location_name || t('bulk.unassignedPile'),
+    source.compartment_display,
+    t('deck.sourceAvailable', { available: source.available, quantity: source.quantity })
+  ].filter(Boolean).join(' · ');
+
   const confirmLeaveEditor = () => {
     if (activeDeck && (editorBusy || savingRecord)) {
       showToast(t('deck.waitForOperation'), 'status');
@@ -177,6 +237,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     setActiveDeck(null);
     setSavedEditorState(null);
     setDeckDraft(null);
+    setSaveDeckError(null);
     setSearchResults([]);
     setImportComparison(null);
     setViewMode('list');
@@ -303,7 +364,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       try {
         const inventory = await loadInventoryCards(activeDeck.game, deckDraft.inventory_type);
         const owned = new Map(inventory.map(card => [card.id, card.owned_qty]));
-        cards = cards.map(card => ({ ...card, owned_qty: owned.get(card.id) || 0, locked_qty: 0, locked_decks: null }));
+        cards = cards.map(card => ({ ...card, source_entry_id: null, owned_qty: owned.get(card.id) || 0, locked_qty: 0, locked_decks: null }));
         setSearchResults([]);
         setImportComparison(null);
         setDeckCardLocations({});
@@ -321,21 +382,24 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     setDeckDraft(null);
   };
 
-  const handleSaveDeck = async () => {
-    if (!activeDeck || !hasUnsavedChanges || editorBusy || savingRecord || searching) return;
+  const handleSaveDeck = async (deck = activeDeck) => {
+    if (!deck || JSON.stringify(deckEditorState(deck)) === savedEditorState || editorBusy || savingRecord || searching || deckDraft) return;
     setSavingDeck(true);
+    setSaveDeckError(null);
     try {
-      const response = await fetch(`/api/decks/${activeDeck.id}/editor`, {
+      const response = await fetch(`/api/decks/${deck.id}/editor`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(deckEditorState(activeDeck))
+        body: JSON.stringify(deckEditorState(deck))
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || t('deck.errSave'));
-      if (await loadDeckDetails(activeDeck.id)) showToast(data.message, 'success');
+      if (await loadDeckDetails(deck.id)) showToast(data.message, 'success');
+      else setSaveDeckError(t('deck.errLoadDetails'));
       await fetchDecks();
     } catch (error) {
       console.error(error);
+      setSaveDeckError(error.message);
       showToast(error.message, 'error');
     } finally {
       setSavingDeck(false);
@@ -357,6 +421,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       setActiveDeck(data);
       setSavedEditorState(JSON.stringify(deckEditorState(data)));
       setDeckDraft(null);
+      setSaveDeckError(null);
       setSearchResults([]);
       setImportComparison(null);
       setDeckSearchGame(data.game);
@@ -446,7 +511,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       ...deck,
       cards: existing
         ? deck.cards.map(current => current.id === cardId ? { ...current, quantity: newQty } : current)
-        : [...deck.cards, { ...card, quantity: newQty, checked_out: 0 }]
+        : [...deck.cards, { ...card, quantity: newQty, checked_out: 0, source_entry_id: null }]
     }));
   };
 
@@ -788,7 +853,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       }
       cards = existing
         ? cards.map(card => card.id === existing.id ? { ...card, quantity } : card)
-        : [...cards, { ...item.card, quantity, checked_out: 0 }];
+        : [...cards, { ...item.card, quantity, checked_out: 0, source_entry_id: null }];
       addedCount++;
       if (item.requestedQty > quantity) {
         skipped.push({ name: item.rawName, quantity: item.requestedQty - quantity, reason: 'deck.notOwned' });
@@ -1624,12 +1689,13 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   <LogOut size={14} /> Check Out for Play
                 </button>
               )}
-              <button className="btn btn-secondary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={handleSaveDeck}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
+              <button className="btn btn-secondary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
                 <button className="btn btn-primary" onClick={startSimulator} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <Play size={14} /> Draw Simulator
                 </button>
             </div>
           </div>
+          {saveDeckError && !previewDeckCard && <p role="alert" className="deck-source-error">{saveDeckError} {t('deck.saveRetryHint')}</p>}
 
           <section className="glass-panel" aria-labelledby="deck-description-heading">
             <h3 id="deck-description-heading" style={{ marginBottom: '0.75rem' }}>{t('deck.description')}</h3>
@@ -1871,16 +1937,18 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
                 {/* Deck Cards Header & Display Mode Toggle */}
                 <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <h3 style={{ fontSize: '1rem', color: 'var(--text-strong)', borderLeft: '3px solid var(--accent-red)', paddingLeft: '0.5rem', margin: 0 }}>
                       Deck Cards ({totalDeckCardsCount} / {targetDeckCardsCount})
                     </h3>
+                    <div className="deck-display-controls">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                       <button
                         type="button"
                         className={`btn ${cardDisplayMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
                         style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                         onClick={() => setCardDisplayMode('list')}
+                        aria-pressed={cardDisplayMode === 'list'}
                       >
                         <List size={12} /> List
                       </button>
@@ -1889,22 +1957,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                         className={`btn ${cardDisplayMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`}
                         style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                         onClick={() => setCardDisplayMode('grid')}
+                        aria-pressed={cardDisplayMode === 'grid'}
                       >
                         <LayoutGrid size={12} /> Grid
                       </button>
                     </div>
-                    <select
-                      className="select-control"
-                      value={deckCardSortBy}
-                      onChange={(e) => setDeckCardSortBy(e.target.value)}
-                      aria-label={t('collection.sortBy')}
-                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', height: 'auto' }}
-                    >
-                      <option value="type">{t('deck.sortByType')}</option>
-                      <option value="location">{t('collection.fLocation')}</option>
-                      <option value="pulled">{t('deck.pulledStatus')}</option>
-                    </select>
-                    {cardDisplayMode === 'grid' && (
                       <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                         <button
                           type="button"
@@ -1929,7 +1986,18 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           <Plus size={13} />
                         </button>
                       </div>
-                    )}
+                    <select
+                      className="select-control"
+                      value={deckCardSortBy}
+                      onChange={(e) => setDeckCardSortBy(e.target.value)}
+                      aria-label={t('collection.sortBy')}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', height: 'auto' }}
+                    >
+                      <option value="type">{t('deck.sortByType')}</option>
+                      <option value="location">{t('collection.fLocation')}</option>
+                      <option value="pulled">{t('deck.pulledStatus')}</option>
+                    </select>
+                    </div>
                   </div>
                   
                   {activeDeck.cards.length === 0 ? (
@@ -1948,11 +2016,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
                           {/* 1. COMPACT LIST VIEW */}
                           {cardDisplayMode === 'list' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <div className="deck-card-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', zoom: deckCardScale, '--deck-card-scale': deckCardScale }}>
                               {list.map(card => (
                                 <div key={card.id} className="deck-card-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', background: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? 'rgba(127,29,29,0.16)' : 'rgba(255,255,255,0.01)', borderRadius: 'var(--radius-sm)', border: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? '1px solid var(--accent-red)' : '1px solid var(--border-glass)', gap: '0.6rem' }}>
-                                  <button type="button" aria-label={`${t('deck.previewArt')}: ${displayName(card)}`} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', minWidth: 0, flex: 1, padding: 0, border: 0, background: 'transparent', textAlign: 'left' }} onClick={() => setPreviewCard(card)}>
-                                    <CardImage card={card} src={card.image_url?.replace(/^(https:\/\/cards\.scryfall\.io)\/normal\//, '$1/small/')} loading="lazy" style={{ width: '32px', height: '44px', objectFit: 'cover', borderRadius: '2px', flexShrink: 0 }} />
+                                  <button type="button" aria-label={`${t('deck.previewArt')}: ${displayName(card)}`} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', minWidth: 0, flex: '1 1 14rem', padding: 0, border: 0, background: 'transparent', textAlign: 'left' }} onClick={() => setPreviewCard(card)}>
+                                    <CardImage card={card} src={card.image_url?.replace(/^(https:\/\/cards\.scryfall\.io)\/normal\//, '$1/small/')} loading="lazy" style={{ width: 32 * deckListImageScale, height: 44 * deckListImageScale, objectFit: 'cover', borderRadius: '2px', flexShrink: 0 }} />
                                     <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
                                       {activeDeck.commander_card_id === card.id && <div className="deck-commander-tag" style={{ backgroundColor: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '2px 6px', fontSize: '0.7rem', fontWeight: 800 }}>{t('deck.commander')}</div>}
                                       <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(card)}</div>
@@ -2558,6 +2626,51 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.75rem' }}>
               {previewCard.set_name} • #{previewCard.number} ({previewCard.rarity || 'Common'})
             </p>
+            {previewDeckCard && (
+              <div className="deck-source-field">
+                <label htmlFor="deck-card-source">{t('deck.sourceLocation')}</label>
+                <select
+                  id="deck-card-source"
+                  className="input-control"
+                  value={selectedSourceId ?? ''}
+                  disabled={editorBusy || savingRecord || searching || !!deckDraft || !!activeDeck.checked_out || !sourcesReady}
+                  aria-describedby="deck-card-source-hint deck-card-source-status"
+                  aria-invalid={selectedSourceUnavailable && !activeDeck.checked_out ? true : undefined}
+                  onChange={event => handleSourceChange(event.target.value)}
+                >
+                  <option value="">{t('deck.sourceAutomatic')}</option>
+                  {selectedSourceId !== null && !selectedSource && (
+                    <option value={selectedSourceId} disabled>
+                      {t('deck.sourceEntry', { id: selectedSourceId })}
+                      {sourcesReady ? ` · ${t('deck.sourceUnavailable')}` : ''}
+                    </option>
+                  )}
+                  {sourcesReady && cardSources.sources.map(source => (
+                    <option key={source.entry_id} value={source.entry_id} disabled={source.available < previewDeckCard.quantity}>
+                      {sourceLabel(source)}
+                    </option>
+                  ))}
+                </select>
+                <p id="deck-card-source-hint">{t('deck.sourceHint', { count: previewDeckCard.quantity })}</p>
+                <div id="deck-card-source-status" role="status">
+                  {savingDeck && <p>{t('deck.saving')}</p>}
+                  {saveDeckError && <p className="deck-source-error">{saveDeckError} {t('deck.saveRetryHint')}</p>}
+                  {!!activeDeck.checked_out && <p>{t('deck.sourceCheckedOut')}</p>}
+                  {!sourcesReady && !sourcesError && <p>{t('deck.sourcesLoading')}</p>}
+                  {sourcesError && (
+                    <>
+                      <p className="deck-source-error">{t('deck.errSources')} {cardSources.error !== t('deck.errSources') ? cardSources.error : ''}</p>
+                      <button type="button" className="btn btn-secondary" onClick={() => setSourceRetry(value => value + 1)}>{t('loc.retry')}</button>
+                    </>
+                  )}
+                  {sourcesReady && !activeDeck.checked_out && selectedSourceUnavailable && (
+                    <p className="deck-source-error">{t('deck.sourceInsufficient', { count: previewDeckCard.quantity })}</p>
+                  )}
+                  {sourcesReady && cardSources.sources.length === 0 && <p>{t('deck.sourcesEmpty')}</p>}
+                </div>
+                <p>{t('deck.sourceSaveHint')}</p>
+              </div>
+            )}
           </div>
         </Modal>
       )}

@@ -306,8 +306,21 @@ async function initDb() {
       card_id TEXT NOT NULL,
       quantity INTEGER DEFAULT 1,
       checked_out INTEGER DEFAULT 0,
+      source_entry_id INTEGER,
       PRIMARY KEY(deck_id, card_id),
       FOREIGN KEY(deck_id) REFERENCES decks(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Keep entry IDs after deletion: a stale source must fail, never become automatic.
+  await run(`
+    CREATE TABLE IF NOT EXISTS deck_card_allocations (
+      deck_id INTEGER NOT NULL,
+      card_id TEXT NOT NULL,
+      entry_id INTEGER NOT NULL,
+      quantity INTEGER NOT NULL CHECK(quantity > 0),
+      PRIMARY KEY(deck_id, card_id, entry_id),
+      FOREIGN KEY(deck_id, card_id) REFERENCES deck_cards(deck_id, card_id) ON DELETE CASCADE
     )
   `);
 
@@ -583,6 +596,9 @@ async function initDb() {
   if (!deckCardsCols.some(c => c.name === 'checked_out')) {
     await run(`ALTER TABLE deck_cards ADD COLUMN checked_out INTEGER DEFAULT 0`);
   }
+  if (!deckCardsCols.some(c => c.name === 'source_entry_id')) {
+    await run(`ALTER TABLE deck_cards ADD COLUMN source_entry_id INTEGER`);
+  }
 
   const decksCols = await all(`PRAGMA table_info(decks)`);
   if (!decksCols.some(c => c.name === 'game')) {
@@ -689,6 +705,17 @@ async function initDb() {
     await adoptOrphanRows(adminId);
     await seedStarterLocations(adminId);
   }
+  // Freeze legacy checkouts once, so later additions cannot change their return list.
+  const { checkedOutSources } = require('./utils/collectionHelpers');
+  await withTransaction(async () => {
+    const users = await all(`SELECT DISTINCT user_id FROM decks WHERE checked_out = 1 AND inventory_type = 'collection'`);
+    for (const { user_id } of users) {
+      for (const source of await checkedOutSources(user_id)) {
+        await run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+          [source.deck_id, source.card_id, source.entry_id, source.quantity]);
+      }
+    }
+  });
 }
 
 // Cards and locations from before multi-user carry `user_id IS NULL`. They belong
