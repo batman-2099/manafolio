@@ -343,14 +343,16 @@ Storage describes where cards are physically kept. It does not create inventory 
 1. Open **Storage** and check **Storage inventory**. Use physical Collection for owned cards or **Graveyard** for archived cards.
 2. Choose **Create Container**.
 3. In **Type**, choose a suitable layout: **Binder**, **Toploader Binder**, **Box**, **Toploader Box**, **Graded Slab Box**, **Display Shelf / Stand**, **Deck Box**, **Tin / Case**, or **Other**.
-4. In **Layout**, enter a recognizable **Name** and the actual number of pages/rows and cards per page/row. Read the total-capacity summary.
+4. In **Layout**, enter a recognizable **Name**, choose **Sleeved** (**None**, **Single**, **Double**, or **Triple**), and enter the actual number of pages/rows and cards per page/row. Read the total-capacity summary.
 5. In **Sort**, add ordering rules if desired. Leave this empty for manual **Custom** order. A rule's **Divider** option shows labeled category breaks.
 6. In **Filing**, add restrictions only if needed. No rules is a useful starting point for a general-purpose container.
 7. Choose **Create Container**.
 
 **Expected result:** an empty named container with the chosen layout. It does not add cards to Collection.
 
-Storage opens as a gallery. Search container names/types or sort by name/quantity, then open a container. In its **⋮ → Container Settings**, **Choose container image** selects a card-art cover; **Automatic image** returns to an automatic cover.
+Storage opens as a gallery. Search container names/types or sort by name/quantity, then open a container. Select the **Container Settings** gear button on its toolbar. **Choose container image** selects a card-art cover; **Automatic image** returns to an automatic cover.
+
+The container toolbar shows its saved sleeve type. Change it through the **Container Settings** gear button → **Sleeved**, then **Save Settings**. This records the sleeve layers used for the container's cards; it does not change capacity, move cards, or alter deck sleeve settings. Existing containers default to **None**, and complete account backups retain the setting.
 
 ### Choose between sort rules and filing rules
 
@@ -402,7 +404,7 @@ To take cards out of a container but keep the records, select them and choose **
 
 ### Arrange fixed positions manually
 
-1. Open **⋮ → Container Settings** and remove all sort rules if you want **Custom** order. Save the settings.
+1. Select the **Container Settings** gear button and remove all sort rules if you want **Custom** order. Save the settings.
 2. Choose **Arrange**.
 3. Tap a card, then the destination. In a binder, tap an empty pocket to place it or an occupied pocket to swap. Row layouts prompt you to drop before another card or into an empty slot.
 4. Repeat, moving the physical cards to match, then choose **Done Arranging**.
@@ -414,7 +416,7 @@ Automatic sorting can renumber positions and shift later cards, especially in a 
 - **Add Page** or **Add Compartment** expands a container. **Container Settings** also exposes its page/row count and capacity; a row/page has **Change capacity** controls.
 - Only the last empty row/page can be removed with the remove-last control. Remove or relocate its cards first.
 - Binder settings offer **Stack duplicates in one pocket**. That is a real storage-capacity setting, unlike Collection's display-only **Stack Duplicates**. Check that your actual pockets can safely hold the copies you record.
-- **⋮ → Lock Container** prevents routine movement, arrangement, deletion, layout/settings changes, and automatic filing into that container. **Unlock Container** makes it editable again.
+- **More → Lock Container** prevents routine movement, arrangement, deletion, layout/settings changes, and automatic filing into that container. **Unlock Container** makes it editable again.
 - A row/page's **Lock** makes filing skip that compartment. A whole-container lock skips all rows/pages, including individually unlocked ones.
 - A lock is an organization safeguard, not a privacy setting.
 
@@ -453,9 +455,9 @@ Individual archiving clears the old physical placement. An individual physical r
 #### Move a whole container while keeping its layout
 
 1. Open the container. Unlock the container and every page/row, and return any reserved copies first.
-2. Choose **⋮ → Move to Graveyard** and confirm.
+2. Choose **More → Move to Graveyard** and confirm.
 3. Open Graveyard Storage and verify the same container, contents, and positions.
-4. To reverse the operation, open the archived container and choose **⋮ → Restore to Collection**.
+4. To reverse the operation, open the archived container and choose **More → Restore to Collection**.
 
 **Expected result:** the container and all its contents change inventory together, preserving quantities, metadata, positions, layout, sorting/filing configuration, and cover. This differs from restoring individual entries.
 

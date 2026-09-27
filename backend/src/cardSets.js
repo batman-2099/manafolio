@@ -161,25 +161,8 @@ async function listAllSets(game, lang) {
     .map(s => s.code);
 }
 
-// Scannable face image(s) for a Scryfall card. Single-image layouts (normal,
-// split, flip, adventure, saga) carry one top-level image. Double-faced cards
-// (transform, modal DFC, art series, reversible) have no top-level image and one
-// distinct image per face — index every face so scanning either side matches.
-// Returns [{ img, illustrationId }]. The id is carried for callers that want to
-// group printings by artwork; each face of a double-faced card has its own
-// illustration, so it is read per face.
-function mtgCardImages(c) {
-  if (c.image_uris?.normal) return [{ img: c.image_uris.normal, illustrationId: c.illustration_id || null }];
-  return (c.card_faces || [])
-    .filter(f => f.image_uris?.normal)
-    .map(f => ({ img: f.image_uris.normal, illustrationId: f.illustration_id || c.illustration_id || null }));
-}
-
-// MTG: page Scryfall for a set family in one language. Returns
-// [{ name, set, number, img, raw }], one entry per scannable face (double-faced
-// cards yield two, same name/number). `name` is the localized (printed) name when
-// there is one, because that is what the post-scan lookup searches Scryfall for —
-// verified: `!"稲妻" lang:ja` with include_multilingual finds the card.
+// MTG: page Scryfall for a set family in one language.
+// ponytail: keep raw cards once per scannable face; the catalog only needs the count.
 async function fetchMtgSet(set, lang, { excludeChildCodes = [] } = {}) {
   const scryfallApi = require('./scryfallApi');
   let url = mtgSearchUrl(await mtgSetFamilyQuery(set, lang, { excludeChildCodes }), lang, '&order=set');
@@ -187,8 +170,9 @@ async function fetchMtgSet(set, lang, { excludeChildCodes = [] } = {}) {
   while (url) {
     const r = await scryfallApi.scryGetRetried(url);
     for (const c of r.data.data || []) {
-      for (const { img, illustrationId } of mtgCardImages(c)) {
-        cards.push({ name: c.printed_name || c.name || '', set: c.set || set, number: c.collector_number || '', img, illustrationId, raw: c });
+      if (c.image_uris?.normal) cards.push(c);
+      else for (const face of c.card_faces || []) {
+        if (face.image_uris?.normal) cards.push(c);
       }
     }
     url = r.data.has_more ? r.data.next_page : null;
@@ -218,8 +202,8 @@ async function cacheFetchedCards(cards, code) {
   try {
     const scryfallApi = require('./scryfallApi');
     const seen = new Set();
-    const rows = cards.filter(c => c.raw?.id && (seen.has(c.raw.id) ? false : seen.add(c.raw.id)));
-    await scryfallApi.cacheCards(rows.map(c => scryfallApi.normalizeCard(c.raw, code)));
+    const rows = cards.filter(c => c.id && (seen.has(c.id) ? false : seen.add(c.id)));
+    await scryfallApi.cacheCards(rows.map(c => scryfallApi.normalizeCard(c, code)));
   } catch (e) { console.warn(`cardSets: caching cards failed: ${e.message}`); }
 }
 

@@ -150,6 +150,7 @@ async function initDb() {
       rule_config TEXT,
       game TEXT DEFAULT 'any',
       inventory_type TEXT NOT NULL DEFAULT 'collection' CHECK(inventory_type IN ('collection', 'graveyard')),
+      sleeved INTEGER NOT NULL DEFAULT 0 CHECK (sleeved IN (0, 1, 2, 3)),
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
     )
   `);
@@ -565,6 +566,9 @@ async function initDb() {
   }
   if (!locationsCols.some(c => c.name === 'inventory_type')) {
     await run(`ALTER TABLE locations ADD COLUMN inventory_type TEXT NOT NULL DEFAULT 'collection' CHECK(inventory_type IN ('collection', 'graveyard'))`);
+  }
+  if (!locationsCols.some(c => c.name === 'sleeved')) {
+    await run(`ALTER TABLE locations ADD COLUMN sleeved INTEGER NOT NULL DEFAULT 0 CHECK (sleeved IN (0, 1, 2, 3))`);
   }
 
   const usersCols = await all(`PRAGMA table_info(users)`);

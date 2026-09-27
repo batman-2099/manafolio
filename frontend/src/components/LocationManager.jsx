@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay, MouseSensor, useSensor, useSensors, useDraggable, useDroppable, pointerWithin } from '@dnd-kit/core';
-import { Plus, Minus, Trash2, X, MoreVertical, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, Edit3, Download, Search, SlidersHorizontal, Layers } from 'lucide-react';
+import { Plus, Minus, Trash2, X, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, Edit3, Download, Search, SlidersHorizontal, Layers } from 'lucide-react';
 import { sortCardsByOrder } from '../utils/cardSort';
 import { getFoilOverlayClass, getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
 import { getCardRarityBorder, getRarityBadgeStyle, getRarityBadgeLabel } from '../utils/cardRarity';
@@ -230,6 +230,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [sortDraft, setSortDraft] = useState([]);
   const [filterDraft, setFilterDraft] = useState([]);
   const [nameDraft, setNameDraft] = useState('');
+  const [sleevedDraft, setSleevedDraft] = useState(0);
   const [capacityDraft, setCapacityDraft] = useState('');
   const [countDraft, setCountDraft] = useState('');
   const [stackingDraft, setStackingDraft] = useState(false);
@@ -806,10 +807,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   };
 
   const handleUpdateLocationFields = async (fields) => {
-    if (!selectedLoc) return;
+    if (!selectedLoc) return false;
     if (selectedLoc.locked && !('locked' in fields)) {
       showToast(t('loc.lockedSettings'), 'error');
-      return;
+      return false;
     }
     try {
       const res = await fetch(`/api/locations/${selectedLoc.id}`, {
@@ -822,6 +823,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         showToast(data.evicted ? `Container updated. ${data.evicted} card${data.evicted === 1 ? '' : 's'} moved to Unsorted.` : 'Container updated.', 'success');
         await refreshAll();
         onUpdate();
+        return true;
       } else {
         const data = await res.json().catch(() => ({}));
         showToast(data.error || 'Failed to update container.', 'error');
@@ -830,6 +832,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       console.error(err);
       showToast(t('loc.errUpdateContainer'), 'error');
     }
+    return false;
   };
 
   const handleAddCompartment = async () => {
@@ -1320,11 +1323,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       rule_type: filterDraft.length > 0 ? 'compound' : 'any',
       rule_config: filterDraft.length > 0 ? JSON.stringify({ rules: filterDraft }) : null,
       allow_stacking: stackingDraft,
+      sleeved: sleevedDraft,
     };
     const trimmedName = (nameDraft || '').trim();
     if (trimmedName && trimmedName !== selectedLoc.name) fields.name = trimmedName;
 
-    await handleUpdateLocationFields(fields);
+    if (!await handleUpdateLocationFields(fields)) return;
 
     const capNum = parseInt(capacityDraft, 10);
     if (capNum > 0 && compartments[0] && capNum !== compartments[0].capacity) {
@@ -1616,6 +1620,16 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               />
             </label>
 
+            <label htmlFor="container-sleeved" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              {t('deck.sleeved')}
+              <select id="container-sleeved" className="input-control" value={sleevedDraft} onChange={(e) => setSleevedDraft(Number(e.target.value))}>
+                <option value={0}>{t('deck.sleevedNone')}</option>
+                <option value={1}>{t('deck.sleevedOne')}</option>
+                <option value={2}>{t('deck.sleevedDouble')}</option>
+                <option value={3}>{t('deck.sleevedTriple')}</option>
+              </select>
+            </label>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem' }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
                 {t(isBinderType ? 'loc.numberOfPages' : 'loc.numberOfRows')}
@@ -1716,6 +1730,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               <option value="" disabled>{t('loc.selectContainer')}</option>
               {locations.slice().sort((a, b) => a.name.localeCompare(b.name)).map(loc => <option key={loc.id} value={loc.id}>{loc.locked ? '🔒 ' : ''}{loc.name} ({loc.type})</option>)}
             </select>
+            {selectedLoc && <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              {t('deck.sleeved')}: {t(['deck.sleevedNone', 'deck.sleevedOne', 'deck.sleevedDouble', 'deck.sleevedTriple'][selectedLoc.sleeved ?? 0])}
+            </span>}
             <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => setShowCreate(s => !s)} title={t('loc.createContainer')} aria-label={t('loc.createContainer')}>
               <Plus size={14} />
             </button>
@@ -1816,30 +1833,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 {t(moveMode ? 'loc.doneArranging' : 'loc.arrange')}
               </button>
             )}
-            <div className="kebab-menu">
-              <button ref={containerMenuButton} className="kebab-menu-button" aria-label={t('nav.more')} aria-expanded={showKebabMenu} onClick={() => setShowKebabMenu(s => !s)}>
-                <MoreVertical size={16} color="var(--text-secondary)" />
-              </button>
-              {showKebabMenu && (
-                <div className="kebab-dropdown">
-                  <button className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => { setShowKebabMenu(false); handleAddCompartment(); }}>
-                    <Plus size={14} /> {t(isBinderType ? 'loc.addPage' : 'loc.addCompartment')}
-                  </button>
-                  <button className="kebab-item" 
-                          disabled={!!selectedLoc.locked || compartments.length <= 1 || (cardsByCompartment.get(compartments[compartments.length-1]?.id) || []).length > 0} 
-                          onClick={() => { setShowKebabMenu(false); handleRemoveCompartment(compartments[compartments.length-1].id); }}
-                          title={t(selectedLoc.locked ? 'loc.containerLockedShort' : 'loc.removeLastHint')}
-                  >
-                    <Trash2 size={14} /> {t(isBinderType ? 'loc.removeLastPage' : 'loc.removeLastCompartment')}
-                  </button>
-                  <button className="kebab-item" onClick={() => { setShowKebabMenu(false); startResort(); }} disabled={!!selectedLoc.locked || (selectedLoc.total_cards || 0) === 0}>
-                    <RefreshCw size={14} /> Re-sort Container
-                  </button>
-                  <button className="kebab-item" onClick={() => { setShowKebabMenu(false); handleToggleContainerLock(); }} title={t('loc.lockKebabHint')}>
-                    <Lock size={14} /> {t(selectedLoc.locked ? 'loc.unlockContainer' : 'loc.lockContainer')}
-                  </button>
-                  <button className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => {
-                    containerMenuButton.current?.focus();
+                  <button type="button" className="btn btn-secondary btn-icon-only" aria-label={t('loc.containerSettings')} title={t('loc.containerSettings')} disabled={!!selectedLoc.locked} onClick={event => {
+                    event.currentTarget.focus();
                     setShowKebabMenu(false);
                     let sDraft = [];
                     if (selectedLoc.sort_order && selectedLoc.sort_order.startsWith('[')) {
@@ -1869,6 +1864,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     setFilterDraft(fDraft);
 
                     setNameDraft(selectedLoc.name || '');
+                    setSleevedDraft(selectedLoc.sleeved ?? 0);
                     setStackingDraft(!!selectedLoc.allow_stacking);
                     setCountDraft(String(compartments.length));
                     const caps = compartments.map(c => c.capacity);
@@ -1877,7 +1873,29 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
                     setShowRulesModal(true);
                   }}>
-                    <Settings size={14} /> Container Settings
+                    <Settings size={16} aria-hidden="true" />
+                  </button>
+            <div className="kebab-menu" style={{ marginLeft: 'auto' }}>
+              <button ref={containerMenuButton} type="button" className="btn btn-secondary" aria-expanded={showKebabMenu} onClick={() => setShowKebabMenu(s => !s)}>
+                {t('nav.more')}
+              </button>
+              {showKebabMenu && (
+                <div className="kebab-dropdown">
+                  <button className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => { setShowKebabMenu(false); handleAddCompartment(); }}>
+                    <Plus size={14} /> {t(isBinderType ? 'loc.addPage' : 'loc.addCompartment')}
+                  </button>
+                  <button className="kebab-item" 
+                          disabled={!!selectedLoc.locked || compartments.length <= 1 || (cardsByCompartment.get(compartments[compartments.length-1]?.id) || []).length > 0} 
+                          onClick={() => { setShowKebabMenu(false); handleRemoveCompartment(compartments[compartments.length-1].id); }}
+                          title={t(selectedLoc.locked ? 'loc.containerLockedShort' : 'loc.removeLastHint')}
+                  >
+                    <Trash2 size={14} /> {t(isBinderType ? 'loc.removeLastPage' : 'loc.removeLastCompartment')}
+                  </button>
+                  <button className="kebab-item" onClick={() => { setShowKebabMenu(false); startResort(); }} disabled={!!selectedLoc.locked || (selectedLoc.total_cards || 0) === 0}>
+                    <RefreshCw size={14} /> Re-sort Container
+                  </button>
+                  <button className="kebab-item" onClick={() => { setShowKebabMenu(false); handleToggleContainerLock(); }} title={t('loc.lockKebabHint')}>
+                    <Lock size={14} /> {t(selectedLoc.locked ? 'loc.unlockContainer' : 'loc.lockContainer')}
                   </button>
                   <button className="kebab-item" disabled={containerTransferLocked || transferringContainer} aria-busy={transferringContainer}
                     title={containerTransferLocked ? t('loc.lockedTransferContainer') : undefined}
@@ -2625,8 +2643,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
             {/* Drop a filed card here to take it back out of the container. */}
             <UnsortedDropZone enabled={dndEnabled}>
-            {unsortedViewMode === 'grid' ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.6rem', marginTop: '0.25rem' }}>
+            {/* ponytail: share card actions; keep each view's presentation inline. */}
+            <div style={unsortedViewMode === 'grid'
+              ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.6rem', marginTop: '0.25rem' }
+              : { display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.25rem' }}>
                 {unsortedCards.map(card => {
                   const picked = moveMode && pickedEntryId === card.entry_id;
                   const isSelected = unsortedSelectMode && unsortedSelectedIds.has(card.entry_id);
@@ -2645,7 +2665,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       className={card.entry_id === focusEntryId ? 'focus-flash' : ''}
                       {...unsortedPressHandlers(card.entry_id)}
                       onClick={() => activateUnsortedCard(card)}
-                      style={{
+                      style={unsortedViewMode === 'grid' ? {
                         display: 'flex',
                         flexDirection: 'column',
                         background: isHighlighted ? 'rgba(255, 71, 71, 0.12)' : 'rgba(255, 255, 255, 0.03)',
@@ -2656,8 +2676,22 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         cursor: 'pointer',
                         userSelect: 'none',
                         transition: 'all 0.15s ease-in-out'
+                      } : {
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.72rem',
+                        padding: '0.4rem',
+                        background: isHighlighted ? 'rgba(255,71,71,0.18)' : 'rgba(255, 255, 255, 0.02)',
+                        border: isHighlighted ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)',
+                        borderRadius: 'var(--radius-sm)',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        transition: 'all 0.15s ease-in-out'
                       }}
                     >
+                      {unsortedViewMode === 'grid' ? (
+                        <>
                       {/* Card Thumbnail Box */}
                       <div
                         style={{
@@ -2735,44 +2769,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                           {card.price_trend > 0 && <span style={{ color: 'var(--accent-yellow)', fontWeight: 600, flexShrink: 0 }}>${card.price_trend.toFixed(2)}</span>}
                         </div>
                       </div>
-                    </DraggableCard>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.25rem' }}>
-                {unsortedCards.map(card => {
-                  const picked = moveMode && pickedEntryId === card.entry_id;
-                  const isSelected = unsortedSelectMode && unsortedSelectedIds.has(card.entry_id);
-                  const isHighlighted = picked || isSelected;
-                  const rarityBorder = getCardRarityBorder(card.rarity);
-                  const foilClass = getFoilOverlayClass(card.printing);
-                  const printingBadgeLabel = getPrintingBadgeLabel(card.printing);
-
-                  return (
-                    <DraggableCard
-                      enabled={dndEnabled}
-                      entryId={card.entry_id}
-                      card={card}
-                      key={card.entry_id}
-                      id={`card-${card.entry_id}`}
-                      className={card.entry_id === focusEntryId ? 'focus-flash' : ''}
-                      {...unsortedPressHandlers(card.entry_id)}
-                      onClick={() => activateUnsortedCard(card)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.72rem',
-                        padding: '0.4rem',
-                        background: isHighlighted ? 'rgba(255,71,71,0.18)' : 'rgba(255, 255, 255, 0.02)',
-                        border: isHighlighted ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)',
-                        borderRadius: 'var(--radius-sm)',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                        transition: 'all 0.15s ease-in-out'
-                      }}
-                    >
+                        </>
+                      ) : (
+                        <>
                       <div
                         style={{ position: 'relative', width: '42px', flexShrink: 0, overflow: 'hidden', borderRadius: '4px', ...rarityBorder }}
                       >
@@ -2809,11 +2808,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                           ${card.price_trend.toFixed(2)}
                         </span>
                       )}
+                        </>
+                      )}
                     </DraggableCard>
                   );
                 })}
               </div>
-            )}
 
             {unsortedCards.length === 0 && <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.5rem' }}>{t('loc.nothingUnsorted')}</p>}
             </UnsortedDropZone>

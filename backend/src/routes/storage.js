@@ -124,8 +124,11 @@ const RULE_TYPES = ['any', 'alphabetical_range', 'specific_sets', 'compound'];
 const GAME_RESTRICTIONS = ['mtg'];
 
 router.post('/locations', async (req, res) => {
-  const { name, type, sort_order = 'name-asc', foil_sorting = 'normals_first', rule_type = 'any', rule_config, compartmentPlan, game = 'mtg', inventory_type = 'collection' } = req.body;
+  const { name, type, sort_order = 'name-asc', foil_sorting = 'normals_first', rule_type = 'any', rule_config, compartmentPlan, game = 'mtg', inventory_type = 'collection', sleeved = 0 } = req.body;
   if (!['collection', 'graveyard'].includes(inventory_type)) return res.status(400).json({ error: 'Invalid inventory_type' });
+  if (!Number.isInteger(sleeved) || sleeved < 0 || sleeved > 3) {
+    return res.status(400).json({ error: 'Sleeved must be an integer between 0 and 3' });
+  }
 
   if (!name || !type) {
     return res.status(400).json({ error: 'name and type are required' });
@@ -149,9 +152,9 @@ router.post('/locations', async (req, res) => {
     }
 
     const result = await db.run(`
-      INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, inventory_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [name, type, sort_order, foil_sorting || 'normals_first', rule_type, ruleConfigJson, game, req.user.id, inventory_type]);
+      INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, inventory_type, sleeved)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [name, type, sort_order, foil_sorting || 'normals_first', rule_type, ruleConfigJson, game, req.user.id, inventory_type, sleeved]);
 
     const plan = compartmentPlan || defaultCompartmentPlan(type);
     await db.createCompartments(result.lastID, Math.max(1, parseInt(plan.count, 10) || 1), Math.max(1, parseInt(plan.capacity, 10) || 40));
@@ -214,7 +217,10 @@ router.post('/locations/:id/transfer', async (req, res) => {
 
 router.put('/locations/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, type, sort_order, foil_sorting, rule_type, rule_config, game, locked, allow_stacking } = req.body;
+  const { name, type, sort_order, foil_sorting, rule_type, rule_config, game, locked, allow_stacking, sleeved } = req.body;
+  if (sleeved !== undefined && (!Number.isInteger(sleeved) || sleeved < 0 || sleeved > 3)) {
+    return res.status(400).json({ error: 'Sleeved must be an integer between 0 and 3' });
+  }
   if (rule_type !== undefined && !RULE_TYPES.includes(rule_type)) {
     return res.status(400).json({ error: 'Invalid rule_type' });
   }
@@ -277,11 +283,13 @@ router.put('/locations/:id', async (req, res) => {
         game = COALESCE(?, game),
         locked = COALESCE(?, locked),
         allow_stacking = COALESCE(?, allow_stacking),
+        sleeved = COALESCE(?, sleeved),
         cover_card_id = CASE WHEN ? THEN ? ELSE cover_card_id END
       WHERE id = ? AND user_id = ?
     `, [name, type, sort_order, foil_sorting, rule_type, ruleConfigJson, game,
         locked === undefined ? null : (locked ? 1 : 0),
         allow_stacking === undefined ? null : (allow_stacking ? 1 : 0),
+        sleeved ?? null,
         cover_card_id !== undefined ? 1 : 0, cover_card_id ?? null,
         id, req.user.id]);
 

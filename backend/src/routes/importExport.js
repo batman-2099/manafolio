@@ -56,6 +56,10 @@ async function parseCompleteBackup(data) {
       && (!Number.isInteger(deck.sleeved) || deck.sleeved < 0 || deck.sleeved > 3))) {
     throw new Error('Invalid backup deck sleeves');
   }
+  if (backup.locations.some(location => Object.hasOwn(location, 'sleeved')
+      && (!Number.isInteger(location.sleeved) || location.sleeved < 0 || location.sleeved > 3))) {
+    throw new Error('Invalid backup container sleeves');
+  }
   for (const deck of backup.decks) {
     Object.assign(deck, await normalizeCardBack({
       color: Object.hasOwn(deck, 'card_back_color') ? deck.card_back_color : null,
@@ -167,11 +171,12 @@ async function restoreCompleteBackup(backup, userId) {
 
     for (const location of backup.locations) {
       const result = await db.run(`
-        INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, locked, allow_stacking, cover_card_id, inventory_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, locked, allow_stacking, cover_card_id, inventory_type, sleeved)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         location.name, location.type, location.sort_order, location.foil_sorting, location.rule_type, location.rule_config,
-        location.game, userId, location.locked || 0, location.allow_stacking || 0, location.cover_card_id || null, location.inventory_type ?? 'collection'
+        location.game, userId, location.locked || 0, location.allow_stacking || 0, location.cover_card_id || null, location.inventory_type ?? 'collection',
+        location.sleeved ?? 0
       ]);
       locationIds.set(location.id, result.lastID);
     }

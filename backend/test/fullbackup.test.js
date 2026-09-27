@@ -17,7 +17,7 @@ async function testFullBackup() {
   try {
     await db.initDb();
     await db.run(`INSERT INTO card_cache (id, name, game) VALUES ('backup-card', 'Backup Card', 'mtg')`);
-    const location = await db.run(`INSERT INTO locations (name, type, user_id) VALUES ('Backup Box', 'Box', 1)`);
+    const location = await db.run(`INSERT INTO locations (name, type, user_id, sleeved) VALUES ('Backup Box', 'Box', 1, 3)`);
     const compartment = await db.run(`INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 100)`, [location.lastID]);
     await db.run(`INSERT INTO compartment_assignments (compartment_id, filter_value) VALUES (?, 'mtg')`, [compartment.lastID]);
     await db.run(`INSERT INTO collection (card_id, location_id, compartment_id, position, game, user_id) VALUES ('backup-card', ?, ?, 1000, 'mtg', 1)`, [location.lastID, compartment.lastID]);
@@ -42,6 +42,7 @@ async function testFullBackup() {
     assert.strictEqual(res.body.version, 1);
     assert.deepStrictEqual(res.body.collection.map(card => [card.card_id, card.position]), [['backup-card', 1000]]);
     assert.ok(res.body.locations.some(row => row.id === location.lastID && row.name === 'Backup Box'));
+    assert.strictEqual(res.body.locations.find(row => row.id === location.lastID).sleeved, 3);
     assert.ok(res.body.compartments.some(row => row.id === compartment.lastID && row.idx === 1 && row.capacity === 100));
     assert.ok(res.body.compartment_assignments.some(row => row.compartment_id === compartment.lastID && row.filter_value === 'mtg'));
     assert.deepStrictEqual(res.body.decks.map(deck => [deck.name, deck.checked_out, deck.wins, deck.losses]), [['Backup Deck', 1, 7, 3], ['Arena Deck', 0, 2, 5]]);
@@ -69,6 +70,7 @@ async function testFullBackup() {
     assert.strictEqual(restoreRes.body.decks, 2);
     assert.deepStrictEqual(await db.all(`SELECT card_id, position FROM collection WHERE user_id = 1 ORDER BY id`), [{ card_id: 'backup-card', position: 1000 }]);
     assert.strictEqual((await db.get(`SELECT COUNT(*) AS count FROM locations WHERE user_id = 1 AND name = 'Discard Box'`)).count, 0);
+    assert.strictEqual((await db.get("SELECT sleeved FROM locations WHERE user_id = 1 AND name = 'Backup Box'")).sleeved, 3);
     assert.deepStrictEqual(await db.all(`SELECT name, checked_out, commander_card_id, inventory_type, wins, losses, sleeved FROM decks WHERE user_id = 1 ORDER BY id`), [
       { name: 'Backup Deck', checked_out: 1, commander_card_id: 'backup-card', inventory_type: 'collection', wins: 7, losses: 3, sleeved: 3 },
       { name: 'Arena Deck', checked_out: 0, commander_card_id: null, inventory_type: 'arena', wins: 2, losses: 5, sleeved: 0 }
@@ -115,6 +117,17 @@ async function testFullBackup() {
       assert.strictEqual(invalidRes.statusCode, 400);
       assert.deepStrictEqual(await db.all(`SELECT * FROM decks WHERE user_id = 1 ORDER BY id`), beforeInvalidRecord, 'invalid sleeve values must not replace saved decks');
     }
+    const backupTables = ['card_cache', 'collection', 'locations', 'compartments', 'compartment_assignments', 'decks', 'deck_cards', 'deck_card_allocations'];
+    const beforeInvalidSleeves = await Promise.all(backupTables.map(table => db.all(`SELECT * FROM ${table}`)));
+    for (const sleeved of [-1, 4, 0.5, '1', null, true]) {
+      const invalid = structuredClone(res.body);
+      invalid.locations.find(row => row.id === location.lastID).sleeved = sleeved;
+      invalidRes.statusCode = 200;
+      await importBackup({ body: { format: 'backup', data: invalid }, user: { id: 1 } }, invalidRes);
+      assert.strictEqual(invalidRes.statusCode, 400);
+      assert.deepStrictEqual(await Promise.all(backupTables.map(table => db.all(`SELECT * FROM ${table}`))),
+        beforeInvalidSleeves, 'invalid container sleeves must reject the entire backup without changing identities or placements');
+    }
     for (const value of [
       { card_back_color: '#fff', card_back_image: null },
       { card_back_color: '#123456', card_back_image: customBack.card_back_image },
@@ -132,11 +145,15 @@ async function testFullBackup() {
 
     // Backups made before commander support remain valid.
     delete res.body.decks[0].commander_card_id;
-    for (const location of res.body.locations) delete location.inventory_type;
+    for (const location of res.body.locations) {
+      delete location.inventory_type;
+      delete location.sleeved;
+    }
     await importBackup({ body: { format: 'backup', data: res.body }, user: { id: 1 } }, restoreRes);
     assert.strictEqual(restoreRes.statusCode, 200);
     assert.strictEqual((await db.get(`SELECT commander_card_id FROM decks WHERE user_id = 1`)).commander_card_id, null);
     assert.ok((await db.all('SELECT inventory_type FROM locations WHERE user_id = 1')).every(row => row.inventory_type === 'collection'));
+    assert.ok((await db.all('SELECT sleeved FROM locations WHERE user_id = 1')).every(row => row.sleeved === 0));
 
     // Older backups do not carry deck records.
     for (const deck of res.body.decks) {

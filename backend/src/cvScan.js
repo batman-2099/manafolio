@@ -247,26 +247,6 @@ function perspectiveTransform(src, dst) {
   return A.map((row, r) => b[r] / row[r]);
 }
 
-function orderQuad(pts) {
-  if (!pts || pts.length !== 4) return pts;
-  const cx = (pts[0].x + pts[1].x + pts[2].x + pts[3].x) / 4;
-  const cy = (pts[0].y + pts[1].y + pts[2].y + pts[3].y) / 4;
-  const sorted = [...pts].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
-  let tlIdx = 0, minScore = Infinity;
-  for (let i = 0; i < 4; i++) {
-    const score = sorted[i].x + sorted[i].y;
-    if (score < minScore) { minScore = score; tlIdx = i; }
-  }
-  const pTL = sorted[tlIdx];
-  const pNext = sorted[(tlIdx + 1) % 4];
-  const pPrev = sorted[(tlIdx + 3) % 4];
-  if (pNext.x - pTL.x > pPrev.x - pTL.x || pPrev.y - pTL.y > pNext.y - pTL.y) {
-    return [sorted[tlIdx], sorted[(tlIdx + 1) % 4], sorted[(tlIdx + 2) % 4], sorted[(tlIdx + 3) % 4]];
-  } else {
-    return [sorted[tlIdx], sorted[(tlIdx + 3) % 4], sorted[(tlIdx + 2) % 4], sorted[(tlIdx + 1) % 4]];
-  }
-}
-
 // Detect the card and return a dewarped EMBED_SIZE square of raw RGB.
 // An already-rectified crop from the browser. Resized rather than trusted to
 // be exact: JPEG round-trips and older clients can hand over something a few
@@ -303,6 +283,7 @@ async function detectAndDewarp(session, imageBuffer) {
   for (let k = 0; k < 4; k++) {
     pts.push({ x: corners[k * 2] * info.width, y: corners[k * 2 + 1] * info.height });
   }
+  const { orderQuad } = await import('../../shared/imgproc.mjs');
   const src = orderQuad(pts);
   const dst = [
     { x: 0, y: 0 }, { x: EMBED_SIZE - 1, y: 0 },

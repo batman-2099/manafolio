@@ -944,7 +944,8 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       }]
     : GROUP_ORDER.map(name => ({
         name,
-        cards: activeDeck?.cards.filter(card => cardGroup(card).toLowerCase() === name.toLowerCase()) || []
+        cards: activeDeck?.cards.filter(card => cardGroup(card).toLowerCase() === name.toLowerCase())
+          .sort((a, b) => displayName(a).localeCompare(displayName(b))) || []
       }));
 
   // --- CHART DATA GENERATION ---
