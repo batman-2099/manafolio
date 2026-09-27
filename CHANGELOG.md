@@ -2,6 +2,11 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Restored Supertype Breakdown, Color & Land Distribution, Deck Health, and the commander card directly below the deck description, before the card editor.
+- Restored beveled edges, a shaded finish, and raised shadows to Commander tags in deck list and grid views.
+
 ## 2.0.7
 
 - Gave all six mana themes matching header emblems, page-title symbols, large background watermarks, and stronger color accents while preserving the stationary logo and Arcane Blue/Jenny appearances.

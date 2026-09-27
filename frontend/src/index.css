@@ -1173,7 +1173,8 @@ button.collection-card-trigger {
   color: var(--text-strong);
 }
 
-.collection-card-tag {
+.collection-card-tag,
+.deck-commander-tag {
   padding: 1px 6px;
   border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 4px;
@@ -1182,6 +1183,10 @@ button.collection-card-trigger {
   line-height: 1.5;
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45),
     inset 0 -2px 3px rgba(0, 0, 0, 0.16), 0 1px 2px rgba(0, 0, 0, 0.22);
+}
+
+.deck-commander-tag {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 45%, rgba(0, 0, 0, 0.12));
 }
 
 .collection-card-tag--foil {

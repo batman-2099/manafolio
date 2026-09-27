@@ -1637,6 +1637,147 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
               {activeDeck.description || '—'}
             </p>
           </section>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+                {/* Pie Chart: Supertypes */}
+                {supertypeData.length > 0 && (
+                  <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <BarChart2 size={14} style={{ color: 'var(--accent-red)' }} /> Supertype Breakdown
+                    </h3>
+                    <div style={{ width: '100%', height: '180px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={supertypeData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={70}
+                            paddingAngle={3}
+                            dataKey="value"
+                          >
+                            {supertypeData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.8)', border: '1px solid var(--border-glass)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-strong)' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    {/* Legend */}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                      {supertypeData.map((d, index) => (
+                        <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}>
+                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}></div>
+                          <span style={{ color: 'var(--text-secondary)' }}>{d.name}: <strong>{d.value}</strong></span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
+                {/* Bar Chart: Color Distribution */}
+                {colorData.length > 0 && (
+                  <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <BarChart2 size={14} style={{ color: 'var(--accent-yellow)' }} /> {t('deck.colorLandDist')}
+                    </h3>
+                    <div style={{ width: '100%', height: '220px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={colorData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+                          <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={10} tickLine={false} />
+                          <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} />
+                          <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.8)', border: '1px solid var(--border-glass)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-strong)' }} />
+                          <Bar dataKey="value" fill="var(--accent-yellow)" radius={[4, 4, 0, 0]}>
+                            {colorData.map((entry, idx) => {
+                              const colorMap = {
+                                'White': '#fef08a', 'Blue': '#3b82f6', 'Black': '#475569', 'Red': '#ef4444', 'Green': '#10b981', 'Colorless': '#cbd5e1',
+                                'Land (Plains)': '#fef08a', 'Land (Island)': '#60a5fa', 'Land (Swamp)': '#475569', 'Land (Mountain)': '#f87171', 'Land (Forest)': '#4ade80', 'Land (Nonbasic)': '#d97706',
+                              };
+                              return <Cell key={`cell-${idx}`} fill={colorMap[entry.name] || 'var(--accent-yellow)'} />;
+                            })}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+                {/* Deck Health & Summary Status */}
+                <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {totalDeckCardsCount === targetDeckCardsCount ? (
+                      <CheckCircle size={15} style={{ color: 'var(--accent-green)' }} />
+                    ) : (
+                      <AlertTriangle size={15} style={{ color: 'var(--accent-yellow)' }} />
+                    )}
+                    {t('deck.healthTitle')}
+                  </h3>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                      <span>{t('deck.targetDeckSize')}</span>
+                      <strong style={{ color: totalDeckCardsCount === targetDeckCardsCount ? 'var(--accent-green)' : 'var(--text-strong)' }}>{totalDeckCardsCount}/{targetDeckCardsCount} {t('deck.cardCapacity')}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                      <span>{t('deck.uniqueCards')}</span>
+                      <strong style={{ color: 'var(--text-strong)' }}>{t('deck.titlesCount', { count: activeDeck.cards.length })}</strong>
+                    </div>
+                    {deckGame === 'mtg' && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                      <span>{t('deck.basicLands')}</span>
+                      <strong style={{ color: 'var(--accent-yellow)' }}>
+                        {t('deck.basicLandsCount', { count: activeDeck.cards.filter(c => isBasicLand(c, deckGame)).reduce((s, c) => s + c.quantity, 0) })}
+                      </strong>
+                    </div>
+                    )}
+                  </div>
+                {activeDeck.game === 'mtg' && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.75rem' }}>
+                    {['win', 'loss'].map(result => {
+                      const count = activeDeck[result === 'win' ? 'wins' : 'losses'] ?? 0;
+                      return (
+                        <div key={result} role="group" aria-label={t(result === 'win' ? 'deck.wins' : 'deck.losses')} aria-busy={savingRecord} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                          <span aria-live="polite" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {t(result === 'win' ? 'deck.wins' : 'deck.losses')}: <strong>{count}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-icon-only"
+                            aria-label={t(result === 'win' ? 'deck.removeWin' : 'deck.removeLoss')}
+                            disabled={savingRecord || savingDeck || count === 0}
+                            onClick={() => handleRecordChange(result, -1)}
+                          >
+                            <Minus size={14} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-icon-only"
+                            aria-label={t(result === 'win' ? 'deck.addWin' : 'deck.addLoss')}
+                            disabled={savingRecord || savingDeck || count === 2147483647}
+                            onClick={() => handleRecordChange(result, 1)}
+                          >
+                            <Plus size={14} aria-hidden="true" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                </div>
+                </div>
+                {commanderCard && (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewCard(commanderCard)}
+                    aria-label={`${t('deck.commander')}: ${displayName(commanderCard)}`}
+                    title={`${t('deck.commander')}: ${displayName(commanderCard)}`}
+                    style={{ padding: 0, width: '100%', maxWidth: '350px', justifySelf: 'center', border: '1px solid var(--accent-yellow)', borderRadius: '8px', background: 'transparent', cursor: 'pointer' }}
+                  >
+                    <CardImage card={commanderCard} style={{ display: 'block', width: '100%', aspectRatio: '0.718', objectFit: 'contain', borderRadius: '7px' }} />
+                  </button>
+                )}
+          </div>
 
 
           {/* Checked out info banner */}
@@ -1813,7 +1954,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                                   <button type="button" aria-label={`${t('deck.previewArt')}: ${displayName(card)}`} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', minWidth: 0, flex: 1, padding: 0, border: 0, background: 'transparent', textAlign: 'left' }} onClick={() => setPreviewCard(card)}>
                                     <CardImage card={card} src={card.image_url?.replace(/^(https:\/\/cards\.scryfall\.io)\/normal\//, '$1/small/')} loading="lazy" style={{ width: '32px', height: '44px', objectFit: 'cover', borderRadius: '2px', flexShrink: 0 }} />
                                     <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                                      {activeDeck.commander_card_id === card.id && <div style={{ background: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '2px 6px', fontSize: '0.7rem', fontWeight: 800 }}>{t('deck.commander')}</div>}
+                                      {activeDeck.commander_card_id === card.id && <div className="deck-commander-tag" style={{ backgroundColor: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '2px 6px', fontSize: '0.7rem', fontWeight: 800 }}>{t('deck.commander')}</div>}
                                       <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(card)}</div>
                                       <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.set_name} • #{card.number}</div>
                                       {deckCardLocations[card.id]?.length > 0 && (
@@ -1873,7 +2014,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                                 <div key={card.id} style={{ position: 'relative', borderRadius: '6px', overflow: 'hidden', border: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', background: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? 'rgba(127,29,29,0.16)' : 'rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', transition: 'transform 0.15s' }}>
                                   <button type="button" aria-label={`${t('deck.previewArt')}: ${displayName(card)}`} style={{ position: 'relative', width: '100%', aspectRatio: 0.718, cursor: 'pointer', padding: 0, border: 0, background: 'transparent' }} onClick={() => setPreviewCard(card)}>
                                     <CardImage card={card} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    {activeDeck.commander_card_id === card.id && <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center', background: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '4px', fontSize: '0.75rem', fontWeight: 800 }}>{t('deck.commander')}</div>}
+                                    {activeDeck.commander_card_id === card.id && <div className="deck-commander-tag" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center', backgroundColor: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '4px', fontSize: '0.75rem', fontWeight: 800 }}>{t('deck.commander')}</div>}
                                     <span style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.85)', color: 'var(--accent-yellow)', fontSize: '0.75rem', fontWeight: 800, padding: '1px 6px', borderRadius: '10px', border: '1px solid var(--accent-yellow)' }}>
                                       x{card.quantity}
                                     </span>
@@ -1916,147 +2057,6 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 </div>
                 <RelatedTokens cardIds={activeDeck.cards.map(card => card.id)} title={t('tokens.title')} inventoryType={activeDeck.inventory_type} commanderCardId={activeDeck.commander_card_id} />
               </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem', alignItems: 'start' }}>
-                {/* Pie Chart: Supertypes */}
-                {supertypeData.length > 0 && (
-                  <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <BarChart2 size={14} style={{ color: 'var(--accent-red)' }} /> Supertype Breakdown
-                    </h3>
-                    <div style={{ width: '100%', height: '180px' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={supertypeData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={50}
-                            outerRadius={70}
-                            paddingAngle={3}
-                            dataKey="value"
-                          >
-                            {supertypeData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.8)', border: '1px solid var(--border-glass)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-strong)' }} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    {/* Legend */}
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                      {supertypeData.map((d, index) => (
-                        <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}>
-                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}></div>
-                          <span style={{ color: 'var(--text-secondary)' }}>{d.name}: <strong>{d.value}</strong></span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
-                {/* Bar Chart: Color Distribution */}
-                {colorData.length > 0 && (
-                  <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <BarChart2 size={14} style={{ color: 'var(--accent-yellow)' }} /> {t('deck.colorLandDist')}
-                    </h3>
-                    <div style={{ width: '100%', height: '220px' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={colorData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
-                          <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={10} tickLine={false} />
-                          <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} />
-                          <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.8)', border: '1px solid var(--border-glass)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-strong)' }} />
-                          <Bar dataKey="value" fill="var(--accent-yellow)" radius={[4, 4, 0, 0]}>
-                            {colorData.map((entry, idx) => {
-                              const colorMap = {
-                                'White': '#fef08a', 'Blue': '#3b82f6', 'Black': '#475569', 'Red': '#ef4444', 'Green': '#10b981', 'Colorless': '#cbd5e1',
-                                'Land (Plains)': '#fef08a', 'Land (Island)': '#60a5fa', 'Land (Swamp)': '#475569', 'Land (Mountain)': '#f87171', 'Land (Forest)': '#4ade80', 'Land (Nonbasic)': '#d97706',
-                              };
-                              return <Cell key={`cell-${idx}`} fill={colorMap[entry.name] || 'var(--accent-yellow)'} />;
-                            })}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                )}
-                {/* Deck Health & Summary Status */}
-                <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {totalDeckCardsCount === targetDeckCardsCount ? (
-                      <CheckCircle size={15} style={{ color: 'var(--accent-green)' }} />
-                    ) : (
-                      <AlertTriangle size={15} style={{ color: 'var(--accent-yellow)' }} />
-                    )}
-                    {t('deck.healthTitle')}
-                  </h3>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                      <span>{t('deck.targetDeckSize')}</span>
-                      <strong style={{ color: totalDeckCardsCount === targetDeckCardsCount ? 'var(--accent-green)' : 'var(--text-strong)' }}>{totalDeckCardsCount}/{targetDeckCardsCount} {t('deck.cardCapacity')}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                      <span>{t('deck.uniqueCards')}</span>
-                      <strong style={{ color: 'var(--text-strong)' }}>{t('deck.titlesCount', { count: activeDeck.cards.length })}</strong>
-                    </div>
-                    {deckGame === 'mtg' && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                      <span>{t('deck.basicLands')}</span>
-                      <strong style={{ color: 'var(--accent-yellow)' }}>
-                        {t('deck.basicLandsCount', { count: activeDeck.cards.filter(c => isBasicLand(c, deckGame)).reduce((s, c) => s + c.quantity, 0) })}
-                      </strong>
-                    </div>
-                    )}
-                  </div>
-                {activeDeck.game === 'mtg' && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.75rem' }}>
-                    {['win', 'loss'].map(result => {
-                      const count = activeDeck[result === 'win' ? 'wins' : 'losses'] ?? 0;
-                      return (
-                        <div key={result} role="group" aria-label={t(result === 'win' ? 'deck.wins' : 'deck.losses')} aria-busy={savingRecord} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
-                          <span aria-live="polite" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                            {t(result === 'win' ? 'deck.wins' : 'deck.losses')}: <strong>{count}</strong>
-                          </span>
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-icon-only"
-                            aria-label={t(result === 'win' ? 'deck.removeWin' : 'deck.removeLoss')}
-                            disabled={savingRecord || savingDeck || count === 0}
-                            onClick={() => handleRecordChange(result, -1)}
-                          >
-                            <Minus size={14} aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-icon-only"
-                            aria-label={t(result === 'win' ? 'deck.addWin' : 'deck.addLoss')}
-                            disabled={savingRecord || savingDeck || count === 2147483647}
-                            onClick={() => handleRecordChange(result, 1)}
-                          >
-                            <Plus size={14} aria-hidden="true" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                </div>
-                </div>
-                {commanderCard && (
-                  <button
-                    type="button"
-                    onClick={() => setPreviewCard(commanderCard)}
-                    aria-label={`${t('deck.commander')}: ${displayName(commanderCard)}`}
-                    title={`${t('deck.commander')}: ${displayName(commanderCard)}`}
-                    style={{ padding: 0, width: '100%', maxWidth: '350px', justifySelf: 'center', border: '1px solid var(--accent-yellow)', borderRadius: '8px', background: 'transparent', cursor: 'pointer' }}
-                  >
-                    <CardImage card={commanderCard} style={{ display: 'block', width: '100%', aspectRatio: '0.718', objectFit: 'contain', borderRadius: '7px' }} />
-                  </button>
-                )}
-          </div>
 
               {/* Mana Curve */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
