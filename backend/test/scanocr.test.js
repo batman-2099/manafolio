@@ -1,6 +1,6 @@
 const assert = require('assert');
 const sharp = require('sharp');
-const { parsePrintingTsv, readPrinting } = require('../src/utils/scanOcr');
+const { parsePrintingTsv, readFooter } = require('../src/utils/scanOcr');
 
 function tsv(lines) {
   return lines.map((line, index) => line.map((word, column) => {
@@ -38,8 +38,8 @@ async function main() {
   assert.deepStrictEqual(parse([['0012', 'R'], ['0013', 'R'], ['MKM', 'EN']]), { status: 'unreadable' });
   assert.deepStrictEqual(parse([['0012', 'R'], ['MKM', 'EN'], ['ELD', 'EN']]), { status: 'unreadable' });
   assert.deepStrictEqual(parsePrintingTsv('not TSV'), { status: 'unreadable' });
-  assert.deepStrictEqual(await readPrinting('/etc/passwd'), { status: 'error' });
-  assert.deepStrictEqual(await readPrinting(Buffer.alloc(0)), { status: 'error' });
+  assert.deepStrictEqual(await readFooter('/etc/passwd'), { status: 'error' });
+  assert.deepStrictEqual(await readFooter(Buffer.alloc(0)), { status: 'error' });
 
   // Opt-in real native executable smoke: node backend/test/scanocr.test.js --ocr-smoke
   // No downloaded fixtures or database/model/catalog access; sharp renders the footer.
@@ -57,7 +57,8 @@ async function main() {
             <text x="${width * 0.06}" y="${width * 0.88}">${first}</text>
             <text x="${width * 0.06}" y="${width * 0.94}">${second}</text>
           </g></svg>`)).png().toBuffer();
-        const result = await readPrinting(image, { setCodes: ['mkm', 'eld'] });
+        const footer = await readFooter(image);
+        const result = footer.tsv ? parsePrintingTsv(footer.tsv, { setCodes: ['mkm', 'eld'] }) : footer;
         assert.equal(result.status, 'read', `${width}px ${first}: ${JSON.stringify(result)}`);
         assert.equal(result.setCode, setCode);
         assert.equal(result.number, number);

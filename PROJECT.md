@@ -249,10 +249,12 @@ Scanning is a beta artwork-matching workflow with footer verification, not gener
 1. `frontend/src/utils/detectWorker.js` runs **cornelius** in a worker via `onnxruntime-web`, drawing the live corner outline. `CameraScanner.localDewarp` uses shared geometry to rectify the captured card to 896×896 pixels, retaining footer detail for OCR.
 2. `cvScan.match` accepts a rectified upload (`cropped: true`) without repeating corner detection. A whole frame instead goes through server-side detection/dewarping. The embedder receives a 448×448 image.
 3. **milo** produces a 128-dimensional normalized embedding. The server sweeps normalized catalog vectors with dot products (cosine similarity), merges/deduplicates hits, and returns ranked candidates.
-4. `/api/scan-match` hydrates Scryfall printings, resolves requested language where possible, evaluates blur/glare/context, and applies `utils/scanOcr.js` to the rectified footer.
+4. `/api/scan-match` overlaps native footer OCR with Scryfall candidate hydration and requested-language resolution. OCR text is interpreted only after hydrated candidate set codes are available, preserving exact-printing checks. ID lookups reuse `card_cache`, then the existing local Scryfall bulk snapshot, before the rate-limited provider fallback.
 5. The client requires **two fresh decoded video frames** to agree on the resolved printing and pass safety checks before auto-add, including Turbo. Changes to settings, pause, and unmount cancel verification; network failure is not agreement.
 
 The shared image geometry lives in `shared/imgproc.mjs` and `shared/cardDetectPure.mjs`. Do not create a different preview crop from the one used for matching.
+
+Scan responses expose millisecond `timings` for matching, metadata, OCR, safety, and total processing. OCR/metadata overlap, so stages are not additive. The frontend's optional diagnostics also record capture (including fresh-frame wait), request/JSON, and candidate-resolution time per verification frame. Presets control fallback-upload limits and auto-add confirmation delay, not model recall/ORB settings; client rectification remains 896×896.
 
 ### Gates and limitations
 

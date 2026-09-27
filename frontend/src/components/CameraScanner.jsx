@@ -14,7 +14,7 @@ import { requestDetect, stopDetect, smoothQuad, meanCornerDrift, DETECT_W } from
 import { getPerspectiveTransform, warpPerspective } from '../../../shared/imgproc.mjs';
 import {
   shouldCapture, shouldRearm, autoStatusKey, scanMatchReasons, recordScanPass, waitForVideoFrame,
-  SCAN_MATCH_MIN_SCORE, SCAN_MATCH_MIN_INLIERS,
+  SCAN_MATCH_MIN_SCORE,
 } from '../utils/autoCapture';
 import { defaultGame, isGameEnabled } from '../utils/games';
 import { useT } from '../utils/i18n';
@@ -59,26 +59,14 @@ const STEADY_FRAMES_NEEDED = 3;   // default; adjustable in scan settings
 // Measured: card small in the frame scores 0.076, so this still rejects that by
 // a wide margin. The real "there is no card" case is handled by `none`, not here.
 const MIN_FILL = 0.55;            // default; adjustable in scan settings
-// Scan-detail presets (quick↔accurate slider). Higher index = more upload
-// resolution, deeper server CLIP recall + more ORB features, longer cooldown:
-// slower but more accurate. Lower = faster, less accurate. Turbo keeps ORB
-// verify but with the fewest recall candidates + features — leanest ORB pass.
+// Presets change fallback-upload width and the auto-add confirmation window only.
+// Client-dewarped images retain RECTIFIED_SIZE for footer OCR in every preset.
 const SCAN_PROFILES = [
-  // uploadW floors at 720 even on the fastest preset: the guide crop is already
-  // most of the way down from the capture, so a 400px upload delivered a ~250px
-  // card, and exact-printing measures 76.0% at 250px against 91.0% at 420px.
-  // That is 15 points given away for a few KB of JPEG, not a speed/accuracy
-  // trade — recallK and orb below are where the real trade lives.
-  //
-  // `cooldown` and `cadence` are gone. Both existed to pace a clock-driven
-  // auto-scan, and auto-scan is now driven by the detector: a card is scanned
-  // when it is present and still, and not again until it is replaced. Waiting
-  // out a preset delay after that only made the scanner feel slow. `countdown`
-  // stays — it is the auto-ADD confirm window, which is a different decision.
-  { label: 'Turbo',    uploadW: 720,  countdown: 0, recallK: 28,  orb: 240 },
-  { label: 'Fast',     uploadW: 800,  countdown: 1, recallK: 60,  orb: 300 },
-  { label: 'Balanced', uploadW: 900,  countdown: 2, recallK: 120, orb: 400 },
-  { label: 'Accurate', uploadW: 1280, countdown: 2, recallK: 250, orb: 500 },
+  // Keep fallback uploads at least 720px wide to preserve exact-printing detail.
+  { key: 'turbo',    uploadW: 720,  countdown: 0 },
+  { key: 'fast',     uploadW: 800,  countdown: 1 },
+  { key: 'balanced', uploadW: 900,  countdown: 2 },
+  { key: 'accurate', uploadW: 1280, countdown: 2 },
 ];
 
 // A fallback is a reviewable candidate, not proof of the requested language.
@@ -122,8 +110,6 @@ function CameraScanner({ onAddSuccess, showToast }) {
     },
   });
   const [scanFlash, setScanFlash] = useState(null); // 'capture', 'error', or null
-  // Fixed-cadence capture countdown (Turbo): ms remaining until the next photo,
-  // or null when the metronome isn't running. Drives the countdown ring.
   // What auto-scan is waiting for, shown as a small pill. Without the old
   // countdown ring there is otherwise no feedback at all when it declines to
   // fire, and "nothing happens" is indistinguishable from "it is broken".
@@ -293,6 +279,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const [debugHashImg, setDebugHashImg] = useState('');
   const [debugCandidates, setDebugCandidates] = useState([]);
   const [debugScoped, setDebugScoped] = useState(null); // set code if set-scoped, false if global, null if n/a
+  const [debugTimings, setDebugTimings] = useState([]);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -310,12 +297,11 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const lastAddedIdRef = useRef(null);
   const resolvedDupIdRef = useRef(null);
   const beepCtxRef = useRef(null); // reused AudioContext for the scan cue
-  const handleCaptureRef = useRef(null); // always the latest handleCapture, for timers
-  // Same trick for the capture gate: the metronome interval closes over its first
-  // render, so it needs a ref to reach the current predicate.
+  const handleCaptureRef = useRef(null); // latest capture closure for the detector
+  // The detector callback needs the current capture gate without restarting.
   const frameWorthCaptureRef = useRef(null);
   const captureBlockedRef = useRef(false); // true while a modal/picker/drawer is up
-  const loadingRef = useRef(false); // mirrors `loading` for the metronome interval
+  const loadingRef = useRef(false); // mirrors `loading` for the detector callback
 
   // The capture cue fires only once all verification frames are acquired.
   // Until then the user must keep the card still. Errors have their own cue.
@@ -367,6 +353,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     loadingRef.current = false;
     setVerificationFrame(null);
     setLoading(false);
+    setDebugTimings([]);
     resolvedDupIdRef.current = null;
     const msg = t('scan.cancelled');
     setScanStatus(msg);
@@ -438,9 +425,8 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [autoAddCountdown, setAutoAddCountdown] = useState(null);
   const [autoAddTargetCard, setAutoAddTargetCard] = useState(null);
-  // The rest of the ORB list, shown beside the countdown. Scanning a whole set
-  // means many near-identical cards, and the one in hand is regularly not ORB's
-  // first pick — so the runners-up stay one tap away instead of requiring an undo.
+  // The remaining candidates stay one tap away during the countdown so a
+  // near-identical printing can be corrected without requiring an undo.
   const [autoAddAlternatives, setAutoAddAlternatives] = useState([]);
   // The picker opens compact and expands on request rather than dumping eight
   // cards at once.
@@ -465,12 +451,14 @@ function CameraScanner({ onAddSuccess, showToast }) {
 
   useBackGuard(scanMatches.length > 0, () => {
     setScanMatches([]);
+    setDebugTimings([]);
     autoArmed.current = true;
     capturedQuad.current = null;
     resolvedDupIdRef.current = null;
   });
   useBackGuard(!!dupConfirmCard, () => {
     setDupConfirmCard(null);
+    setDebugTimings([]);
     resolvedDupIdRef.current = null;
   });
   useBackGuard(!!inspectorEntry, () => setInspectorEntry(null));
@@ -508,6 +496,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     loadingRef.current = false;
     setLoading(false);
     setVerificationFrame(null);
+    setDebugTimings([]);
     setScanStatus('');
     setScanMatches([]);
     setLastMatches([]);
@@ -953,6 +942,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     setDebugHashImg('');
     setDebugCandidates([]);
     setDebugScoped(null);
+    setDebugTimings([]);
     lastAddedIdRef.current = null;
     resolvedDupIdRef.current = null;
     autoArmed.current = true;
@@ -997,9 +987,8 @@ function CameraScanner({ onAddSuccess, showToast }) {
   // above stops the tracks (which also kills the torch).
 
   const autoAddCard = async (card, qty = 1, overrides = null) => {
-    // Mark the dup guard BEFORE the await: a fast cooldown can fire the next
-    // capture before this POST resolves, and a match of the same card must hit
-    // the duplicate path instead of auto-adding a second time.
+    // Mark the duplicate guard before awaiting the save, so a replaced card
+    // cannot trigger a second automatic add while this request is in flight.
     lastAddedIdRef.current = card.id;
     try {
       const autoPrinting = overrides?.printing || 'Normal';
@@ -1185,7 +1174,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
 
   // Only independently verified agreement may use the automatic single-result
   // path. A single unsafe result still needs the manual picker, for every game.
-  // Is this resolved card the printing ORB reported? Set + number is the
+  // Is this resolved card the printing the matcher reported? Set + number is the
   // identity; the name is not checked because the index and the provider can
   // spell it differently, which is exactly the disagreement that used to make
   // candidates vanish.
@@ -1199,7 +1188,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     && (String(card.set_id).toLowerCase() === String(cand.set).toLowerCase()
       || String(card.set_name || '').toLowerCase() === String(cand.set).toLowerCase());
 
-  // Turn ORB candidates into full cards, preserving ORB's order so the options
+  // Turn candidates into full cards, preserving rank so the options
   // on screen line up one-for-one with the match list. Each lookup is by the
   // matched printing, never by name as well: the index stores the name from when
   // the set was built, and one re-spelling would drop the candidate entirely.
@@ -1304,6 +1293,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     setScanMatches([]);
     setLastMatches([]);
     setAutoAddAlternatives([]);
+    setDebugTimings([]);
     const video = videoRef.current;
     let agreement = null;
     const reviewCandidates = [];
@@ -1315,6 +1305,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
       for (let pass = 1; pass <= 2; pass++) {
         setVerificationFrame(pass);
         setScanStatus(t('scan.verifying', { frame: pass, total: 2 }));
+        const captureStarted = performance.now();
         const frame = await waitForVideoFrame(video, controller.signal);
         if (scanId !== currentScanId.current) return;
         const guideElement = document.querySelector('.scan-card-guide');
@@ -1335,15 +1326,21 @@ function CameraScanner({ onAddSuccess, showToast }) {
         setDebugHashImg(imageData);
         lastScanImgRef.current = imageData;
         lastScanCroppedRef.current = !!cropped;
+        const timing = { frame: pass, captureMs: performance.now() - captureStarted };
+        const requestStarted = performance.now();
         const response = await fetch('/api/scan-match', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
           body: JSON.stringify({ game: scanGame, image: imageData, cropped: !!cropped,
-            set: scanSetParam, lang: scanLang, recallK: profile.recallK, orb: profile.orb }),
+            set: scanSetParam, lang: scanLang }),
         });
         const data = await response.json();
         if (scanId !== currentScanId.current) return;
+        timing.requestMs = performance.now() - requestStarted;
+        // Optional server durations are milliseconds; parallel stages overlap.
+        timing.server = data?.timings;
+        setDebugTimings(previous => [...previous, { ...timing }]);
         if (!response.ok) {
           if (data?.notBuilt) throw new Error('catalogNotBuilt');
           throw new Error('scanFailed');
@@ -1353,8 +1350,11 @@ function CameraScanner({ onAddSuccess, showToast }) {
         setDebugScoped(scoped ? scanSetParam : false);
         setDebugCandidates(candidates.map(candidate => ({ ...candidate, verified })));
         scanMatchReasons(data).forEach(reason => reasons.add(reason));
+        const resolveStarted = performance.now();
         const resolved = await resolveCandidates([...candidates, ...alternatives].slice(0, 8), matchGame, scanLang, controller.signal);
         if (scanId !== currentScanId.current) return;
+        timing.resolveMs = performance.now() - resolveStarted;
+        setDebugTimings(previous => previous.map(item => item.frame === pass ? { ...timing } : item));
         const validCandidates = resolved.filter(Boolean);
         for (const card of validCandidates) {
           if (!reviewCandidates.some(previous => previous.id === card.id)) reviewCandidates.push(card);
@@ -1398,12 +1398,10 @@ function CameraScanner({ onAddSuccess, showToast }) {
       }
     }
   };
-  // Keep the ref pointing at the latest handleCapture so timers (metronome /
-  // cooldown) always invoke the current closure, never a stale one.
+  // Keep detector callbacks on the current closure.
   handleCaptureRef.current = handleCapture;
   frameWorthCaptureRef.current = frameWorthCapturing;
-  // Metronome reads this (not effect deps) to decide whether to fire a capture,
-  // so a modal/picker/drawer pauses the beat without restarting the interval.
+  // A modal/picker/drawer pauses capture without restarting detection.
   captureBlockedRef.current = isDrawerOpen || scanMatches.length > 0 || !!autoAddTargetCard || !!dupConfirmCard;
   loadingRef.current = loading;
   autoScanRef.current = autoScan;
@@ -2000,19 +1998,14 @@ function CameraScanner({ onAddSuccess, showToast }) {
               </div>
             )}
 
-            {/* Scan Detail. What it still controls: upload resolution and the
-                auto-add confirm window. recallK/orb are inert — every scan is
-                CollectorVision now, whose per-frame cost is one 448px embed and one
-                cosine sweep per catalog, and the ORB pipeline those two knobs
-                tuned no longer exists. Kept rather than hidden because uploadW and
-                the countdown are real on every path; the request still carries the
-                two dead fields so an older backend keeps working. */}
+            {/* Presets do not change CollectorVision or the two-frame safety checks. */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.detail')}</span>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-red)' }}>{profile.label}</span>
+                <label htmlFor="scan-detail" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.detail')}</label>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-red)' }}>{t(`scan.preset.${profile.key}`)}</span>
               </div>
               <input
+                id="scan-detail"
                 type="range"
                 min="0"
                 max={SCAN_PROFILES.length - 1}
@@ -2025,6 +2018,9 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 <span>{t('scan.detailQuick')}</span>
                 <span>{t('scan.detailSlow')}</span>
               </div>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                {t('scan.presetHint', { width: profile.uploadW, seconds: profile.countdown, rectified: RECTIFIED_SIZE })}
+              </span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
@@ -2100,6 +2096,23 @@ function CameraScanner({ onAddSuccess, showToast }) {
               needs an actual crop/candidate, so no empty dashed box. */}
           {showDebug && cameraActive && (debugHashImg || debugCandidates.length > 0) && (
             <div className="glass-panel" style={{ width: '100%', padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.3)', border: '1px dashed var(--border-glass-hover)', display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.25rem' }}>
+              {debugTimings.length > 0 && (
+                <div aria-label={t('scan.timings')} style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                  <strong>{t('scan.timings')}</strong>
+                  {debugTimings.map(timing => (
+                    <div key={timing.frame}>
+                      <div>{t('scan.timingFrame', { frame: timing.frame })}</div>
+                      <div>{['captureMs', 'requestMs', 'resolveMs']
+                        .filter(key => Number.isFinite(timing[key]))
+                        .map(key => `${t(`scan.timing.${key}`)}: ${Math.round(timing[key])} ms`).join(' · ')}</div>
+                      <div>{['matchMs', 'metadataMs', 'ocrMs', 'safetyMs', 'totalMs']
+                        .filter(key => Number.isFinite(timing.server?.[key]))
+                        .map(key => `${t(`scan.timing.${key}`)}: ${Math.round(timing.server[key])} ms`).join(' · ')}</div>
+                    </div>
+                  ))}
+                  <div>{t('scan.timingsHint')}</div>
+                </div>
+              )}
               {/* Hash-match diagnostics: what was cropped + the ranked candidates. */}
               {(debugHashImg || debugCandidates.length > 0) && (
                 <div style={{ display: 'flex', gap: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', marginTop: '0.25rem' }}>
@@ -2115,12 +2128,12 @@ function CameraScanner({ onAddSuccess, showToast }) {
                         {debugScoped ? t('scan.debugScoped', { sets: debugScoped }) : t('scan.debugGlobal')}
                       </span>
                     )}
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t(debugCandidates[0]?.verified ? 'scan.debugTopMatchesInliers' : 'scan.debugTopMatchesSimilarity')}</span>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t('scan.debugTopMatchesSimilarity')}</span>
                     {debugCandidates.length === 0 ? (
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t('scan.noCandidates')}</span>
                     ) : debugCandidates.slice(0, 3).map((cd, i) => {
-                      const pass = cd.verified ? cd.inliers >= SCAN_MATCH_MIN_INLIERS : cd.score >= SCAN_MATCH_MIN_SCORE;
-                      const label = cd.verified ? `${cd.inliers} inl` : (cd.score != null ? cd.score.toFixed(2) : '?');
+                      const pass = cd.score >= SCAN_MATCH_MIN_SCORE;
+                      const label = cd.score != null ? cd.score.toFixed(2) : '?';
                       return (
                         <div key={i} style={{ fontSize: '0.7rem', color: i === 0 ? '#fff' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           <span style={{ color: pass ? 'var(--accent-green)' : 'var(--accent-red)', fontWeight: 700 }}>{label}</span>
@@ -2325,6 +2338,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                       autoArmed.current = true;
                       capturedQuad.current = null;
                       resolvedDupIdRef.current = null;
+                      setDebugTimings([]);
                       showToast(t('scan.autoAddCancelled'), 'status');
                     }}
                     style={{ flex: 1, fontSize: '0.75rem', padding: '0.45rem 0' }}
@@ -2362,6 +2376,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                       autoArmed.current = true;
                       capturedQuad.current = null;
                       resolvedDupIdRef.current = null;
+                      setDebugTimings([]);
                       showToast(t('scan.autoAddCancelled'), 'status');
                     }}
                     style={{ flex: 1, fontSize: '0.75rem', padding: '0.45rem 0' }}
@@ -2372,7 +2387,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
               </div>
             )}
 
-            {/* The rest of the ORB list, in ORB's order.
+            {/* The remaining candidates, in match order.
                 Auto-add commits to the strongest match, and within a single set
                 — many cards, one frame, near-identical art — that is regularly
                 not the card in hand. Showing the runners-up here turns a wrong
@@ -2503,6 +2518,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 onClick={() => {
                   resolvedDupIdRef.current = dupConfirmCard.id;
                   setDupConfirmCard(null);
+                  setDebugTimings([]);
                   showToast(t('scan.discardedRepeat'), 'status');
                 }}
                 style={{ width: '100%', fontSize: '0.8rem', padding: '0.45rem 0' }}
@@ -2547,6 +2563,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 className="btn btn-secondary btn-icon-only" 
                 onClick={() => {
                   setScanMatches([]);
+                  setDebugTimings([]);
                   setScanStatus('');
                   autoArmed.current = true;
                   capturedQuad.current = null;
@@ -2614,7 +2631,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
             </div>
 
             {/* Strongest matches first — the same order, and the same cards, as
-                the ORB match list. Only the first few are shown: eight cards at
+                the match list. Only the first few are shown: eight cards at
                 once is a wall to read while holding the card you are trying to
                 identify, and the answer is usually near the top. */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.75rem', maxHeight: '350px', overflowY: 'auto', padding: '0.25rem' }}>
@@ -2656,6 +2673,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 className="btn btn-primary" 
                 onClick={() => {
                   setScanMatches([]);
+                  setDebugTimings([]);
                   setScanStatus('');
                   autoArmed.current = true;
                   capturedQuad.current = null;
@@ -2671,6 +2689,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 className="btn btn-secondary"
                 onClick={() => {
                   setScanMatches([]);
+                  setDebugTimings([]);
                   setScanStatus('');
                   setAutoScan(false);
                   if (!stream || !cameraActive) startCamera();

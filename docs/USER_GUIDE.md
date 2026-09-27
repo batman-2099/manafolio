@@ -208,13 +208,21 @@ Scanning helps identify a printing; it does **not** determine condition, foil/fi
 
 #### When you enable auto-add
 
-- **Auto-add matches** saves qualifying matches without the ordinary review form. Slower **Scan Detail** profiles show a confirmation countdown; tap the card to adjust condition/foil, choose an alternative, use **Add Now**, or **Cancel**.
+- **Auto-add matches** saves qualifying matches without the ordinary review form. **Scan preset** shows the fallback-upload resolution and automatic-add confirmation delay. Fast uses a one-second delay; Balanced and High resolution use two seconds. Tap the countdown card to adjust condition/foil, choose an alternative, use **Add Now**, or **Cancel**.
 - **Turbo** removes that countdown; it does not remove the requirement for two fresh photos to agree and pass safety checks.
 - Hold the same card still through verification. Changing settings, pausing, or leaving cancels pending verification.
 - A set/language fallback, missing catalog coverage, or conflicting verification can require manual selection. Do not treat a confident artwork candidate as proof of the printing.
 - Auto-add initially uses Near Mint/Normal settings and records the resolved market price as purchase price. Review those records if they do not describe your cards or what you paid.
 
 If **Same card scanned again** appears, decide whether it is genuinely another physical copy. Choose **Add … more copy/copies** only for additional inventory. **Discard — same card, keep scanning** ignores the repeat and continues; **Done — that was another photo of the same card** ignores it and pauses scanning.
+
+#### Scan speed and diagnostics
+
+Use **Show scan diagnostics** in Scan settings to inspect per-frame capture, request, and candidate-resolution durations. Server stages show artwork matching, metadata lookup, footer OCR, safety checks, and total request processing. OCR and metadata run concurrently: do not add their times together. Request time includes server processing and network transfer, while the confirmation countdown is separate.
+
+Presets do not reduce recognition checks. Client-rectified images stay at 896×896 pixels; the preset's upload limit applies only when client rectification is unavailable. Choose a known set and language, keep the footer readable, and use a stable server connection. A downloaded Scryfall bulk catalog can supply uncached candidate details locally instead of waiting for provider requests.
+
+For a comfortable scanning rhythm, wait for the saved-card confirmation, lift the old card completely out of the box, then place the next card and hold it steady. Pause scanning if you need more time. The confirmation countdown occurs **before** saving; it is not a post-save handling timer.
 
 #### Scanner troubleshooting and privacy
 

@@ -764,9 +764,15 @@ async function getCardById(cardId) {
   }
   if (cached) return parseCardRow(cached);
   try {
-    const resp = await scryGet(`/cards/${rawId}`);
-    if (resp.data) {
-      const norm = normalizeCard(resp.data);
+    // Reuse the downloaded snapshot before spending a rate-limited request.
+    let raw;
+    if (await scryfallBulk.storedMetadata()) {
+      const { pairs } = await scryfallBulk.resolveRows([{ id: rawId }]);
+      raw = pairs[0]?.raw;
+    }
+    raw ||= (await scryGet(`/cards/${rawId}`)).data;
+    if (raw) {
+      const norm = normalizeCard(raw);
       await cacheCards([norm]);
       return norm;
     }

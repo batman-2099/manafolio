@@ -227,20 +227,15 @@ async function scanArtworkPrintings(candidates, sets, langName) {
     && (art.get(card.id) || []).some(id => topArt.has(id)));
 }
 
-async function applyScanSafety(result, buf, { cropped, sets, langName }) {
+async function applyScanSafety(result, footer, { sets, langName }) {
   const candidates = result.candidates;
   const codes = await db.all(`SELECT id AS code FROM sets WHERE game = 'mtg'
     UNION SELECT DISTINCT set_id AS code FROM card_cache WHERE game = 'mtg'`);
-  let ocr;
-  try {
-    const image = cropped ? buf : (result.crop ? Buffer.from(result.crop.split(',').pop(), 'base64') : null);
-    ocr = image && result.detected !== false
-      ? await scanOcr.readPrinting(image, { setCodes: [...codes.map(r => scanSetCode(r.code)), ...candidates.map(c => scanSetCode(c.set))] })
-      : { status: 'unreadable' };
-  } catch (error) {
-    console.warn('scan-match OCR failed:', error.message);
-    ocr = { status: 'error' };
-  }
+  let ocr = typeof footer.tsv === 'string'
+    ? scanOcr.parsePrintingTsv(footer.tsv, {
+      setCodes: [...codes.map(r => scanSetCode(r.code)), ...candidates.map(c => scanSetCode(c.set))],
+    })
+    : footer;
   const artPrintings = await scanArtworkPrintings(candidates, sets, candidates[0]?.card?.language || langName);
   const topScore = candidates[0]?.score;
   const nearby = candidates.filter(c => topScore - c.score < cvScan.STRONG_MARGIN);
@@ -295,6 +290,7 @@ async function applyScanSafety(result, buf, { cropped, sets, langName }) {
 }
 
 router.post('/scan-match', searchLimiter, async (req, res) => {
+  const started = performance.now();
   try {
     const { image, set = '', lang, cropped = false } = req.body || {};
     const game = req.body?.game === undefined ? 'mtg' : req.body.game;
@@ -328,7 +324,27 @@ router.post('/scan-match', searchLimiter, async (req, res) => {
     }
 
     const sets = parseSetList(set);
+    const timings = {};
+    const matchStarted = performance.now();
     const result = await cvScan.match(buf, game, 8, { sets, lang: langName, cropped: !!cropped });
+    timings.matchMs = performance.now() - matchStarted;
+
+    // Recognition needs the crop, not metadata. Catch immediately so a failed
+    // subprocess never rejects unobserved while provider requests are pending.
+    const ocrPromise = (async () => {
+      const ocrStarted = performance.now();
+      try {
+        const footer = cropped ? buf : (result.crop ? Buffer.from(result.crop.split(',').pop(), 'base64') : null);
+        return footer && result.detected !== false
+          ? await scanOcr.readFooter(footer) : { status: 'unreadable' };
+      } catch (error) {
+        console.warn('scan-match OCR failed:', error.message);
+        return { status: 'error' };
+      } finally {
+        timings.ocrMs = performance.now() - ocrStarted;
+      }
+    })();
+    const metadataStarted = performance.now();
 
     result.candidates = await Promise.all(result.candidates.map(async (cand) => {
       if (!cand.cardId) return cand;
@@ -346,7 +362,13 @@ router.post('/scan-match', searchLimiter, async (req, res) => {
 
     result.candidates = result.candidates.filter((candidate, index, all) =>
       all.findIndex(other => scanPrintingId(other) === scanPrintingId(candidate)) === index);
-    await applyScanSafety(result, buf, { cropped: !!cropped, sets, langName });
+    timings.metadataMs = performance.now() - metadataStarted;
+    const footer = await ocrPromise;
+    const safetyStarted = performance.now();
+    await applyScanSafety(result, footer, { sets, langName });
+    timings.safetyMs = performance.now() - safetyStarted;
+    // Overlapping wall-clock stages: these durations are not additive.
+    result.timings = { ...timings, totalMs: performance.now() - started };
 
     return res.json(result);
   } catch (error) {

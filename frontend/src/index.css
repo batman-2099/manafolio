@@ -1378,12 +1378,9 @@ button.collection-card-trigger {
   height: 72%;
   aspect-ratio: 5 / 7;
   max-width: 88%;
-  /* Invisible on purpose. The element still defines the crop region and stays
-     draggable — buildFramedCanvas reads its geometry — but the live green
-     outline is what shows where the detector actually is, so a second box
-     drawn around it was only noise. border-color still carries the error
-     flash; the capture cue is the full-frame .scan-flash below. */
-  border: 2px solid transparent;
+  /* Keep the aiming frame visible before detection; its geometry defines the crop. */
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(0, 0, 0, 0.8);
   border-radius: var(--radius-md);
   position: relative;
 }

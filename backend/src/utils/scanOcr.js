@@ -88,10 +88,10 @@ function recognize(image) {
   });
 }
 
-async function readPrinting(rectifiedImageBuffer, { setCodes = [] } = {}) {
+async function readFooter(rectifiedImageBuffer) {
   // Bound work before decoding/spawning; busy callers get an explicit retryable error.
   if (!Buffer.isBuffer(rectifiedImageBuffer) || !rectifiedImageBuffer.length
-      || rectifiedImageBuffer.length > 8 * 1024 * 1024 || !Array.isArray(setCodes) || active >= 2) {
+      || rectifiedImageBuffer.length > 8 * 1024 * 1024 || active >= 2) {
     return { status: 'error' };
   }
   active++;
@@ -107,7 +107,8 @@ async function readPrinting(rectifiedImageBuffer, { setCodes = [] } = {}) {
       .flatten({ background: '#fff' }).grayscale().resize({ width: 1344 }).normalise().sharpen()
       .extend({ top: 16, bottom: 16, left: 16, right: 16, background: '#fff' })
       .timeout({ seconds: 3 }).png().toBuffer();
-    return parsePrintingTsv(await recognize(footer), { setCodes });
+    // Parse only after candidate hydration supplies any newly learned set codes.
+    return { tsv: await recognize(footer) };
   } catch (error) {
     if (error.code === 'ENOENT') return { status: 'unavailable' };
     console.warn('[scanOcr]', error.message);
@@ -117,4 +118,4 @@ async function readPrinting(rectifiedImageBuffer, { setCodes = [] } = {}) {
   }
 }
 
-module.exports = { readPrinting, parsePrintingTsv };
+module.exports = { readFooter, parsePrintingTsv };
