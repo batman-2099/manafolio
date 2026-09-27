@@ -14,6 +14,7 @@ Release history starts with Manafolio 2.0.
 - Made List-view card artwork grow slightly faster than the surrounding row when zooming in, while keeping its default size unchanged.
 - Made the scanner's card-shaped placement guide visible before detection, with a white border and dark outline; capture geometry and recognition behavior are unchanged.
 - Overlapped scan footer OCR with candidate metadata lookup, reused the local Scryfall bulk snapshot for uncached card-ID lookups, and exposed per-frame timing diagnostics. Scanner presets now describe their actual upload/confirmation controls; unused ORB parameters were removed without weakening verification.
+- Refined the dashboard's card total, net worth, invested cost, and unrealized gain summary with clearer typography, theme-aware solid surfaces, and responsive grouping. Moved average market value per card beneath Net Worth; calculations and inventory filters are unchanged.
 
 ## 2.0.8
 

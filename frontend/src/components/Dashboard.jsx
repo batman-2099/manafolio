@@ -207,13 +207,13 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
           <div>
             <dt>{t(isArchive ? 'dash.archivedValue' : 'dash.netWorth')}</dt>
             <dd className="dashboard-summary-value">{currencySymbol()}{money(summary.totalValue)}</dd>
+            <dd className="dashboard-summary-note">{t('dash.avgPerCard', { price: priceText(summary.avgCardValue) })}</dd>
           </div>
         </dl>
         <dl className="dashboard-summary-secondary">
           <div>
             <dt>{t(isArchive ? 'dash.archivedCost' : 'dash.totalInvested')}</dt>
             <dd className="dashboard-summary-value">{currencySymbol()}{money(summary.totalSpent)}</dd>
-            <dd className="dashboard-summary-note">{t('dash.avgPerCard', { price: priceText(summary.avgCardValue) })}</dd>
           </div>
           <div>
             <dt>{t(isArchive ? 'dash.archivedValueDifference' : 'dash.unrealizedGain')}</dt>
