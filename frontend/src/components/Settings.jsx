@@ -6,6 +6,7 @@ import { LOCALES, localeName, useT } from '../utils/i18n';
 import { getRepoUrl, issueUrl } from '../utils/repo';
 import CodexSettings from './CodexSettings';
 import themes from '../../../shared/themes.json';
+import './Settings.css';
 
 
 function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
@@ -459,12 +460,31 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }} className="settings-grid">
+      <div className="settings-layout">
+      <nav className="settings-sections" aria-label={t('settings.title')} onClick={event => {
+        const link = event.target.closest('a');
+        if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const heading = document.getElementById(link.hash.slice(1));
+        if (!heading) return;
+        event.preventDefault();
+        heading.focus({ preventScroll: true });
+        heading.scrollIntoView({ block: 'start' });
+      }}>
+        <a href="#settings-sharing">{t('settings.sharingTitle')}</a>
+        <a href="#settings-security">{t('settings.securityTitle')}</a>
+        <a href="#settings-keys">{t('settings.keysTitle')}</a>
+        {user && <a href="#codex-settings-title">{t('codexSettings.title')}</a>}
+        {user?.role === 'admin' && <a href="#settings-bulk-title">{t('settings.bulkTitle')}</a>}
+        <a href="#settings-backup">{t('settings.backupTitle')}</a>
+        <a href="#settings-preferences">{t('prefs.title')}</a>
+        <a href="#settings-about">{t('settings.aboutTitle')}</a>
+      </nav>
+      <div className="settings-grid">
         {/* Sharing Panel */}
         <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Share2 size={20} aria-hidden="true" />
-            <h3 className="section-heading">{t('settings.sharingTitle')}</h3>
+            <h3 id="settings-sharing" tabIndex={-1} className="section-heading">{t('settings.sharingTitle')}</h3>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
@@ -624,10 +644,10 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <KeyRound size={20} aria-hidden="true" />
-            <h3 className="section-heading">{t('settings.securityTitle')}</h3>
+            <h3 id="settings-security" tabIndex={-1} className="section-heading">{t('settings.securityTitle')}</h3>
           </div>
 
-          <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <form className="settings-password-form" onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label htmlFor="current-password">{t('settings.currentPassword')}</label>
               <input
@@ -692,7 +712,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <KeyRound size={20} aria-hidden="true" />
-            <h3 className="section-heading">{t('settings.keysTitle')}</h3>
+            <h3 id="settings-keys" tabIndex={-1} className="section-heading">{t('settings.keysTitle')}</h3>
           </div>
 
 
@@ -769,7 +789,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
           <section className="view-section" aria-labelledby="settings-bulk-title" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Database size={20} aria-hidden="true" />
-              <h3 id="settings-bulk-title" className="section-heading">{t('settings.bulkTitle')}</h3>
+              <h3 id="settings-bulk-title" tabIndex={-1} className="section-heading">{t('settings.bulkTitle')}</h3>
             </div>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>{t('settings.bulkHint')}</p>
             <form onSubmit={(e) => { e.preventDefault(); handleBulkAction('save'); }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -814,7 +834,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Database size={20} aria-hidden="true" />
-            <h3 className="section-heading">{t('settings.backupTitle')}</h3>
+            <h3 id="settings-backup" tabIndex={-1} className="section-heading">{t('settings.backupTitle')}</h3>
           </div>
 
           <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
@@ -870,7 +890,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <SlidersHorizontal size={20} aria-hidden="true" />
-            <h3 className="section-heading">{t('prefs.title')}</h3>
+            <h3 id="settings-preferences" tabIndex={-1} className="section-heading">{t('prefs.title')}</h3>
           </div>
 
           {/* Interface language. The picker only appears once a second locale file
@@ -999,7 +1019,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Info size={20} aria-hidden="true" />
-            <h3 className="section-heading">{t('settings.aboutTitle')}</h3>
+            <h3 id="settings-about" tabIndex={-1} className="section-heading">{t('settings.aboutTitle')}</h3>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -1101,6 +1121,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
             </a>}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

@@ -24,11 +24,17 @@ const MODEL_DIR = process.env.CV_MODEL_DIR || path.join(__dirname, '..', 'data',
 const SIZE = 448;
 const MEAN = [0.485, 0.456, 0.406];
 const STD = [0.229, 0.224, 0.225];
-const GAMES = ['mtg', 'lorcana'];
+const GAMES = ['mtg'];
 
 const suffix = (lang) => (!lang || lang === 'en' || lang === 'English' ? '' : `-${String(lang).toLowerCase()}`);
-const binPath = (game, lang) => path.join(MODEL_DIR, `milo-${game}${suffix(lang)}-local.bin`);
-const metaPath = (game, lang) => path.join(MODEL_DIR, `milo-${game}${suffix(lang)}-local.json`);
+const binPath = (game, lang) => {
+  if (game !== 'mtg') throw new Error('Unsupported game');
+  return path.join(MODEL_DIR, `milo-mtg${suffix(lang)}-local.bin`);
+};
+const metaPath = (game, lang) => {
+  if (game !== 'mtg') throw new Error('Unsupported game');
+  return path.join(MODEL_DIR, `milo-mtg${suffix(lang)}-local.json`);
+};
 
 // One build at a time. Two concurrent builds would fight over the same provider
 // rate limits and the same single-threaded ONNX session, and finish later than
@@ -58,13 +64,10 @@ function stop() {
 // set, in other words. The weekly refresh keeps the set list current (server.js
 // calls fetchAndCacheSets with force), so a release surfaces here on its own.
 //
-// The comparison has to be done in the SAME id namespace as card_cache, and that
-// differs per game, which is the whole reason this is not one query:
-//
-//   MTG — the `sets` table stores ids prefixed ("mtg-fdn") while card_cache stores
-//   the bare Scryfall code ("fdn"). Comparing them raw reports every set as new;
-//   the first version of this function did exactly that and claimed 1047 of 1047.
+// The `sets` table stores ids prefixed ("mtg-fdn") while card_cache stores the
+// bare Scryfall code ("fdn"). Comparing them raw reports every set as new.
 async function newSetCount(game, lang = 'English') {
+  if (game !== 'mtg') throw new Error('Unsupported game');
   try {
     // Do not repeatedly rebuild sets the provider cannot serve.
     const gaps = new Set((await db.all(
@@ -93,10 +96,10 @@ async function newSetCount(game, lang = 'English') {
     const rows = await db.all(
       `SELECT id FROM sets WHERE game = ? AND COALESCE(total, 0) > 0`, [game]
     );
-    // The `sets` table prefixes ids ("mtg-fdn", "lorcana-tfc") while card_cache
+    // The `sets` table prefixes ids ("mtg-fdn") while card_cache
     // holds the bare code ("fdn"). Both forms are checked, which is what the OR in
     // the old query did — dropping either one reports every set as new.
-    const bare = (id) => String(id).toLowerCase().replace(/^(?:mtg|lorcana)-/, '');
+    const bare = (id) => String(id).toLowerCase().replace(/^mtg-/, '');
     return rows.filter(r =>
       !gaps.has(bare(r.id))
       && !cached.has(String(r.id).toLowerCase())
@@ -165,6 +168,7 @@ async function list() {
 //
 // Keyed by lowercased set_id, which is what the scan filter matches on.
 async function setCounts(game, lang = 'English') {
+  if (game !== 'mtg') throw new Error('Unsupported game');
   const rows = await db.all(
     `SELECT id, LOWER(set_id) sid FROM card_cache
       WHERE game = ? AND language = ? AND set_id IS NOT NULL AND set_id != ''
@@ -181,7 +185,7 @@ async function setCounts(game, lang = 'English') {
   const sets = {};
   for (const r of rows) {
     const sid = r.sid;
-    const bare = sid.replace(/^(mtg|lorcana)-/, '');
+    const bare = sid.replace(/^mtg-/, '');
     const e = sets[sid] || (sets[sid] = { cached: 0, embedded: 0 });
     e.cached++;
     if (embedded && embedded.has(r.id)) e.embedded++;
@@ -285,7 +289,7 @@ async function embedPhase(job) {
   // it embedded.
   const scoped = job.sets && job.sets.length;
   const setFilter = scoped ? job.sets.flatMap(s => {
-    const bare = s.replace(/^(mtg|lorcana)-/, '');
+    const bare = s.replace(/^mtg-/, '');
     return [bare, `${job.game}-${bare}`];
   }) : [];
   const rows = await db.all(
@@ -324,15 +328,6 @@ async function embedPhase(job) {
   const inflight = new Map();
   const CONCURRENCY = 8;
 
-  // Use full-size Lorcana artwork for embeddings without enlarging grid thumbnails.
-  const embedUrl = (row) => {
-    let url = row.image_url;
-    if (url.includes('cards.lorcast.io/card/digital/')) {
-      url = url.replace(/\/card\/digital\/(?:small|normal)\//, '/card/digital/large/');
-    }
-    return url;
-  };
-
   // Scryfall's image CDN rejects a request with no User-Agent — 400, not 403, which
   // reads like a bad URL. Read the version from package.json.
   const HEADERS = {
@@ -340,7 +335,7 @@ async function embedPhase(job) {
     Accept: 'image/*',
   };
   const fetchOne = async (row) => {
-    const res = await fetch(embedUrl(row), {
+    const res = await fetch(row.image_url, {
       signal: AbortSignal.timeout(30000),
       headers: HEADERS,
     });
@@ -352,11 +347,9 @@ async function embedPhase(job) {
   const pump = () => {
     while (inflight.size < CONCURRENCY && queue.length && !job.cancelled) {
       const row = queue.shift();
-      // Resume compares the url that was EMBEDDED, not the one card_cache holds:
-      // raising the resolution above has to invalidate every vector built from the
-      // old one, and a row whose art was re-uploaded still has to rebuild.
-      if (prev && prev.vecs.has(row.id) && prev.srcs.get(row.id) === embedUrl(row)) {
-        ids.push(row.id); vecs.push(prev.vecs.get(row.id)); srcs[row.id] = embedUrl(row);
+      // Rebuild a vector when its source artwork changes.
+      if (prev && prev.vecs.has(row.id) && prev.srcs.get(row.id) === row.image_url) {
+        ids.push(row.id); vecs.push(prev.vecs.get(row.id)); srcs[row.id] = row.image_url;
         reused++; job.done++;
         continue;
       }
@@ -376,7 +369,7 @@ async function embedPhase(job) {
         const out = await session.run({ image: toTensor(data) });
         vecs.push(out.embedding.data);
         ids.push(settled.row.id);
-        srcs[settled.row.id] = embedUrl(settled.row);
+        srcs[settled.row.id] = settled.row.image_url;
         built++;
       } catch { failed++; }
     }
@@ -414,8 +407,8 @@ async function embedPhase(job) {
 }
 
 function start(game, lang = 'English', opts = {}) {
+  if (game !== 'mtg') throw new Error('Unsupported game');
   if (current) throw new Error('a catalog build is already running');
-  if (!GAMES.includes(game)) throw new Error(`unknown game ${game}`);
   const job = {
     game, lang: languages.toName(lang) || 'English',
     // Which sets this build covers, or empty for the whole game. Lowercased once

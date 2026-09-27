@@ -228,6 +228,8 @@ In Docker, `127.0.0.1` is the container. To reach host Ollama, use `OLLAMA_BASE_
 
 Use **Settings → Collection Backup & Data Options → Export Complete Backup**. The JSON includes collection entries, cached metadata, storage layouts and placements (including Graveyard), decks, commander selections, and deck results. Restore **replaces the signed-in account's collection, storage, and decks** after confirmation; it is not a merge or a server-credential backup.
 
+Only Magic integrations are supported. Records from removed integrations are not deleted or relabeled, and account exports retain them. Restore rejects backups containing unsupported game identities, or attempts to replace unsupported records already in the account, before changing account data. Preserve original backups for use with a compatible older deployment; do not change card IDs or game fields to force a restore.
+
 Restore accepts only the top-level format `manafolio-backup`. For an older compatible export, keep the original outside the deployment, make a copy, and change only that copy's top-level `format` to `manafolio-backup`. Leave its version and data intact: this is a marker conversion, not a schema upgrade or permission to relabel arbitrary JSON. Restore still validates compatibility.
 
 For server recovery, preserve the persistent volume and keep protected backups outside it; snapshots in the same volume do not protect against losing that volume. Stop database writers before an offline whole-volume copy, retaining the database and any WAL/SHM files together. Whole-volume backups may include account credentials and TLS private keys.

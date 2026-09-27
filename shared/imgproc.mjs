@@ -370,26 +370,6 @@ export function convexHullPacked(flat) {
   return lower.concat(upper).map((i) => ({ x: X(i), y: Y(i) }));
 }
 
-// Convex hull, counter-clockwise, via Andrew's monotone chain.
-export function convexHull(pts) {
-  if (pts.length < 3) return pts.slice();
-  const p = pts.slice().sort((a, b) => (a.x - b.x) || (a.y - b.y));
-  const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-  const lower = [];
-  for (const q of p) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop();
-    lower.push(q);
-  }
-  const upper = [];
-  for (let i = p.length - 1; i >= 0; i--) {
-    const q = p[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop();
-    upper.push(q);
-  }
-  lower.pop(); upper.pop();
-  return lower.concat(upper);
-}
-
 // Douglas-Peucker simplification of a closed polygon, matching cv.approxPolyDP.
 export function approxPolyDP(pts, epsilon) {
   if (pts.length < 3) return pts.slice();
@@ -437,13 +417,12 @@ export function isContourConvex(pts) {
   return true;
 }
 
-// Minimum-area enclosing rectangle, via rotating calipers over the hull.
+// Minimum-area enclosing rectangle of an existing convex hull.
 // Returns { center:{x,y}, size:{width,height}, points:[4] } like cv.minAreaRect
 // plus the corner points, since every caller here wants those.
-export function minAreaRect(pts) {
-  const hull = convexHull(pts);
+export function minAreaRect(hull) {
   if (hull.length < 3) {
-    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const xs = hull.map(p => p.x), ys = hull.map(p => p.y);
     const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
     return {
       center: { x: (x0 + x1) / 2, y: (y0 + y1) / 2 },

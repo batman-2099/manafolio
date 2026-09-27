@@ -228,9 +228,12 @@ router.put('/locations/:id', async (req, res) => {
     return res.status(400).json({ error: 'rule_config must be valid JSON' });
   }
   try {
-    const loc = await db.get(`SELECT id, sort_order, foil_sorting, inventory_type FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
+    const loc = await db.get(`SELECT id, game, sort_order, foil_sorting, inventory_type FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
     if (!loc) {
       return res.status(404).json({ error: 'Location not found' });
+    }
+    if (loc.game != null && !['mtg', 'any'].includes(loc.game)) {
+      return res.status(400).json({ error: 'Unsupported game' });
     }
     if (req.body.inventory_type !== undefined && req.body.inventory_type !== loc.inventory_type) {
       return res.status(400).json({ error: 'Container inventory cannot be changed after creation' });

@@ -1,0 +1,72 @@
+.admin-user-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.admin-user-action-label {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .admin-user-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .admin-user-table,
+  .admin-user-table tbody {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-user-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-glass);
+  }
+
+  .admin-user-table td {
+    min-width: 0;
+    padding: 0.5rem;
+    border: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-user-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 400;
+    margin-bottom: 0.25rem;
+  }
+
+  .admin-user-table .admin-user-actions-cell {
+    grid-column: 1 / -1;
+  }
+
+  .admin-user-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .admin-user-actions .btn {
+    width: 100%;
+    aspect-ratio: auto;
+    min-height: 44px;
+    justify-content: flex-start;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .admin-user-action-label {
+    display: inline;
+  }
+}

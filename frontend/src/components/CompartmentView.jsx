@@ -536,6 +536,7 @@ export default function CompartmentView({
               <input
                 autoFocus
                 className="input-control"
+                aria-label={t('compartment.renameHint')}
                 value={labelDraft}
                 onChange={(e) => setLabelDraft(e.target.value)}
                 onBlur={() => { if (editingLabel) { setEditingLabel(false); onRename(labelDraft); } }}
@@ -574,8 +575,9 @@ export default function CompartmentView({
                 <span>{compartment.count} /</span>
                 <input
                   type="number" min="1" className="input-control" defaultValue={compartment.capacity}
-                  onBlur={(e) => { const v = parseInt(e.target.value, 10); if (v > 0 && v !== compartment.capacity) onSetCapacity(v); }}
+                  onBlur={(e) => { const v = parseInt(e.target.value, 10); if (v > 0 && v !== compartment.capacity) onSetCapacity(v, e.currentTarget); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                  aria-label={t('compartment.changeCapacity')}
                   title={t('compartment.changeCapacity')}
                   style={{ width: '40px', padding: '0 0.1rem', fontSize: '0.65rem', background: 'transparent', border: '1px solid transparent', color: 'inherit', textAlign: 'left' }}
                 />
@@ -583,7 +585,7 @@ export default function CompartmentView({
             )}
             
             {canRemove && onRemove && (
-              <button type="button" className="btn btn-danger btn-icon-only" onClick={onRemove} title={t('compartment.removePage')} style={{ width: '22px', height: '22px', padding: 0, marginLeft: 'auto' }}>
+              <button type="button" className="btn btn-danger btn-icon-only" onClick={onRemove} aria-label={t('compartment.removePage')} title={t('compartment.removePage')} style={{ width: '22px', height: '22px', padding: 0, marginLeft: 'auto' }}>
                 &times;
               </button>
             )}
@@ -922,6 +924,7 @@ export default function CompartmentView({
             <button
               type="button"
               className="box-coverflow-nav left"
+              aria-label={t('loc.prev')}
               disabled={activeCardIndex <= 0}
               onClick={() => setCoverflowActiveIndex(prev => Math.max(0, prev - 1))}
             >
@@ -1061,6 +1064,7 @@ export default function CompartmentView({
             <button
               type="button"
               className="box-coverflow-nav right"
+              aria-label={t('common.next')}
               disabled={activeCardIndex >= renderedCards.length - 1}
               onClick={() => setCoverflowActiveIndex(prev => Math.min(renderedCards.length - 1, prev + 1))}
             >

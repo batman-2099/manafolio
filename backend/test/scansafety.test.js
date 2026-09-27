@@ -30,6 +30,13 @@ process.env.CV_MODEL_DIR = dir;
   fs.writeFileSync(path.join(dir, 'milo-mtg-local.json'), JSON.stringify({ dim: 2, ids: cards.map(card => card.id) }));
   fs.writeFileSync(path.join(dir, 'milo-mtg-local.bin'), Buffer.from(new Float32Array([0.94, 0, 0.88, 0, 0.1, 0]).buffer));
   const cvScan = require('../src/cvScan');
+  assert.throws(() => cvScan.isBuilt('unsupported'), /Unsupported game/);
+  assert.throws(() => cvScan.builtLangs('unsupported'), /Unsupported game/);
+  assert.throws(() => cvScan.reload('unsupported'), /Unsupported game/);
+  await assert.rejects(cvScan.load('unsupported'), /Unsupported game/);
+  await assert.rejects(cvScan.loadAll('unsupported'), /Unsupported game/);
+  await assert.rejects(cvScan.match(null, 'unsupported'), /Unsupported game/);
+  await assert.rejects(cvScan.scoreCards(null, 'unsupported', []), /Unsupported game/);
   const rgb = Buffer.alloc(448 * 448 * 3);
   for (let y = 0; y < 448; y++) {
     for (let x = 0; x < 448; x++) {

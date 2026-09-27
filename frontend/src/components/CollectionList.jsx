@@ -15,6 +15,7 @@ import AddToDeckSelect from './AddToDeckSelect';
 import PackPriceSplitter from './PackPriceSplitter';
 import CardImage from './CardImage';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import Modal from './Modal';
 
 const labelStyle = { fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' };
 const PAGE_SIZE = 60;
@@ -236,12 +237,12 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
     [locationFilter, rarityFilter, conditionFilter, graderFilter, printingFilter,
     setFilter, typeFilter, colorFilter, cmcFilter, languageFilter]
       .filter(v => v.length > 0).length
-    + (gameFilter !== '' ? 1 : 0)
     + (minPriceFilter !== '' ? 1 : 0)
     + (maxPriceFilter !== '' ? 1 : 0)
     + (tradeOnly ? 1 : 0)
     + (favoriteOnly ? 1 : 0)
     + (notCheckedOutOnly ? 1 : 0);
+  const hasUserFilters = activeFilterCount > 0 || searchFilter !== '';
 
   const clearAllFilters = () => {
     setSearchFilter('');
@@ -266,7 +267,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       const matchesLocation = locationFilter.length === 0 ? true :
                               locationFilter.some(f => f === 'unassigned' ? !item.location_id : item.location_id == f);
       // Hidden games remain stored but are excluded from this view and its exports.
-      const itemGame = item.game || 'mtg';
+      const itemGame = item.game;
       const matchesGame = gameFilter === '' ? isGameEnabled(itemGame) : itemGame === gameFilter;
       const matchesRarity = rarityFilter.length === 0 ? true : rarityFilter.includes(item.rarity);
       const matchesCondition = conditionFilter.length === 0 ? true : conditionFilter.includes(item.condition);
@@ -367,42 +368,22 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
   return (
     <div>
+      <div className="collection-inventory-picker form-group">
+        <label htmlFor="collection-inventory">{t('collection.inventory')}</label>
+        <select id="collection-inventory" className="select-control" value={subTab} onChange={event => setSubTab(event.target.value)}>
+          <option value="collection">{t('nav.collection')}</option>
+          <option value="arena">{t('collection.arena')}</option>
+          <option value="graveyard">{t('collection.graveyard')}</option>
+          <option value="unsorted">{t('bulk.unassignedPile')}</option>
+          <option value="wishlist">{t('collection.wishlist')}</option>
+        </select>
+      </div>
       <div className="sub-nav-tabs collection-inventory-nav" style={{ marginBottom: '0.75rem' }}>
-          <button
-            className={`sub-nav-tab ${subTab === 'collection' ? 'active' : ''}`}
-            aria-pressed={subTab === 'collection'}
-            onClick={() => setSubTab('collection')}
-          >
-            {t('nav.collection')}
+        {[['collection', 'nav.collection'], ['arena', 'collection.arena'], ['graveyard', 'collection.graveyard'], ['unsorted', 'bulk.unassignedPile'], ['wishlist', 'collection.wishlist']].map(([value, label]) => (
+          <button key={value} className={`sub-nav-tab ${subTab === value ? 'active' : ''}`} aria-pressed={subTab === value} onClick={() => setSubTab(value)}>
+            {t(label)}
           </button>
-          <button
-            className={`sub-nav-tab ${subTab === 'arena' ? 'active' : ''}`}
-            aria-pressed={subTab === 'arena'}
-            onClick={() => setSubTab('arena')}
-          >
-            {t('collection.arena')}
-          </button>
-          <button
-            className={`sub-nav-tab ${subTab === 'graveyard' ? 'active' : ''}`}
-            aria-pressed={subTab === 'graveyard'}
-            onClick={() => setSubTab('graveyard')}
-          >
-            {t('collection.graveyard')}
-          </button>
-          <button
-            className={`sub-nav-tab ${subTab === 'unsorted' ? 'active' : ''}`}
-            aria-pressed={subTab === 'unsorted'}
-            onClick={() => setSubTab('unsorted')}
-          >
-            {t('bulk.unassignedPile')}
-          </button>
-          <button
-            className={`sub-nav-tab ${subTab === 'wishlist' ? 'active' : ''}`}
-            aria-pressed={subTab === 'wishlist'}
-            onClick={() => setSubTab('wishlist')}
-          >
-            {t('collection.wishlist')}
-          </button>
+        ))}
       </div>
 
 
@@ -437,6 +418,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
             onClick={() => setShowFilters(s => !s)}
             aria-expanded={showFilters}
             aria-controls="collection-filter-options"
+            aria-haspopup="dialog"
             style={{ padding: '0.5rem 0.9rem', minHeight: '44px', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
           >
             <SlidersHorizontal size={15} />
@@ -450,9 +432,15 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
         </div>
 
         {showFilters && (
-          <div id="collection-filter-options" className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <Modal onClose={() => setShowFilters(false)} aria-labelledby="collection-filter-title">
+          <div id="collection-filter-options" className="glass-panel collection-filter-panel">
+            <header className="collection-filter-heading">
+              <h2 id="collection-filter-title">{t('collection.filters')}</h2>
+              <button type="button" className="btn btn-secondary btn-icon-only" aria-label={t('common.close')} onClick={() => setShowFilters(false)}><X size={18} /></button>
+            </header>
+            <div className="collection-filter-body">
             {/* Selector filters grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
+            <div className="collection-filter-grid">
               <Field label={t('collection.fLocation')}>
                 <MultiSelectDropdown
                   label={t('collection.fLocation')}
@@ -624,13 +612,14 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                 </div>
               )}
 
-              {activeFilterCount > 0 && (
-                <button className="btn btn-secondary" onClick={clearAllFilters} style={{ marginLeft: 'auto', fontSize: '0.72rem', padding: '0.3rem 0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <X size={13} /> {t('collection.clearFilters')}
-                </button>
-              )}
             </div>
+            </div>
+            <footer className="collection-filter-footer">
+              <button type="button" className="btn btn-secondary" disabled={!hasUserFilters} onClick={clearAllFilters}>{t('collection.clearFilters')}</button>
+              <button type="button" className="btn btn-primary" onClick={() => setShowFilters(false)}>{t('bulk.done')}</button>
+            </footer>
           </div>
+          </Modal>
         )}
       </div>
 
@@ -782,7 +771,14 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
         <div className="spinner"></div>
       ) : displayCards.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem 0' }}>
-          <p>{t('collection.noMatches')} {t(activeFilterCount > 0 ? 'collection.noMatchesFiltered' : 'collection.noMatchesEmpty')}</p>
+          <p>{t(hasUserFilters ? 'collection.noMatches' : 'collection.emptyInventory')}</p>
+          {hasUserFilters ? (
+            <button type="button" className="btn btn-secondary" onClick={clearAllFilters}>{t('collection.clearFilters')}</button>
+          ) : subTab === 'graveyard' || subTab === 'unsorted' ? (
+            <button type="button" className="btn btn-secondary" onClick={() => setSubTab('collection')}>{t('nav.collection')}</button>
+          ) : (
+            <button type="button" className="btn btn-primary" onClick={() => onNavigate('add-cards')}>{t('nav.addCards')}</button>
+          )}
         </div>
       ) : viewMode === 'gallery' ? (
         /* Visual Cards Grid Gallery View */
@@ -797,7 +793,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                 key={item.entry_id}
                 className="tcg-card"
                 style={{ cursor: 'pointer', touchAction: 'pan-y' }}
-                aria-label={getCardDisplayName(item.name, item.language, item.printed_name)}
+                aria-label={getCardDisplayName(item.name, item.printed_name)}
                 aria-pressed={selectMode ? selected : undefined}
                 aria-haspopup={selectMode ? undefined : 'dialog'}
                 onClick={(e) => activateCard(item, e)}
@@ -817,7 +813,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
                 </span>
                 <span className="tcg-card-info">
-                  <span className="tcg-card-name">{getCardDisplayName(item.name, item.language, item.printed_name)}</span>
+                  <span className="tcg-card-name">{getCardDisplayName(item.name, item.printed_name)}</span>
                   <span className="tcg-card-meta">
                     <span>{item.set_name} • #{item.number}</span>
                     <span className="tcg-card-price">{priceText(item.price_trend, item.price_currency)}</span>
@@ -860,7 +856,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                           <input
                             type="checkbox"
                             checked={selected}
-                            aria-label={getCardDisplayName(item.name, item.language, item.printed_name)}
+                            aria-label={getCardDisplayName(item.name, item.printed_name)}
                             onChange={() => toggleSelect(item.entry_id)}
                             style={{ width: '18px', height: '18px', flexShrink: 0, cursor: 'pointer' }}
                           />
@@ -868,7 +864,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                         <button
                           type="button"
                           className="collection-card-trigger"
-                          aria-label={getCardDisplayName(item.name, item.language, item.printed_name)}
+                          aria-label={getCardDisplayName(item.name, item.printed_name)}
                           aria-pressed={selectMode ? selected : undefined}
                           aria-haspopup={selectMode ? undefined : 'dialog'}
                           onClick={(e) => activateCard(item, e)}
@@ -881,7 +877,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                           )}
                         </button>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <button type="button" className="collection-card-trigger" aria-pressed={selectMode ? selected : undefined} aria-haspopup={selectMode ? undefined : 'dialog'} onClick={(e) => activateCard(item, e)} {...pressHandlers(item.entry_id)} style={{ display: 'block', maxWidth: '100%', fontWeight: 700, color: 'var(--text-strong)', fontSize: '1rem', textAlign: 'left', cursor: 'pointer' }}>{getCardDisplayName(item.name, item.language, item.printed_name)}</button>
+                          <button type="button" className="collection-card-trigger" aria-pressed={selectMode ? selected : undefined} aria-haspopup={selectMode ? undefined : 'dialog'} onClick={(e) => activateCard(item, e)} {...pressHandlers(item.entry_id)} style={{ display: 'block', maxWidth: '100%', fontWeight: 700, color: 'var(--text-strong)', fontSize: '1rem', textAlign: 'left', cursor: 'pointer' }}>{getCardDisplayName(item.name, item.printed_name)}</button>
                           <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem' }}>
                             <span>{item.set_name} • #{item.number}</span>
                             <span style={{ fontSize: '0.875rem', fontWeight: 600, ...getRarityBadgeStyle(item.rarity) }}>
@@ -896,7 +892,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                               <button className="btn btn-secondary btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => openEdit(item)} title={t('common.edit')} aria-label={t('common.edit')}>
                                 <Edit2 size={16} />
                               </button>
-                              <button className="btn btn-danger btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => handleDelete(item.entry_id, getCardDisplayName(item.name, item.language, item.printed_name))} title={t('common.delete')} aria-label={t('common.delete')}>
+                              <button className="btn btn-danger btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => handleDelete(item.entry_id, getCardDisplayName(item.name, item.printed_name))} title={t('common.delete')} aria-label={t('common.delete')}>
                                 <Trash2 size={16} />
                               </button>
                             </div>

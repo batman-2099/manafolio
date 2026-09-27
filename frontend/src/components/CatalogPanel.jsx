@@ -190,7 +190,7 @@ function BuildPicker({ game, lang, disabled, onBuild, showToast, label }) {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const codeOf = (s) => (s.id || '').replace(/^(mtg|lorcana)-/, '');
+  const codeOf = (s) => (s.id || '').replace(/^mtg-/, '');
 
   useEffect(() => {
     if (!open || sets.length) return;
@@ -255,7 +255,7 @@ function BuildPicker({ game, lang, disabled, onBuild, showToast, label }) {
         className="input-control"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder={game === 'lorcana' ? t('catalog.searchLorcanaPlaceholder') : t('catalog.searchMtgPlaceholder')}
+        placeholder={t('catalog.searchMtgPlaceholder')}
         style={{ padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
       />
       {loading

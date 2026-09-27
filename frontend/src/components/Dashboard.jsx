@@ -8,7 +8,7 @@ import { defaultGameFilter, gameLabel } from '../utils/games';
 import { useT } from '../utils/i18n';
 import CardInspectorModal from './CardInspectorModal';
 import CardImage from './CardImage';
-import DashboardAnalytics from './DashboardAnalytics';
+import DashboardAnalytics, { ChartDataTable } from './DashboardAnalytics';
 
 const COLORS = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', 
@@ -22,13 +22,7 @@ const TYPE_COLORS = {
   'Black': '#334155',
   'Red': '#ef4444',
   'Green': '#10b981',
-  'Land': '#d97706',
-  'Amber': '#f59e0b',
-  'Amethyst': '#a855f7',
-  'Emerald': '#10b981',
-  'Ruby': '#ef4444',
-  'Sapphire': '#3b82f6',
-  'Steel': '#94a3b8'
+  'Land': '#d97706'
 };
 
 function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEntryId, onUpdate, showToast }) {
@@ -191,6 +185,12 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
   const change = timePeriod === '7d' ? summary.change7d
     : timePeriod === '30d' ? summary.change30d
     : timePeriod === '1y' ? summary.change1y : summary.change5y;
+  const timelineTitle = t(isArchive ? 'dash.archiveTimelineTitle' : 'dash.timelineTitle');
+  const setTitle = t(isArchive ? 'dash.archiveValueBySet' : 'dash.valueBySet');
+  const typeTitle = t(gameFilter === 'mtg' ? 'dash.colorDistribution' : 'dash.typeDistribution');
+  const rarityTitle = t('dash.rarityDistribution');
+  const formatMoney = value => `${currencySymbol()}${money(value)}`;
+  const formatDate = value => new Date(`${value}T00:00:00Z`).toLocaleDateString(locale, { timeZone: 'UTC' });
 
   return (
     <div className="dashboard-page">
@@ -229,7 +229,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
 
       <section className="dashboard-timeline view-section" aria-labelledby="dashboard-timeline-title">
         <div className="dashboard-timeline-header">
-          <h2 id="dashboard-timeline-title" className="section-heading">{t(isArchive ? 'dash.archiveTimelineTitle' : 'dash.timelineTitle')}</h2>
+          <h2 id="dashboard-timeline-title" className="section-heading">{timelineTitle}</h2>
           <div className="sub-nav-tabs dashboard-periods" style={{ margin: 0 }}>
             {['7d', '30d', '1y', '5y'].map(period => (
               <button key={period} type="button" className={`sub-nav-tab ${timePeriod === period ? 'active' : ''}`}
@@ -256,25 +256,27 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
             <div className="chart-empty">{t('dash.notEnoughHistory')}</div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={historyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              <AreaChart data={historyData} role="img" aria-labelledby="dashboard-timeline-title" margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={valueColor} stopOpacity={0.4}/>
                     <stop offset="95%" stopColor={valueColor} stopOpacity={0.0}/>
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="date" stroke="var(--text-secondary)" style={{ fontSize: '0.7rem' }} />
+                <XAxis dataKey="date" tickFormatter={formatDate} stroke="var(--text-secondary)" style={{ fontSize: '0.7rem' }} />
                 <YAxis stroke="var(--text-secondary)" style={{ fontSize: '0.7rem' }} tickFormatter={(v) => `${currencySymbol()}${v}`} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }}
                   labelStyle={{ color: 'var(--text-primary)' }}
-                  formatter={(v) => [`${currencySymbol()}${v}`, t(isArchive ? 'dash.archivedValue' : 'dash.portfolioValue')]}
+                  labelFormatter={formatDate}
+                  formatter={v => [formatMoney(v), t(isArchive ? 'dash.archivedValue' : 'dash.portfolioValue')]}
                 />
                 <Area type="monotone" dataKey="value" stroke={valueColor} strokeWidth={2} fillOpacity={1} fill="url(#colorVal)" />
               </AreaChart>
             </ResponsiveContainer>
           )}
         </div>
+        {!loadingHistory && historyData.length > 0 && <ChartDataTable titleId="dashboard-timeline-title" title={timelineTitle} category={t('dash.date')} categoryKey="date" formatCategory={formatDate} rows={historyData} series={[{ key: 'value', label: t(isArchive ? 'dash.archivedValue' : 'dash.portfolioValue') }]} format={formatMoney} />}
       </section>
 
       <section className="dashboard-analytics view-section" aria-labelledby="dashboard-analytics-title">
@@ -286,20 +288,20 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
           
           {/* Card Value by Set Chart */}
           <div className="dashboard-subsection view-section">
-            <h3 className="section-heading">{t(isArchive ? 'dash.archiveValueBySet' : 'dash.valueBySet')}</h3>
-            <div className="chart-container dashboard-set-chart" role="region" aria-label={t(isArchive ? 'dash.archiveValueBySet' : 'dash.valueBySet')} tabIndex={0}>
+            <h3 id="dashboard-set-title" className="section-heading">{setTitle}</h3>
+            <div className="chart-container dashboard-set-chart" role="region" aria-labelledby="dashboard-set-title" tabIndex={0}>
               {sets.length === 0 ? (
                 <div className="chart-empty">{t('dash.noSetData')}</div>
               ) : (
               <div className="dashboard-set-chart-inner" style={{ width: '100%', height: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sets} layout="vertical" margin={{ left: 10, right: 30, top: 10, bottom: 10 }}>
+                <BarChart data={sets} role="img" aria-labelledby="dashboard-set-title" layout="vertical" margin={{ left: 10, right: 30, top: 10, bottom: 10 }}>
                   <XAxis type="number" stroke="var(--text-secondary)" tickFormatter={(v) => `${currencySymbol()}${v}`} />
                   <YAxis dataKey="name" type="category" width={120} stroke="var(--text-secondary)" tickLine={false} axisLine={false} style={{ fontSize: '0.8rem' }} />
                   <Tooltip 
                     contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }}
                     labelStyle={{ color: 'var(--text-primary)' }}
-                    formatter={(v) => [`${currencySymbol()}${v}`, t('dash.value')]}
+                    formatter={v => [formatMoney(v), t('dash.value')]}
                   />
                   <Bar dataKey="value" fill="var(--accent-red)" radius={[0, 4, 4, 0]} />
                 </BarChart>
@@ -307,18 +309,19 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
               </div>
               )}
             </div>
+            {sets.length > 0 && <ChartDataTable titleId="dashboard-set-title" title={setTitle} category={t('sort.by.set')} rows={sets} series={[{ key: 'value', label: t('dash.value') }]} format={formatMoney} />}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
             {/* Type Distribution Donut Chart */}
             <div className="dashboard-subsection view-section">
-              <h3 className="section-heading">{t(gameFilter === 'mtg' ? 'dash.colorDistribution' : 'dash.typeDistribution')}</h3>
+              <h3 id="dashboard-type-title" className="section-heading">{typeTitle}</h3>
               <div className="chart-container dashboard-donut" style={{ height: '220px' }}>
                 {typeChartData.length === 0 ? (
                   <div className="chart-empty">{t('dash.noTypeData')}</div>
                 ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
+                  <PieChart role="img" aria-labelledby="dashboard-type-title">
                     <Pie
                       data={typeChartData}
                       cx="50%"
@@ -349,17 +352,18 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                 </ResponsiveContainer>
                 )}
               </div>
+              {typeChartData.length > 0 && <ChartDataTable titleId="dashboard-type-title" title={typeTitle} category={t(gameFilter === 'mtg' ? 'collection.fColor' : 'sort.by.type')} rows={typeChartData} series={[{ key: 'value', label: t('dash.cards') }]} />}
             </div>
 
             {/* Rarity Distribution Chart */}
             <div className="dashboard-subsection view-section">
-              <h3 className="section-heading">{t('dash.rarityDistribution')}</h3>
+              <h3 id="dashboard-rarity-title" className="section-heading">{rarityTitle}</h3>
               <div className="chart-container dashboard-donut" style={{ height: '220px' }}>
                 {rarityChartData.length === 0 ? (
                   <div className="chart-empty">{t('dash.noRarityData')}</div>
                 ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
+                  <PieChart role="img" aria-labelledby="dashboard-rarity-title">
                     <Pie
                       data={rarityChartData}
                       cx="50%"
@@ -390,6 +394,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                 </ResponsiveContainer>
                 )}
               </div>
+              {rarityChartData.length > 0 && <ChartDataTable titleId="dashboard-rarity-title" title={rarityTitle} category={t('sort.by.rarity')} rows={rarityChartData} series={[{ key: 'value', label: t('dash.cards') }]} />}
             </div>
           </div>
         </div>
@@ -419,7 +424,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                   <CardImage card={card} style={{ width: '56px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }} />
                   <div className="dashboard-card-description" style={{ flex: 1, overflow: 'hidden' }}>
                     <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {getCardDisplayName(card.name, card.language, card.printed_name)}
+                      {getCardDisplayName(card.name, card.printed_name)}
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <span>{card.set_name} • {card.rarity}</span>
@@ -458,7 +463,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                     <CardImage card={card} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }} />
                     <div className="dashboard-card-description" style={{ flex: 1, overflow: 'hidden' }}>
                       <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {getCardDisplayName(card.name, card.language, card.printed_name)}
+                        {getCardDisplayName(card.name, card.printed_name)}
                       </div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         <span>{card.set_name} • #{card.number}</span>

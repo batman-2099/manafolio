@@ -29,7 +29,7 @@ async function testEditor() {
       (name, description, game, format, category, accent_color, target_size, user_id, commander_card_id, wins, losses)
       VALUES ('Before', 'Before', 'mtg', 'Commander', 'Casual', '#eab308', 100, 1, 'first', 2, 3)`)).lastID;
     const foreignDeck = (await db.run("INSERT INTO decks (name, game, user_id) VALUES ('Foreign deck', 'mtg', 2)")).lastID;
-    const legacyDeck = (await db.run("INSERT INTO decks (name, game, user_id) VALUES ('Legacy', 'lorcana', 1)")).lastID;
+    const legacyDeck = (await db.run("INSERT INTO decks (name, game, user_id) VALUES ('Legacy', 'unsupported', 1)")).lastID;
     await db.run(`INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, 'first', 1), (?, 'removed', 1), (?, 'foreign', 1)`, [id, id, foreignDeck]);
     const inventory = await db.all('SELECT * FROM collection ORDER BY id');
     const foreignBefore = await db.get('SELECT * FROM decks WHERE id = ?', [foreignDeck]);

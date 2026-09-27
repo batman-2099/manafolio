@@ -41,11 +41,11 @@ process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-cardprinting-${process.p
     ['mtg-neo-1', 'Ancestral Katana', 'neo', '1', 'mtg', 'English', 'USD']
   );
 
-  // Insert mock Lorcana card into cache
+  // Stored unsupported cards remain unchanged and cannot be localized.
   await db.run(
     `INSERT OR REPLACE INTO card_cache (id, name, set_id, number, game, language, price_currency)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ['lorcana-tyler', 'Tyler Nguyen-Baker - 4*Town Fan', 'lorcana-5', '12', 'lorcana', 'English', 'USD']
+    ['legacy-card', 'Legacy Card', 'legacy-set', '12', 'unsupported', 'English', 'USD']
   );
 
   const server = app.listen(0);
@@ -61,22 +61,15 @@ process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-cardprinting-${process.p
     assert.strictEqual(dataMtg.printed_name, '祖先の刀');
     assert.strictEqual(dataMtg.name, 'Ancestral Katana');
 
-    // 3. Lorcana card translation in French
-    const resLorcanaFr = await fetch(`${baseUrl}/cards/lorcana-tyler/printing?lang=fr&game=lorcana`);
-    assert.strictEqual(resLorcanaFr.status, 200);
-    const dataLorcanaFr = await resLorcanaFr.json();
-    assert.strictEqual(dataLorcanaFr.language, 'French');
-    assert.strictEqual(dataLorcanaFr.printed_name, 'Tyler Nguyen-Baker - Fan des 4*Town');
-
-    // 3b. Lorcana card translation in German
-    const resLorcanaDe = await fetch(`${baseUrl}/cards/lorcana-tyler/printing?lang=de&game=lorcana`);
-    assert.strictEqual(resLorcanaDe.status, 200);
-    const dataLorcanaDe = await resLorcanaDe.json();
-    assert.strictEqual(dataLorcanaDe.language, 'German');
-    assert.strictEqual(dataLorcanaDe.printed_name, 'Tyler Nguyen-Baker - 4*Town-Fan');
+    for (const query of ['lang=fr', 'lang=en', 'lang=fr&game=mtg']) {
+      const response = await fetch(`${baseUrl}/cards/legacy-card/printing?${query}`);
+      assert.strictEqual(response.status, 400);
+    }
+    assert.deepStrictEqual(await db.get('SELECT game, language, printed_name FROM card_cache WHERE id = ?', ['legacy-card']),
+      { game: 'unsupported', language: 'English', printed_name: null });
 
     // 4. Missing lang parameter returns 400
-    const resMissing = await fetch(`${baseUrl}/cards/lorcana-tyler/printing`);
+    const resMissing = await fetch(`${baseUrl}/cards/mtg-neo-1/printing`);
     assert.strictEqual(resMissing.status, 400);
 
     // 5. Nonexistent card returns 404
@@ -85,7 +78,7 @@ process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-cardprinting-${process.p
 
     const unsupported = await fetch(`${baseUrl}/cards/unsupported-1/printing?lang=ja`);
     assert.strictEqual(unsupported.status, 400);
-    const mismatched = await fetch(`${baseUrl}/cards/mtg-neo-1/printing?lang=ja&game=lorcana`);
+    const mismatched = await fetch(`${baseUrl}/cards/mtg-neo-1/printing?lang=ja&game=unsupported`);
     assert.strictEqual(mismatched.status, 400);
 
     await db.run(`INSERT INTO card_cache (id, name, set_id, number, game, language)

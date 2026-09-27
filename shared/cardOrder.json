@@ -3,7 +3,6 @@
   "type": {
     "White": 1, "Blue": 2, "Black": 3, "Red": 4, "Green": 5,
     "Multicolor": 6, "Colorless": 7,
-    "Amber": 8, "Amethyst": 9, "Emerald": 10, "Ruby": 11, "Sapphire": 12, "Steel": 13,
     "Unknown": 100
   },
   "printingNormalsFirst": {

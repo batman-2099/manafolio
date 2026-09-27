@@ -172,21 +172,13 @@ const CERTIFICATE = {
   // Exercise the mounted cert endpoint, including provider dispatch and rejection.
   const express = require('express');
   const scryfall = require('../src/scryfallApi');
-  const lorcast = require('../src/lorcastApi');
   const originalSearch = scryfall.searchCards;
-  const originalLorcanaSearch = lorcast.searchCards;
   scryfall.searchCards = async ({ name, number }) => {
     assert.strictEqual(name, 'BLACK LOTUS');
     assert.strictEqual(number, '232');
     return { cards: [{ id: 'mtg-cert-match', name: 'Black Lotus', game: 'mtg' }] };
   };
-  lorcast.searchCards = async ({ name, number }) => {
-    assert.strictEqual(name, 'MICKEY MOUSE');
-    assert.strictEqual(number, '1');
-    return { cards: [{ id: 'lorcana-cert-match', name: 'Mickey Mouse', game: 'lorcana' }] };
-  };
   for (const [number, brand, subject] of [
-    ['55555555', 'DISNEY LORCANA', 'MICKEY MOUSE'],
     ['66666666', 'UNSUPPORTED GAME', 'Unsupported Card'],
   ]) {
     await db.run('INSERT INTO psa_cert (cert_number, payload) VALUES (?, ?)',
@@ -198,20 +190,15 @@ const CERTIFICATE = {
   const server = app.listen(0);
   const base = `http://127.0.0.1:${server.address().port}/api/collection/cert`;
   try {
-    for (const [cert, game, card] of [
-      ['82613901', 'mtg', 'mtg-cert-match'], ['55555555', 'lorcana', 'lorcana-cert-match'],
-    ]) {
-      const response = await fetch(`${base}/${cert}`);
-      assert.strictEqual(response.status, 200);
-      const body = await response.json();
-      assert.strictEqual(body.game, game);
-      assert.strictEqual(body.cert.grade, 9);
-      assert.strictEqual(body.candidates[0].id, card);
-    }
+    const response = await fetch(`${base}/82613901`);
+    assert.strictEqual(response.status, 200);
+    const body = await response.json();
+    assert.strictEqual(body.game, 'mtg');
+    assert.strictEqual(body.cert.grade, 9);
+    assert.strictEqual(body.candidates[0].id, 'mtg-cert-match');
     assert.strictEqual((await fetch(`${base}/66666666`)).status, 400);
   } finally {
     scryfall.searchCards = originalSearch;
-    lorcast.searchCards = originalLorcanaSearch;
     await new Promise(resolve => server.close(resolve));
   }
 

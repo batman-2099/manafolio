@@ -275,7 +275,7 @@ router.delete('/users/:id', async (req, res) => {
 
 // --- Set-index build management ---
 
-const isGame = (g) => ['mtg', 'lorcana'].includes(g);
+const isGame = (g) => g === 'mtg';
 
 // List persisted builds plus any in-flight/recent build progress.
 // --- Catalogs -------------------------------------------------------------

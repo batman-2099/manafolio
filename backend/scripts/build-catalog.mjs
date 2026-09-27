@@ -7,7 +7,6 @@
 //
 // Usage, from backend/:
 //   node scripts/build-catalog.mjs --game mtg
-//   node scripts/build-catalog.mjs --game lorcana
 //   node scripts/build-catalog.mjs --game mtg --skip-cache   # embed what is cached
 import { createRequire } from 'node:module';
 
@@ -17,6 +16,7 @@ const catalog = require('../src/catalog');
 
 const arg = (f, d) => { const i = process.argv.indexOf(f); return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
 const game = arg('--game', 'mtg');
+if (game !== 'mtg') throw new Error('Unsupported game');
 const lang = arg('--lang', 'English');
 const skipCache = process.argv.includes('--skip-cache');
 

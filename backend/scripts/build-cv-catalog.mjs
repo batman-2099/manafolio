@@ -4,14 +4,13 @@
 // Unlike published snapshots, they can incorporate newly cached cards.
 //
 // Output, beside the models:
-//   milo-<game>-local.bin    Float32 embeddings, n * dim, row-major
-//   milo-<game>-local.json   { dim, ids: [...], builtAt, model, views }
+//   milo-mtg-local.bin    Float32 embeddings, n * dim, row-major
+//   milo-mtg-local.json   { dim, ids: [...], builtAt, model, views }
 //
 // Resumable: re-running keeps every embedding already computed and only fetches
 // cards that are new or whose image_url changed. A full MTG build takes hours.
 //
 // Usage, from backend/:
-//   node scripts/build-cv-catalog.mjs --game lorcana
 //   node scripts/build-cv-catalog.mjs --game mtg --limit 2000
 //   node scripts/build-cv-catalog.mjs --game mtg --views 3   # augmented mean
 import fs from 'node:fs';
@@ -27,7 +26,7 @@ const db = require('../src/db');
 
 const arg = (f, d) => { const i = process.argv.indexOf(f); return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
 const game = arg('--game', 'mtg');
-if (!['mtg', 'lorcana'].includes(game)) throw new Error('Unsupported game');
+if (game !== 'mtg') throw new Error('Unsupported game');
 const lang = arg('--lang', 'English');
 const limit = parseInt(arg('--limit', '0'), 10);
 const views = Math.max(1, parseInt(arg('--views', '1'), 10));

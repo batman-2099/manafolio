@@ -121,7 +121,7 @@ async function testImportRoute() {
       '"mtg-arena-lancer","A-Cobbled Lancer","","VOW","","1","Near Mint","Normal","English","0","mtg"',
       '"mtg-arena-charger","A-Cosmos Charger","","KHM","","1","Near Mint","Normal","English","0","mtg"'
     ].join('\n');
-    await db.run(`INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)`, ['mtg-a-brine-comber', 'Stale CSV card', 'lorcana']);
+    await db.run(`INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)`, ['mtg-a-brine-comber', 'Stale CSV card', 'mtg']);
     const manafolioCsvRes = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
     await handler({
       body: { format: 'internal', data: manafolioCsv, list_type: 'collection' },
@@ -156,9 +156,6 @@ async function testImportRoute() {
       ['A-Cobbled Lancer', 'VOW', undefined],
       ['A-Cosmos Charger', 'KHM', undefined]
     ]);
-    await db.run(`UPDATE card_cache SET game = 'lorcana' WHERE id = ?`, ['mtg-a-brine-comber']);
-    await db.initDb();
-    assert.strictEqual((await db.get(`SELECT game FROM card_cache WHERE id = ?`, ['mtg-a-brine-comber'])).game, 'mtg');
     const arenaCsv = [
       'Count,Name,Edition,Collector Number,Condition,Language,Foil,Tag',
       '1,A-Brine Comber,VOW,,Near Mint,English,,',

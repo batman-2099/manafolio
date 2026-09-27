@@ -5,6 +5,8 @@ import CatalogPanel from './CatalogPanel';
 import SetupWizard from './SetupWizard';
 import { currencySymbol } from '../utils/formatPrice';
 import { useT } from '../utils/i18n';
+import Modal from './Modal';
+import './AdminPanel.css';
 
 const formatBytes = (n) => {
   if (!n) return '0 B';
@@ -28,7 +30,8 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
   // Change Password Modal States
   const [targetUser, setTargetUser] = useState(null);
-  useBackGuard(!!targetUser, () => setTargetUser(null));
+  const closePassword = () => { setTargetUser(null); setUpdatePassword(''); };
+  useBackGuard(!!targetUser, closePassword);
   const [updatePassword, setUpdatePassword] = useState('');
   const [pwdLoading, setPwdLoading] = useState(false);
 
@@ -572,7 +575,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
             </div>
           ) : (
             <div className="collection-table-wrapper" style={{ overflowX: 'auto' }}>
-              <table className="collection-table">
+              <table className="collection-table admin-user-table">
                 <thead>
                   <tr>
                     <th>{t('login.username')}</th>
@@ -606,34 +609,40 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                       <td className="hide-mobile" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                         {new Date(user.created_at).toLocaleDateString(locale)}
                       </td>
-                      <td style={{ fontWeight: 600 }}>{t('admin.userCards', { count: user.total_cards })}</td>
-                      <td style={{ fontWeight: 700, color: 'var(--accent-yellow)' }}>
+                      <td data-label={t('sets.colCards')} style={{ fontWeight: 600 }}>{t('admin.userCards', { count: user.total_cards })}</td>
+                      <td data-label={t('admin.colPortfolio')} style={{ fontWeight: 700, color: 'var(--accent-yellow)' }}>
                         {currencySymbol()}{(user.total_value || 0).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <td className="admin-user-actions-cell">
+                        <div className="admin-user-actions">
                           <button 
                             className="btn btn-secondary btn-icon-only" 
                             title={t('admin.toggleRole')}
+                            aria-label={t('admin.toggleRole')}
                             onClick={() => handleToggleRole(user)}
                             disabled={user.username === 'admin'}
                           >
                             {user.role === 'admin' ? <ToggleRight size={14} style={{ color: 'var(--accent-red)' }} /> : <ToggleLeft size={14} />}
+                            <span className="admin-user-action-label">{t('admin.toggleRole')}</span>
                           </button>
                           <button 
                             className="btn btn-secondary btn-icon-only" 
                             title={t('admin.resetPassword')}
+                            aria-label={t('admin.resetPassword')}
                             onClick={() => setTargetUser(user)}
                           >
                             <Key size={14} style={{ color: 'var(--accent-yellow)' }} />
+                            <span className="admin-user-action-label">{t('admin.resetPassword')}</span>
                           </button>
                           <button 
                             className="btn btn-danger btn-icon-only" 
                             title={t('admin.deleteAccount')}
+                            aria-label={t('admin.deleteAccount')}
                             onClick={() => handleDeleteUser(user)}
                             disabled={user.username === 'admin'}
                           >
                             <Trash2 size={14} />
+                            <span className="admin-user-action-label">{t('admin.deleteAccount')}</span>
                           </button>
                         </div>
                       </td>
@@ -648,7 +657,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
       {/* Change Password Dialog Overlay */}
       {targetUser && (
-        <div className="modal-overlay" style={{
+        <Modal onClose={closePassword} aria-labelledby="admin-reset-title" style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.6)',
@@ -656,11 +665,11 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 999
+          zIndex: 999, padding: '1rem'
         }}>
           <div className="glass-panel" style={{ maxWidth: '380px', width: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div>
-              <h3 style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('admin.resetPassword')}</h3>
+              <h3 id="admin-reset-title" style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('admin.resetPassword')}</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{t('admin.resetPasswordFor')} <strong>{targetUser.username}</strong></p>
             </div>
             <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -676,12 +685,11 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                   value={updatePassword}
                   onChange={(e) => setUpdatePassword(e.target.value)}
                   required
-                  autoFocus
                   disabled={pwdLoading}
                 />
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => { setTargetUser(null); setUpdatePassword(''); }} disabled={pwdLoading}>
+                <button type="button" className="btn btn-secondary" onClick={closePassword} disabled={pwdLoading}>
                   {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={pwdLoading}>
@@ -690,7 +698,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
     </div>

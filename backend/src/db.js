@@ -251,20 +251,6 @@ async function initDb() {
     )
   `);
 
-  // Derived card-to-product mappings used by published Lorcana scan catalogs.
-  await run(`
-    CREATE TABLE IF NOT EXISTS tcgplayer_product (
-      card_id TEXT PRIMARY KEY,
-      product_id INTEGER NOT NULL,
-      category_id INTEGER NOT NULL,
-      confidence REAL DEFAULT 1,
-      matched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(card_id) REFERENCES card_cache(id)
-    )
-  `);
-  await run(`CREATE INDEX IF NOT EXISTS idx_tcgplayer_product_pid ON tcgplayer_product(product_id)`);
-
-
   // Sets the provider LISTS but has no usable card data for — no cards at all, or
   // cards with no artwork, which a scan catalog cannot use either way.
   //
@@ -339,10 +325,7 @@ async function initDb() {
   `);
 
   // --- MIGRATIONS ---
-  // Repair Magic cache rows whose game was omitted by older CSV imports.
-  await run(`UPDATE card_cache SET game = 'mtg' WHERE id LIKE 'mtg-%' AND game <> 'mtg'`);
-
-  // When each game's price sweep last ran. Scryfall updates prices once a day,
+  // When the Magic price sweep last ran. Scryfall updates prices once a day,
   // so a sweep more often than that cannot return anything new — and the boot
   // sweep would otherwise re-run on every restart (constantly, under nodemon).
   // Persisted rather than in-memory precisely because restarts are the problem.
@@ -358,10 +341,6 @@ async function initDb() {
   if (!appSettingsCols.some(c => c.name === 'scryfall_bulk_download_time')) {
     await run(`ALTER TABLE app_settings ADD COLUMN scryfall_bulk_download_time TEXT NOT NULL DEFAULT '10:00'`);
   }
-  if (!appSettingsCols.some(c => c.name === 'lorcana_prices_swept_at')) {
-    await run(`ALTER TABLE app_settings ADD COLUMN lorcana_prices_swept_at DATETIME`);
-  }
-
   // VESTIGIAL. This gated non-admin members building an individual per-set ORB
   // index, and there are no per-set indexes any more — scanning is CollectorVision
   // embeddings over a catalog, and catalog builds are admin-only (they walk a whole

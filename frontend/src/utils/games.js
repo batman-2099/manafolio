@@ -4,4 +4,6 @@
 export const isGameEnabled = (game) => String(game || '').toLowerCase() === 'mtg';
 export const defaultGame = () => 'mtg';
 export const defaultGameFilter = () => 'mtg';
-export const gameLabel = (_game, short = false) => short ? 'MTG' : 'Magic: The Gathering';
+export const gameLabel = (game, short = false) => isGameEnabled(game)
+  ? (short ? 'MTG' : 'Magic: The Gathering')
+  : String(game || 'Unknown');

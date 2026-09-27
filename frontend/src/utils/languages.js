@@ -52,10 +52,10 @@ import { getCardDisplayName } from './langHelper.js';
 
 // The card name to show: providers give us the localized name (printed_name) for
 // a non-English printing and the English one is still there for searching, so
-// prefer whatever the card itself was printed with, falling back to translation dictionaries.
+// prefer whatever the card itself was printed with, falling back to the original name.
 export const displayName = (card) => {
   if (!card) return '';
-  return getCardDisplayName(card.name, card.language, card.printed_name, card.game || card.supertype);
+  return getCardDisplayName(card.name, card.printed_name);
 };
 
 // The English name to show ALONGSIDE the localized one, or null when there isn't a

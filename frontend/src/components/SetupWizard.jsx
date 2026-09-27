@@ -7,6 +7,7 @@ import {
 import { gameLabel } from '../utils/games';
 import { containerTypeKey } from '../utils/cardOptions';
 import { LOCALES, localeName, useT } from '../utils/i18n';
+import Modal from './Modal';
 
 // First-run setup.
 //
@@ -175,7 +176,7 @@ export default function SetupWizard({ user, onClose, showToast }) {
 
   const Heading = ({ icon, title, sub }) => (
     <div>
-      <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '1.05rem' }}>
+      <h3 id="setup-step-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '1.05rem' }}>
         {icon} {title}
       </h3>
       {sub && <p style={{ ...body, marginTop: '0.4rem' }}>{sub}</p>}
@@ -348,10 +349,11 @@ export default function SetupWizard({ user, onClose, showToast }) {
               <>
                 <input
                   type="text" value={editName} autoFocus
+                  aria-label={t('setup.storage.rename', { name: l.name })}
                   onChange={(e) => setEditName(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') renameLocation(l.id);
-                    if (e.key === 'Escape') setEditingId(null);
+                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setEditingId(null); }
                   }}
                   style={{ ...input, flex: 1 }}
                 />
@@ -388,17 +390,24 @@ export default function SetupWizard({ user, onClose, showToast }) {
       </div>
       <div>
         <div style={{ ...label, marginBottom: '0.3rem' }}>{t('setup.storage.addAnother')}</div>
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
-          <input
-            type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addLocation(); }}
-            placeholder={t('setup.storage.namePlaceholder')} style={{ ...input, flex: 1 }}
-          />
-          <select className="select-control" style={{ ...input, width: 'auto' }} value={newType} onChange={(e) => setNewType(e.target.value)}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'end' }}>
+          <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+            <label htmlFor="setup-location-name" style={{ ...label, display: 'block', marginBottom: '0.3rem' }}>{t('container.name')}</label>
+            <input
+              id="setup-location-name"
+              type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') addLocation(); }}
+              placeholder={t('setup.storage.namePlaceholder')} style={{ ...input, width: '100%' }}
+            />
+          </div>
+          <div style={{ flex: '1 1 130px', minWidth: 0 }}>
+            <label htmlFor="setup-location-type" style={{ ...label, display: 'block', marginBottom: '0.3rem' }}>{t('container.step.type')}</label>
+            <select id="setup-location-type" className="select-control" style={{ ...input, width: '100%' }} value={newType} onChange={(e) => setNewType(e.target.value)}>
             {NEW_LOCATION_TYPES.map(type => (
               <option key={type} value={type}>{typeName(type)}</option>
             ))}
           </select>
+          </div>
           <button className="btn btn-secondary btn-sm" onClick={addLocation} disabled={!newName.trim()}>{t('setup.storage.add')}</button>
         </div>
         <p style={{ ...body, fontSize: '0.74rem', marginTop: '0.35rem' }}>
@@ -438,7 +447,7 @@ export default function SetupWizard({ user, onClose, showToast }) {
   const last = step === STEPS.length - 1;
 
   return (
-    <div style={{
+    <Modal onClose={onClose} aria-labelledby="setup-step-title" style={{
       position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: '1rem', background: 'rgba(0,0,0,0.72)',
       backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
@@ -462,7 +471,7 @@ export default function SetupWizard({ user, onClose, showToast }) {
             </span>
           </div>
           <button type="button" onClick={onClose} aria-label={t('common.close')}
-            style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+            className="btn btn-icon-only" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
             <X size={18} />
           </button>
         </div>
@@ -471,7 +480,7 @@ export default function SetupWizard({ user, onClose, showToast }) {
           {content}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', borderTop: '1px solid var(--border-glass)', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderTop: '1px solid var(--border-glass)', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
           <button className="btn btn-secondary btn-sm" onClick={finish}>{t('setup.skip')}</button>
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             {step > 0 && (
@@ -487,7 +496,7 @@ export default function SetupWizard({ user, onClose, showToast }) {
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

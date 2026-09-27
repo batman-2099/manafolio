@@ -5,7 +5,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const game = req.query.game === undefined ? 'mtg' : req.query.game;
-    if (!['mtg', 'lorcana'].includes(game)) return res.status(400).json({ error: 'Unsupported game' });
+    if (game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
     const where = `WHERE game = ?`;
     const params = [game];
     const sets = await db.all(`

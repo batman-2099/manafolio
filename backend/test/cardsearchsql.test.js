@@ -17,7 +17,7 @@ async function main() {
     ['mtg-ja', 'Lightning Bolt', '稲妻', '004', 'mtg', 'Japanese'],
     ['mtg-promo', 'Promo One', null, 'A12', 'mtg', 'English'],
     ['mtg-other-promo', 'Promo Two', null, 'B49', 'mtg', 'English'],
-    ['lorcana-card', 'Mickey Mouse', null, '4', 'lorcana', 'English'],
+    ['unsupported-card', 'Legacy Card', null, '4', 'unsupported', 'English'],
     ['mtg-private', 'Private Card', null, '8', 'mtg', 'English'],
     ['mtg-wishlist', 'Wishlist Card', null, '9', 'mtg', 'English'],
   ]) {
@@ -26,7 +26,7 @@ async function main() {
   }
   for (const [card, owner, qty, list] of [
     ['mtg-en', user, 2, 'collection'], ['mtg-en', user, 3, 'collection'],
-    ['mtg-ja', user, 1, 'collection'], ['lorcana-card', user, 1, 'collection'],
+    ['mtg-ja', user, 1, 'collection'], ['unsupported-card', user, 1, 'collection'],
     ['mtg-private', other, 5, 'collection'], ['mtg-wishlist', user, 7, 'wishlist'],
   ]) {
     await db.run('INSERT INTO collection (card_id, user_id, quantity, list_type) VALUES (?, ?, ?, ?)', [card, owner, qty, list]);

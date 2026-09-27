@@ -28,19 +28,6 @@ for (const name of ['English', 'Japanese', 'German', 'French', 'Spanish', 'Itali
   assert.strictEqual(languages.toName(name), name, `${name} must survive a round trip`);
 }
 assert.strictEqual(languages.toCode('klingon'), 'en', 'unknown input degrades to English');
-assert.ok(languages.isEnglish(''), 'no language means English');
-assert.ok(languages.isEnglish('English') && languages.isEnglish('en'));
-assert.ok(!languages.isEnglish('ja'));
-
-// --- 1b. Game-scoped language filtering ---------------------------------------
-assert.strictEqual(languages.getLanguagesForGame('lorcana').length, 6, 'Lorcana supports 6 languages');
-assert.ok(languages.isLanguageSupported('lorcana', 'fr'), 'Lorcana supports French');
-assert.ok(languages.isLanguageSupported('lorcana', 'de'), 'Lorcana supports German');
-assert.ok(languages.isLanguageSupported('lorcana', 'French'), 'Lorcana supports French by name');
-assert.ok(!languages.isLanguageSupported('lorcana', 'es'), 'Lorcana does not support Spanish');
-assert.ok(!languages.isLanguageSupported('lorcana', 'pt'), 'Lorcana does not support Portuguese');
-assert.ok(!languages.isLanguageSupported('lorcana', 'ko'), 'Lorcana does not support Korean');
-assert.strictEqual(languages.getLanguagesForGame('mtg').length, 11, 'MTG supports 11 languages');
 
 // --- 2. Scryfall query construction -----------------------------------------
 // Capture the URLs fetchWindow actually requests.

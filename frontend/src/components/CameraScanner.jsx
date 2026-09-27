@@ -244,7 +244,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   // 523 sets when 40 are built is a menu of mostly wrong answers.
   const [onlyBuiltSets, setOnlyBuiltSets] = useState(true);
   // Catalogs use bare set codes rather than the API's game-prefixed ids.
-  const setScanCode = (s) => String(s.id || '').replace(/^(?:mtg|lorcana)-/, '');
+  const setScanCode = (s) => String(s.id || '').replace(/^mtg-/, '');
   // The filter is a flat list of catalog set codes — parent codes and subset codes
   // sit side by side in it, because that is what card_cache.set_id holds and what
   // the scan route filters on. The tree is a VIEW of that list, not a second
@@ -1028,7 +1028,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
         const data = await response.json();
         const qtyLabel = qty > 1 ? `${qty}× ` : '';
         const placementLabel = data.placement?.label || null;
-        const cardDisplayName = getCardDisplayName(card.name, autoLanguage, card.printed_name);
+        const cardDisplayName = getCardDisplayName(card.name, card.printed_name);
         if (placementLabel) {
           showToast(t('scan.addedTo', { qty: qtyLabel, name: cardDisplayName, place: placementLabel }), 'success');
         } else if (data.container_full) {
@@ -1054,7 +1054,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
         
         onAddSuccess(); // Refresh stats
       } else {
-        showToast(t('scan.errAutoAdd', { name: getCardDisplayName(card.name, autoLanguage, card.printed_name) }), 'error');
+        showToast(t('scan.errAutoAdd', { name: getCardDisplayName(card.name, card.printed_name) }), 'error');
         signal('error');
       }
     } catch (err) {
@@ -1608,7 +1608,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
       if (response.ok) {
         const data = await response.json();
         const placementLabel = data.placement?.label || null;
-        const cardDisplayName = getCardDisplayName(selectedCard.name, language, selectedCard.printed_name);
+        const cardDisplayName = getCardDisplayName(selectedCard.name, selectedCard.printed_name);
         if (placementLabel) {
           showToast(t('scan.addedToPlain', { name: cardDisplayName, place: placementLabel }), 'success');
         } else if (data.container_full) {
@@ -2124,7 +2124,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                       return (
                         <div key={i} style={{ fontSize: '0.7rem', color: i === 0 ? '#fff' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           <span style={{ color: pass ? 'var(--accent-green)' : 'var(--accent-red)', fontWeight: 700 }}>{label}</span>
-                          {' '}{cd.card ? getCardDisplayName(cd.card.name, addLanguage(cd.card), cd.card.printed_name) : cd.name} <span style={{ color: 'var(--text-muted)' }}>({cd.set} #{cd.number})</span>
+                          {' '}{cd.card ? getCardDisplayName(cd.card.name, cd.card.printed_name) : cd.name} <span style={{ color: 'var(--text-muted)' }}>({cd.set} #{cd.number})</span>
                         </div>
                       );
                     })}
@@ -2242,7 +2242,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.15em', fontWeight: 800 }}>{t(autoAddEditing ? 'scan.adjustAndAdd' : 'scan.exactMatch')}</span>
               {/* The name AS PRINTED when the provider gave one, so a Japanese
                   scan reads as the Japanese card it is. Falls back to English. */}
-              <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-strong)', margin: '0.25rem 0 0.35rem 0' }}>{getCardDisplayName(autoAddTargetCard.name, addLanguage(autoAddTargetCard), autoAddTargetCard.printed_name)}</h3>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-strong)', margin: '0.25rem 0 0.35rem 0' }}>{getCardDisplayName(autoAddTargetCard.name, autoAddTargetCard.printed_name)}</h3>
               <p style={{ color: 'var(--text-primary)', fontSize: '1rem', fontWeight: 700, margin: 0 }}>#{autoAddTargetCard.number}</p>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0 }}>{autoAddTargetCard.set_name}</p>
               <LangFallbackNote card={autoAddTargetCard} />
@@ -2259,7 +2259,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
               style={{ position: 'relative', width: '115px', aspectRatio: 0.718, margin: '0.5rem 0', cursor: autoAddEditing ? 'default' : 'pointer' }}
               title={autoAddEditing ? undefined : 'Tap to change condition/foil'}
             >
-              <img src={autoAddTargetCard.image_url} alt={getCardDisplayName(autoAddTargetCard.name, addLanguage(autoAddTargetCard), autoAddTargetCard.printed_name)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', boxShadow: 'var(--shadow-glow)' }} />
+              <img src={autoAddTargetCard.image_url} alt={getCardDisplayName(autoAddTargetCard.name, autoAddTargetCard.printed_name)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', boxShadow: 'var(--shadow-glow)' }} />
               {!autoAddEditing && (
                 <div style={{
                   position: 'absolute',
@@ -2396,12 +2396,12 @@ function CameraScanner({ onAddSuccess, showToast }) {
                         setAutoAddAlternatives([]);
                         openQuickAdd(alt);
                       }}
-                      title={`${getCardDisplayName(alt.name, addLanguage(alt), alt.printed_name)} · ${alt.set_name} #${alt.number}`}
+                      title={`${getCardDisplayName(alt.name, alt.printed_name)} · ${alt.set_name} #${alt.number}`}
                       style={{ flex: '0 0 auto', width: '68px', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'center' }}
                     >
                       <img
                         src={alt.image_url}
-                        alt={getCardDisplayName(alt.name, addLanguage(alt), alt.printed_name)}
+                        alt={getCardDisplayName(alt.name, alt.printed_name)}
                         style={{ width: '100%', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border-glass-hover)' }}
                       />
                       <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -2454,11 +2454,11 @@ function CameraScanner({ onAddSuccess, showToast }) {
           <div className="glass-panel animate-fade-in scan-confirm-modal" style={{ maxWidth: '420px', width: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: '1.25rem', alignItems: 'center', textAlign: 'center', border: '1px solid var(--accent-yellow)' }}>
             <div>
               <span style={{ fontSize: '0.75rem', color: 'var(--accent-yellow)', textTransform: 'uppercase', letterSpacing: '0.15em', fontWeight: 800 }}>{t('scan.sameCardAgain')}</span>
-              <h3 style={{ fontSize: '1.25rem', color: 'var(--text-strong)', margin: '0.25rem 0 0.5rem 0' }}>{getCardDisplayName(dupConfirmCard.name, addLanguage(dupConfirmCard), dupConfirmCard.printed_name)}</h3>
+              <h3 style={{ fontSize: '1.25rem', color: 'var(--text-strong)', margin: '0.25rem 0 0.5rem 0' }}>{getCardDisplayName(dupConfirmCard.name, dupConfirmCard.printed_name)}</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0 }}>{dupConfirmCard.set_name} • #{dupConfirmCard.number}</p>
             </div>
 
-            <img src={dupConfirmCard.image_url} alt={getCardDisplayName(dupConfirmCard.name, addLanguage(dupConfirmCard), dupConfirmCard.printed_name)} style={{ width: '110px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '6px', boxShadow: 'var(--shadow-glow)' }} />
+            <img src={dupConfirmCard.image_url} alt={getCardDisplayName(dupConfirmCard.name, dupConfirmCard.printed_name)} style={{ width: '110px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '6px', boxShadow: 'var(--shadow-glow)' }} />
 
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
               {t('scan.repeatHint')}
@@ -2621,14 +2621,14 @@ function CameraScanner({ onAddSuccess, showToast }) {
               {(showAllMatches ? scanMatches : scanMatches.slice(0, PICKER_PREVIEW)).map(card => (
                 <div key={card.id} className="tcg-card" onClick={() => openQuickAdd(card)} style={{ cursor: 'pointer' }}>
                   <div className="tcg-card-inner" style={{ border: '1px solid var(--border-glass-hover)' }}>
-                    <img src={card.image_url} alt={getCardDisplayName(card.name, addLanguage(card), card.printed_name)} className="tcg-card-image" />
+                    <img src={card.image_url} alt={getCardDisplayName(card.name, card.printed_name)} className="tcg-card-image" />
                   </div>
                   {/* Name and number are what the choice is actually made on —
                       the picture is already on screen above them, and at 0.75/0.65rem
                       the two lines that say WHICH printing this is were the smallest
                       text in the modal. */}
                   <div className="tcg-card-info" style={{ textAlign: 'center', marginTop: '0.5rem' }}>
-                    <div className="tcg-card-name" style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-strong)', lineHeight: 1.2 }}>{getCardDisplayName(card.name, addLanguage(card), card.printed_name)}</div>
+                    <div className="tcg-card-name" style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-strong)', lineHeight: 1.2 }}>{getCardDisplayName(card.name, card.printed_name)}</div>
                     <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>#{card.number}</div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{card.set_name}</div>
                     <LangFallbackNote card={card} />
@@ -2719,7 +2719,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
               >
                 <img
                   src={item.image_url}
-                  alt={getCardDisplayName(item.name, item.language, item.printed_name)}
+                  alt={getCardDisplayName(item.name, item.printed_name)}
                   draggable={false}
                   style={{ width: '76px', height: '106px', objectFit: 'cover', borderRadius: '4px', border: selected ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', boxShadow: selected ? '0 0 12px var(--accent-red-glow)' : '0 2px 6px rgba(0,0,0,0.3)', pointerEvents: 'none' }}
                 />
@@ -2756,7 +2756,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
               <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
                 <h3 style={{ color: 'var(--text-muted)', fontSize: '0.7rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}>{t('scan.addScannedTitle')}</h3>
                 <p style={{ color: 'var(--text-strong)', fontSize: '1.25rem', fontWeight: 800, margin: '0.1rem 0 0 0', lineHeight: 1.2, wordBreak: 'break-word' }}>
-                  {getCardDisplayName(selectedCard.name, language, selectedCard.printed_name)} <span style={{ color: 'var(--text-primary)' }}>#{selectedCard.number}</span>
+                  {getCardDisplayName(selectedCard.name, selectedCard.printed_name)} <span style={{ color: 'var(--text-primary)' }}>#{selectedCard.number}</span>
                 </p>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, wordBreak: 'break-word' }}>{selectedCard.set_name}</p>
                 <LangFallbackNote card={selectedCard} style={{ justifyContent: 'flex-start' }} />
@@ -2774,7 +2774,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 <div className="quick-add-preview">
                   <img 
                     src={selectedCard.image_url} 
-                    alt={getCardDisplayName(selectedCard.name, language, selectedCard.printed_name)} 
+                    alt={getCardDisplayName(selectedCard.name, selectedCard.printed_name)} 
                     className="quick-add-preview-img"
                   />
                   <div className="quick-add-preview-info">

@@ -15,7 +15,7 @@
 // producing.
 import {
   rgbaToGray, gaussianBlur5, otsuThreshold, morphClose, dilate, canny,
-  connectedRegions, arcLength, convexHull, approxPolyDP,
+  connectedRegions, arcLength, approxPolyDP,
   isContourConvex, minAreaRect, orderQuad,
 } from './imgproc.mjs';
 
@@ -65,10 +65,8 @@ export function createDetector() {
     return !!m && m.ar <= 0.95 && m.ar >= 0.5 && m.parallelism >= 0.6 && m.orthogonality >= 0.55;
   }
   
-  // Finds the 4 true perspective corners of a card contour by stepping epsilon on
-  // its convex hull until the outline simplifies to exactly 4 primary vertices.
-  function findCardQuad(c) {
-    const hull = convexHull(c);
+  // Simplify the region's existing convex hull to four perspective corners.
+  function findCardQuad(hull) {
     const peri = arcLength(hull);
     for (let epsScale = 0.015; epsScale <= 0.12; epsScale += 0.005) {
       const approx = approxPolyDP(hull, epsScale * peri);
@@ -154,10 +152,7 @@ export function createDetector() {
       for (const region of connectedRegions(mask, w, h, MIN_AREA_FRAC * imgArea)) {
         const area = region.area;
         if (area > MAX_AREA_FRAC * imgArea) continue;
-        // The region hands back its convex hull, not raw boundary pixels: both
-        // minAreaRect and the quad approximation start by hulling anyway, and
-        // materialising thousands of points per region per frame was the GC load
-        // that made the live preview degrade and then stall.
+        // Consume the region's hull directly; no raw boundary pixels are needed.
         const c = region.hull;
         const rect = minAreaRect(c);
         let rw = rect.size.width, rh = rect.size.height;

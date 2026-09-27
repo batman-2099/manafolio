@@ -25,25 +25,7 @@ const toCode = (input) => resolve(input).code;
 // Display name ('Japanese'). This is what goes in collection.language.
 const toName = (input) => resolve(input).name;
 
-// Unknown or empty inputs resolve to English.
-const isEnglish = (input) => resolve(input).code === 'en';
-
-// Which languages a game is printed in. Default/fallback is all languages.
-function getLanguagesForGame(game) {
-  if (!game) return LANGUAGES;
-  const g = String(game).toLowerCase();
-  return LANGUAGES.filter(l => !l.games || l.games.includes(g));
-}
-
-const getLanguageNamesForGame = (game) => getLanguagesForGame(game).map(l => l.name);
-
-const isLanguageSupported = (game, lang) => {
-  if (!game || !lang) return true;
-  const code = toCode(lang);
-  return getLanguagesForGame(game).some(l => l.code === code);
-};
 
 module.exports = {
-  LANGUAGES, DEFAULT, resolve, toCode, toName, isEnglish,
-  getLanguagesForGame, getLanguageNamesForGame, isLanguageSupported,
+  LANGUAGES, DEFAULT, resolve, toCode, toName,
 };

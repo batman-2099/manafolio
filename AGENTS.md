@@ -4,7 +4,7 @@
 
 Manafolio is a self-hosted, multi-user Magic: The Gathering collection, storage, and deck manager. Physical and Arena inventories are separate; Wishlist plans acquisitions and Graveyard retains archived records without supplying owned totals or decks. The React/Vite frontend and Express backend share one SQLite collection database. Docker packages the web application for desktop and phone browsers.
 
-Disney Lorcana data and provider tooling remain alongside the Magic-focused interface. Preserve existing records and their game identities when changing shared code; removing an integration must not delete or relabel stored collections.
+Only Magic provider integrations are supported. Preserve existing records and their game identities when changing shared code; removing an integration must not delete or relabel stored collections.
 
 Read [README.md](README.md) for installation and user workflows, [PROJECT.md](PROJECT.md) for architecture, and [PRIVACY.md](PRIVACY.md) for data handling.
 
@@ -60,7 +60,7 @@ Follow the Node versions in Docker and CI when reproducing builds. Native depend
 - **Routes:** validate at the HTTP boundary, use parameterized SQL and `db.run/get/all`, catch asynchronous failures with operational logging, and return safe `{ error: '...' }` responses. Do not add raw callback-based SQLite operations.
 - **Authorization:** account mutations use `req.user.id`, not client-supplied ownership. Preserve mount order: public auth/share/art paths must not accidentally pass through or bypass the wrong authenticated gate.
 - **Transactions:** preserve WAL, migrations, and `withTransaction`. Collection, placement, reservations, and deck changes that form one operation must not leave partial state.
-- **Providers:** normalize/cache through existing Scryfall and Lorcast clients. Reuse `cardApi` for supported stored card IDs; reject unsupported provider identities rather than guessing conversions or relabeling records.
+- **Providers:** normalize/cache through the existing Scryfall client. Reuse `cardApi` for supported stored card IDs; reject unsupported provider identities rather than guessing conversions or relabeling records.
 - **Errors:** auth, ownership, and mutations fail explicitly. Noncritical warmups may remain nonblocking; do not move their downloads onto request paths.
 - **React:** use function components and hooks; clean up requests/listeners in effects. Keep local loading/error state with its view. Use `useT()` and stable keys rather than literal UI copy.
 - **Styles:** reuse existing tokens and classes. Scope Arcane Blue to the dark theme; retain other account themes, readable contrast, keyboard focus, and responsive controls. Keep the brand logo stationary.

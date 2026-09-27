@@ -1,5 +1,5 @@
 // The one place that knows card_cache's column list.
-// Providers write their normalized card shapes through this shared upsert.
+// Scryfall writes normalized card shapes through this upsert.
 const db = require('../db');
 
 const COLUMNS = [
@@ -30,8 +30,16 @@ const SET_CLAUSE = COLUMNS
 async function cacheNormalizedCards(cards, game) {
   const rowSql = `(${COLUMNS.map(() => '?').join(', ')}, CURRENT_TIMESTAMP)`;
   const rows = (cards || []).filter(c => c && c.id);
+  if (game !== 'mtg' || rows.some(c => c.game != null && c.game !== game)) {
+    throw Object.assign(new Error('Unsupported card game'), { status: 400 });
+  }
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
+    const conflict = await db.get(
+      `SELECT id FROM card_cache WHERE id IN (${chunk.map(() => '?').join(',')}) AND game IS NOT ? LIMIT 1`,
+      [...chunk.map(c => c.id), game]
+    );
+    if (conflict) throw Object.assign(new Error('Card identity conflicts with stored data'), { status: 400 });
     const params = [];
     for (const c of chunk) {
       params.push(

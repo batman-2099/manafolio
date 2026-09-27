@@ -85,7 +85,7 @@ async function testCommander() {
     await testCommanderCreation();
     const deck = (await db.run(`INSERT INTO decks (name, game, format, user_id) VALUES ('Commanders', 'mtg', 'cOmMaNdEr / eDh', 1)`)).lastID;
     const other = (await db.run(`INSERT INTO decks (name, game, format, user_id) VALUES ('Other', 'mtg', 'Standard', 1)`)).lastID;
-    const legacy = (await db.run(`INSERT INTO decks (name, game, format, user_id) VALUES ('Legacy', 'lorcana', 'Commander', 1)`)).lastID;
+    const legacy = (await db.run(`INSERT INTO decks (name, game, format, user_id) VALUES ('Legacy', 'unsupported', 'Commander', 1)`)).lastID;
     await db.run(`INSERT INTO deck_cards (deck_id, card_id) VALUES (?, 'first'), (?, 'second'), (?, 'outside')`, [deck, deck, other]);
 
     assert.strictEqual((await request('put', '/:id/commander', deck, { card_id: 'first' })).statusCode, 200);

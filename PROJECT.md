@@ -32,7 +32,7 @@ This guide describes the current implementation and the contracts to preserve wh
 | Optional AI | OpenAI Codex app-server, Gemini, OpenRouter, or a user-selected Ollama service |
 | Delivery | One container serves API and built frontend to desktop and phone browsers |
 
-The active search, scan, sets, statistics, and deck surfaces are Magic-focused. Lorcana data and provider tooling remain available. Preserve stored game and provider identities when maintaining shared code; removing an integration must not delete existing records or relabel them as Magic.
+Search, scan, sets, statistics, and deck workflows support Magic only. Preserve stored game and provider identities when maintaining shared code; removing an integration must not delete existing records or relabel them as Magic.
 
 ## Repository layout
 
@@ -106,7 +106,7 @@ Missing/Found is a flag on an entry, not deletion or archival. Individual invent
 | `notes` | User-owned notes and pinning |
 | `app_settings` | Singleton settings row, including public URL and refresh schedules |
 | `psa_cert` | Cached certification responses |
-| `tcgplayer_product`, `set_data_gaps` | Lorcana scan mappings and shared catalog coverage gaps |
+| `set_data_gaps` | Catalog coverage gaps |
 
 ## Backend and API boundaries
 
@@ -197,9 +197,9 @@ A manually entered copy value writes `market_value` with source/timestamp metada
 
 `price_history` records price changes rather than duplicate points on every sweep. Parse SQLite's naive timestamp strings as UTC through `parseSqliteUtc`. Dashboard growth is derived from retained owned quantities and original addition dates, not an immutable acquisition ledger. Deck performance is saved wins/losses, not match history. Graveyard analytics are separate and reflect currently archived entries, not historical archive membership.
 
-### Lorcana data
+### Unsupported legacy data
 
-`lorcastApi.js` supplies Disney Lorcana cards and prices. Shared dispatch in `utils/cardApi.js` handles supported stored IDs. Do not guess cross-provider conversions or reinterpret unsupported records as Magic cards.
+Shared dispatch in `utils/cardApi.js` accepts Magic identities only. Removed integrations do not trigger data deletion or relabeling. Account exports retain saved records; restore rejects unsupported game identities and refuses to replace unsupported records already in the target account. Keep original backups for use with a compatible older deployment rather than editing their game identities.
 
 ## Storage and sorting
 

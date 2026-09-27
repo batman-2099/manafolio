@@ -69,11 +69,9 @@ const GAP_K = 11;
 // intra-op thread is measurably faster here than the default fan-out.
 const SESSION_OPTS = { intraOpNumThreads: 1, interOpNumThreads: 1, executionMode: 'sequential' };
 
-// The two models are game-independent — a card is a card to the corner detector
-// and the embedder. Only the catalog differs, so sessions load once and catalogs
-// load per game, on first use of that game.
+// Models load once; language catalogs load on first use.
 let models = null;
-const catalogs = {};   // game -> { cat, ids, n, dim } (or an in-flight promise)
+const catalogs = {};   // catalog key -> { cat, ids, n, dim } (or an in-flight promise)
 
 // Preserve the bare English filename; other languages have their own catalogs.
 const suffix = (lang) => (!lang || lang === 'en' || lang === 'English' ? '' : `-${String(lang).toLowerCase()}`);
@@ -90,6 +88,7 @@ function hasLocal(game, lang) {
 }
 
 function isBuilt(game = 'mtg', lang) {
+  if (game !== 'mtg') throw new Error('Unsupported game');
   if (!fs.existsSync(path.join(MODEL_DIR, 'cornelius.onnx'))
     || !fs.existsSync(path.join(MODEL_DIR, 'milo.onnx'))) return false;
   if (hasLocal(game, lang)) return true;
@@ -108,6 +107,7 @@ function isBuilt(game = 'mtg', lang) {
 // picker, which was offering fifteen languages with no hint that fourteen of them
 // would be answered by the English catalog and filed as English printings.
 function builtLangs(game = 'mtg') {
+  if (game !== 'mtg') throw new Error('Unsupported game');
   const names = require('./utils/languages').LANGUAGES.map(l => l.name);
   const out = names.filter(l => hasLocal(game, l));
   // English also answers from a published .npz, which is not a local build.
@@ -134,6 +134,7 @@ function loadModels() {
 // brute-force sweep costs ~25 ms, so there is no ANN index here on purpose —
 // building one would cost more than it saves.
 async function load(game = 'mtg', lang) {
+  if (game !== 'mtg') throw new Error('Unsupported game');
   // Fall back to the English catalog when the requested language has none: the
   // art is identical, so it still identifies the card, and the route re-expresses
   // the answer into the requested language by name.
@@ -431,7 +432,7 @@ async function match(imageBuffer, game = 'mtg', topK = 8, opts = {}) {
   // narrowed the scan on purpose, and an unscoped sweep of the other language is
   // exactly the wrong-card answer the scope was meant to prevent.
   const wanted = (opts.sets || []).map(x => String(x).toLowerCase()).filter(Boolean);
-  const want = new Set(wanted.flatMap(x => [x, x.replace(/^(mtg|lorcana)-/, ''), `${game}-${x.replace(/^(mtg|lorcana)-/, '')}`]));
+  const want = new Set(wanted.flatMap(x => [x, x.replace(/^mtg-/, ''), `mtg-${x.replace(/^mtg-/, '')}`]));
   let scoped = null;
   const search = [];
   for (const c of cats) {
@@ -486,7 +487,7 @@ async function match(imageBuffer, game = 'mtg', topK = 8, opts = {}) {
   }
   hits.sort((a, b) => b.sim - a.sim);
 
-  // Published Magic IDs are Scryfall UUIDs; Lorcana uses TCGplayer product IDs.
+  // Published Magic IDs are Scryfall UUIDs.
   //
   // A DFC's back is catalogued as `{id}_back`; both faces are the same printing.
   //
@@ -499,11 +500,8 @@ async function match(imageBuffer, game = 'mtg', topK = 8, opts = {}) {
     const id = String(h.c.ids[h.i]).replace(/_back$/, '');
     if (seen.has(id)) continue;
     seen.add(id);
-    // A local catalog is already keyed by card_cache.id for any game; only the
-    // published catalogs need their provider id translated.
-    candidates.push(h.c.local ? { cardId: id, score: h.sim, catalogLang: h.c.lang }
-      : game === 'lorcana' ? { productId: Number(id), score: h.sim, catalogLang: h.c.lang }
-        : { cardId: `${game}-${id}`, score: h.sim, catalogLang: h.c.lang });
+    // Local catalogs use card_cache.id; published catalogs use Scryfall UUIDs.
+    candidates.push({ cardId: h.c.local ? id : `mtg-${id}`, score: h.sim, catalogLang: h.c.lang });
     if (candidates.length >= topK) break;
   }
 
@@ -552,6 +550,7 @@ async function match(imageBuffer, game = 'mtg', topK = 8, opts = {}) {
 
 // Score a list of cards against an image embedding and sort them by visual similarity.
 async function scoreCards(imageBuffer, game = 'mtg', cards = [], opts = {}) {
+  if (game !== 'mtg') throw new Error('Unsupported game');
   if (!cards || cards.length <= 1 || !imageBuffer) return cards;
   if (!isBuilt(game, opts.lang)) return cards;
 
@@ -577,33 +576,14 @@ async function scoreCards(imageBuffer, game = 'mtg', cards = [], opts = {}) {
       }
     }
 
-    let prodMap = null;
-    if (game === 'lorcana') {
-      const db = require('./db');
-      const cardIds = cards.map(c => c.id).filter(Boolean);
-      if (cardIds.length) {
-        const placeholders = cardIds.map(() => '?').join(',');
-        const prodRows = await db.all(
-          `SELECT card_id, product_id FROM tcgplayer_product WHERE card_id IN (${placeholders})`,
-          cardIds
-        ).catch(() => []);
-        if (prodRows.length) {
-          prodMap = new Map(prodRows.map(r => [r.card_id, String(r.product_id)]));
-        }
-      }
-    }
-
     for (const card of cards) {
       let maxScore = null;
       const possibleIds = [];
       if (card.id) {
         possibleIds.push(String(card.id));
-        possibleIds.push(String(card.id).replace(/^(mtg|lorcana)-/, ''));
+        possibleIds.push(String(card.id).replace(/^mtg-/, ''));
       }
       if (card.scryfall_id) possibleIds.push(String(card.scryfall_id));
-      if (card.tcgplayer_id) possibleIds.push(String(card.tcgplayer_id));
-      if (card.tcgplayer_product_id) possibleIds.push(String(card.tcgplayer_product_id));
-      if (prodMap && prodMap.has(card.id)) possibleIds.push(prodMap.get(card.id));
 
       for (const c of cats) {
         for (const pid of possibleIds) {
@@ -642,6 +622,7 @@ async function scoreCards(imageBuffer, game = 'mtg', cards = [], opts = {}) {
 // Evict a cached catalog so a freshly built one takes effect without a restart.
 // The models are untouched — only the embedding table changes on a rebuild.
 function reload(game, lang) {
+  if (game !== 'mtg') throw new Error('Unsupported game');
   const key = `${game}${suffix(hasLocal(game, lang) ? lang : undefined)}`;
   delete catalogs[key];
   // A build can turn a game that had no catalog at all into one that does, and

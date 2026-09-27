@@ -61,7 +61,7 @@ async function main() {
     assert.strictEqual((await request('GET', '/me', bobToken)).body.user.theme, theme);
   }
 
-  for (const theme of ['light', 'mtg', 'lcars', 'lorcana', 'unknown', null, ['dark'], undefined]) {
+  for (const theme of ['light', 'mtg', 'lcars', 'unknown', null, ['dark'], undefined]) {
     assert.strictEqual((await request('PATCH', '/theme', aliceToken, { theme })).status, 400);
   }
   assert.strictEqual((await request('GET', '/me', aliceToken)).body.user.theme, 'jenny', 'invalid saves leave the preference unchanged');

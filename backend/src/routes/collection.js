@@ -1,7 +1,6 @@
 const express = require('express');
 const db = require('../db');
 const scryfallApi = require('../scryfallApi');
-const lorcastApi = require('../lorcastApi');
 const mtgjsonApi = require('../mtgjsonApi');
 const cvScan = require('../cvScan');
 const scanOcr = require('../utils/scanOcr');
@@ -98,13 +97,12 @@ router.all('/search', searchLimiter, async (req, res) => {
   const query = req.method === 'POST' ? { ...req.query, ...req.body } : req.query;
   const { name: rawName, number: rawNumber, set: rawSet, scope = 'database', lang, prints, q, image, cropped, list_type } = query;
   const game = query.game === undefined ? 'mtg' : query.game;
-  if (!['mtg', 'lorcana'].includes(game)) return res.status(400).json({ error: 'Unsupported game' });
+  if (game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
   const { name, number, set } = normalizeSearchParams({ name: rawName, number: rawNumber, set: rawSet, q });
   const page = Math.max(1, parseInt(query.page, 10) || 1);
   const limit = Math.min(250, Math.max(1, parseInt(query.limit, 10) || 60));
   try {
-    const api = game === 'mtg' ? scryfallApi : lorcastApi;
-    let { cards, total } = await api.searchCards({
+    let { cards, total } = await scryfallApi.searchCards({
       name, number, set, scope, userId: req.user.id, lang,
       allPrints: prints === '1', page, limit,
     });
@@ -153,7 +151,7 @@ router.get('/collection/cert/:certNumber', searchLimiter, async (req, res) => {
   try {
     const cert = await psaApi.lookupCert(req.params.certNumber, req.user.psa_api_token || '');
     const brand = `${cert.brand || ''} ${cert.category || ''}`.toUpperCase();
-    const game = /MAGIC|GATHERING/.test(brand) ? 'mtg' : (/LORCANA/.test(brand) ? 'lorcana' : null);
+    const game = /MAGIC|GATHERING/.test(brand) ? 'mtg' : null;
     if (!game) return res.status(400).json({ error: 'Unsupported certification game' });
     let candidates = [];
     if (game) {
@@ -163,8 +161,7 @@ router.get('/collection/cert/:certNumber', searchLimiter, async (req, res) => {
         // discriminator between printings of the same name, and the search treats
         // it as optional so a label without one still returns something.
         const number = cert.card_number || '';
-        const api = game === 'mtg' ? scryfallApi : lorcastApi;
-        ({ cards: candidates } = await api.searchCards({
+        ({ cards: candidates } = await scryfallApi.searchCards({
           name, number, userId: req.user.id,
           allPrints: true, limit: 24,
         }));
@@ -188,7 +185,7 @@ router.get('/collection/cert/:certNumber', searchLimiter, async (req, res) => {
 // match nothing. Read-only counts, no build controls.
 router.get('/scan-sets', async (req, res) => {
   const game = req.query.game === undefined ? 'mtg' : req.query.game;
-  if (!['mtg', 'lorcana'].includes(game)) return res.status(400).json({ error: 'Unsupported game' });
+  if (game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
   try {
     // Report built languages so the picker can explain catalog coverage.
     res.json({
@@ -301,7 +298,7 @@ router.post('/scan-match', searchLimiter, async (req, res) => {
   try {
     const { image, set = '', lang, cropped = false } = req.body || {};
     const game = req.body?.game === undefined ? 'mtg' : req.body.game;
-    if (!['mtg', 'lorcana'].includes(game)) return res.status(400).json({ error: 'Unsupported game' });
+    if (game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
     if (!image || typeof image !== 'string') return res.status(400).json({ error: 'Missing image' });
     const base64 = image.includes(',') ? image.slice(image.indexOf(',') + 1) : image;
     const buf = Buffer.from(base64, 'base64');
@@ -334,64 +331,22 @@ router.post('/scan-match', searchLimiter, async (req, res) => {
     const result = await cvScan.match(buf, game, 8, { sets, lang: langName, cropped: !!cropped });
 
     result.candidates = await Promise.all(result.candidates.map(async (cand) => {
-      // Resolve each candidate through the provider that owns its card ID.
-      if (cand.cardId) {
-        if (game === 'mtg') {
-          const card = await scryfallApi.getCardById(cand.cardId).catch(() => null);
-          if (!card) return cand;
-          // The preference selects a real translated printing, never a relabelled
-          // English fallback. Keep the provider's language authoritative.
-          const localized = languages.toCode(card.language) === languages.toCode(langName) ? null
-            : await scryfallApi.getPrintingInLang(card.set_id, card.number, langName).catch(() => null);
-          const use = localized && languages.toCode(localized.language) === languages.toCode(langName)
-            ? localized : card;
-          const marked = languages.toCode(use.language) === languages.toCode(langName)
-            ? use : { ...use, langFallback: langName };
-          return { ...cand, name: use.name, set: use.set_id, number: use.number, card: marked };
-        }
-        if (game === 'lorcana') {
-          let row = await db.get(
-            `SELECT * FROM card_cache WHERE id = ? AND image_url IS NOT NULL AND image_url != '' LIMIT 1`,
-            [cand.cardId]
-          );
-          if (!row) {
-            const card = await lorcastApi.getCardById(cand.cardId).catch(() => null);
-            if (card) return { ...cand, name: card.name, set: card.set_id, number: card.number, card };
-            return cand;
-          }
-          const card = parseCardRow(row);
-          return { ...cand, name: card.name, set: card.set_id, number: card.number, card };
-        }
-      }
-      if (game === 'lorcana') {
-        const row = await db.get(
-          `SELECT c.* FROM tcgplayer_product t
-             JOIN card_cache c ON c.id = t.card_id
-            WHERE t.product_id = ? AND c.game = 'lorcana'
-              AND c.image_url IS NOT NULL AND c.image_url != ''
-            LIMIT 1`,
-          [cand.productId]
-        );
-        if (row) {
-          const card = parseCardRow(row);
-          return { ...cand, name: card.name, set: card.set_id, number: card.number, card };
-        }
-        const directRow = await db.get(
-          `SELECT * FROM card_cache WHERE tcgplayer_product_id = ? AND game = 'lorcana' AND image_url IS NOT NULL AND image_url != '' LIMIT 1`,
-          [cand.productId]
-        );
-        if (directRow) {
-          const card = parseCardRow(directRow);
-          return { ...cand, name: card.name, set: card.set_id, number: card.number, card };
-        }
-        return cand;
-      }
-      return cand;
+      if (!cand.cardId) return cand;
+      const card = await scryfallApi.getCardById(cand.cardId).catch(() => null);
+      if (!card) return cand;
+      // Keep the provider's actual printing language authoritative.
+      const localized = languages.toCode(card.language) === languages.toCode(langName) ? null
+        : await scryfallApi.getPrintingInLang(card.set_id, card.number, langName).catch(() => null);
+      const use = localized && languages.toCode(localized.language) === languages.toCode(langName)
+        ? localized : card;
+      const marked = languages.toCode(use.language) === languages.toCode(langName)
+        ? use : { ...use, langFallback: langName };
+      return { ...cand, name: use.name, set: use.set_id, number: use.number, card: marked };
     }));
 
     result.candidates = result.candidates.filter((candidate, index, all) =>
       all.findIndex(other => scanPrintingId(other) === scanPrintingId(candidate)) === index);
-    if (game === 'mtg') await applyScanSafety(result, buf, { cropped: !!cropped, sets, langName });
+    await applyScanSafety(result, buf, { cropped: !!cropped, sets, langName });
 
     return res.json(result);
   } catch (error) {
@@ -754,7 +709,7 @@ router.get('/cards/:id/printing', async (req, res) => {
     const cardId = req.params.id;
     const targetLang = req.query.lang;
     const game = req.query.game;
-    if (game !== undefined && !['mtg', 'lorcana'].includes(game)) {
+    if (game !== undefined && game !== 'mtg') {
       return res.status(400).json({ error: 'Unsupported game' });
     }
     if (!targetLang) {
@@ -762,8 +717,7 @@ router.get('/cards/:id/printing', async (req, res) => {
     }
 
     let card = await db.get(`SELECT * FROM card_cache WHERE id = ?`, [cardId]);
-    const idGame = card ? card.game : (cardId.startsWith('mtg-') ? 'mtg' : cardId.startsWith('lorcana-') ? 'lorcana' : null);
-    if (!['mtg', 'lorcana'].includes(idGame) || (game !== undefined && game !== idGame)) {
+    if (!cardApi.isMtgId(cardId) || (card && card.game !== 'mtg')) {
       return res.status(400).json({ error: 'Unsupported card ID or game' });
     }
     if (!card) {
@@ -782,6 +736,7 @@ router.get('/cards/:id/printing', async (req, res) => {
     res.status(404).json({ error: 'No printing found in the requested language' });
   } catch (error) {
     console.error('Error fetching card localized printing:', error);
+    if (error.status) return res.status(error.status).json({ error: error.message });
     res.status(500).json({ error: 'Failed to fetch card printing' });
   }
 });
@@ -982,7 +937,9 @@ router.put('/collection/:id', async (req, res) => {
   try {
     const entry = await db.get(`SELECT * FROM collection WHERE id = ? AND user_id = ?`, [id, req.user.id]);
     if (!entry) return res.status(404).json({ error: 'Collection entry not found' });
-    if (game !== undefined && game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
+    if (entry.game !== 'mtg' || (game !== undefined && game !== entry.game)) {
+      return res.status(400).json({ error: 'Unsupported game' });
+    }
     if (list_type !== undefined && !LIST_TYPES.includes(list_type)) return res.status(400).json({ error: 'Invalid list_type' });
     const nextListType = list_type ?? entry.list_type;
     const listChanged = nextListType !== entry.list_type;

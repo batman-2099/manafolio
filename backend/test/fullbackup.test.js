@@ -79,6 +79,17 @@ async function testFullBackup() {
     assert.ok(invalidRes.statusCode >= 400, 'a commander outside its deck must make the backup invalid');
     assert.strictEqual((await db.get(`SELECT commander_card_id FROM decks WHERE user_id = 1`)).commander_card_id, 'backup-card', 'invalid backups must not replace existing data');
 
+    const beforeUnsupported = await Promise.all(['card_cache', 'collection', 'locations', 'decks', 'deck_cards'].map(table => db.all(`SELECT * FROM ${table}`)));
+    for (const table of ['card_cache', 'collection', 'locations', 'decks']) {
+      const unsupported = structuredClone(res.body);
+      unsupported[table][0].game = 'unsupported';
+      invalidRes.statusCode = 200;
+      await importBackup({ body: { format: 'backup', data: unsupported }, user: { id: 1 } }, invalidRes);
+      assert.strictEqual(invalidRes.statusCode, 400, `${table}: unsupported backups must be rejected as a whole`);
+      assert.deepStrictEqual(await Promise.all(['card_cache', 'collection', 'locations', 'decks', 'deck_cards'].map(table => db.all(`SELECT * FROM ${table}`))),
+        beforeUnsupported, 'unsupported backups must not modify current data');
+    }
+
     const beforeInvalidRecord = await db.all(`SELECT * FROM decks WHERE user_id = 1 ORDER BY id`);
     for (const key of ['wins', 'losses']) {
       for (const value of [-1, 0.5, '1', null, true, 2147483648]) {

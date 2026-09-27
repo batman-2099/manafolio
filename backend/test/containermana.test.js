@@ -21,7 +21,7 @@ let server;
     const colorless = await location('Colorless');
     const empty = await location('Empty');
     const unknown = await location('Unknown');
-    const legacy = await location('Lorcana');
+    const legacy = await location('Legacy');
     const scoped = await location('Scoped');
     const archived = await location('Archived', 1, 'graveyard');
     const foreign = await location('Foreign', 2);
@@ -34,7 +34,7 @@ let server;
       ['white', '["White"]'], ['blue', '["U"]'], ['black', '["B"]'], ['red', '["R"]'], ['green', '["G"]'],
       ['missing', null], ['invalid-json', '['], ['scalar', '"W"'], ['object', '{}'],
       ['invalid-array', '[null,{"toString":null},1]'], ['invalid-colors', '["Amber","unknown"]'],
-      ['legacy-colors', '["White","Blue"]', 'lorcana'], ['legacy-empty', '[]', 'lorcana'],
+      ['legacy-colors', '["White","Blue"]', 'unsupported'], ['legacy-empty', '[]', 'unsupported'],
     ]) await card(id, identity, game);
     const store = (id, loc, { user = 1, inventory = 'collection', quantity = 1, compartmentId = null, missing = 0 } = {}) => db.run(
       `INSERT INTO collection (card_id, user_id, location_id, compartment_id, list_type, quantity, missing)
@@ -85,7 +85,7 @@ let server;
     assert.deepEqual(byId.get(colorless).mana_symbols, ['C']);
     assert.deepEqual(byId.get(empty).mana_symbols, [], 'cover and rules do not create contents');
     assert.deepEqual(byId.get(unknown).mana_symbols, [], 'missing, malformed and unknown identities are not colorless');
-    assert.deepEqual(byId.get(legacy).mana_symbols, [], 'Lorcana never supplies MTG mana symbols');
+    assert.deepEqual(byId.get(legacy).mana_symbols, [], 'unsupported games never supply MTG mana symbols');
     assert.deepEqual(byId.get(scoped).mana_symbols, ['W'], 'only positive stored copies from the same owner and inventory contribute; missing status retains storage membership');
     assert.equal(byId.get(mixed).total_cards, 5, 'slot occupancy continues to use compartment contents');
     assert.equal(byId.get(mixed).total_capacity, 9);

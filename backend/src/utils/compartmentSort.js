@@ -22,15 +22,6 @@ function safeJsonParse(val, fallback = []) {
   }
 }
 
-function prepareCardMetadata(card) {
-  if (!card) return card;
-  return {
-    ...card,
-    parsed_types: Array.isArray(card.types) ? card.types : safeJsonParse(card.types, []),
-    parsed_subtypes: Array.isArray(card.subtypes) ? card.subtypes : safeJsonParse(card.subtypes, []),
-    parsed_color_identity: Array.isArray(card.color_identity) ? card.color_identity : safeJsonParse(card.color_identity, [])
-  };
-}
 
 const COLOR_IDENTITY_NAMES = { W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green' };
 
@@ -709,7 +700,6 @@ module.exports = {
   compartmentAcceptsCard,
   loadSetsCache,
   getSortCategory,
-  prepareCardMetadata,
   safeJsonParse,
   stackKey,
   STACK_KEY_SQL

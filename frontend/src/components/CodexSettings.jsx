@@ -250,10 +250,10 @@ export default function CodexSettings() {
   };
 
   return (
-    <section className="glass-panel" aria-labelledby="codex-settings-title" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', minWidth: 0 }}>
+    <section className="glass-panel ai-settings" aria-labelledby="codex-settings-title">
       <div style={{ ...rowStyle, borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
         <Sparkles size={20} style={{ color: 'var(--accent-yellow)' }} aria-hidden="true" />
-        <h3 id="codex-settings-title" style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('codexSettings.title')}</h3>
+        <h3 id="codex-settings-title" tabIndex={-1} style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('codexSettings.title')}</h3>
       </div>
       <div className="form-group">
         <label htmlFor="ai-provider">{t('codexSettings.provider')}</label>
@@ -264,8 +264,8 @@ export default function CodexSettings() {
           {Object.entries(HOSTED_PROVIDERS).map(([id, entry]) => <option key={id} value={id}>{entry.name}</option>)}
         </select>
       </div>
-      {provider && <>
-      <p style={{ color: 'var(--text-secondary)', margin: 0 }}>{t(hosted ? `codexSettings.${provider}Hint` : isOllama ? 'codexSettings.ollamaHint' : 'aiDeck.accountHint')}</p>
+      {provider && <div className="ai-connection">
+      <h4>{hosted ? hosted.name : isOllama ? 'Ollama' : t('aiDeck.accountTitle')}</h4>
       {isOllama && (
         <div className="form-group">
           <label htmlFor="ai-ollama-url">{t('codexSettings.ollamaUrl')}</label>
@@ -273,13 +273,11 @@ export default function CodexSettings() {
           <p id="ai-ollama-url-hint" style={{ color: 'var(--text-secondary)', margin: 0 }}>{t('codexSettings.ollamaUrlHint')}</p>
         </div>
       )}
-      <h4>{hosted ? hosted.name : isOllama ? 'Ollama' : t('aiDeck.accountTitle')}</h4>
-      <p style={{ color: 'var(--text-secondary)', margin: 0 }}>{t(hosted ? `codexSettings.${provider}Privacy` : isOllama ? 'codexSettings.ollamaPrivacy' : 'aiDeck.privacy')}</p>
       <div style={rowStyle}>
         <span role="status">{account?.connected ? t('aiDeck.connected') : isOllama && checkedOllamaUrl === null ? t('codexSettings.checkRequired') : account === null && !accountError ? t('common.loading') : t('aiDeck.disconnected')}{isChatGPT && account?.connected && account.email ? ` · ${account.email}` : ''}</span>
         {isOllama || hosted ? (
-          <button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || modelsLoading || saving} onClick={checkConnection}>
-            {t(accountLoading ? 'common.loading' : accountError ? 'aiDeck.retry' : 'codexSettings.checkConnection')}
+          !accountError && <button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || modelsLoading || saving} onClick={checkConnection}>
+            {t(accountLoading ? 'common.loading' : 'codexSettings.checkConnection')}
           </button>
         ) : (
           <button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || saving || !!login} onClick={() => handleAccount(!!account?.connected)}>
@@ -293,7 +291,7 @@ export default function CodexSettings() {
             <label htmlFor="ai-api-key">{t('codexSettings.apiKey', { provider: hosted.name })}</label>
             <input id="ai-api-key" name="ai-api-key" type="password" className="input-control" value={apiKey} autoComplete="new-password" spellCheck={false} required disabled={accountBusy || accountLoading || saving} onChange={event => setApiKey(event.target.value)} aria-describedby="ai-api-key-hint" />
             <p id="ai-api-key-hint" style={{ color: 'var(--text-secondary)', margin: 0 }}>{t(import.meta.env.VITE_DEMO ? 'codexSettings.demoKeyHint' : 'codexSettings.apiKeyHint')}</p>
-            <a href={hosted.keyUrl} target="_blank" rel="noopener noreferrer">{t('codexSettings.getApiKey', { provider: hosted.name })}</a>
+            <a className="ai-provider-key-link" href={hosted.keyUrl} target="_blank" rel="noopener noreferrer">{t('codexSettings.getApiKey', { provider: hosted.name })}</a>
           </div>
           <div style={rowStyle}>
             <button type="submit" className="btn btn-secondary" disabled={accountBusy || accountLoading || saving || !apiKey.trim()}>{t(accountBusy ? 'common.loading' : account?.connected ? 'codexSettings.replaceApiKey' : 'codexSettings.saveApiKey')}</button>
@@ -310,8 +308,19 @@ export default function CodexSettings() {
           <button type="button" className="btn btn-secondary" disabled={accountBusy} onClick={() => handleAccount(true)}>{t('common.cancel')}</button>
         </div>
       )}
-      {accountError && <p role="alert" style={{ color: 'var(--status-error)' }}>{accountError}</p>}
-      </>}
+      {accountError && <div className="ai-connection-error" role="alert">
+        <p>{accountError}</p>
+        <button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || modelsLoading || saving} onClick={checkConnection}>{t('aiDeck.retry')}</button>
+      </div>}
+      <div className="ai-privacy">
+        <p>{t('codexSettings.privacySummary')}</p>
+        <details key={provider}>
+          <summary>{t('codexSettings.privacyDetails')}</summary>
+          <p>{t(hosted ? `codexSettings.${provider}Hint` : isOllama ? 'codexSettings.ollamaHint' : 'aiDeck.accountHint')}</p>
+          <p>{t(hosted ? `codexSettings.${provider}Privacy` : isOllama ? 'codexSettings.ollamaPrivacy' : 'aiDeck.privacy')}</p>
+        </details>
+      </div>
+      </div>}
       <p style={{ color: 'var(--text-secondary)', margin: 0 }}>{t('codexSettings.hint')}</p>
       {!preferences && !preferencesError && <p role="status">{t('common.loading')}</p>}
       {preferencesError && <p role="alert" style={{ color: 'var(--status-error)' }}>{preferencesError} <button type="button" className="btn btn-secondary" onClick={() => setPreferencesRevision(value => value + 1)}>{t('aiDeck.retry')}</button></p>}
@@ -351,7 +360,7 @@ export default function CodexSettings() {
         </form>
       )}
       {modelsLoading && <p role="status">{t('aiDeck.loadingModels')}</p>}
-      {modelsError && <p role="alert" style={{ color: 'var(--status-error)' }}>{modelsError} <button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || saving} onClick={checkConnection}>{t('aiDeck.retry')}</button></p>}
+      {modelsError && (!isOllama || modelsError !== accountError) && <div className="ai-connection-error" role="alert"><p>{modelsError}</p><button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || modelsLoading || saving} onClick={checkConnection}>{t('aiDeck.retry')}</button></div>}
       {saveError && <p role="alert" style={{ color: 'var(--status-error)' }}>{saveError}</p>}
       {saved && <p role="status">{t('codexSettings.saved')}</p>}
     </section>

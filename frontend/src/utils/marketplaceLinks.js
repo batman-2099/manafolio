@@ -9,7 +9,6 @@
 function cardGame(card) {
   if (card?.game) return card.game;
   if (card?.supertype === 'MTG' || String(card?.id).startsWith('mtg-')) return 'mtg';
-  if (card?.supertype === 'Lorcana' || String(card?.id).startsWith('lorcana-')) return 'lorcana';
   return null;
 }
 
@@ -31,8 +30,7 @@ const isProductUrl = (url) => /%2Fproduct%2F|\/product\//.test(String(url || '')
 // The card's page on TCGplayer, or null.
 export function tcgplayerUrl(card) {
   // The id first. It exists only when the card is genuinely listed, and unlike a
-  // stored URL it cannot quietly be a search. MTG gets it from Scryfall's
-  // `tcgplayer_id`; Lorcana from Lorcast's `tcgplayer_id`.
+  // stored URL it cannot quietly be a search. MTG gets it from Scryfall's `tcgplayer_id`.
   if (card?.tcgplayer_product_id) {
     return `https://www.tcgplayer.com/product/${card.tcgplayer_product_id}`;
   }
@@ -61,12 +59,10 @@ export function cardmarketUrl(card) {
 // Null for a name with no Latin letters: English-name searches cannot match it.
 export function searchUrl(card) {
   if (!searchable(card)) return null;
-  const g = cardGame(card);
-  const line = g === 'mtg' ? 'magic' : (g === 'lorcana' ? 'lorcana-tcg' : null);
-  if (!line) return null;
+  if (cardGame(card) !== 'mtg') return null;
   // Name only. Appending set name + number narrowed a lot of searches to zero
   // hits — Scryfall's own links search the bare name for the same reason.
-  return `https://www.tcgplayer.com/search/${line}/product?q=${encodeURIComponent(card.name)}`;
+  return `https://www.tcgplayer.com/search/magic/product?q=${encodeURIComponent(card.name)}`;
 }
 
 // Which marketplace the displayed price came from, and in what currency.
@@ -74,7 +70,6 @@ export function searchUrl(card) {
 // Read the source and currency off the row rather than guessing from its language.
 const SOURCE_NAMES = {
   scryfall: 'TCGplayer',
-  lorcast: 'TCGplayer',
 };
 export function priceSource(card) {
   // No price means no source to name.

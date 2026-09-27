@@ -15,6 +15,7 @@ import CreateContainerModal from './CreateContainerModal';
 import CardImage from './CardImage';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
+import Modal from './Modal';
 
 const MANA_SYMBOLS = [
   ['W', 'White', -475], ['U', 'Blue', -370], ['B', 'Black', -265],
@@ -172,6 +173,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [loadedCardsKey, setLoadedCardsKey] = useState(null);
   const [cardsError, setCardsError] = useState(false);
   const cardsRequest = useRef(0);
+  const containerMenuButton = useRef(null);
   const cardsKey = `${inventoryType}:${statsTrigger}`;
   const cardsReady = loadedCardsKey === cardsKey;
   const [loading, setLoading] = useState(true);
@@ -218,6 +220,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [transferringContainer, setTransferringContainer] = useState(false);
 
   const [capacityUpdatePending, setCapacityUpdatePending] = useState(null);
+  const cancelCapacityUpdate = () => {
+    const input = capacityUpdatePending?.returnFocus;
+    if (input) input.value = input.defaultValue;
+    setCapacityUpdatePending(null);
+  };
   const [showKebabMenu, setShowKebabMenu] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [sortDraft, setSortDraft] = useState([]);
@@ -243,7 +250,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [rulesComp, setRulesComp] = useState(null);
   useBackGuard(!!rulesComp, () => setRulesComp(null));
   useBackGuard(showRulesModal, () => setShowRulesModal(false));
-  useBackGuard(!!capacityUpdatePending, () => setCapacityUpdatePending(null));
+  useBackGuard(!!capacityUpdatePending, cancelCapacityUpdate);
   useBackGuard(!!selectedLocationId, () => setSelectedLocationId && setSelectedLocationId(null));
   const [compRuleDraft, setCompRuleDraft] = useState([]);
 
@@ -902,13 +909,14 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     } catch (err) { console.error(err); showToast(t('loc.errRename'), 'error'); }
   };
 
-  const handleSetCapacity = async (compartmentId, capacity, forceUpdateAll = false) => {
+  const handleSetCapacity = async (compartmentId, capacity, forceUpdateAll = false, returnFocus = null) => {
+    if (returnFocus && capacityUpdatePending) return;
     if (selectedLoc?.locked) {
       showToast(t('loc.lockedCapacity'), 'error');
       return;
     }
     if (compartments.length > 1 && !forceUpdateAll && !capacityUpdatePending) {
-      setCapacityUpdatePending({ id: compartmentId, capacity });
+      setCapacityUpdatePending({ id: compartmentId, capacity, returnFocus });
       return;
     }
     const updateAll = forceUpdateAll || false;
@@ -1525,8 +1533,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         </dialog>
       )}
       {coverLocation && (
-        <dialog ref={element => { if (element && !element.open) element.showModal(); }} onCancel={() => setCoverLocation(null)} aria-label={t('loc.chooseCover')} style={{ margin: 'auto', width: 'min(700px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
-          <h3>{t('loc.chooseCover')} — {coverLocation.name}</h3>
+        <Modal onClose={() => setCoverLocation(null)} aria-labelledby="container-cover-title">
+        <div style={{ width: 'min(700px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
+          <h3 id="container-cover-title">{t('loc.chooseCover')} — {coverLocation.name}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '0.75rem' }}>
             {coverChoices.map(card => <button key={card.card_id} className="btn btn-secondary" disabled={savingCover} onClick={() => saveCover(card.card_id)} style={{ display: 'flex', flexDirection: 'column', padding: '0.4rem' }}>
               <CardImage card={card} style={{ width: '100%', borderRadius: '4px' }} />
@@ -1537,7 +1546,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             <button className="btn btn-secondary" disabled={savingCover} onClick={() => saveCover(null)}>{t('loc.automaticCover')}</button>
             <button className="btn btn-secondary" disabled={savingCover} onClick={() => setCoverLocation(null)}>{t('common.close')}</button>
           </div>
-        </dialog>
+        </div>
+        </Modal>
       )}
       {draggingCard && (
         <DragOverlay dropAnimation={null}>
@@ -1558,9 +1568,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       )}
 
       {rulesComp && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setRulesComp(null)}>
+        <Modal onClose={() => setRulesComp(null)} aria-labelledby="compartment-rules-title">
           <div className="glass-panel" style={{ width: '480px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-secondary)' }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: 0 }}>{rulesComp.display_label}: Accepts</h3>
+            <h3 id="compartment-rules-title" style={{ margin: 0 }}>{rulesComp.display_label}: {t('compartment.accepts')}</h3>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0 }}>
               Rules controlling which cards may be filed into this {isBinderType ? 'page' : 'row'}. No rules = accepts anything the container allows.
             </p>
@@ -1570,28 +1580,29 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               <button className="btn btn-primary" onClick={saveCompartmentRules}>{t('loc.saveRules')}</button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {capacityUpdatePending && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
-            <h3 style={{ margin: 0 }}>{t('loc.syncCapacity')}</h3>
+        <Modal onClose={cancelCapacityUpdate} returnFocus={capacityUpdatePending.returnFocus} aria-labelledby="capacity-sync-title">
+          <div className="glass-panel" style={{ width: '400px', maxWidth: '100%', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
+            <h3 id="capacity-sync-title" style={{ margin: 0 }}>{t('loc.syncCapacity')}</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
               Do you want to apply the capacity <strong>{capacityUpdatePending.capacity}</strong> to ALL compartments in this container, or just this specific one?
             </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+              <button className="btn btn-secondary" onClick={cancelCapacityUpdate}>{t('common.cancel')}</button>
               <button className="btn btn-secondary" onClick={() => { handleSetCapacity(capacityUpdatePending.id, capacityUpdatePending.capacity, false); setCapacityUpdatePending(null); }}>{t('loc.justThisOne')}</button>
               <button className="btn btn-primary" onClick={() => { handleSetCapacity(capacityUpdatePending.id, capacityUpdatePending.capacity, true); setCapacityUpdatePending(null); }}>{t('loc.applyToAll')}</button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {showRulesModal && selectedLoc && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+        <Modal onClose={() => setShowRulesModal(false)} aria-labelledby="container-settings-title">
           <div className="glass-panel" style={{ width: '400px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
-            <h3 style={{ margin: 0 }}>{t('loc.containerSettings')}</h3>
+            <h3 id="container-settings-title" style={{ margin: 0 }}>{t('loc.containerSettings')}</h3>
             <button className="btn btn-secondary" onClick={() => setCoverLocation(selectedLoc)}>{t('loc.chooseCover')}</button>
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
@@ -1605,7 +1616,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               />
             </label>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem' }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
                 {t(isBinderType ? 'loc.numberOfPages' : 'loc.numberOfRows')}
                 <input
@@ -1620,7 +1631,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               </label>
 
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                Cards per {isBinderType ? 'page' : 'row'}
+                {t(`container.${isBinderType ? 'page' : 'row'}.perLabel`)}
                 <input
                   type="number"
                   min="1"
@@ -1668,7 +1679,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 <li>{t('loc.ruleNoteResort', { containerType: isBinderType ? t('loc.binderLower') : t('loc.boxLower') })}</li>
                 <li>{t('loc.ruleNoteFilter')}</li>
                 <li>{t('loc.ruleNoteCustom')}</li>
-                <li>{t('loc.ruleNoteShrink', { unitType: isBinderType ? t('loc.pageLower') : t('loc.rowLower') })}</li>
+                <li>{t('loc.ruleNoteShrink', { compartment: isBinderType ? t('loc.pageLower') : t('loc.rowLower') })}</li>
               </ul>
             </div>
 
@@ -1678,12 +1689,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             <SortBuilder value={sortDraft} onChange={setSortDraft} />
             <FilterBuilder value={filterDraft} onChange={setFilterDraft} setsList={setsList} fieldOptions={filterFieldOptions} />
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
               <button className="btn btn-secondary" onClick={() => setShowRulesModal(false)}>{t('common.cancel')}</button>
               <button className="btn btn-primary" onClick={saveContainerSettings}>{t('admin.saveSettings')}</button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
 
@@ -1806,7 +1817,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               </button>
             )}
             <div className="kebab-menu">
-              <button className="kebab-menu-button" onClick={() => setShowKebabMenu(s => !s)}>
+              <button ref={containerMenuButton} className="kebab-menu-button" aria-label={t('nav.more')} aria-expanded={showKebabMenu} onClick={() => setShowKebabMenu(s => !s)}>
                 <MoreVertical size={16} color="var(--text-secondary)" />
               </button>
               {showKebabMenu && (
@@ -1828,6 +1839,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     <Lock size={14} /> {t(selectedLoc.locked ? 'loc.unlockContainer' : 'loc.lockContainer')}
                   </button>
                   <button className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => {
+                    containerMenuButton.current?.focus();
                     setShowKebabMenu(false);
                     let sDraft = [];
                     if (selectedLoc.sort_order && selectedLoc.sort_order.startsWith('[')) {
@@ -1988,7 +2000,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             )}
 
             {containerViewMode === 'layout' && isBinderType && compartments.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', margin: '0.2rem 0', background: 'rgba(0,0,0,0.1)', padding: '0.4rem', borderRadius: 'var(--radius-sm)' }}>
+              <div className="storage-page-nav" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', margin: '0.2rem 0', background: 'rgba(0,0,0,0.1)', padding: '0.4rem', borderRadius: 'var(--radius-sm)' }}>
                 <button
                   type="button"
                   className="btn btn-secondary"
@@ -2004,6 +2016,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 </button>
                 <select
                   className="select-control"
+                  aria-label={t('container.page.label')}
                   value={activePageIndex}
                   onChange={(e) => {
                     if (e.target.value === '__add_new__') {
@@ -2084,12 +2097,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       ['printing', t('collection.allPrintings'), containerFilterOptions.printings],
                       ['language', t('collection.allLanguages'), containerFilterOptions.languages]
                     ].map(([key, label, options]) => (
-                      <select key={key} className="select-control" value={containerFilters[key]} onChange={(e) => setContainerFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
+                      <select key={key} className="select-control" aria-label={label} value={containerFilters[key]} onChange={(e) => setContainerFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
                         <option value="">{label}</option>
                         {options.map(option => <option key={option} value={option}>{option}</option>)}
                       </select>
                     ))}
-                    <select className="select-control" value={containerFilters.deckStatus} onChange={(e) => setContainerFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
+                    <select className="select-control" aria-label={t('loc.allDeckStatuses')} value={containerFilters.deckStatus} onChange={(e) => setContainerFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
                       <option value="">{t('loc.allDeckStatuses')}</option>
                       <option value="inPlay">{t('loc.inPlay')}</option>
                       <option value="notInPlay">{t('loc.notInPlay')}</option>
@@ -2153,7 +2166,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   canRemove: i === compartments.length - 1 && compartments.length > 1 && (cardsByCompartment.get(c.id) || []).length === 0,
                   moveTargets: compartments,
                   onRename: (label) => handleRenameCompartment(c.id, label),
-                  onSetCapacity: (cap) => handleSetCapacity(c.id, cap),
+                  onSetCapacity: (cap, input) => handleSetCapacity(c.id, cap, false, input),
                   onRemove: () => handleRemoveCompartment(c.id),
                   onToggleLock: () => handleToggleCompartmentLock(c.id, !c.locked),
                   containerLocked: !!selectedLoc.locked,
@@ -2262,11 +2275,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <div key={activeComp.id} className="row-flash" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(0,0,0,0.1)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <button className="btn btn-secondary btn-icon-only" disabled={activeCompIdx <= 0} onClick={() => setActiveCompartmentId(compartments[activeCompIdx - 1]?.id)} style={{ width: '24px', height: '24px', padding: 0 }}>
+                        <button className="btn btn-secondary btn-icon-only" aria-label={t('loc.prev')} disabled={activeCompIdx <= 0} onClick={() => setActiveCompartmentId(compartments[activeCompIdx - 1]?.id)} style={{ width: '24px', height: '24px', padding: 0 }}>
                           &larr;
                         </button>
                         <select
                           className="select-control"
+                          aria-label={t('container.row.label')}
                           value={activeComp.id}
                           onChange={(e) => {
                             if (e.target.value === '__add_new__') {
@@ -2280,7 +2294,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                           {compartments.map(c => <option key={c.id} value={c.id}>{c.display_label}</option>)}
                           <option value="__add_new__" disabled={!!selectedLoc.locked}>+ {t('loc.addRow')}</option>
                         </select>
-                        <button className="btn btn-secondary btn-icon-only" disabled={activeCompIdx >= compartments.length - 1} onClick={() => setActiveCompartmentId(compartments[activeCompIdx + 1]?.id)} style={{ width: '24px', height: '24px', padding: 0 }}>
+                        <button className="btn btn-secondary btn-icon-only" aria-label={t('common.next')} disabled={activeCompIdx >= compartments.length - 1} onClick={() => setActiveCompartmentId(compartments[activeCompIdx + 1]?.id)} style={{ width: '24px', height: '24px', padding: 0 }}>
                           &rarr;
                         </button>
                       </div>
@@ -2329,7 +2343,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       setsList={setsList}
                       moveTargets={compartments}
                       onRename={(label) => handleRenameCompartment(activeComp.id, label)}
-                      onSetCapacity={(cap) => handleSetCapacity(activeComp.id, cap)}
+                      onSetCapacity={(cap, input) => handleSetCapacity(activeComp.id, cap, false, input)}
                       onRemove={() => handleRemoveCompartment(activeComp.id)}
                       onToggleLock={() => handleToggleCompartmentLock(activeComp.id, !activeComp.locked)}
                       containerLocked={!!selectedLoc.locked}
@@ -2543,15 +2557,15 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '0.4rem' }}>
+            <div className="storage-queue-filters" style={{ display: 'flex', gap: '0.4rem' }}>
               <input
-                className="input-control" placeholder={t('loc.searchPlaceholder')} value={unsortedFilters.search}
+                className="input-control" aria-label={t('shared.search')} placeholder={t('loc.searchPlaceholder')} value={unsortedFilters.search}
                 onChange={(e) => setUnsortedFilters(filters => ({ ...filters, search: e.target.value }))} style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem', flex: 1, minWidth: 0 }}
               />
               <button className={`btn ${showUnsortedFilters ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setShowUnsortedFilters(show => !show)} style={{ padding: '0.3rem 0.5rem', display: 'inline-flex', alignItems: 'center' }} title={t('collection.filters')}>
                 <SlidersHorizontal size={13} />
               </button>
-              <select className="select-control" value={unsortedSort} onChange={(e) => setUnsortedSort(e.target.value)} style={{ fontSize: '0.7rem', padding: '0.3rem 0.5rem', maxWidth: '150px' }}>
+              <select className="select-control" aria-label={t('collection.sortBy')} value={unsortedSort} onChange={(e) => setUnsortedSort(e.target.value)} style={{ fontSize: '0.7rem', padding: '0.3rem 0.5rem', maxWidth: '150px' }}>
                 <option value="scanned-desc">{t('collection.sort.scanned-desc')}</option>
                 <option value="scanned-asc">{t('collection.sort.scanned-asc')}</option>
                 <option value="name-asc">{t('loc.sortAZ')}</option>
@@ -2570,12 +2584,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   ['printing', t('collection.allPrintings'), unsortedFilterOptions.printings],
                   ['language', t('collection.allLanguages'), unsortedFilterOptions.languages]
                 ].map(([key, label, options]) => (
-                  <select key={key} className="select-control" value={unsortedFilters[key]} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
+                  <select key={key} className="select-control" aria-label={label} value={unsortedFilters[key]} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
                     <option value="">{label}</option>
                     {options.map(option => <option key={option} value={option}>{option}</option>)}
                   </select>
                 ))}
-                <select className="select-control" value={unsortedFilters.deckStatus} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
+                <select className="select-control" aria-label={t('loc.allDeckStatuses')} value={unsortedFilters.deckStatus} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
                   <option value="">{t('loc.allDeckStatuses')}</option>
                   <option value="inPlay">{t('loc.inPlay')}</option>
                   <option value="notInPlay">{t('loc.notInPlay')}</option>

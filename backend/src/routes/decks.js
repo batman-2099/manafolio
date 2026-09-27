@@ -95,7 +95,6 @@ router.post('/', async (req, res) => {
   try {
     let preconPairs = null;
     if (precon_file) {
-      if (deckGame !== 'mtg') return res.status(400).json({ error: 'Precon decks are only available for Magic' });
       const precon = await mtgjsonApi.getDeck(precon_file);
       if (!precon) return res.status(404).json({ error: 'MTGJSON deck not found' });
       const rows = mtgjsonApi.deckCardRows(precon);
@@ -638,7 +637,7 @@ router.post('/:id/cards', async (req, res) => {
       console.log(`Card ${card_id} not in cache. Fetching...`);
       const apiCard = await cardApi.getCardById(card_id);
       if (!apiCard) {
-        return res.status(404).json({ error: `Card ${card_id} not found on any card provider.` });
+        return res.status(404).json({ error: `Card ${card_id} not found on Scryfall.` });
       }
     }
 
@@ -663,6 +662,7 @@ router.post('/:id/cards', async (req, res) => {
 
     res.json({ message: 'Card added/updated in deck successfully' });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     console.error(error);
     res.status(500).json({ error: 'Failed to add card to deck' });
   }

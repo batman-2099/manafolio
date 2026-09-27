@@ -98,7 +98,7 @@ const pct = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor((p / 10
 
 async function main() {
   const [game = 'mtg', lang = 'English', sizeArg = '60'] = process.argv.slice(2);
-  if (!['mtg', 'lorcana'].includes(game)) throw new Error('Unsupported game');
+  if (game !== 'mtg') throw new Error('Unsupported game');
   const sample = Number(sizeArg);
   const s = await cvScan.load(game, lang);
   if (!s.local) throw new Error(`${game}/${lang} has no locally built catalog to measure`);

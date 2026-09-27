@@ -6,6 +6,22 @@ const cellStyle = { padding: '0.65rem', borderBottom: '1px solid var(--border-gl
 const tableStyle = { width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' };
 const noteStyle = { color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.5, margin: '0.75rem 0' };
 
+export function ChartDataTable({ titleId, title, category, rows, series, format, categoryKey = 'name', formatCategory = value => value }) {
+  const { t, locale } = useT();
+  return (
+    <details className="dashboard-data" style={{ marginTop: '0.75rem' }}>
+      <summary aria-describedby={titleId}>{t('dash.viewData')}</summary>
+      <div role="region" aria-labelledby={titleId} tabIndex={0} style={{ overflowX: 'auto' }}>
+        <table style={tableStyle}>
+          <caption style={noteStyle}>{title}</caption>
+          <thead><tr><th scope="col" style={{ ...cellStyle, overflowWrap: 'normal' }}>{category}</th>{series.map(item => <th key={item.key} scope="col" style={{ ...cellStyle, overflowWrap: 'normal' }}>{item.label}</th>)}</tr></thead>
+          <tbody>{rows.map(row => <tr key={row.month || row[categoryKey]}><th scope="row" style={cellStyle}>{formatCategory(row[categoryKey])}</th>{series.map(item => <td key={item.key} style={{ ...cellStyle, whiteSpace: 'nowrap' }}>{format ? format(row[item.key]) : row[item.key].toLocaleString(locale)}</td>)}</tr>)}</tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
 export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
   const { t, locale } = useT();
   const revealRef = useScrollReveal();
@@ -41,6 +57,31 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
     },
   ];
   const decks = analytics?.deckPerformance;
+  const allUnavailable = charts.every(chart => !chart.rows) && (isArchive || !decks);
+
+  if (allUnavailable) {
+    return (
+      <div>
+        <p style={noteStyle}>{t('dash.analyticsUnavailable')}</p>
+        <details className="dashboard-methodology">
+          <summary>{t('dash.methodology')}</summary>
+          <div className="dashboard-analytics-grid">
+            {charts.map(chart => (
+              <section key={chart.key} aria-labelledby={`analytics-${chart.key}`}>
+                <h3 id={`analytics-${chart.key}`} className="section-heading">{chart.title}</h3>
+                <p style={noteStyle}>{chart.note}</p>
+              </section>
+            ))}
+            {!isArchive && <section aria-labelledby="analytics-decks">
+              <h3 id="analytics-decks" className="section-heading">{t('dash.deckPerformance')}</h3>
+              <p style={noteStyle}>{t('dash.deckPerformanceNote')}</p>
+            </section>}
+          </div>
+          {!isArchive && <p style={noteStyle}>{t('dash.deckSlotsNote')}</p>}
+        </details>
+      </div>
+    );
+  }
 
   return (
     <div ref={revealRef} className="dashboard-analytics-grid">
@@ -73,16 +114,7 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
                   </ResponsiveContainer>
                 </div>
               )}
-              <details style={{ marginTop: '0.75rem' }}>
-                <summary style={{ cursor: 'pointer', color: 'var(--text-primary)' }}>{t('dash.viewData')}</summary>
-                <div role="region" aria-label={chart.title} tabIndex={0} style={{ overflowX: 'auto' }}>
-                  <table style={tableStyle}>
-                    <caption style={noteStyle}>{chart.title}</caption>
-                    <thead><tr><th scope="col" style={cellStyle}>{chart.category}</th>{chart.series.map(series => <th key={series.key} scope="col" style={cellStyle}>{series.label}</th>)}</tr></thead>
-                    <tbody>{chart.rows.map(row => <tr key={row.month || row.name}><th scope="row" style={cellStyle}>{row.name}</th>{chart.series.map(series => <td key={series.key} style={cellStyle}>{number(row[series.key])}</td>)}</tr>)}</tbody>
-                  </table>
-                </div>
-              </details>
+              <ChartDataTable titleId={`analytics-${chart.key}`} title={chart.title} category={chart.category} rows={chart.rows} series={chart.series} />
             </>
           )}
         </section>

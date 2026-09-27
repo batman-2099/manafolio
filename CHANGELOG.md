@@ -2,6 +2,15 @@
 
 Release history starts with Manafolio 2.0.
 
+## 2.0.6
+
+- Removed Disney Lorcana provider, UI, translation, scanning, and maintenance integration. Magic workflows remain supported; existing stored records retain their identities, and unsupported backups are rejected before restore can replace account data.
+- Removed unused storage styles and backend helpers; scanner geometry now consumes existing convex hulls instead of recomputing them.
+- Unified audited deck, storage, setup, and account dialogs with native modal focus, Escape dismissal, focus restoration, and placement above mobile navigation; balanced browser-back guards during Strict Mode remounts while retaining existing themes and API contracts.
+- Fixed narrow-screen deck editing and draw-hand layouts, enlarged storage controls, associated form labels, and made account actions and collection inventories discoverable on phones.
+- Added accessible data tables to the remaining dashboard charts, consolidated unavailable analytics, and improved settings navigation, form widths, provider feedback, and theme-aware links.
+- Corrected collection filter counts and empty-state actions, bounded advanced filters, kept search progress visible, standardized mobile input sizing, and removed duplicated deck-health quantities.
+
 ## 2.0.5
 
 - Pointed Settings support, contribution, source, and update checks to the Manafolio repository instead of Bindarr.

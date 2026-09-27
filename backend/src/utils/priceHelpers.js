@@ -84,12 +84,11 @@ async function recordPrice(cardId, price) {
 // Scryfall: "We only update prices for cards once per day. Fetching card data
 // more frequently than 24 hours will not yield new prices."
 // (https://scryfall.com/docs/api/rate-limits). Sweeping more often than daily
-// is pure load for zero new data, so both providers gate on this.
+// is pure load for zero new data.
 const PRICE_SWEEP_INTERVAL_MS = 1000 * 60 * 60 * 24;
-// Each supported provider has an independent persisted sweep clock.
+// The supported provider's persisted sweep clock.
 const SWEEP_COLUMN = {
   mtg: 'mtg_prices_swept_at',
-  lorcana: 'lorcana_prices_swept_at',
 };
 
 // How often the automatic sweep is allowed to run, as configured. 0 turns it off.

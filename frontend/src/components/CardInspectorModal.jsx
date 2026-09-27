@@ -490,7 +490,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
             </div>
 
             <h3 id={titleId} className="section-heading" style={{ fontSize: '1.5rem', color: 'var(--text-strong)', fontWeight: 700, lineHeight: 1.2, marginBottom: '0.25rem' }}>
-              {getCardDisplayName(activeCard.name, language, activeCard.printed_name, activeCard.game || activeCard.supertype)}
+              {getCardDisplayName(activeCard.name, activeCard.printed_name)}
             </h3>
             {/* Show the English name alongside a localized printing when available. */}
             {translatedName(activeCard) && (

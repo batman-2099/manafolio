@@ -176,7 +176,7 @@ async function testContainerImport() {
     await add('5', 17, 'Normal', privateBox, 'collection', 0, 2);
     await add('5', 18, 'Normal', privateBox);
     const wrongGame = (await add('5', 19)).lastID;
-    await db.run("UPDATE collection SET game = 'lorcana' WHERE id = ?", [wrongGame]);
+    await db.run("UPDATE collection SET game = 'unsupported' WHERE id = ?", [wrongGame]);
     const certifiedStack = (await add('5', 20, 'Holofoil')).lastID;
     await db.run("UPDATE collection SET grader = 'PSA', cert_number = 'legacy-cert' WHERE id = ?", [certifiedStack]);
     const foreignReference = (await add('other', 1, 'Normal', source, 'collection', 0, 2)).lastID;
@@ -248,7 +248,7 @@ async function testContainerImport() {
     assert.strictEqual((await move({ ...payload, printing: 'Unsupported finish' })).statusCode, 400);
     for (const [field, value, original] of [
       ['locked', 1, 0], ['type', 'Binder', 'Box'], ['sort_order', 'name', 'custom'],
-      ['rule_type', 'set', 'any'], ['game', 'lorcana', 'mtg'], ['allow_stacking', 1, 0]
+      ['rule_type', 'set', 'any'], ['game', 'unsupported', 'mtg'], ['allow_stacking', 1, 0]
     ]) {
       await db.run(`UPDATE locations SET ${field} = ? WHERE id = ?`, [value, review.body.id]);
       assert.strictEqual((await move()).statusCode, 409, `changed destination ${field} is rejected`);

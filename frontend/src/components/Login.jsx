@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { User, Lock, ArrowRight, Eye, EyeOff, Shield } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { User, Lock, ArrowRight, Eye, EyeOff, Shield, ShieldAlert } from 'lucide-react';
 import { useT } from '../utils/i18n';
 import Logo from './Logo';
 
@@ -13,6 +13,8 @@ function Login({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [mismatchSubmitted, setMismatchSubmitted] = useState(false);
+  const confirmPasswordRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(() => {
     try {
@@ -65,6 +67,7 @@ function Login({ onLoginSuccess }) {
   // Creating an account (first-run owner, or self-registration) asks for the
   // password twice and validates it; signing in does neither.
   const creating = isRegister || setupRequired;
+  const passwordMismatch = creating && mismatchSubmitted && password !== confirmPassword;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -89,7 +92,8 @@ function Login({ onLoginSuccess }) {
         return;
       }
       if (password !== confirmPassword) {
-        setError(t('login.errPasswordMismatch'));
+        setMismatchSubmitted(true);
+        confirmPasswordRef.current?.focus();
         setLoading(false);
         return;
       }
@@ -277,11 +281,14 @@ function Login({ onLoginSuccess }) {
               <div style={{ position: 'relative' }}>
                 <input
                   id="login-confirm-password"
+                  ref={confirmPasswordRef}
+                  aria-invalid={passwordMismatch || undefined}
+                  aria-describedby={passwordMismatch ? 'login-confirm-error' : undefined}
                   type={showPassword ? 'text' : 'password'}
                   name="confirm-password"
                   autoComplete="new-password"
                   className="input-control"
-                  style={{ width: '100%', paddingLeft: '2.5rem' }}
+                  style={{ width: '100%', paddingLeft: '2.5rem', borderColor: passwordMismatch ? 'var(--accent-red)' : undefined }}
                   placeholder={t('login.confirmPasswordPlaceholder')}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -290,6 +297,12 @@ function Login({ onLoginSuccess }) {
                 />
                 <Lock size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               </div>
+              {passwordMismatch && (
+                <p id="login-confirm-error" role="alert" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-red)', fontSize: '0.875rem', margin: '0.5rem 0 0' }}>
+                  <ShieldAlert size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+                  {t('login.errPasswordMismatch')}
+                </p>
+              )}
             </div>
           )}
 

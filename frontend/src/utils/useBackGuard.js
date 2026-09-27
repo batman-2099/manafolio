@@ -52,6 +52,15 @@ export function useBackGuard(isOpen, onClose) {
 
   useEffect(() => {
     if (!isOpen) return;
-    return pushBackGuard(() => onCloseRef.current && onCloseRef.current());
+    let active = true;
+    let dispose;
+    // Strict Mode replays mount effects before microtasks; register only the live mount.
+    queueMicrotask(() => {
+      if (active) dispose = pushBackGuard(() => onCloseRef.current && onCloseRef.current());
+    });
+    return () => {
+      active = false;
+      dispose?.();
+    };
   }, [isOpen]);
 }

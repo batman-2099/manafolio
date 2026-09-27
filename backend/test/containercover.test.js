@@ -36,7 +36,7 @@ const list = router.stack.find(layer => layer.route?.path === '/locations' && la
       ['newest', 'mtg', 'newest.jpg', 1, id, 'collection', '2026-02-01'],
       ['same-time', 'mtg', 'tie.jpg', 1, id, 'collection', '2026-02-01'],
       ['no-image', 'mtg', '', 1, id, 'collection', '2026-03-01'],
-      ['wrong-game', 'lorcana', 'lorcana.jpg', 1, id, 'collection', '2026-04-01'],
+      ['wrong-game', 'unsupported', 'unsupported.jpg', 1, id, 'collection', '2026-04-01'],
       ['wrong-user', 'mtg', 'private.jpg', 2, id, 'collection', '2026-05-01'],
       ['wrong-inventory', 'mtg', 'arena.jpg', 1, id, 'arena', '2026-06-01'],
       ['archived', 'mtg', 'archive.jpg', 1, archivedId, 'graveyard', '2026-07-01'],

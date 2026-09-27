@@ -39,7 +39,7 @@ async function testRecord() {
     assert.strictEqual(created.statusCode, 201);
     const arena = created.body.id;
     assert.deepStrictEqual(await counts(arena), { wins: 0, losses: 0 });
-    const legacy = (await db.run(`INSERT INTO decks (name, game, user_id) VALUES ('Legacy', 'lorcana', 1)`)).lastID;
+    const legacy = (await db.run(`INSERT INTO decks (name, game, user_id) VALUES ('Legacy', 'unsupported', 1)`)).lastID;
     await db.run(`INSERT INTO card_cache (id, name, game) VALUES ('record-card', 'Record Card', 'mtg')`);
     await db.run(`INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out) VALUES (?, 'record-card', 2, 1)`, [physical]);
     const metadataBefore = await db.get('SELECT * FROM decks WHERE id = ?', [physical]);

@@ -73,23 +73,6 @@ async function runTests() {
       'Authorization': `Bearer ${token}`
     };
 
-    // F6-TC2: Mixed-game collection sorting (Magic colors and Lorcana inks)
-    try {
-      const { sortCards } = require('../../src/utils/compartmentSort');
-      const cards = [
-        { name: 'Swamp', types: ['Black'], game: 'mtg' },
-        { name: 'Mickey Mouse', types: ['Steel'], game: 'lorcana' },
-        { name: 'Plains', types: ['White'], game: 'mtg' },
-        { name: 'Ariel', types: ['Amber'], game: 'lorcana' }
-      ];
-      const sorted = sortCards(cards, 'type-name', 'normals_first');
-      assert.deepStrictEqual(sorted.map(card => card.name), ['Plains', 'Swamp', 'Ariel', 'Mickey Mouse']);
-      console.log('PASS: F6-TC2');
-    } catch (err) {
-      console.error('FAIL: F6-TC2 -', err.message);
-      throw err;
-    }
-
     // F6-TC3: Scryfall proxy search & add to binder with price history writing
     try {
       const searchRes = await fetch(`http://localhost:${port}/api/search?game=mtg&name=Lotus`, { headers: authHeaders });

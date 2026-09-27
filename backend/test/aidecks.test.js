@@ -12,7 +12,7 @@ process.env.DB_PATH = path.join(directory, 'test.db');
 process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 const db = require('../src/db');
 const id = number => `mtg-00000000-0000-4000-8000-${String(number).padStart(12, '0')}`;
-const ids = { forest: id(1), bolt: id(2), reprint: id(3), locked: id(4), tenant: id(5), wishlist: id(6), lorcana: id(7), commander: id(8), island: id(9), banned: id(10), restricted: id(11), unknown: id(12), missing: id(13) };
+const ids = { forest: id(1), bolt: id(2), reprint: id(3), locked: id(4), tenant: id(5), wishlist: id(6), unsupported: id(7), commander: id(8), island: id(9), banned: id(10), restricted: id(11), unknown: id(12), missing: id(13) };
 Object.assign(ids, { multicolor: id(14), unknownColor: id(15), outsideSet: id(16) });
 const requestBody = { inventory_type: 'collection', format: 'Standard', target_size: 60, prompt: 'An efficient deck using my available cards.' };
 const draft = changes => ({
@@ -72,7 +72,7 @@ async function seed() {
     { id: ids.locked, name: 'Locked Creature', subtypes: ['Creature'], color: ['G'] },
     { id: ids.tenant, name: 'Other Users Private Card', subtypes: ['Creature'], color: ['G'] },
     { id: ids.wishlist, name: 'Wishlist Only', subtypes: ['Creature'], color: ['G'] },
-    { id: ids.lorcana, name: 'Not Magic', subtypes: ['Creature'], color: [], game: 'lorcana' },
+    { id: ids.unsupported, name: 'Not Magic', subtypes: ['Creature'], color: [], game: 'unsupported' },
     { id: ids.commander, name: 'Green Commander', subtypes: ['Legendary', 'Creature'], color: ['G'] },
     { id: ids.island, name: 'Island', subtypes: ['Basic', 'Land', 'Island'], color: ['U'], set: 'alt' },
     { id: ids.banned, name: 'Banned Card', subtypes: ['Sorcery'], color: ['G'], legalities: { standard: 'banned', modern: 'legal' } },
@@ -120,7 +120,7 @@ async function seed() {
   await own(ids.locked, 2);
   await own(ids.tenant, 10, 2);
   await own(ids.wishlist, 10, 1, 'wishlist');
-  await own(ids.lorcana, 10, 1, 'collection', 0, 'lorcana');
+  await own(ids.unsupported, 10, 1, 'collection', 0, 'unsupported');
   await own(ids.commander, 1);
   await own(ids.commander, 1, 1, 'arena');
   await own(ids.island, 100);
@@ -187,7 +187,7 @@ async function main() {
     assert.deepStrictEqual([physicalBolt.owned_qty, physicalBolt.locked_qty, physicalBolt.available_qty, physicalBolt.missing_qty], [4, 1, 3, 2]);
     assert.strictEqual(physical.body.cards.find(card => card.id === ids.locked).available_qty, 0);
     assert.strictEqual(physical.body.cards.find(card => card.id === ids.missing).available_qty, 0);
-    assert.ok([ids.tenant, ids.wishlist, ids.lorcana].every(cardId => !physical.body.cards.some(card => card.id === cardId)));
+    assert.ok([ids.tenant, ids.wishlist, ids.unsupported].every(cardId => !physical.body.cards.some(card => card.id === cardId)));
     const arena = await request('GET', '/ai/inventory?inventory_type=arena');
     const arenaBolt = arena.body.cards.find(card => card.id === ids.bolt);
     assert.deepStrictEqual([arenaBolt.owned_qty, arenaBolt.locked_qty, arenaBolt.available_qty], [4, 0, 4]);
@@ -218,7 +218,7 @@ async function main() {
     assert.deepStrictEqual(await db.get('SELECT COUNT(*) AS count FROM decks'), before, 'suggesting never creates a deck');
     assert.strictEqual(suggested.body.draft.include_checked_out, false);
     const sent = JSON.parse(calls[0].prompt.slice(calls[0].prompt.lastIndexOf('\n') + 1));
-    assert.ok([ids.tenant, ids.wishlist, ids.lorcana, ids.locked, ids.missing, ids.banned].every(cardId => !sent.catalog.some(card => card[0] === cardId)));
+    assert.ok([ids.tenant, ids.wishlist, ids.unsupported, ids.locked, ids.missing, ids.banned].every(cardId => !sent.catalog.some(card => card[0] === cardId)));
     assert.deepStrictEqual(sent.catalog.map(card => card[0]).sort(), physical.body.cards.filter(card => card.available_qty > 0 && card.id !== ids.banned).map(card => card.id).sort(), 'every eligible owned printing is sent');
     assert.ok(!calls[0].prompt.includes('PRIVATE STORAGE NOTE'));
     const largeInventory = Array.from({ length: 2000 }, (_, i) => ({
@@ -458,7 +458,7 @@ async function main() {
       assert.ok(!calls.at(-1).prompt.includes(card.name), 'excluded metadata must not reach the model');
       if (card.oracle_text) assert.ok(!calls.at(-1).prompt.includes(card.oracle_text), 'excluded rules must not reach the model');
     }
-    assert.ok([ids.tenant, ids.wishlist, ids.lorcana].every(cardId => !calls.at(-1).prompt.includes(cardId)));
+    assert.ok([ids.tenant, ids.wishlist, ids.unsupported].every(cardId => !calls.at(-1).prompt.includes(cardId)));
     const filteredInventoryEvent = filteredEvents.find(event => event.stage === 'inventory_ready');
     assert.strictEqual(filteredInventoryEvent.printings, 4);
     assert.strictEqual(filteredInventoryEvent.availableCopies, 109);
@@ -531,7 +531,7 @@ async function main() {
     assert.strictEqual(lastPayload().catalog.find(row => row[0] === ids.locked)[2], 2);
     assert.strictEqual(lastPayload().catalog.find(row => row[0] === ids.bolt)[2], 4,
       'including checkout uses this user’s non-missing owned copies, not other tenants or Arena copies');
-    assert.ok([ids.missing, ids.tenant, ids.wishlist, ids.lorcana, ids.banned].every(cardId => !lastPayload().catalog.some(row => row[0] === cardId)));
+    assert.ok([ids.missing, ids.tenant, ids.wishlist, ids.unsupported, ids.banned].every(cardId => !lastPayload().catalog.some(row => row[0] === cardId)));
     const { warnings: includedWarnings, ...includedSave } = included.body.draft;
     const locksBeforeSave = await db.all('SELECT id, checked_out, checked_out_at FROM decks WHERE checked_out = 1 ORDER BY id');
     assert.strictEqual((await request('POST', '/ai', { ...includedSave, include_checked_out: false }, 3)).status, 409,
@@ -667,7 +667,7 @@ async function main() {
     const unsupportedResult = await request('POST', '/ai/suggest', { ...improvement, source_deck_id: unsupported.lastID }, 5);
     assert.strictEqual(unsupportedResult.status, 400);
     assert.match(unsupportedResult.body.error, /unsupported.*format/i);
-    await db.run("UPDATE decks SET game = 'lorcana' WHERE id = ?", [unsupported.lastID]);
+    await db.run("UPDATE decks SET game = 'unsupported' WHERE id = ?", [unsupported.lastID]);
     assert.strictEqual((await request('POST', '/ai/suggest', { ...improvement, source_deck_id: unsupported.lastID }, 5)).status, 404,
       'owned non-Magic decks are not exposed as improvement sources');
     await db.run('DELETE FROM decks WHERE id = ?', [unsupported.lastID]);

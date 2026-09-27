@@ -271,7 +271,7 @@ db.initDb()
     }, 1000 * 60 * 60 * 24 * 7);
 
     // Prices. Hourly tick, and NOT forced — shouldSweepPrices decides whether
-    // each provider is actually due, from the admin's price_refresh_days.
+    // Scryfall is actually due, from the admin's price_refresh_days.
     //
     // Hourly rather than daily because a daily tick against a daily interval
     // skips on any clock drift at all — "23h 59m elapsed" is not due, so the

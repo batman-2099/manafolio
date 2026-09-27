@@ -87,6 +87,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   const [searchLang, setSearchLang] = useState('en');
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(false);
+  const searchPending = useRef(false);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
 
@@ -179,7 +180,7 @@ function CardSearch({ onAddSuccess, showToast }) {
         const seen = new Set();
         setKnownSets(rows
           .filter(s => !s.game || s.game === game)
-          .map(s => ({ code: String(s.id || '').replace(/^(?:mtg|lorcana)-/, ''), name: s.name, symbol_url: s.symbol_url }))
+          .map(s => ({ code: String(s.id || '').replace(/^mtg-/, ''), name: s.name, symbol_url: s.symbol_url }))
           .filter(s => s.code && !seen.has(s.code) && seen.add(s.code))
           .reverse()); // newest first — that is what people are adding
       })
@@ -205,6 +206,8 @@ function CardSearch({ onAddSuccess, showToast }) {
 
   // pageNum > 1 appends to the existing results instead of replacing them.
   const runSearch = async (pageNum, size = pageSize) => {
+    if (searchPending.current) return;
+    searchPending.current = true;
     const append = pageNum > 1;
     if (append) setLoadingMore(true); else setLoading(true);
     setSearchError(null);
@@ -257,6 +260,7 @@ function CardSearch({ onAddSuccess, showToast }) {
       console.error(err);
       showToast(t('search.errApi'), 'error');
     } finally {
+      searchPending.current = false;
       setLoading(false);
       setLoadingMore(false);
     }
@@ -715,12 +719,13 @@ function CardSearch({ onAddSuccess, showToast }) {
         <form onSubmit={handleSearch} style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.cardName')}</label>
+              <label htmlFor="search-card-name" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.cardName')}</label>
               <div style={{ position: 'relative' }}>
                 <input
+                  id="search-card-name"
                   type="text"
                   className="input-control"
-                  placeholder={t(game === 'mtg' ? 'search.namePlaceholderMtg' : 'search.namePlaceholder')}
+                  placeholder={t('search.namePlaceholderMtg')}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   style={{ width: '100%', paddingLeft: '2.5rem' }}
@@ -735,8 +740,9 @@ function CardSearch({ onAddSuccess, showToast }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               {/* The language of the cards being searched for, not the app's. */}
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.language')}</label>
+              <label htmlFor="search-language" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.language')}</label>
               <select
+                id="search-language"
                 className="select-control"
                 value={searchLang}
                 onChange={(e) => {
@@ -753,8 +759,9 @@ function CardSearch({ onAddSuccess, showToast }) {
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.cardNumber')}</label>
+              <label htmlFor="search-card-number" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.cardNumber')}</label>
               <input
+                id="search-card-number"
                 type="text"
                 className="input-control"
                 placeholder={t('search.numberPlaceholder')}
@@ -773,7 +780,7 @@ function CardSearch({ onAddSuccess, showToast }) {
                 autoComplete="off"
                 aria-expanded={setsOpen}
                 aria-controls="known-set-codes"
-                placeholder={t(game === 'mtg' ? 'search.setsPlaceholderMtg' : 'search.setsPlaceholder')}
+                placeholder={t('search.setsPlaceholderMtg')}
                 value={setCodeQuery}
                 onFocus={() => setSetsOpen(true)}
                 onChange={event => { setSetCodeQuery(event.target.value); setSetsOpen(true); }}
@@ -808,8 +815,10 @@ function CardSearch({ onAddSuccess, showToast }) {
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-            <button type="submit" className="btn btn-primary" style={{ flex: '1 1 220px' }}>
-              <Search size={18} />
+            <button type="submit" className="btn btn-primary" disabled={loading || loadingMore} aria-busy={loading} style={{ flex: '1 1 220px' }}>
+              {loading
+                ? <span className="spinner" aria-hidden="true" style={{ width: 18, height: 18, margin: 0, borderWidth: 2, borderColor: 'currentColor', borderTopColor: 'transparent' }} />
+                : <Search size={18} aria-hidden="true" />}
               {t('search.submit')}
             </button>
             <button
@@ -850,6 +859,9 @@ function CardSearch({ onAddSuccess, showToast }) {
               </span>
             </button>
           </div>
+          <span role="status" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap' }}>
+            {loading ? t('common.loading') : ''}
+          </span>
         </form>
       </div>
 
@@ -929,7 +941,7 @@ function CardSearch({ onAddSuccess, showToast }) {
       )}
 
       {searchError && (
-        <div className="glass-panel" style={{ borderLeft: '4px solid var(--accent-red)', background: 'rgba(239, 68, 68, 0.08)', padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div role="alert" className="glass-panel" style={{ borderLeft: '4px solid var(--accent-red)', background: 'rgba(239, 68, 68, 0.08)', padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-red)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
             <ShieldAlert size={18} />
             {t(`searchErr.${searchError}.title`)}
@@ -939,9 +951,6 @@ function CardSearch({ onAddSuccess, showToast }) {
           </p>
         </div>
       )}
-
-      {/* Loading state */}
-      {loading && <div className="spinner"></div>}
 
       {/* Filters and Sorting Panel */}
       {!loading && cards.length > 0 && (
@@ -1131,7 +1140,7 @@ function CardSearch({ onAddSuccess, showToast }) {
               <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
                 <h3 style={{ color: 'var(--text-strong)', fontSize: '1.25rem', margin: 0, wordBreak: 'break-word' }}>{t('search.addCardTitle')}</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.25rem 0 0 0', wordBreak: 'break-word' }}>
-                  {getCardDisplayName(selectedCard.name, language, selectedCard.printed_name, selectedCard.game || game)}
+                  {getCardDisplayName(selectedCard.name, selectedCard.printed_name)}
                   {translatedName(selectedCard) && <span style={{ color: 'var(--text-muted)' }}> ({translatedName(selectedCard)})</span>}
                   {' '}({selectedCard.set_name}
                   {/* Code only where the set name isn't readable to an English speaker. */}

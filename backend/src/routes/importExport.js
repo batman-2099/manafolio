@@ -52,10 +52,10 @@ function parseCompleteBackup(data) {
     throw new Error('Invalid backup deck record');
   }
   if (['card_cache', 'collection', 'decks'].some(key =>
-    backup[key].some(row => row.game != null && !['mtg', 'lorcana'].includes(row.game)))
-    || backup.locations.some(location => location.game != null && !['any', 'mtg', 'lorcana'].includes(location.game))
+    backup[key].some(row => row.game != null && row.game !== 'mtg'))
+    || backup.locations.some(location => location.game != null && !['any', 'mtg'].includes(location.game))
     || backup.card_cache.some(card => typeof card.id !== 'string'
-      || (!['mtg', 'lorcana'].includes(card.game) && !/^(mtg|lorcana)-/.test(card.id)))) {
+      || (card.game !== 'mtg' && !card.id.startsWith('mtg-')))) {
     throw Object.assign(new Error('Unsupported backup card ID or game'), { status: 400 });
   }
 
@@ -97,6 +97,25 @@ async function restoreCompleteBackup(backup, userId) {
   const deckIds = new Map();
 
   await db.withTransaction(async () => {
+    const unsupported = await db.get(`
+      SELECT id FROM collection WHERE user_id = ? AND game NOT IN ('mtg')
+      UNION ALL SELECT id FROM decks WHERE user_id = ? AND game NOT IN ('mtg')
+      UNION ALL SELECT id FROM locations WHERE user_id = ? AND game NOT IN ('mtg', 'any')
+      UNION ALL SELECT c.id FROM collection c JOIN card_cache cc ON cc.id = c.card_id
+        WHERE c.user_id = ? AND cc.game NOT IN ('mtg')
+      UNION ALL SELECT d.id FROM decks d JOIN deck_cards dc ON dc.deck_id = d.id
+        JOIN card_cache cc ON cc.id = dc.card_id WHERE d.user_id = ? AND cc.game NOT IN ('mtg')
+      LIMIT 1
+    `, [userId, userId, userId, userId, userId]);
+    if (unsupported) {
+      throw Object.assign(new Error('Restore would replace unsupported stored records; export them before restoring into a separate account'), { status: 400 });
+    }
+    for (const card of backup.card_cache) {
+      const cached = await db.get('SELECT game FROM card_cache WHERE id = ?', [card.id]);
+      if (cached && cached.game !== card.game) {
+        throw Object.assign(new Error('Backup card identity conflicts with stored data'), { status: 400 });
+      }
+    }
     await db.run('DELETE FROM deck_cards WHERE deck_id IN (SELECT id FROM decks WHERE user_id = ?)', [userId]);
     await db.run('DELETE FROM decks WHERE user_id = ?', [userId]);
     await db.run('DELETE FROM collection WHERE user_id = ?', [userId]);
@@ -332,6 +351,9 @@ router.post('/import/preview', (req, res) => {
 // Import endpoint
 router.post('/import', async (req, res) => {
   const { format = 'internal', data, list_type = 'collection', mapping } = req.body;
+  if (req.body.game !== undefined && req.body.game !== 'mtg') {
+    return res.status(400).json({ error: 'Unsupported game' });
+  }
   if (!data) {
     return res.status(400).json({ error: 'No data provided' });
   }
@@ -403,8 +425,18 @@ router.post('/import', async (req, res) => {
     if (!Array.isArray(rawItems)) {
       return res.status(400).json({ error: 'Invalid data payload' });
     }
-    if (rawItems.some(item => !item || (item.game !== undefined && !['mtg', 'lorcana'].includes(item.game)))) {
+    if (rawItems.some(item => !item || (item.game !== undefined && item.game !== 'mtg'))) {
       return res.status(400).json({ error: 'Unsupported game' });
+    }
+    const inputIds = [...new Set(rawItems.map(item => item.card_id || item.id).filter(Boolean))];
+    for (let offset = 0; offset < inputIds.length; offset += 500) {
+      const ids = inputIds.slice(offset, offset + 500);
+      const cached = await db.all(`SELECT id, game FROM card_cache WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
+      const identities = new Map(cached.map(card => [card.id, card.game]));
+      if (ids.some(id => typeof id !== 'string'
+        || (identities.has(id) ? identities.get(id) !== 'mtg' : !id.startsWith('mtg-')))) {
+        return res.status(400).json({ error: 'Unsupported card ID or game' });
+      }
     }
     onProgress?.({ stage: 'parsed', total: rawItems.length });
 
@@ -431,10 +463,7 @@ router.post('/import', async (req, res) => {
 
       unmatchedCount = magicItems.length - pairs.length;
       failedItems = unmatchedRows.map(failedItem);
-      rawItems = [
-        ...pairs.map(({ row, card }) => ({ ...row, card_id: card.id })),
-        ...rawItems.filter(item => item.game === 'lorcana'),
-      ];
+      rawItems = pairs.map(({ row, card }) => ({ ...row, card_id: card.id }));
       if (rawItems.length === 0) {
         return respond(400, { error: 'No Magic cards matched Scryfall' });
       }
@@ -452,8 +481,8 @@ router.post('/import', async (req, res) => {
         const cardId = item.card_id || item.id;
         const cached = typeof cardId === 'string'
           ? await db.get(`SELECT id, game FROM card_cache WHERE id = ?`, [cardId]) : null;
-        const idGame = (typeof cardId === 'string' && /^(mtg|lorcana)-/.exec(cardId)?.[1]) || cached?.game;
-        if (!['mtg', 'lorcana'].includes(idGame) || (item.game !== undefined && item.game !== idGame)) {
+        const idGame = cached ? cached.game : (typeof cardId === 'string' && cardId.startsWith('mtg-') ? 'mtg' : null);
+        if (idGame !== 'mtg' || (item.game !== undefined && item.game !== idGame)) {
           throw Object.assign(new Error('Unsupported card ID or game'), { status: 400 });
         }
         const game = idGame;
@@ -477,8 +506,6 @@ router.post('/import', async (req, res) => {
               game
             ]
           );
-        } else if (cached.game !== game) {
-          await db.run(`UPDATE card_cache SET game = ? WHERE id = ?`, [game, cardId]);
         }
 
         await db.run(

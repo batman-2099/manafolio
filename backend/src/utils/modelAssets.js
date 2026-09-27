@@ -145,7 +145,7 @@ function start(what) {
       // A newly installed catalog or model has to be picked up without a restart.
       try {
         const cvScan = require('../cvScan');
-        for (const game of ['mtg', 'lorcana']) cvScan.reload(game);
+        cvScan.reload('mtg');
       } catch { /* nothing loaded yet is fine — the next scan loads it */ }
     } catch (e) {
       job.phase = 'error';

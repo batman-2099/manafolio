@@ -1,25 +1,20 @@
-// Dispatch card IDs to the provider that owns them.
+// Validate card identities before calling Scryfall.
 const scryfallApi = require('../scryfallApi');
-const lorcastApi = require('../lorcastApi');
 const languages = require('./languages');
 
-const isMtgId = (id) => String(id || '').startsWith('mtg-');
-const isLorcanaId = (id) => String(id || '').startsWith('lorcana-');
+const isMtgId = (id) => typeof id === 'string' && id.startsWith('mtg-');
 
-// The game an ID implies. `game` from the request wins when explicit; otherwise inferred from prefix.
 function gameOf(id, requestedGame) {
-  if (requestedGame === 'mtg' || isMtgId(id)) return 'mtg';
-  if (requestedGame === 'lorcana' || isLorcanaId(id)) return 'lorcana';
-  return null;
+  if (!isMtgId(id) || (requestedGame !== undefined && requestedGame !== 'mtg')) {
+    throw Object.assign(new Error('Unsupported card ID or game'), { status: 400 });
+  }
+  return 'mtg';
 }
 
-// Fetch a card from whichever provider minted its ID. Returns null when that
-// provider does not have it.
+// Returns null when Scryfall does not have the requested Magic card.
 async function getCardById(id, { game } = {}) {
-  const g = gameOf(id, game);
-  if (g === 'mtg') return await scryfallApi.getCardById(id);
-  if (g === 'lorcana') return await lorcastApi.getCardById(id);
-  return null;
+  gameOf(id, game);
+  return scryfallApi.getCardById(id);
 }
 
 // The same card as printed in `language`, or null when there is no such printing.
@@ -34,23 +29,12 @@ async function getCardById(id, { game } = {}) {
 // Null means keep the card you had when no printing exists in the requested language.
 async function printingInLanguage(card, language) {
   if (!card) return null;
+  if (card.game !== 'mtg') {
+    throw Object.assign(new Error('Unsupported card ID or game'), { status: 400 });
+  }
   if (languages.toName(card.language) === languages.toName(language)) return null;
-  const g = gameOf(card.id, card.game);
-  if (g === 'mtg') {
-    const set = String(card.set_id || '').replace(/^mtg-/, '');
-    return await scryfallApi.getPrintingInLang(set, card.number, language).catch(() => null);
-  }
-  if (g === 'lorcana') {
-    const { translateLorcanaName } = require('./lorcanaHelper');
-    const targetName = languages.toName(language);
-    const translated = translateLorcanaName(card.name, language);
-    return {
-      ...card,
-      language: targetName,
-      printed_name: translated,
-    };
-  }
-  return null;
+  const set = String(card.set_id || '').replace(/^mtg-/, '');
+  return scryfallApi.getPrintingInLang(set, card.number, language).catch(() => null);
 }
 
-module.exports = { isMtgId, isLorcanaId, gameOf, getCardById, printingInLanguage };
+module.exports = { isMtgId, gameOf, getCardById, printingInLanguage };

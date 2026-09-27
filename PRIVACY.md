@@ -48,7 +48,7 @@ External services receive the network information needed to serve a request, suc
 | Optional AI | The server sends the request context described below to OpenAI, Google Gemini, OpenRouter and its upstream provider, or the selected Ollama service. |
 | Links to marketplaces or other sites | Following an external link contacts that site. Card-specific links can include names, identifiers, or search terms. |
 
-Manafolio's current product interface is Magic-focused; retained Lorcana integrations can also contact Lorcast and its artwork hosts. Customized deployments may use additional services and need corresponding disclosures. The table above is not a promise that every deployment contacts only a fixed list of hosts.
+Manafolio's provider integrations support Magic only. Previously stored records can still contain external artwork URLs, which a browser may request when those records are displayed. Customized deployments may use additional services and need corresponding disclosures. The table above is not a promise that every deployment contacts only a fixed list of hosts.
 
 The application does not include an advertising or third-party tracking analytics integration. Its collection dashboard analytics are calculations about your saved cards and decks, not a telemetry service. This does not prevent external resource providers, your hosting provider, or your administrator from logging the requests they receive.
 

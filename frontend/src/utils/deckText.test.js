@@ -16,7 +16,6 @@ assert.strictEqual(buildDeckExport(cards, 'plain').split('\n')[0], '4 Lightning 
 assert.deepStrictEqual(parseDeckLine('4 Lightning Bolt (2X2) 117'), { qty: 4, name: 'Lightning Bolt', setCode: '2x2', number: '117' });
 assert.deepStrictEqual(parseDeckLine('2 Forest (FDN) #280'), { qty: 2, name: 'Forest', setCode: 'fdn', number: '280' });
 assert.deepStrictEqual(parseDeckLine('4 Llanowar Elves'), { qty: 4, name: 'Llanowar Elves' });
-assert.deepStrictEqual(parseDeckLine('1 Elsa - Snow Queen'), { qty: 1, name: 'Elsa - Snow Queen' });
 assert.strictEqual(parseDeckLine('not a card line'), null);
 
 const arenaLines = `3 Llanowar Elves (FDN) 227

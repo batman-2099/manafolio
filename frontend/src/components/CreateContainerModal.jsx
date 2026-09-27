@@ -4,6 +4,7 @@ import { SortBuilder, FilterBuilder } from './SortFilterBuilder';
 import { isBinderType, containerTypeKey } from '../utils/cardOptions';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
+import Modal from './Modal';
 
 // Container types and their default layout. Counts kept modest; the user adjusts
 // them on step 2. Mirrors defaultCompartmentPlan in
@@ -72,12 +73,12 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
   };
 
   return (
-    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+    <Modal onClose={onClose} aria-labelledby="create-container-title">
       <div className="glass-panel" style={{ width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }} onClick={(e) => e.stopPropagation()}>
         {/* Header + step indicator */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0 }}>{t('container.newTitle')}</h3>
-          <button className="btn btn-secondary btn-icon-only" onClick={onClose} style={{ width: '28px', height: '28px', padding: 0 }}><X size={15} /></button>
+          <h3 id="create-container-title" style={{ margin: 0 }}>{t('container.newTitle')}</h3>
+          <button className="btn btn-secondary btn-icon-only" aria-label={t('common.close')} onClick={onClose} style={{ width: '44px', height: '44px', padding: 0 }}><X size={15} /></button>
         </div>
         <div style={{ display: 'flex', gap: '0.4rem' }}>
           {STEPS.map((s, i) => (
@@ -96,6 +97,7 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
                 key={meta.type}
                 type="button"
                 onClick={() => pickType(meta.type)}
+                aria-pressed={type === meta.type}
                 title={t(`container.blurb.${containerTypeKey(meta.type)}`)}
                 style={{
                   textAlign: 'left', cursor: 'pointer', padding: '0.7rem', borderRadius: 'var(--radius-sm)',
@@ -117,17 +119,17 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label style={{ fontSize: '0.72rem' }}>{t('container.name')}</label>
-              <input className="input-control" autoFocus placeholder={t('container.namePlaceholder', { type: typeLabel(TYPE_META.find(m => m.type === type) || TYPE_META[0]) })} value={name} onChange={(e) => setName(e.target.value)} />
+              <label htmlFor="create-container-name" style={{ fontSize: '0.72rem' }}>{t('container.name')}</label>
+              <input id="create-container-name" className="input-control" placeholder={t('container.namePlaceholder', { type: typeLabel(TYPE_META.find(m => m.type === type) || TYPE_META[0]) })} value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div style={{ display: 'flex', gap: '0.9rem', flexWrap: 'wrap' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: '0.72rem' }}>{t(`container.${kind}.label`)}</label>
-                <input type="number" min="1" className="input-control" value={count} onChange={(e) => setCount(e.target.value)} style={{ width: '110px' }} />
+                <label htmlFor="create-container-count" style={{ fontSize: '0.72rem' }}>{t(`container.${kind}.label`)}</label>
+                <input id="create-container-count" type="number" min="1" className="input-control" value={count} onChange={(e) => setCount(e.target.value)} style={{ width: '110px' }} />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: '0.72rem' }}>{t(`container.${kind}.perLabel`)}</label>
-                <input type="number" min="1" className="input-control" value={capacity} onChange={(e) => setCapacity(e.target.value)} style={{ width: '110px' }} />
+                <label htmlFor="create-container-capacity" style={{ fontSize: '0.72rem' }}>{t(`container.${kind}.perLabel`)}</label>
+                <input id="create-container-capacity" type="number" min="1" className="input-control" value={capacity} onChange={(e) => setCapacity(e.target.value)} style={{ width: '110px' }} />
               </div>
             </div>
             <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: 0 }}>
@@ -176,6 +178,6 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
           )}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

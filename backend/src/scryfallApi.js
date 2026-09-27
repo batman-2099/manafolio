@@ -759,6 +759,9 @@ async function getPrintingInLang(setCode, number, lang) {
 async function getCardById(cardId) {
   const rawId = cardId.startsWith('mtg-') ? cardId.slice(4) : cardId;
   const cached = await db.get(`SELECT * FROM card_cache WHERE id = ?`, [cardId]);
+  if (cached && cached.game !== 'mtg') {
+    throw Object.assign(new Error('Unsupported card ID or game'), { status: 400 });
+  }
   if (cached) return parseCardRow(cached);
   try {
     const resp = await scryGet(`/cards/${rawId}`);

@@ -16,11 +16,9 @@
 const W = 718;
 const H = 1000;
 
-// Per-game accents. The frame is shared so a mixed Magic/Lorcana grid of missing
-// art still reads as one set of backs rather than two unrelated placeholders.
+// Magic accents and a neutral fallback share the same frame.
 const THEMES = {
   mtg: { glow: '#a855f7', ring: '#cbd5e1' },
-  lorcana: { glow: '#eab308', ring: '#f59e0b' },
   default: { glow: '#ff4747', ring: '#cbd5e1' },
 };
 
@@ -38,20 +36,7 @@ function manaPips(cx, cy, r) {
   }).join('');
 }
 
-// The six Lorcana Inks: Amber, Amethyst, Emerald, Ruby, Sapphire, Steel.
-const LORCANA_INKS = ['#f59e0b', '#a855f7', '#10b981', '#ef4444', '#3b82f6', '#94a3b8'];
-
-function inkPips(cx, cy, r) {
-  return LORCANA_INKS.map((fill, i) => {
-    const a = (i / 6) * 2 * Math.PI - Math.PI / 2;
-    const x = (cx + r * Math.cos(a)).toFixed(1);
-    const y = (cy + r * Math.sin(a)).toFixed(1);
-    return `<circle cx="${x}" cy="${y}" r="22" fill="${fill}" stroke="#0b1120" stroke-width="4"/>`;
-  }).join('');
-}
-
-// Three binder rings, stood on end, mark the generic back;
-// Magic and Lorcana get their resource pips.
+// Three binder rings mark the generic back; Magic gets its mana pips.
 function binderRings(cx, cy) {
   return [-150, 0, 150]
     .map(dy => `<path d="M ${cx - 78} ${cy + dy} A 78 78 0 0 1 ${cx + 78} ${cy + dy}"
@@ -66,7 +51,6 @@ function svg(game) {
   const cx = W / 2;
   const cy = H / 2;
   const isMtg = game === 'mtg';
-  const isLorcana = game === 'lorcana';
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
   <defs>
@@ -99,7 +83,7 @@ function svg(game) {
   <circle cx="${cx}" cy="${cy}" r="212" fill="none" stroke="${t.ring}" stroke-opacity="0.28" stroke-width="4"/>
   <circle cx="${cx}" cy="${cy}" r="188" fill="#0b1120" fill-opacity="0.55"/>
 
-  ${isMtg ? manaPips(cx, cy, 132) : (isLorcana ? inkPips(cx, cy, 132) : binderRings(cx, cy))}
+  ${isMtg ? manaPips(cx, cy, 132) : binderRings(cx, cy)}
 
   <text x="${cx}" y="${H - 92}" text-anchor="middle"
         font-family="Outfit, 'Plus Jakarta Sans', system-ui, sans-serif"
@@ -112,16 +96,14 @@ function svg(game) {
 // than the base64 of the same bytes, and stays greppable in devtools.
 const toDataUri = (s) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(s.replace(/\s+/g, ' '))}`;
 
-// Built once at module load — three small strings, reused by every <img> on the
+// Built once at module load — two small strings, reused by every <img> on the
 // page, so a grid of 200 artless cards shares one decoded image per game.
 const BACKS = {
   mtg: toDataUri(svg('mtg')),
-  lorcana: toDataUri(svg('lorcana')),
   default: toDataUri(svg('default')),
 };
 
-// `game` comes off the card row and is 'mtg' | 'lorcana' in practice; anything
-// else (or nothing, as on a partially-hydrated scan result) gets the neutral back.
-export const cardBackFor = (game) => BACKS[game] || BACKS.default;
+// Unknown or missing game identities get the neutral back.
+export const cardBackFor = (game) => game === 'mtg' ? BACKS.mtg : BACKS.default;
 
 export default BACKS;
