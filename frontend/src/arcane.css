@@ -135,7 +135,7 @@
   outline-offset: 3px;
 }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) button:disabled { opacity: 0.5; cursor: not-allowed; }
-:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) :is(.kebab-dropdown, .dropdown-menu, .quick-add-drawer, .stack-inspector-drawer) {
+:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) :is(.kebab-dropdown, .dropdown-menu, .quick-add-drawer) {
   background: var(--bg-secondary);
   border-color: var(--border-glass-hover);
   box-shadow: 0 8px 24px rgba(var(--arcane-shadow-rgb, 1, 7, 20), 0.4);

@@ -5,8 +5,9 @@ import { priceText } from '../utils/formatPrice';
 import { CONDITIONS, getPrintings, GRADERS } from '../utils/cardOptions';
 import { getPrintingBadgeLabel, getPrintingBadgeStyle, getFoilOverlayClass } from '../utils/cardPrinting';
 import { getCardRarityBorder, getRarityBadgeLabel, getRarityBadgeStyle } from '../utils/cardRarity';
-import { sortCardsByOrder } from '../utils/cardSort';
+import { COLLECTION_SORT_CRITERIA, sortCardsByOrder } from '../utils/cardSort';
 import { buildCollectionExport } from '../utils/collectionExport';
+import { downloadBlob } from '../utils/downloadBlob';
 import { useMultiSelect } from '../utils/useMultiSelect';
 import { defaultGameFilter, isGameEnabled } from '../utils/games';
 import { useT } from '../utils/i18n';
@@ -20,22 +21,9 @@ import Modal from './Modal';
 const labelStyle = { fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' };
 const PAGE_SIZE = 60;
 
-// Maps each Sort By option to sortCardsByOrder criteria so ordering matches the
-// storage engine (set = chronological via setsList, type = TYPE_ORDER).
-// 'qty-desc' isn't a card-order scheme, handled separately.
 const SORT_CRITERIA = {
-  'added-newest': [{ by: 'added_at', dir: 'desc' }, { by: 'entry_id', dir: 'desc' }],
+  ...COLLECTION_SORT_CRITERIA,
   'added-oldest': [{ by: 'added_at', dir: 'asc' }],
-  'name-asc': [{ by: 'name', dir: 'asc' }],
-  'name-desc': [{ by: 'name', dir: 'desc' }],
-  'price-desc': [{ by: 'price', dir: 'desc' }],
-  'price-asc': [{ by: 'price', dir: 'asc' }],
-  'set-asc': [{ by: 'set', dir: 'asc' }, { by: 'number', dir: 'asc' }],
-  'number-asc': [{ by: 'number', dir: 'asc' }, { by: 'name', dir: 'asc' }],
-  'rarity-desc': [{ by: 'rarity', dir: 'desc' }, { by: 'name', dir: 'asc' }],
-  'rarity-asc': [{ by: 'rarity', dir: 'asc' }, { by: 'name', dir: 'asc' }],
-  'type-asc': [{ by: 'type', dir: 'asc' }, { by: 'name', dir: 'asc' }],
-  'language-asc': [{ by: 'language', dir: 'asc' }, { by: 'name', dir: 'asc' }],
   'favorite-first': [{ by: 'favorite', dir: 'desc' }, { by: 'added_at', dir: 'desc' }],
 };
 
@@ -336,13 +324,9 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   }, [displayCards, subTab, tradeOnly]);
 
   const exportView = (format) => {
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([buildCollectionExport(displayCards, format)], {
+    downloadBlob(new Blob([buildCollectionExport(displayCards, format)], {
       type: format === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
-    }));
-    link.download = `manafolio-${subTab}-view.${format}`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    }), `manafolio-${subTab}-view.${format}`);
   };
 
   const totalValue = useMemo(

@@ -630,5 +630,5 @@ function reload(game, lang) {
   delete catalogs[game];
 }
 
-module.exports = { match, load, loadAll, isBuilt, builtLangs, reload, scoreCards, imageQuality, STRONG_SIM, STRONG_MARGIN, GAP_FLOOR };
+module.exports = { match, load, loadAll, isBuilt, builtLangs, reload, scoreCards, imageQuality, toTensor, STRONG_SIM, STRONG_MARGIN, GAP_FLOOR };
 

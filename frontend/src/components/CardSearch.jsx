@@ -13,6 +13,7 @@ import { defaultGame, gameLabel } from '../utils/games';
 import CardImage from './CardImage';
 import { useT } from '../utils/i18n';
 import { readProgressStream } from '../utils/importStream';
+import { downloadBlob } from '../utils/downloadBlob';
 
 const CSV_FIELDS = [
   ['name', 'csvMapping.name', ['name', 'card name', 'card']],
@@ -663,11 +664,7 @@ function CardSearch({ onAddSuccess, showToast }) {
         : '';
       return `${item.quantity} ${item.name}${printing}`;
     }).join('\n');
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
-    link.download = `${importSummary.filename.replace(/\.[^.]+$/, '')}-failed.txt`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    downloadBlob(new Blob([text], { type: 'text/plain' }), `${importSummary.filename.replace(/\.[^.]+$/, '')}-failed.txt`);
   };
 
   const commitImport = async (format, preview) => {

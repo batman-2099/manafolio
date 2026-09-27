@@ -22,8 +22,6 @@ const cvScan = require('./cvScan');
 
 const MODEL_DIR = process.env.CV_MODEL_DIR || path.join(__dirname, '..', 'data', 'models');
 const SIZE = 448;
-const MEAN = [0.485, 0.456, 0.406];
-const STD = [0.229, 0.224, 0.225];
 const GAMES = ['mtg'];
 
 const suffix = (lang) => (!lang || lang === 'en' || lang === 'English' ? '' : `-${String(lang).toLowerCase()}`);
@@ -205,17 +203,6 @@ async function setCounts(game, lang = 'English') {
   };
 }
 
-function toTensor(rgb) {
-  const plane = SIZE * SIZE;
-  const x = new Float32Array(3 * plane);
-  for (let p = 0; p < plane; p++) {
-    x[p] = (rgb[p * 3] / 255 - MEAN[0]) / STD[0];
-    x[plane + p] = (rgb[p * 3 + 1] / 255 - MEAN[1]) / STD[1];
-    x[2 * plane + p] = (rgb[p * 3 + 2] / 255 - MEAN[2]) / STD[2];
-  }
-  return new ort.Tensor('float32', x, [1, 3, SIZE, SIZE]);
-}
-
 // --- phase 1 -----------------------------------------------------------------
 async function cachePhase(job) {
   // A scoped build walks only the sets asked for. Everything else about the job is
@@ -366,7 +353,7 @@ async function embedPhase(job) {
       try {
         const { data } = await sharp(settled.buf).resize(SIZE, SIZE, { fit: 'fill' })
           .removeAlpha().raw().toBuffer({ resolveWithObject: true });
-        const out = await session.run({ image: toTensor(data) });
+        const out = await session.run({ image: cvScan.toTensor(data, SIZE) });
         vecs.push(out.embedding.data);
         ids.push(settled.row.id);
         srcs[settled.row.id] = settled.row.image_url;

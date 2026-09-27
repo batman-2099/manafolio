@@ -4,6 +4,7 @@ import App from './App.jsx'
 import { I18nProvider } from './utils/i18n.jsx'
 import './index.css'
 import './arcane.css'
+import './mana.css'
 
 // Demo build (GitHub Pages): install the fixture-backed fetch shim and seed a
 // fake session BEFORE first render. Guard is a static env check, so a normal

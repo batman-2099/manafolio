@@ -5,6 +5,7 @@ import CatalogPanel from './CatalogPanel';
 import SetupWizard from './SetupWizard';
 import { currencySymbol } from '../utils/formatPrice';
 import { useT } from '../utils/i18n';
+import { downloadBlob } from '../utils/downloadBlob';
 import Modal from './Modal';
 import './AdminPanel.css';
 
@@ -107,14 +108,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       const res = await fetch(`/api/admin/backups/${encodeURIComponent(file)}/download`);
       if (!res.ok) { showToast(t('admin.errDownload'), 'error'); return; }
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, file);
     } catch (err) {
       console.error(err);
       showToast(t('admin.errDownloadGeneric'), 'error');

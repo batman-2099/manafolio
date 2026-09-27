@@ -2,6 +2,13 @@
 
 Release history starts with Manafolio 2.0.
 
+## 2.0.7
+
+- Gave all six mana themes matching header emblems, page-title symbols, large background watermarks, and stronger color accents while preserving the stationary logo and Arcane Blue/Jenny appearances.
+- Replaced the theme dropdown with responsive, symbol-led radio choices; keyboard focus stays on the selected theme while saving.
+- Removed unused move-feedback, advanced-configuration, and stack-inspector styles; consolidated scanner tensor normalization, collection sort mappings, and immediate-revoke file downloads.
+- Replaced GSAP/ScrollTrigger with native viewport observation and Web Animations for once-only heading reveals, retaining reduced-motion handling, keyboard/focus cancellation, and cleanup.
+
 ## 2.0.6
 
 - Removed Disney Lorcana provider, UI, translation, scanning, and maintenance integration. Magic workflows remain supported; existing stored records retain their identities, and unsupported backups are rejected before restore can replace account data.

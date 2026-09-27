@@ -4,6 +4,7 @@ import { ShieldAlert, Share2, Clipboard, RefreshCw, KeyRound, Check, Database, D
 import { CURRENCIES, getCurrency, setCurrency } from '../utils/formatPrice';
 import { LOCALES, localeName, useT } from '../utils/i18n';
 import { getRepoUrl, issueUrl } from '../utils/repo';
+import { downloadBlob } from '../utils/downloadBlob';
 import CodexSettings from './CodexSettings';
 import themes from '../../../shared/themes.json';
 import './Settings.css';
@@ -308,14 +309,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         return;
       }
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = format === 'backup' ? 'manafolio_backup.json' : `manafolio_collection.${format === 'json' ? 'json' : 'csv'}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, format === 'backup' ? 'manafolio_backup.json' : `manafolio_collection.${format === 'json' ? 'json' : 'csv'}`);
     } catch (err) {
       console.error(err);
       showToast(t('settings.errExportGeneric'), 'error');
@@ -937,21 +931,21 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
             </div>}
           </div>
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label htmlFor="settings-theme">{t('prefs.theme')}</label>
-            <select
-              id="settings-theme"
-              className="select-control"
-              value={theme}
-              disabled={themeLoading}
-              onChange={(e) => handleThemeChange(e.target.value)}
-            >
-              {themes.map(value => <option key={value} value={value}>{t(`theme.${value}`)}</option>)}
-            </select>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>
-              {t('prefs.themeHint')}
+          <fieldset className="theme-choices" aria-busy={themeLoading} aria-describedby="settings-theme-hint">
+            <legend>{t('prefs.theme')}</legend>
+            <div className="theme-choice-grid">
+              {themes.map(value => (
+                <label key={value} className="theme-choice" data-mana-theme={value}>
+                  <input type="radio" name="settings-theme" value={value} checked={theme === value} aria-disabled={themeLoading} onChange={() => { if (!themeLoading) handleThemeChange(value); }} />
+                  <span className="mana-theme-symbol" aria-hidden="true" />
+                  <span className="theme-choice-name">{t(`theme.${value}`)}</span>
+                </label>
+              ))}
             </div>
-          </div>
+            <p id="settings-theme-hint" style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+              {t('prefs.themeHint')}
+            </p>
+          </fieldset>
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label htmlFor="settings-currency">{t('prefs.currency')}</label>

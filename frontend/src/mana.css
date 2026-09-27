@@ -1,0 +1,99 @@
+/* Crop the existing mana sprite; em-based geometry keeps every emblem crisp. */
+:is(:root[data-theme="mana-white"], [data-mana-theme="mana-white"]) { --mana-x: -4.2em; --mana-tint: #edcf8c; }
+:is(:root[data-theme="mana-blue"], [data-mana-theme="mana-blue"]) { --mana-x: -5.25em; --mana-tint: #71d9f2; }
+:is(:root[data-theme="mana-black"], [data-mana-theme="mana-black"]) { --mana-x: -6.3em; --mana-tint: #c4a3e8; }
+:is(:root[data-theme="mana-red"], [data-mana-theme="mana-red"]) { --mana-x: -7.35em; --mana-tint: #ff8198; }
+:is(:root[data-theme="mana-green"], [data-mana-theme="mana-green"]) { --mana-x: -8.4em; --mana-tint: #add58c; }
+:is(:root[data-theme="mana-colorless"], [data-mana-theme="mana-colorless"]) {
+  --mana-tint: #d3dce5;
+  --mana-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23CAC5C0'/%3E%3Cpath fill='%230D0F0F' fill-rule='evenodd' d='M50 10 90 50 50 90 10 50Z M50 30 30 50 50 70 70 50Z'/%3E%3C/svg%3E");
+  --mana-size: 1em 1em;
+  --mana-position: 0 0;
+}
+
+:root[data-theme^="mana-"] body {
+  background-attachment: fixed;
+  background-image: radial-gradient(ellipse at 85% 0%, color-mix(in srgb, var(--mana-tint) 18%, transparent), transparent 60%), var(--bg-gradient);
+}
+:root[data-theme^="mana-"] .app-header {
+  border-bottom: 1px solid var(--border-glass-hover);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--mana-tint) 12%, transparent);
+}
+:root[data-theme^="mana-"] .app-header::after,
+:root[data-theme^="mana-"] .page-title::before,
+:root[data-theme^="mana-"] body::before,
+.mana-theme-symbol {
+  content: '';
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  flex: none;
+  border-radius: 50%;
+  background-image: var(--mana-image, url('/mana.svg'));
+  background-size: var(--mana-size, 10.45em 7.30002em);
+  background-position: var(--mana-position, var(--mana-x) -2.10002em);
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+:root[data-theme^="mana-"] .app-header::after {
+  font-size: 56px;
+  box-shadow: 0 0 0 5px var(--bg-primary), 0 0 0 6px var(--border-glass-hover), 0 6px 20px #0006;
+  margin: 6px;
+}
+:root[data-theme^="mana-"] .page-title::before {
+  font-size: 0.95em;
+  vertical-align: -0.1em;
+  margin-right: 0.5em;
+  box-shadow: 0 0 0 3px var(--surface-3);
+}
+:root[data-theme^="mana-"] body::before {
+  position: fixed;
+  right: -0.16em;
+  top: 25vh;
+  font-size: min(42vw, 560px);
+  opacity: 0.075;
+  z-index: -1;
+}
+:root[data-theme^="mana-"] body { isolation: isolate; }
+:root[data-theme^="mana-"] .nav-tab.active {
+  border-color: var(--mana-tint);
+  box-shadow: inset 0 -3px 0 var(--mana-tint), inset 0 1px 0 var(--arcane-highlight);
+}
+:root[data-theme^="mana-"] .section-heading {
+  border-bottom-color: var(--border-glass-hover);
+}
+
+.theme-choices { border: 0; min-width: 0; }
+.theme-choices legend { font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.75rem; }
+.theme-choice-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+.theme-choice {
+  --mana-image: url('/mana.svg');
+  --mana-size: 10.45em 7.30002em;
+  --mana-position: var(--mana-x) -2.10002em;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  min-width: 0;
+}
+.theme-choice:has(:checked) { border-color: var(--mana-tint, var(--accent-red)); background: var(--surface-2); }
+.theme-choice:has(:focus-visible) { outline: 2px solid var(--text-primary); outline-offset: 3px; }
+.theme-choice:has([aria-disabled="true"]) { opacity: 0.6; cursor: wait; }
+.theme-choice input { accent-color: var(--mana-tint, var(--accent-red)); flex: none; }
+.theme-choice-name { overflow-wrap: anywhere; font-size: 0.875rem; }
+.mana-theme-symbol { font-size: 36px; }
+.theme-choice[data-mana-theme="dark"] .mana-theme-symbol { background: linear-gradient(135deg, #305779, #7ec5f6); }
+.theme-choice[data-mana-theme="jenny"] .mana-theme-symbol { background: linear-gradient(135deg, #9270a8, #fdba74); }
+@media (max-width: 768px) {
+  :root[data-theme^="mana-"] .app-header::after { font-size: 36px; }
+  .theme-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .theme-choice { padding: 0.75rem; gap: 0.5rem; flex-wrap: wrap; }
+  .theme-choice-name { flex-basis: 100%; }
+  .mana-theme-symbol { font-size: 32px; }
+  :root[data-theme^="mana-"] body::before { font-size: 70vw; top: 35vh; }
+}

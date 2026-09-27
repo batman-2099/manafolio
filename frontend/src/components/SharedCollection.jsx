@@ -6,7 +6,7 @@ import { priceText } from '../utils/formatPrice';
 import { getPrintings } from '../utils/cardOptions';
 import { getFoilOverlayClass, getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
 import { useBackGuard } from '../utils/useBackGuard';
-import { sortCardsByOrder } from '../utils/cardSort';
+import { COLLECTION_SORT_CRITERIA, sortCardsByOrder } from '../utils/cardSort';
 import { displayName } from '../utils/languages';
 import CardImage from './CardImage';
 import { useT } from '../utils/i18n';
@@ -21,23 +21,6 @@ const TYPE_COLORS = {
   'Colorless': '#cbd5e1',
   'White': '#fef08a', 'Blue': '#3b82f6', 'Black': '#334155', 'Red': '#ef4444',
   'Green': '#10b981', 'Land': '#d97706'
-};
-
-// Same Sort By options as the owner's collection view (CollectionList), minus
-// the owner-only 'favorite'/'added' notions. 'qty-desc' isn't a card-order
-// scheme so it's handled separately below.
-const SORT_CRITERIA = {
-  'added-newest': [{ by: 'added_at', dir: 'desc' }, { by: 'entry_id', dir: 'desc' }],
-  'name-asc': [{ by: 'name', dir: 'asc' }],
-  'name-desc': [{ by: 'name', dir: 'desc' }],
-  'price-desc': [{ by: 'price', dir: 'desc' }],
-  'price-asc': [{ by: 'price', dir: 'asc' }],
-  'set-asc': [{ by: 'set', dir: 'asc' }, { by: 'number', dir: 'asc' }],
-  'number-asc': [{ by: 'number', dir: 'asc' }, { by: 'name', dir: 'asc' }],
-  'rarity-desc': [{ by: 'rarity', dir: 'desc' }, { by: 'name', dir: 'asc' }],
-  'rarity-asc': [{ by: 'rarity', dir: 'asc' }, { by: 'name', dir: 'asc' }],
-  'type-asc': [{ by: 'type', dir: 'asc' }, { by: 'name', dir: 'asc' }],
-  'language-asc': [{ by: 'language', dir: 'asc' }, { by: 'name', dir: 'asc' }],
 };
 
 function typeColor(name, i) {
@@ -116,7 +99,7 @@ function SharedCollection({ shareToken }) {
       return matchesSearch && matchesRarity && matchesPrinting && matchesType;
     });
     if (sortBy === 'qty-desc') return result.sort((a, b) => (b.quantity || 0) - (a.quantity || 0));
-    return sortCardsByOrder(result, SORT_CRITERIA[sortBy] || SORT_CRITERIA['added-newest']);
+    return sortCardsByOrder(result, COLLECTION_SORT_CRITERIA[sortBy] || COLLECTION_SORT_CRITERIA['added-newest']);
   }, [collection, searchFilter, rarityFilter, printingFilter, typeFilter, sortBy]);
 
   // Group duplicate cards if stack option is active (default true)

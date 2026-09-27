@@ -23,6 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sharp = require('sharp');
 const ort = require('onnxruntime-node');
 const db = require('../src/db');
+const { toTensor } = require('../src/cvScan');
 
 const arg = (f, d) => { const i = process.argv.indexOf(f); return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
 const game = arg('--game', 'mtg');
@@ -34,8 +35,6 @@ const concurrency = Math.max(1, parseInt(arg('--concurrency', '8'), 10));
 
 const MODEL_DIR = process.env.CV_MODEL_DIR || path.join(__dirname, '..', 'data', 'models');
 const SIZE = 448;
-const MEAN = [0.485, 0.456, 0.406];
-const STD = [0.229, 0.224, 0.225];
 // MUST match cvScan's naming, including the English special case: English keeps
 // the bare filename so existing builds stay valid, every other language gets its
 // own file. Without the suffix a `--lang Japanese` build silently OVERWRITES the
@@ -44,17 +43,6 @@ const STD = [0.229, 0.224, 0.225];
 const langSuffix = (l) => (!l || l === 'en' || l === 'English' ? '' : `-${String(l).toLowerCase()}`);
 const binPath = path.join(MODEL_DIR, `milo-${game}${langSuffix(lang)}-local.bin`);
 const metaPath = path.join(MODEL_DIR, `milo-${game}${langSuffix(lang)}-local.json`);
-
-function toTensor(rgb) {
-  const plane = SIZE * SIZE;
-  const x = new Float32Array(3 * plane);
-  for (let p = 0; p < plane; p++) {
-    x[p] = (rgb[p * 3] / 255 - MEAN[0]) / STD[0];
-    x[plane + p] = (rgb[p * 3 + 1] / 255 - MEAN[1]) / STD[1];
-    x[2 * plane + p] = (rgb[p * 3 + 2] / 255 - MEAN[2]) / STD[2];
-  }
-  return new ort.Tensor('float32', x, [1, 3, SIZE, SIZE]);
-}
 
 // The reference image is already a flat, square-on card render — there is nothing
 // to dewarp. `--views` insets the crop instead, which moves the reference a little
@@ -72,7 +60,7 @@ async function embedCard(session, buf) {
       : sharp(buf);
     const { data } = await pipe.resize(SIZE, SIZE, { fit: 'fill' }).removeAlpha()
       .raw().toBuffer({ resolveWithObject: true });
-    const out = await session.run({ image: toTensor(data) });
+    const out = await session.run({ image: toTensor(data, SIZE) });
     vecs.push(out.embedding.data);
   }
   if (vecs.length === 1) return vecs[0];

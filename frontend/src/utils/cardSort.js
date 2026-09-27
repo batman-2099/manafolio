@@ -2,6 +2,21 @@ import { getRarityRank } from './cardRarity';
 import cardOrder from '../../../shared/cardOrder.json';
 import sortSchemes from '../../../shared/sortSchemes.json';
 
+// Collection sort choices shared by owner and public views; quantity stays local.
+export const COLLECTION_SORT_CRITERIA = {
+  'added-newest': [{ by: 'added_at', dir: 'desc' }, { by: 'entry_id', dir: 'desc' }],
+  'name-asc': [{ by: 'name', dir: 'asc' }],
+  'name-desc': [{ by: 'name', dir: 'desc' }],
+  'price-desc': [{ by: 'price', dir: 'desc' }],
+  'price-asc': [{ by: 'price', dir: 'asc' }],
+  'set-asc': [{ by: 'set', dir: 'asc' }, { by: 'number', dir: 'asc' }],
+  'number-asc': [{ by: 'number', dir: 'asc' }, { by: 'name', dir: 'asc' }],
+  'rarity-desc': [{ by: 'rarity', dir: 'desc' }, { by: 'name', dir: 'asc' }],
+  'rarity-asc': [{ by: 'rarity', dir: 'asc' }, { by: 'name', dir: 'asc' }],
+  'type-asc': [{ by: 'type', dir: 'asc' }, { by: 'name', dir: 'asc' }],
+  'language-asc': [{ by: 'language', dir: 'asc' }, { by: 'name', dir: 'asc' }],
+};
+
 // Shared comparator logic for ordering collection cards. Previously copy-pasted
 // across autoSortContainerCards, findNextRecommendedSlot, the sorting assistant
 // queue, and the unsorted list view in LocationManager.jsx.

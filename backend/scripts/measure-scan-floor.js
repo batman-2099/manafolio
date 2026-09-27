@@ -19,22 +19,10 @@
 //
 // Run: node scripts/measure-scan-floor.js [game] [language] [sampleSize]
 const sharp = require('sharp');
-const ort = require('onnxruntime-node');
 const db = require('../src/db');
 const cvScan = require('../src/cvScan');
 
 const SIZE = 448;
-const MEAN = [0.485, 0.456, 0.406];
-const STD = [0.229, 0.224, 0.225];
-
-function toTensor(rgb) {
-  const plane = SIZE * SIZE;
-  const x = new Float32Array(3 * plane);
-  for (let p = 0; p < plane; p++) {
-    for (let c = 0; c < 3; c++) x[c * plane + p] = (rgb[p * 3 + c] / 255 - MEAN[c]) / STD[c];
-  }
-  return new ort.Tensor('float32', x, [1, 3, SIZE, SIZE]);
-}
 
 // A capture, not a scan of the reference image. Two regimes, because they answer
 // different questions:
@@ -133,7 +121,7 @@ async function main() {
       const art = Buffer.from(await res.arrayBuffer());
       for (const regime of ['mild', 'harsh']) {
         const rgb = await asCapture(art, regime === 'harsh');
-        const out = await s.milo.run({ image: toTensor(rgb) });
+        const out = await s.milo.run({ image: cvScan.toTensor(rgb, SIZE) });
         const emb = out.embedding.data;
         const hit = top2(emb, s.cat, s.n, s.dim, -1);
         if (regime === 'harsh' && hit.i !== i) wrongTop++;
