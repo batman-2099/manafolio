@@ -75,7 +75,7 @@ window.fetch = function (input, options = {}) {
     };
   }
   return originalFetch(input, finalOptions).then(response => {
-    if (response.status === 401 && !isPublicOrAuthRoute && token === localStorage.getItem('manafolio_token')) {
+    if (response.status === 401 && url.startsWith('/api/') && !isPublicOrAuthRoute && token === localStorage.getItem('manafolio_token')) {
       // Dispatch custom event to trigger logout without page refresh
       window.dispatchEvent(new Event('manafolio_logout'));
     }

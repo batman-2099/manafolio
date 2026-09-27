@@ -159,6 +159,16 @@ Choose **Export view CSV** or **Export view TXT** in Collection. Export includes
 
 Commander / EDH and Brawl support one **Commander** toggle; selecting another replaces it. The card inspector's **Create Commander Deck** starts a 100-card-target deck with that card as commander, using its inventory, without moving or checking out copies. Review format legality yourself.
 
+Below Description, one summary panel groups **Supertype Breakdown**, **Color & Land Distribution**, **Containers needed**, and **Deck Health & Rules**. Color-coded, labeled bars show exact counts with lengths relative to the deck's total card count; multicolor cards can contribute to more than one color. The panel stacks on phones, and win/loss controls remain in Deck Health.
+
+Under Wins and Losses, **Sleeved** records **None**, **Single**, **Double**, or **Triple** for that deck. Changes save immediately without saving or discarding other deck edits; the selection is retained in deck duplicates and complete account backups.
+
+Click the **card back** beneath the commander to preview a solid sleeve color or upload a PNG, JPEG, or WebP image. **Save** stores that deck's choice independently of other edits; **Cancel** leaves it unchanged, and the default option restores the Magic card back. Custom images are resized, kept with the deck in the database, and preserved in duplicates and complete account backups.
+
+You can also enter a direct **Image URL** and choose **Load image** before saving. The browser downloads and resizes a copy; your server does not fetch arbitrary URLs. If the image host blocks cross-origin downloads, download the file yourself and use the upload option.
+
+For Physical decks, **Containers needed** beneath **Supertype Breakdown** lists each source container and the number of copies to gather, including Unassigned Pile and a count of unavailable copies. It uses the saved deck's pull-list plan (reserved locations when checked out); save draft changes to refresh the list. Arena decks do not show physical containers.
+
 ### Check out a physical deck
 
 Save first, then choose **Check Out for Play**. Manafolio reserves the copies and creates a pull list grouped by container and compartment while retaining their stored positions. Other decks show unavailable quantities and the reserving deck's name. Mark cards **Pulled** as you gather them; sorting by **Pulled status** puts not-yet-pulled cards first.

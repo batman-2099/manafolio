@@ -2,8 +2,12 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.0.9
 
+- Combined deck composition, health, and source containers into a responsive, color-coded summary with exact counts and accessible controls.
+- Added per-deck sleeve settings: None, Single, Double, and Triple, saved independently of deck drafts.
+- Added customizable deck backs beneath commander artwork: original Magic back, solid color, image upload, or direct image URL import. Choices persist in duplicates and complete account backups.
+- Restricted automatic sign-out on HTTP 401 to application API requests, so an external image host cannot sign users out.
 - Added a source-location dropdown to Deck Builder card previews. Physical decks can save a location/compartment for each card, combine available copies there, and use those exact reservations for checkout and return without moving stored cards.
 - Source-location changes now automatically save the entire deck draft. Normal saves allow unavailable cards and retained unavailable sources; checkout still validates availability. Failed autosaves preserve the draft for manual retry.
 - Enabled zoom in Deck Builder's List view and centered the List/Grid, zoom, and sort controls together. List rows wrap at larger sizes and retain usable touch targets when zoomed out.

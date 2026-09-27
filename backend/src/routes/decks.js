@@ -8,6 +8,7 @@ const { FORMATS } = require('../utils/aiDecks');
 const scryfallApi = require('../scryfallApi');
 const { parseManaboxText } = require('../utils/csvMappers');
 const mtgjsonApi = require('../mtgjsonApi');
+const { normalizeCardBack } = require('../utils/cardBack');
 
 const router = express.Router();
 
@@ -32,6 +33,7 @@ router.get('/', async (req, res) => {
         d.checked_out_at,
         d.wins,
         d.losses,
+        d.sleeved,
         COUNT(dc.card_id) as total_card_types,
         COALESCE(SUM(dc.quantity), 0) as total_cards,
         COALESCE(SUM(CASE WHEN cc.color_identity LIKE '%"White"%' OR cc.color_identity LIKE '%"W"%' THEN dc.quantity ELSE 0 END), 0) AS white_cards,
@@ -489,6 +491,45 @@ router.patch('/:id/record', async (req, res) => {
   }
 });
 
+router.patch('/:id/sleeved', async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)
+      || Object.keys(body).some(key => key !== 'sleeved')
+      || !Number.isInteger(body.sleeved) || body.sleeved < 0 || body.sleeved > 3) {
+    return res.status(400).json({ error: 'Sleeved must be an integer between 0 and 3' });
+  }
+  try {
+    const deck = await db.get(
+      `UPDATE decks SET sleeved = ? WHERE id = ? AND user_id = ? AND game = 'mtg' RETURNING sleeved`,
+      [body.sleeved, req.params.id, req.user.id]
+    );
+    if (!deck) return res.status(404).json({ error: 'Deck not found' });
+    res.json(deck);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update deck sleeves' });
+  }
+});
+
+router.patch('/:id/card-back', async (req, res) => {
+  try {
+    const owned = await db.get(`SELECT id FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [req.params.id, req.user.id]);
+    if (!owned) return res.status(404).json({ error: 'Deck not found' });
+    const back = await normalizeCardBack(req.body);
+    const deck = await db.get(
+      `UPDATE decks SET card_back_color = ?, card_back_image = ?
+       WHERE id = ? AND user_id = ? AND game = 'mtg' RETURNING card_back_color, card_back_image`,
+      [back.card_back_color, back.card_back_image, req.params.id, req.user.id]
+    );
+    if (!deck) return res.status(404).json({ error: 'Deck not found' });
+    res.json(deck);
+  } catch (error) {
+    if (error.status === 400) return res.status(400).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update deck card back' });
+  }
+});
+
 // Designate one existing card as commander; null clears the designation.
 router.put('/:id/commander', async (req, res) => {
   const { id } = req.params;
@@ -523,7 +564,7 @@ router.post('/:id/duplicate', async (req, res) => {
   const { id } = req.params;
   try {
     const deck = await db.get(
-      `SELECT name, description, game, format, category, accent_color, target_size, inventory_type, commander_card_id
+      `SELECT name, description, game, format, category, accent_color, target_size, inventory_type, commander_card_id, sleeved, card_back_color, card_back_image
        FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`,
       [id, req.user.id]
     );
@@ -531,9 +572,9 @@ router.post('/:id/duplicate', async (req, res) => {
 
     const duplicateId = await db.withTransaction(async () => {
       const result = await db.run(
-        `INSERT INTO decks (name, description, game, format, category, accent_color, target_size, inventory_type, commander_card_id, user_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [`${deck.name} (Copy)`, deck.description, deck.game, deck.format, deck.category, deck.accent_color, deck.target_size, deck.inventory_type, deck.commander_card_id, req.user.id]
+        `INSERT INTO decks (name, description, game, format, category, accent_color, target_size, inventory_type, commander_card_id, sleeved, card_back_color, card_back_image, user_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [`${deck.name} (Copy)`, deck.description, deck.game, deck.format, deck.category, deck.accent_color, deck.target_size, deck.inventory_type, deck.commander_card_id, deck.sleeved, deck.card_back_color, deck.card_back_image, req.user.id]
       );
       await db.run(
         `INSERT INTO deck_cards (deck_id, card_id, quantity, source_entry_id)

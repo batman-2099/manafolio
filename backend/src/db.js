@@ -295,6 +295,9 @@ async function initDb() {
       inventory_type TEXT DEFAULT 'collection',
       wins INTEGER NOT NULL DEFAULT 0,
       losses INTEGER NOT NULL DEFAULT 0,
+      sleeved INTEGER NOT NULL DEFAULT 0 CHECK (sleeved IN (0, 1, 2, 3)),
+      card_back_color TEXT,
+      card_back_image TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
     )
@@ -627,6 +630,15 @@ async function initDb() {
   }
   if (!decksCols.some(c => c.name === 'losses')) {
     await run(`ALTER TABLE decks ADD COLUMN losses INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!decksCols.some(c => c.name === 'sleeved')) {
+    await run(`ALTER TABLE decks ADD COLUMN sleeved INTEGER NOT NULL DEFAULT 0 CHECK (sleeved IN (0, 1, 2, 3))`);
+  }
+  if (!decksCols.some(c => c.name === 'card_back_color')) {
+    await run(`ALTER TABLE decks ADD COLUMN card_back_color TEXT`);
+  }
+  if (!decksCols.some(c => c.name === 'card_back_image')) {
+    await run(`ALTER TABLE decks ADD COLUMN card_back_image TEXT`);
   }
 
   // Lock flags: a locked compartment/location is skipped by auto-filing

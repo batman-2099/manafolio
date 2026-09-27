@@ -32,6 +32,8 @@ The normal scan path processes images in memory rather than adding them to your 
 
 **Uploaded replacement artwork is different from a scan.** Artwork uploads are saved on the server and served through unauthenticated card-art URLs so shared views can display them. They are not private account attachments, even when collection sharing is off. Do not upload images containing personal information. Uploading art does not automatically submit it to the source repository.
 
+**Custom deck backs** are separate from shared card artwork. Uploaded deck-back images are resized and stored in the collection database, returned through account-authenticated deck endpoints, and included in complete account backups. They are not published through the public card-art route.
+
 ## External network requests
 
 External services receive the network information needed to serve a request, such as the connecting IP address, requested URL, timing, and HTTP headers. Browser requests may also disclose referrer information according to browser policy. The services' own terms, privacy policies, and retention rules apply.

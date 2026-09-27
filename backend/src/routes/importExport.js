@@ -7,6 +7,7 @@ const { generateExportCSV } = require('../utils/csvExporters');
 const { resolveCardPrice, rebalanceCompartmentPositions } = require('../utils/priceHelpers');
 const { isBinderType } = require('../utils/compartmentSort');
 const { assertStorageInventory, checkedOutSources } = require('../utils/collectionHelpers');
+const { normalizeCardBack } = require('../utils/cardBack');
 
 function parseCsvRows(data) {
   const lines = typeof data === 'string' ? data.split(/\r?\n/).map(line => line.trim()).filter(Boolean) : [];
@@ -41,7 +42,7 @@ function csvFormat(headers, format) {
 }
 
 
-function parseCompleteBackup(data) {
+async function parseCompleteBackup(data) {
   const backup = typeof data === 'string' ? JSON.parse(data) : data;
   const arrays = ['collection', 'card_cache', 'locations', 'compartments', 'compartment_assignments', 'decks', 'deck_cards'];
   if (!backup || backup.format !== 'manafolio-backup' || backup.version !== 1 || !arrays.every(key => Array.isArray(backup[key]))) {
@@ -50,6 +51,16 @@ function parseCompleteBackup(data) {
   if (backup.decks.some(deck => ['wins', 'losses'].some(key => Object.hasOwn(deck, key)
       && (!Number.isInteger(deck[key]) || deck[key] < 0 || deck[key] > 2147483647)))) {
     throw new Error('Invalid backup deck record');
+  }
+  if (backup.decks.some(deck => Object.hasOwn(deck, 'sleeved')
+      && (!Number.isInteger(deck.sleeved) || deck.sleeved < 0 || deck.sleeved > 3))) {
+    throw new Error('Invalid backup deck sleeves');
+  }
+  for (const deck of backup.decks) {
+    Object.assign(deck, await normalizeCardBack({
+      color: Object.hasOwn(deck, 'card_back_color') ? deck.card_back_color : null,
+      image: Object.hasOwn(deck, 'card_back_image') ? deck.card_back_image : null
+    }, true));
   }
   if (['card_cache', 'collection', 'decks'].some(key =>
     backup[key].some(row => row.game != null && row.game !== 'mtg'))
@@ -204,12 +215,12 @@ async function restoreCompleteBackup(backup, userId) {
       const result = await db.run(`
         INSERT INTO decks (
           name, description, checked_out, checked_out_at, game, created_at, format, category,
-          accent_color, target_size, commander_card_id, inventory_type, wins, losses, user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          accent_color, target_size, commander_card_id, inventory_type, wins, losses, sleeved, card_back_color, card_back_image, user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         deck.name, deck.description, deck.checked_out || 0, deck.checked_out_at, deck.game, deck.created_at,
         deck.format, deck.category, deck.accent_color, deck.target_size, deck.commander_card_id ?? null,
-        deck.inventory_type ?? 'collection', deck.wins ?? 0, deck.losses ?? 0, userId
+        deck.inventory_type ?? 'collection', deck.wins ?? 0, deck.losses ?? 0, deck.sleeved ?? 0, deck.card_back_color, deck.card_back_image, userId
       ]);
       deckIds.set(deck.id, result.lastID);
     }
@@ -423,7 +434,7 @@ router.post('/import', async (req, res) => {
       return res.status(400).json({ error: 'Invalid list_type' });
     }
     if (formatKey === 'backup') {
-      const backup = parseCompleteBackup(data);
+      const backup = await parseCompleteBackup(data);
       onProgress?.({ stage: 'parsed', total: backup.collection.length });
       onProgress?.({ stage: 'saving', current: 0, total: backup.collection.length });
       const restored = await restoreCompleteBackup(backup, req.user.id);

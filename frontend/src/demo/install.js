@@ -72,6 +72,36 @@ window.fetch = (input, opts = {}) => {
     routes['/api/auth/me'].user.theme = theme;
     return Promise.resolve(json({ theme }));
   }
+  if (method === 'PATCH' && /^\/api\/decks\/\d+\/card-back$/.test(path)) {
+    const deck = routes[path.replace(/\/card-back$/, '')];
+    if (!deck || deck.game !== 'mtg') return Promise.resolve(json({ error: 'Deck not found.' }, 404));
+    const body = JSON.parse(opts.body || '{}');
+    const { color, image } = body;
+    if (Object.keys(body).length !== 2 || !Object.hasOwn(body, 'color') || !Object.hasOwn(body, 'image')
+      || !(color === null || (typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color)))
+      || !(image === null || (typeof image === 'string' && image.length < 500_000 && /^data:image\/webp;base64,/.test(image)))
+      || (color !== null && image !== null)) {
+      return Promise.resolve(json({ error: 'Invalid card back.' }, 400));
+    }
+    const back = { card_back_color: color, card_back_image: image };
+    Object.assign(deck, back);
+    const listedDeck = routes['/api/decks'].find(item => item.id === deck.id);
+    if (listedDeck) Object.assign(listedDeck, back);
+    return Promise.resolve(json(back));
+  }
+  if (method === 'PATCH' && /^\/api\/decks\/\d+\/sleeved$/.test(path)) {
+    const deckPath = path.replace(/\/sleeved$/, '');
+    const deck = routes[deckPath];
+    if (!deck) return Promise.resolve(json({ error: 'Deck not found.' }, 404));
+    const { sleeved } = JSON.parse(opts.body || '{}');
+    if (!Number.isInteger(sleeved) || sleeved < 0 || sleeved > 3) {
+      return Promise.resolve(json({ error: 'Invalid sleeve setting.' }, 400));
+    }
+    deck.sleeved = sleeved;
+    const listedDeck = routes['/api/decks'].find(item => item.id === deck.id);
+    if (listedDeck) listedDeck.sleeved = sleeved;
+    return Promise.resolve(json({ sleeved }));
+  }
 
   if (method === 'GET' && routes[path]) {
     let data = routes[path];

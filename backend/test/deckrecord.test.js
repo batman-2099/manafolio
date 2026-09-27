@@ -35,6 +35,9 @@ async function testRecord() {
     const physical = (await db.run(`INSERT INTO decks (name, user_id, checked_out, checked_out_at) VALUES ('Physical', 1, 1, '2026-09-22')`)).lastID;
     await db.initDb();
     assert.deepStrictEqual(await counts(physical), { wins: 0, losses: 0 });
+    assert.strictEqual((await db.get('SELECT sleeved FROM decks WHERE id = ?', [physical])).sleeved, 0, 'upgraded decks start unsleeved');
+    assert.deepStrictEqual(await db.get('SELECT card_back_color, card_back_image FROM decks WHERE id = ?', [physical]),
+      { card_back_color: null, card_back_image: null }, 'upgraded decks use the default back');
     const created = await request('post', '/', null, { name: 'Arena', inventory_type: 'arena' });
     assert.strictEqual(created.statusCode, 201);
     const arena = created.body.id;
@@ -82,14 +85,68 @@ async function testRecord() {
     const lower = await Promise.all([record(physical, 'loss', -1), record(physical, 'loss', -1)]);
     assert.deepStrictEqual(lower.map(res => res.statusCode).sort(), [200, 400]);
     assert.deepStrictEqual(await counts(physical), { wins: 19, losses: 0 });
+    const beforeSleeves = await db.get('SELECT * FROM decks WHERE id = ?', [physical]);
+    const beforeSleeveCards = await db.all('SELECT * FROM deck_cards ORDER BY deck_id, card_id');
+    for (const sleeved of [1, 2, 0, 3]) {
+      const response = await request('patch', '/:id/sleeved', physical, { sleeved });
+      assert.strictEqual(response.statusCode, 200);
+      assert.deepStrictEqual(response.body, { sleeved });
+      assert.strictEqual((await request('get', '/:id', physical)).body.sleeved, sleeved);
+    }
+    for (const body of [null, [], {}, { sleeved: -1 }, { sleeved: 4 }, { sleeved: 1.5 }, { sleeved: '1' }, { sleeved: true }, { sleeved: null }, { sleeved: 2, user_id: 2 }]) {
+      assert.strictEqual((await request('patch', '/:id/sleeved', physical, body)).statusCode, 400);
+    }
+    assert.strictEqual((await request('patch', '/:id/sleeved', physical, { sleeved: 0 }, 2)).statusCode, 404);
+    assert.strictEqual((await request('patch', '/:id/sleeved', legacy, { sleeved: 1 })).statusCode, 404);
+    assert.strictEqual((await request('patch', '/:id/sleeved', 999999, { sleeved: 1 })).statusCode, 404);
+    assert.deepStrictEqual(await db.get('SELECT * FROM decks WHERE id = ?', [physical]), { ...beforeSleeves, sleeved: 3 }, 'sleeves only change the owned deck sleeve state');
+    assert.deepStrictEqual(await db.all('SELECT * FROM deck_cards ORDER BY deck_id, card_id'), beforeSleeveCards);
+    assert.strictEqual((await request('get', '/', null)).body.find(deck => deck.id === physical).sleeved, 3);
+    assert.strictEqual((await request('get', '/:id', arena)).body.sleeved, 0, 'other decks keep their own selection');
+    const sleevedCopy = await request('post', '/:id/duplicate', physical);
+    assert.strictEqual(sleevedCopy.statusCode, 201);
+    assert.strictEqual((await request('get', '/:id', sleevedCopy.body.id)).body.sleeved, 3);
     await db.initDb();
     const reloaded = new sqlite3.Database(tmpDb);
     try {
       const persisted = await new Promise((resolve, reject) => reloaded.get('SELECT wins, losses FROM decks WHERE id = ?', [physical], (error, row) => error ? reject(error) : resolve(row)));
       assert.deepStrictEqual(persisted, { wins: 19, losses: 0 }, 'records survive initialization and a fresh database connection');
+      const sleeves = await new Promise((resolve, reject) => reloaded.get('SELECT sleeved FROM decks WHERE id = ?', [physical], (error, row) => error ? reject(error) : resolve(row)));
+      assert.strictEqual(sleeves.sleeved, 3, 'sleeves survive initialization and a fresh database connection');
     } finally {
       await new Promise(resolve => reloaded.close(resolve));
     }
+    const beforeBack = await db.get('SELECT * FROM decks WHERE id = ?', [physical]);
+    const back = body => request('patch', '/:id/card-back', physical, body);
+    assert.deepStrictEqual((await back({ color: '#aBc123', image: null })).body, { card_back_color: '#ABC123', card_back_image: null });
+    assert.deepStrictEqual(await db.get('SELECT * FROM decks WHERE id = ?', [physical]),
+      { ...beforeBack, card_back_color: '#ABC123' }, 'card backs leave draft content, sleeves and records untouched');
+    for (const body of [null, [], {}, { color: '#fff', image: null }, { color: 1, image: null },
+      { color: null }, { color: '#abcdef', image: 'x' }, { color: null, image: null, user_id: 2 },
+      { color: null, image: 'https://example.com/back.png' }, { color: null, image: 'data:image/png;base64,YmFk' },
+      { color: null, image: 'data:image/svg+xml;base64,PHN2Zy8+' }, { color: null, image: 'x'.repeat(700001) }]) {
+      assert.strictEqual((await back(body)).statusCode, 400);
+    }
+    assert.strictEqual((await request('patch', '/:id/card-back', physical, { color: null, image: null }, 2)).statusCode, 404);
+    assert.strictEqual((await request('patch', '/:id/card-back', legacy, { color: null, image: null })).statusCode, 404);
+    const sharp = require('sharp');
+    for (const format of ['png', 'jpeg', 'webp']) {
+      const input = await sharp({ create: { width: 976, height: 1360, channels: 3, background: '#123456' } }).toFormat(format).toBuffer();
+      const saved = await back({ color: null, image: `data:image/${format};base64,${input.toString('base64')}` });
+      assert.strictEqual(saved.statusCode, 200);
+      assert.strictEqual(saved.body.card_back_color, null);
+      const metadata = await sharp(Buffer.from(saved.body.card_back_image.split(',')[1], 'base64')).metadata();
+      assert.deepStrictEqual([metadata.format, metadata.width, metadata.height], ['webp', 488, 680]);
+      assert.strictEqual((await request('get', '/:id', physical)).body.card_back_image, saved.body.card_back_image);
+    }
+    const oversized = await sharp({ create: { width: 5001, height: 4000, channels: 3, background: '#123456' } }).png().toBuffer();
+    assert.strictEqual((await back({ color: null, image: `data:image/png;base64,${oversized.toString('base64')}` })).statusCode, 400);
+    const png = await sharp({ create: { width: 10, height: 10, channels: 3, background: '#123456' } }).png().toBuffer();
+    assert.strictEqual((await back({ color: null, image: `data:image/jpeg;base64,${png.toString('base64')}` })).statusCode, 400);
+    const customCopy = await request('post', '/:id/duplicate', physical);
+    assert.strictEqual((await request('get', '/:id', customCopy.body.id)).body.card_back_image,
+      (await request('get', '/:id', physical)).body.card_back_image);
+    assert.deepStrictEqual((await back({ color: null, image: null })).body, { card_back_color: null, card_back_image: null });
   } finally {
     await new Promise(resolve => db.dbConnection.close(resolve));
     for (const suffix of ['', '-wal', '-shm']) {
