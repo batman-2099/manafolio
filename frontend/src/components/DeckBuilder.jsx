@@ -35,6 +35,7 @@ const NEW_DECK_DEFAULTS = { format: 'Commander / EDH', targetSize: 100 };
 const deckEditorState = (deck) => ({
   name: deck.name.trim(),
   description: deck.description || '',
+  notes: deck.notes || '',
   format: deck.format || NEW_DECK_DEFAULTS.format,
   category: deck.category || 'Competitive',
   accent_color: deck.accent_color || '#eab308',
@@ -1750,6 +1751,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             </p>
           </section>
           <div className={`deck-summary-layout${commanderCard || activeDeck.game === 'mtg' ? ' deck-summary-layout--commander' : ''}`}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
             <div className="deck-overview">
               <div className="deck-overview-column">
                 <section className="deck-overview-section" aria-labelledby="deck-types-heading">
@@ -1893,6 +1895,24 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   </div>
                 </section>
               </div>
+            </div>
+          <section className="glass-panel" aria-labelledby="deck-notes-heading">
+            <h3 id="deck-notes-heading" style={{ marginBottom: '0.75rem' }}>
+              <label htmlFor="deck-notes">{t('nav.notes')}</label>
+            </h3>
+            <textarea
+              id="deck-notes"
+              className="input-control"
+              rows={6}
+              style={{ display: 'block', width: '100%', fontSize: '16px', resize: 'vertical' }}
+              value={activeDeck.notes || ''}
+              disabled={editorBusy || !!deckDraft}
+              onChange={(event) => setActiveDeck(deck => ({ ...deck, notes: event.target.value }))}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
+              <button className="btn btn-secondary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
+            </div>
+          </section>
             </div>
               <div className="deck-card-previews">
                 {commanderCard && (

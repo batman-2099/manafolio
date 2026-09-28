@@ -17,6 +17,7 @@ Object.assign(ids, { multicolor: id(14), unknownColor: id(15), outsideSet: id(16
 const requestBody = { inventory_type: 'collection', format: 'Standard', target_size: 60, prompt: 'An efficient deck using my available cards.' };
 const draft = changes => ({
   name: 'AI suggestion', description: 'Suggested deck', inventory_type: 'collection', format: 'Standard',
+  strategy: 'Use Lightning Bolt to answer early threats. Forest provides green mana, but this limited pool lacks a reliable win condition; mulligan hands without useful action and reassess the plan in the mid and late game.',
   target_size: 60, commander_card_id: null,
   cards: [{ card_id: ids.bolt, quantity: 2 }, { card_id: ids.forest, quantity: 58 }], ...changes,
 });
@@ -217,6 +218,7 @@ async function main() {
     assert.strictEqual(calls[0].options.reasoning_effort, undefined);
     assert.deepStrictEqual(await db.get('SELECT COUNT(*) AS count FROM decks'), before, 'suggesting never creates a deck');
     assert.strictEqual(suggested.body.draft.include_checked_out, false);
+    assert.strictEqual(suggested.body.draft.strategy, draft().strategy);
     const sent = JSON.parse(calls[0].prompt.slice(calls[0].prompt.lastIndexOf('\n') + 1));
     assert.ok([ids.tenant, ids.wishlist, ids.unsupported, ids.locked, ids.missing, ids.banned].every(cardId => !sent.catalog.some(card => card[0] === cardId)));
     assert.deepStrictEqual(sent.catalog.map(card => card[0]).sort(), physical.body.cards.filter(card => card.available_qty > 0 && card.id !== ids.banned).map(card => card.id).sort(), 'every eligible owned printing is sent');
@@ -328,6 +330,7 @@ async function main() {
     const localResult = await request('POST', '/ai/suggest', localRequest, 2);
     assert.strictEqual(localResult.status, 200, JSON.stringify(localResult.body));
     assert.deepStrictEqual(localResult.body.draft.cards, ollamaDraft.draft.cards);
+    assert.strictEqual(localResult.body.draft.strategy, ollamaDraft.draft.strategy);
     assert.strictEqual(otherOllamaCalls.at(-1).body.model, 'other:8b');
     assert.strictEqual(ollamaCalls.length, defaultCallsBeforeGeneration, 'generation uses only the saved user address');
     const localCatalog = JSON.parse(otherOllamaCalls.at(-1).body.messages.find(message => message.role === 'user').content.split('\n').at(-1)).catalog;
@@ -350,6 +353,10 @@ async function main() {
       current_draft: draft({ target_size: 2, name: 'My local edit', cards: [{ card_id: ids.bolt, quantity: 1 }] }),
     }, 2);
     assert.deepStrictEqual(localQuestion, { status: 200, body: ollamaDraft }, 'Ollama discussion uses the same nullable envelope');
+    ollamaDraft = { ...localGenerated, draft: { ...localGenerated.draft, strategy: undefined } };
+    const localMissingStrategy = await request('POST', '/ai/suggest', localRequest, 2);
+    assert.strictEqual(localMissingStrategy.status, 502);
+    assert.match(localMissingStrategy.body.error, /Strategy/);
     ollamaDraft = localGenerated;
     ollamaDraft = { ...ollamaDraft, draft: { ...ollamaDraft.draft, cards: [{ card_id: ids.forest, quantity: 2 }] } };
     assert.strictEqual((await request('POST', '/ai/suggest', localRequest, 2)).status, 502, 'Ollama drafts use the same owned-card validation');
@@ -514,6 +521,7 @@ async function main() {
     const loaded = await request('GET', `/decks/${saved.body.id}`);
     assert.strictEqual(loaded.body.name, edited.name);
     assert.strictEqual(loaded.body.description, edited.description);
+    assert.strictEqual(loaded.body.notes, edited.strategy, 'the reviewed strategy is saved separately from the description');
     assert.strictEqual(loaded.body.checked_out, 0);
     assert.deepStrictEqual([loaded.body.wins, loaded.body.losses], [0, 0], 'AI-created decks start a new record');
     assert.deepStrictEqual(loaded.body.cards.map(card => [card.id, card.quantity]).sort(), edited.cards.map(card => [card.card_id, card.quantity]).sort());
@@ -625,8 +633,9 @@ async function main() {
     await db.run(`INSERT INTO collection (card_id, quantity, user_id, list_type, missing, game, notes)
       SELECT card_id, quantity, 5, list_type, missing, game, notes FROM collection WHERE user_id = 3`);
     const source = await db.run(`INSERT INTO decks
-      (user_id, name, description, game, inventory_type, format, target_size, category, checked_out, checked_out_at)
-      VALUES (5, 'PRIVATE SOURCE NAME', 'PRIVATE SOURCE DESCRIPTION', 'mtg', 'collection', 'Standard', 60, 'PRIVATE CATEGORY', 1, '2026-09-22')`);
+      (user_id, name, description, notes, game, inventory_type, format, target_size, category, checked_out, checked_out_at)
+      VALUES (5, 'PRIVATE SOURCE NAME', 'PRIVATE SOURCE DESCRIPTION', 'PRIVATE DECK NOTES', 'mtg', 'collection', 'Standard', 60, 'PRIVATE CATEGORY', 1, '2026-09-22')`);
+    await db.run('UPDATE decks SET notes = ? WHERE id = ?', [`  PRIVATE DECK NOTES\n${'Keep my plans. '.repeat(600)}  `, source.lastID]);
     const sourceCards = [
       { card_id: ids.bolt, name: 'Lightning Bolt', quantity: 1 },
       { card_id: ids.reprint, name: 'Lightning Bolt', quantity: 1 },
@@ -680,6 +689,7 @@ async function main() {
     model = async () => ({ message: 'Here is the revised deck.', draft: { ...sourceEligibleDraft, warnings: [] } });
     const improved = await request('POST', '/ai/suggest', improvement, 5);
     assert.strictEqual(improved.status, 200, JSON.stringify(improved.body));
+    assert.strictEqual(improved.body.draft.strategy, sourceEligibleDraft.strategy);
     const improvedPayload = lastPayload();
     assert.deepStrictEqual(improvedPayload.source_deck, {
       inventory_type: 'collection', format: 'Standard', target_size: 60, commander_card_id: null,
@@ -690,7 +700,7 @@ async function main() {
     assert.ok(!Object.hasOwn(improvedPayload.request, 'source_deck_id'));
     assert.ok(!Object.hasOwn(improved.body.draft, 'source_deck_id'));
     assert.ok(!Object.hasOwn(sent, 'source_deck'), 'ordinary generation keeps its original payload');
-    assert.ok(['PRIVATE SOURCE NAME', 'PRIVATE SOURCE DESCRIPTION', 'PRIVATE CATEGORY', 'PRIVATE STORAGE NOTE']
+    assert.ok(['PRIVATE SOURCE NAME', 'PRIVATE SOURCE DESCRIPTION', 'PRIVATE DECK NOTES', 'PRIVATE CATEGORY', 'PRIVATE STORAGE NOTE']
       .every(value => !calls.at(-1).prompt.includes(value)));
     assert.strictEqual(improvedPayload.catalog.find(row => row[0] === ids.reprint)[2], 1, 'source set exemption admits only source quantity');
     assert.strictEqual(improvedPayload.catalog.find(row => row[0] === ids.locked)[2], 1, 'source checkout is exempt but other reservations remain locked');
@@ -719,6 +729,7 @@ async function main() {
     assert.notStrictEqual(newDeck.body.id, source.lastID);
     const newLoaded = await request('GET', `/decks/${newDeck.body.id}`, undefined, 5);
     assert.strictEqual(newLoaded.body.name, 'Edited improvement');
+    assert.strictEqual(newLoaded.body.notes, improvementSave.strategy, 'Save as New uses the new strategy, not private source notes');
     assert.strictEqual(newLoaded.body.checked_out, 0);
     assert.deepStrictEqual(newLoaded.body.cards.map(card => [card.id, card.quantity]).sort(),
       sourceEligibleDraft.cards.map(card => [card.card_id, card.quantity]).sort());
@@ -784,13 +795,21 @@ async function main() {
     assert.deepStrictEqual(await db.get('SELECT COUNT(*) AS count FROM decks'), countBeforeReplacement);
     const afterReplacement = await replacementState();
     assert.deepStrictEqual(afterReplacement.deck, { ...beforeReplacement.deck, name: replacement.name, description: replacement.description,
-      commander_card_id: replacement.commander_card_id }, 'records, category, accent, timestamps and inventory settings survive');
+      commander_card_id: replacement.commander_card_id, notes: `${beforeReplacement.deck.notes}\n\n${replacement.strategy}` },
+    'existing notes, records, category, accent, timestamps and inventory settings survive without truncation');
     assert.deepStrictEqual(afterReplacement.cards.map(({ card_id, quantity, checked_out }) => ({ card_id, quantity, checked_out })),
       replacement.cards.map(card => ({ ...card, checked_out: card.card_id === ids.forest ? 1 : 0 }))
         .sort((a, b) => a.card_id.localeCompare(b.card_id)), 'cards are fully replaced; retained pulls survive and new cards start unpulled');
+    assert.strictEqual((await request('PUT', `/ai/${source.lastID}`, replacement, 5)).status, 200);
+    assert.deepStrictEqual(await replacementState(), afterReplacement, 'saving the same strategy again does not append it twice');
     const copiedReplacement = await request('POST', '/ai', replacement, 5);
     assert.strictEqual(copiedReplacement.status, 201);
     assert.notStrictEqual(copiedReplacement.body.id, source.lastID);
+    assert.strictEqual((await request('GET', `/decks/${copiedReplacement.body.id}`, undefined, 5)).body.notes, replacement.strategy);
+    const copyReplacement = { ...replacement, source_deck_id: copiedReplacement.body.id };
+    assert.strictEqual((await request('PUT', `/ai/${copiedReplacement.body.id}`, copyReplacement, 5)).status, 200);
+    assert.strictEqual((await request('GET', `/decks/${copiedReplacement.body.id}`, undefined, 5)).body.notes, replacement.strategy,
+      'notes equal to the strategy are not duplicated either');
     assert.deepStrictEqual(await replacementState(), afterReplacement, 'save as new still leaves the source unchanged');
     assert.deepStrictEqual(await db.all('SELECT card_id, quantity, checked_out FROM deck_cards WHERE deck_id = ? ORDER BY card_id', [copiedReplacement.body.id]),
       replacement.cards.map(card => ({ ...card, checked_out: 0 })).sort((a, b) => a.card_id.localeCompare(b.card_id)));
@@ -1014,7 +1033,7 @@ async function main() {
     assert.strictEqual((await request('POST', '/ai/suggest', { ...unscopedRequest, inventory_type: 'arena', target_size: 2, container_ids: [] }, 7)).status, 200);
     assert.deepStrictEqual(lastPayload().catalog.map(row => [row[0], row[2]]), [[ids.bolt, 9]]);
     const { suggestionRequest, modelRequest } = require('../src/utils/aiDecks');
-    const incomplete = draft({ name: '', cards: [] });
+    const incomplete = draft({ name: '', strategy: '', cards: [] });
     const history = [
       { role: 'user', content: 'Please build a green deck.' },
       { role: 'assistant', content: 'Here is a first draft.' },
@@ -1029,6 +1048,7 @@ async function main() {
       { current_draft: { ...incomplete, cards: [{ card_id: ids.forest, quantity: 1.5 }] } },
       { current_draft: { ...incomplete, cards: [{ card_id: ids.forest, quantity: 1 }, { card_id: ids.forest, quantity: 1 }] } },
       { current_draft: { ...incomplete, include_checked_out: true } },
+      ...[undefined, null, 42, {}, [], 'x'.repeat(8001)].map(strategy => ({ current_draft: { ...incomplete, strategy } })),
     ]) {
       assert.throws(() => suggestionRequest({ ...requestBody, ...invalid }), error => error.status === 400);
     }
@@ -1050,7 +1070,7 @@ async function main() {
     const discussedEvents = (await discussed.text()).trim().split('\n').map(line => JSON.parse(line));
     assert.deepStrictEqual(discussedEvents.filter(event => event.type !== 'progress'), [{ type: 'complete', data: discussion }],
       'streamed discussion completes without a replacement draft, including an incomplete manual draft');
-    const manuallyEdited = draft({ name: 'My manual name', description: 'Keep this description', cards: [{ card_id: ids.forest, quantity: 57 }] });
+    const manuallyEdited = draft({ name: 'My manual name', description: 'Keep this description', strategy: 'My edited strategy: keep Forest for later green spells.', cards: [{ card_id: ids.forest, quantity: 57 }] });
     model = async (_user, prompt) => {
       const { request: context } = JSON.parse(prompt.split('\n').at(-1));
       return { message: 'I filled the remaining slots while preserving your edits.', draft: {
@@ -1063,6 +1083,7 @@ async function main() {
     assert.strictEqual(refined.status, 200, JSON.stringify(refined.body));
     assert.strictEqual(refined.body.draft.name, manuallyEdited.name);
     assert.strictEqual(refined.body.draft.description, manuallyEdited.description);
+    assert.strictEqual(refined.body.draft.strategy, manuallyEdited.strategy);
     assert.deepStrictEqual(refined.body.draft.cards, [...manuallyEdited.cards, { card_id: ids.bolt, quantity: 3 }]);
     assert.deepStrictEqual(lastPayload().request.messages, history, 'only prior completed messages are sent as history');
     assert.deepStrictEqual(lastPayload().request.current_draft, manuallyEdited, 'the latest partial manual draft replaces stale model context');
@@ -1093,6 +1114,33 @@ async function main() {
     assert.deepStrictEqual(await db.all('SELECT * FROM deck_cards ORDER BY deck_id, card_id'), conversationCards);
     assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), conversationInventory,
       'discussion, refinement and rejected output never save decks, alter inventory or change checkout state');
+
+    await db.run("INSERT INTO users (id, username, password_hash, share_token) VALUES (12, 'strategy-user', 'not-a-real-password', 'strategy-share')");
+    await db.run(`INSERT INTO collection (card_id, quantity, user_id, list_type, game)
+      SELECT card_id, quantity, 12, list_type, game FROM collection WHERE user_id = 3 AND missing = 0`);
+    const beforeStrategyFailures = await db.all('SELECT * FROM decks ORDER BY id');
+    for (const strategy of [undefined, null, 42, {}, [], '', '   ', 'x'.repeat(8001)]) {
+      model = async () => ({ message: 'Here is the revised deck.', draft: { ...draft({ strategy }), warnings: [] } });
+      const rejected = await request('POST', '/ai/suggest', requestBody, 12);
+      assert.strictEqual(rejected.status, 502);
+      assert.match(rejected.body.error, /Strategy/);
+      if (strategy !== '' && strategy !== '   ') {
+        assert.strictEqual((await request('POST', '/ai', draft({ strategy }), 12)).status, 400);
+      }
+    }
+    assert.deepStrictEqual(await db.all('SELECT * FROM decks ORDER BY id'), beforeStrategyFailures,
+      'missing, malformed and oversized strategies never save a deck or fabricate a fallback');
+    const fullStrategy = 'x'.repeat(8000);
+    model = async () => ({ message: 'Here is the revised deck.', draft: { ...draft({ strategy: fullStrategy }), warnings: [] } });
+    const boundedStrategy = await request('POST', '/ai/suggest', requestBody, 12);
+    assert.strictEqual(boundedStrategy.status, 200);
+    assert.strictEqual(boundedStrategy.body.draft.strategy, fullStrategy, 'the exact strategy bound is accepted without truncation');
+    const clearedStrategy = await request('POST', '/ai', draft({ strategy: '' }), 12);
+    assert.strictEqual(clearedStrategy.status, 201, 'users may clear the editable strategy before saving');
+    assert.strictEqual((await request('GET', `/decks/${clearedStrategy.body.id}`, undefined, 12)).body.notes, '');
+    assert.strictEqual((await request('PUT', `/ai/${source.lastID}`, { ...replacement, strategy: '' }, 5)).status, 200);
+    assert.strictEqual((await request('GET', `/decks/${source.lastID}`, undefined, 5)).body.notes, afterReplacement.deck.notes,
+      'an empty edited strategy preserves all existing notes');
     console.log('AI deck owned-inventory, draft, legality and atomic-save self-check passed');
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));

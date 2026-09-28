@@ -56,6 +56,9 @@ async function parseCompleteBackup(data) {
       && (!Number.isInteger(deck.sleeved) || deck.sleeved < 0 || deck.sleeved > 3))) {
     throw new Error('Invalid backup deck sleeves');
   }
+  if (backup.decks.some(deck => deck.notes != null && typeof deck.notes !== 'string')) {
+    throw new Error('Invalid backup deck notes');
+  }
   if (backup.locations.some(location => Object.hasOwn(location, 'sleeved')
       && (!Number.isInteger(location.sleeved) || location.sleeved < 0 || location.sleeved > 3))) {
     throw new Error('Invalid backup container sleeves');
@@ -219,11 +222,11 @@ async function restoreCompleteBackup(backup, userId) {
     for (const deck of backup.decks) {
       const result = await db.run(`
         INSERT INTO decks (
-          name, description, checked_out, checked_out_at, game, created_at, format, category,
+          name, description, notes, checked_out, checked_out_at, game, created_at, format, category,
           accent_color, target_size, commander_card_id, inventory_type, wins, losses, sleeved, card_back_color, card_back_image, user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        deck.name, deck.description, deck.checked_out || 0, deck.checked_out_at, deck.game, deck.created_at,
+        deck.name, deck.description, deck.notes ?? '', deck.checked_out || 0, deck.checked_out_at, deck.game, deck.created_at,
         deck.format, deck.category, deck.accent_color, deck.target_size, deck.commander_card_id ?? null,
         deck.inventory_type ?? 'collection', deck.wins ?? 0, deck.losses ?? 0, deck.sleeved ?? 0, deck.card_back_color, deck.card_back_image, userId
       ]);

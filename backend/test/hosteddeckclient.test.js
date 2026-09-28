@@ -16,6 +16,7 @@ const { sanitizeUser } = require('../src/utils/authHelpers');
 const settings = { inventory_type: 'collection', format: 'Casual', target_size: 1, prompt: 'Build my deck.' };
 const valid = { message: 'Here is your deck.', draft: {
   name: 'Owned deck', description: '', inventory_type: 'collection', format: 'Casual', target_size: 1,
+  strategy: 'Keep Forest to make green mana in the opening turns. With only a Forest, there are no spells, synergies or win conditions for the mid or late game; mulligans cannot fix this limited pool.',
   commander_card_id: null, cards: [{ card_id: 'mtg-hosted-forest', quantity: 1 }], warnings: [],
 } };
 const choices = content => ({ choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: JSON.stringify(content) } }] });
@@ -151,12 +152,19 @@ async function main() {
       const response = await ai('POST', '/suggest', settings);
       assert.strictEqual(response.status, 200);
       assert.deepStrictEqual(response.body.draft.cards, valid.draft.cards);
+      assert.strictEqual(response.body.draft.strategy, valid.draft.strategy);
       const complete = replies[provider];
       const wrap = provider === 'gemini' ? candidates : choices;
       replies[provider] = wrap({ ...valid, draft: { ...valid.draft, cards: [{ card_id: 'mtg-not-owned', quantity: 1 }] } });
       assert.strictEqual((await ai('POST', '/suggest', settings)).status, 502, 'hosted output must pass owned inventory validation');
       replies[provider] = wrap({ ...valid, message: 'x'.repeat(8001) });
       assert.strictEqual((await ai('POST', '/suggest', settings)).status, 502, 'local string bounds remain enforced for Gemini');
+      for (const strategy of [undefined, '', 'x'.repeat(8001)]) {
+        replies[provider] = wrap({ ...valid, draft: { ...valid.draft, strategy } });
+        const rejected = await ai('POST', '/suggest', settings);
+        assert.strictEqual(rejected.status, 502, 'every hosted provider must return a nonempty, bounded strategy');
+        assert.match(rejected.body.error, /Strategy/);
+      }
       replies[provider] = wrap({ message: 'What play style?', draft: null });
       assert.deepStrictEqual((await ai('POST', '/suggest', settings)).body, { message: 'What play style?', draft: null });
       replies[provider] = complete;

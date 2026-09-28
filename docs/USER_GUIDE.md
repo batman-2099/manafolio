@@ -1,6 +1,6 @@
 # Manafolio help and how-to guide
 
-A practical guide to managing a Magic: The Gathering collection, finding physical cards, and preparing decks in Manafolio. Instructions use the English interface; translated labels may differ. Open **How-to** after **Notes** in the app, or **More → How-to** on a phone, to read this guide without leaving Manafolio.
+A practical guide to managing a Magic: The Gathering collection, finding physical cards, and preparing decks in Manafolio. Instructions use the English interface; translated labels may differ. Open **How-to** in the app, or **More → How-to** on a phone, to read this guide without leaving Manafolio.
 
 **Using a demonstration site?** Demo cards are sample data. The demo is not a place to maintain your collection: changes are not reliably saved, and live search, importing, scanning, and provider features require a server installation.
 
@@ -52,8 +52,7 @@ The guide text is currently English. Tables scroll horizontally on narrow screen
 | Add Cards | Search, rapid entry, collection imports, preconstructed decks, and camera scanning. |
 | Collection | Find and inspect owned, planned, or archived cards; filter and export results. |
 | Storage | Physical and archived containers, positions, covers, filing, and moving copies. |
-| Deck Builder | Deck drafts, imports, commander selection, checkout, results, and draw simulation. |
-| Notes | Written reminders and plans. Do not use notes as a substitute for saved inventory or deck changes. |
+| Deck Builder | Deck drafts, private deck notes, imports, commander selection, checkout, results, and draw simulation. |
 | How-to | Searchable chapters and step-by-step instructions from this guide. |
 | Settings | Preferences, sharing, security, API access, AI configuration, and account backup/restore. |
 | Admin | Administrator-only account, instance, backup, and catalog management. |
@@ -687,7 +686,7 @@ AI is not required for ordinary deck editing. Configure it only if you want to s
 
 **Expected result:** the provider/model preferences are saved for your Manafolio account across devices. Saving a Gemini/OpenRouter key alone does not select that provider for requests. If a saved model or thinking level becomes unavailable, choose a supported option and save again. Requests do not silently switch to a different provider/model on failure.
 
-**Privacy and cost:** read **Privacy, trust and costs** before connecting. Requests include eligible card metadata and counts, the conversation, and the current draft—including a draft name or description you edit. Storage identities, container names/IDs, saved private notes, other users' records, and an improved source deck's saved description are excluded. Do not paste secrets into the conversation or draft.
+**Privacy and cost:** read **Privacy, trust and costs** before connecting. Requests include eligible card metadata and counts, the conversation, and the current draft—including its name, description, and strategy, with your edits. Storage identities, container names/IDs, saved private notes, other users' records, and an improved source deck's saved description are excluded. Do not paste secrets into the conversation or draft.
 
 ChatGPT uses your Codex access and usage limits. Gemini's free-tier data-use terms and quotas apply where relevant. OpenRouter forwards data to the chosen model provider, whose policies also matter; paid models can consume credits. Ollama may be local or remote and may use cloud services, depending on its configuration. Only connect to a trusted Manafolio server: its administrators can access persisted credentials. **Disconnect** removes local ChatGPT connection data. **Remove API key** removes that hosted provider's key from Manafolio, but you must revoke it at the provider to invalidate it externally. Account JSON backups omit these credentials; server/database backups can include them.
 
@@ -698,9 +697,11 @@ ChatGPT uses your Codex access and usage limits. Gemini's free-tier data-use ter
 3. In **Card pool & filters**, optionally select colors/sets and, for Physical inventory, **Containers**. Empty filters include all eligible cards. Missing Physical copies are excluded; Arena is separate.
 4. Leave **Include checked-out cards** off unless intentionally planning with reserved copies. Turning it on does not release or share reservations.
 5. Enter a **Question or deck request**, then select **Send message**. With no typed request, **Generate suggestion** requests a deck from the selected inventory/settings.
-6. Read the conversation and any **Review and edit draft**. Edit the name, description, quantities, removals, and commander as needed. Read warnings and check the total against the target.
+6. Read the conversation and any **Review and edit draft**. Edit the name, description, strategy, quantities, removals, and commander as needed. The strategy covers opening hands, the game plan, synergies, and win conditions; review it against the actual cards. Read warnings and check the total against the target.
 7. Ask follow-up questions or request revisions. Questions leave the draft unchanged; requests for changes use your current manual edits.
 8. Select **Add Deck** only when you want to save the reviewed draft.
+
+The reviewed strategy is saved to the new deck's **Notes**. You can edit it before saving; a manually cleared strategy saves no strategy text.
 
 **Expected result:** a saved, unchecked-out deck after successful validation—not a collection mutation or automatic checkout. Until Add Deck, the conversation/draft is not a saved deck. Saving rechecks ownership, quantities, copy limits, and cached rules; a failed save does not partially replace account data.
 
@@ -714,8 +715,8 @@ If no eligible cards match, adjust filters or ask questions without generating a
 2. Select **Improve with AI**.
 3. Ask for advice or describe changes. Inventory, format, and target size stay fixed for this workflow.
 4. Review/edit the returned draft and choose:
-   - **Save Deck** to replace the original's name, description, cards, and commander while retaining its identity, results, and settings.
-   - **Save as New Deck** to keep the original and create a separate unchecked-out deck.
+   - **Save Deck** to replace the original's name, description, cards, and commander while retaining its identity, results, and settings. The reviewed strategy is appended to existing Notes without overwriting them; an identical strategy already at the end is not repeated.
+   - **Save as New Deck** to keep the original and create a separate unchecked-out deck with the reviewed strategy in its Notes.
 
 **Expected result:** only the explicitly selected save action persists the draft. **Save Deck is a replacement, not a merge**; return a checked-out source before replacing it. Eligible source-deck copies remain usable for planning despite its own reservation or the filters, up to the source quantities. Reservations from other decks still apply unless included for planning. Neither save action moves cards or shares/releases existing reservations.
 
@@ -783,7 +784,7 @@ Public data includes the account username, card names/printings, quantities, con
 2. Select **Complete Backup**.
 3. Save the downloaded JSON somewhere protected outside the Manafolio deployment. Keep older known-good versions rather than overwriting your only backup.
 
-**Expected result:** a `manafolio-backup` JSON export containing this account's inventory entries (including Physical, Arena, Wishlist, and Graveyard), associated cached card metadata, storage layouts/placements, decks, commander selections, Pulled state, checkout data, and wins/losses. It includes private card metadata such as purchase prices and card notes, so treat it as private even though login/provider credentials are excluded.
+**Expected result:** a `manafolio-backup` JSON export containing this account's inventory entries (including Physical, Arena, Wishlist, and Graveyard), associated cached card metadata, storage layouts/placements, decks and their private notes, commander selections, Pulled state, checkout data, and wins/losses. It includes private card metadata such as purchase prices and card notes, so treat it as private even though login/provider credentials are excluded.
 
 **Export CSV** and **Export JSON** in this panel are card-data exports, not substitutes for **Complete Backup**. The complete account file does not include the server installation, login credentials, API/provider keys, sessions, account/browser preferences, standalone Notes records, price-history tables, or uploaded artwork files. It is an account data transfer/recovery file, not a whole-server backup.
 
@@ -808,17 +809,17 @@ For full server recovery, ask the operator to maintain protected persistent-data
 
 ## Keep private Notes
 
-Notes is a standalone notebook for your account, separate from a card's notes field and a deck's Description.
+Each deck has its own **Notes** section below the deck stats in **Deck Builder**. Notes are separate from the deck description and card-entry notes.
 
-1. Open **Notes** and select **New Note**. A new **Untitled** note is created.
-2. Edit **Title** and the **Write something...** text area.
-3. After changing each field, click or tap outside it, or Tab to the next field. **Edits save when the field loses focus**, not after every keystroke and not through a Save button. Leave the field before closing the page.
-4. Select **Pin** to keep an important note above unpinned notes; select **Unpin** to undo that.
-5. Use **Search notes...** to search title and body, and choose **Recently updated**, **Recently created**, or **Title (A-Z)**. Pinned notes remain first.
+1. Open a deck and enter reminders, matchup plans, or upgrade ideas in **Notes**.
+2. Select **Save** beneath the field or in the deck toolbar. Both save the whole deck draft, including any card or property changes.
+3. Reopen the deck to read its saved notes. To clear them, delete the text and Save.
 
-**Expected result:** saved notes are available in this account on the server, not just in this browser. There is no saved-status indicator for each edit. If **Failed to save note** appears, do not assume the visible text is persisted: the UI can still display the failed edit. Copy important text somewhere safe, resolve the connection problem, and verify the note after reopening before discarding your copy.
+**Expected result:** notes persist with that deck on the server. Edits are not autosaved; leaving with unsaved changes prompts for confirmation. If saving fails, the text remains in the editor so you can retry.
 
-To remove a note, use its **Delete** icon and confirm **Delete this note?**. **Warning:** deletion has no in-app undo. Standalone Notes are not included in **Complete Backup**, unlike card-entry notes, and restoring that backup does not replace them. Preserve important notebook text separately. Notes are account-scoped and not part of public share views or automatically included in AI requests; copying a note into an AI message sends that text to the chosen provider.
+Duplicating a deck copies its notes. **Complete Backup** includes deck notes; public shares and AI requests do not automatically include them. Text pasted into an AI conversation is sent to the chosen provider.
+
+The standalone **Notes** navigation item has been removed. Existing account notebook records remain stored and are not automatically assigned to a deck or deleted. Those legacy records remain outside **Complete Backup**; operators can retain them through a full database backup.
 
 
 ## Administrator essentials

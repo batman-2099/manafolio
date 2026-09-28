@@ -21,7 +21,7 @@ async function testFullBackup() {
     const compartment = await db.run(`INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 100)`, [location.lastID]);
     await db.run(`INSERT INTO compartment_assignments (compartment_id, filter_value) VALUES (?, 'mtg')`, [compartment.lastID]);
     await db.run(`INSERT INTO collection (card_id, location_id, compartment_id, position, game, user_id) VALUES ('backup-card', ?, ?, 1000, 'mtg', 1)`, [location.lastID, compartment.lastID]);
-    const deck = await db.run(`INSERT INTO decks (name, game, format, commander_card_id, checked_out, wins, losses, sleeved, user_id) VALUES ('Backup Deck', 'mtg', 'Commander / EDH', 'backup-card', 1, 7, 3, 3, 1)`);
+    const deck = await db.run(`INSERT INTO decks (name, description, notes, game, format, commander_card_id, checked_out, wins, losses, sleeved, user_id) VALUES ('Backup Deck', 'Public description', 'Private plans\nKeep all whitespace  ', 'mtg', 'Commander / EDH', 'backup-card', 1, 7, 3, 3, 1)`);
     await db.run(`INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out) VALUES (?, 'backup-card', 2, 1)`, [deck.lastID]);
     await db.run(`INSERT INTO decks (name, game, inventory_type, wins, losses, user_id) VALUES ('Arena Deck', 'mtg', 'arena', 2, 5, 1)`);
     const { normalizeCardBack } = require('../src/utils/cardBack');
@@ -48,6 +48,7 @@ async function testFullBackup() {
     assert.deepStrictEqual(res.body.decks.map(deck => [deck.name, deck.checked_out, deck.wins, deck.losses]), [['Backup Deck', 1, 7, 3], ['Arena Deck', 0, 2, 5]]);
     assert.strictEqual(res.body.decks[0].commander_card_id, 'backup-card');
     assert.deepStrictEqual(res.body.decks.map(deck => deck.sleeved), [3, 0]);
+    assert.deepStrictEqual(res.body.decks.map(deck => deck.notes), ['Private plans\nKeep all whitespace  ', '']);
     assert.deepStrictEqual(res.body.deck_cards.map(card => [card.card_id, card.quantity, card.checked_out]), [['backup-card', 2, 1]]);
     assert.deepStrictEqual(res.body.card_cache.map(card => card.id), ['backup-card']);
 
@@ -78,6 +79,9 @@ async function testFullBackup() {
     assert.deepStrictEqual(await db.all(`SELECT card_id, quantity, checked_out FROM deck_cards`), [{ card_id: 'backup-card', quantity: 2, checked_out: 1 }]);
     assert.deepStrictEqual(await db.all('SELECT card_back_color, card_back_image FROM decks WHERE user_id = 1 ORDER BY id'),
       [customBack, { card_back_color: '#ABC123', card_back_image: null }], 'backup restores custom image bytes and colors');
+    assert.deepStrictEqual(await db.all('SELECT description, notes FROM decks WHERE user_id = 1 ORDER BY id'),
+      [{ description: 'Public description', notes: 'Private plans\nKeep all whitespace  ' }, { description: null, notes: '' }],
+      'complete backup restores private notes separately from descriptions');
 
     const invalidBackup = { ...res.body, decks: [{ ...res.body.decks[0], commander_card_id: 'discard-card' }] };
     const invalidRes = {
@@ -128,6 +132,15 @@ async function testFullBackup() {
       assert.deepStrictEqual(await Promise.all(backupTables.map(table => db.all(`SELECT * FROM ${table}`))),
         beforeInvalidSleeves, 'invalid container sleeves must reject the entire backup without changing identities or placements');
     }
+    for (const notes of [12, true, {}, []]) {
+      const invalid = structuredClone(res.body);
+      invalid.decks[0].notes = notes;
+      invalidRes.statusCode = 200;
+      await importBackup({ body: { format: 'backup', data: invalid }, user: { id: 1 } }, invalidRes);
+      assert.strictEqual(invalidRes.statusCode, 400);
+      assert.deepStrictEqual(await Promise.all(backupTables.map(table => db.all(`SELECT * FROM ${table}`))),
+        beforeInvalidSleeves, 'invalid notes must reject the backup without replacing account data');
+    }
     for (const value of [
       { card_back_color: '#fff', card_back_image: null },
       { card_back_color: '#123456', card_back_image: customBack.card_back_image },
@@ -157,6 +170,7 @@ async function testFullBackup() {
 
     // Older backups do not carry deck records.
     for (const deck of res.body.decks) {
+      delete deck.notes;
       delete deck.wins;
       delete deck.losses;
       delete deck.sleeved;
@@ -171,6 +185,13 @@ async function testFullBackup() {
     assert.deepStrictEqual(await db.all('SELECT sleeved FROM decks WHERE user_id = 1 ORDER BY id'), [{ sleeved: 0 }, { sleeved: 0 }]);
     assert.deepStrictEqual(await db.all('SELECT card_back_color, card_back_image FROM decks WHERE user_id = 1 ORDER BY id'),
       [{ card_back_color: null, card_back_image: null }, { card_back_color: null, card_back_image: null }]);
+    assert.deepStrictEqual(await db.all('SELECT notes FROM decks WHERE user_id = 1 ORDER BY id'), [{ notes: '' }, { notes: '' }],
+      'old backups without notes restore empty strings');
+    res.body.decks[0].notes = null;
+    await importBackup({ body: { format: 'backup', data: res.body }, user: { id: 1 } }, restoreRes);
+    assert.strictEqual(restoreRes.statusCode, 200);
+    assert.strictEqual((await db.get('SELECT notes FROM decks WHERE user_id = 1 ORDER BY id')).notes, '',
+      'nullable backup notes normalize to an empty string');
   } finally {
     try { db.dbConnection.close(); } catch { /* already closed */ }
     for (const suffix of ['', '-wal', '-shm']) {

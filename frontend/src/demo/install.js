@@ -102,6 +102,13 @@ window.fetch = (input, opts = {}) => {
     if (listedDeck) listedDeck.sleeved = sleeved;
     return Promise.resolve(json({ sleeved }));
   }
+  if (method === 'PUT' && /^\/api\/decks\/\d+\/editor$/.test(path)) {
+    const deck = routes[path.replace(/\/editor$/, '')];
+    if (!deck) return Promise.resolve(json({ error: 'Deck not found.' }, 404));
+    const body = JSON.parse(opts.body || '{}');
+    if (typeof body.notes === 'string') deck.notes = body.notes;
+    return Promise.resolve(json({ message: 'Demo mode: notes are saved for this session only. Other editor changes are not saved.' }));
+  }
 
   if (method === 'GET' && routes[path]) {
     let data = routes[path];
@@ -144,34 +151,10 @@ window.fetch = (input, opts = {}) => {
     return Promise.resolve(json({ tokens }));
   }
 
-  if (method === 'POST' && path === '/api/notes') {
-    const body = opts.body ? JSON.parse(opts.body) : {};
-    return Promise.resolve(json({
-      note: {
-        id: Date.now(),
-        user_id: 1,
-        title: body.title || 'Untitled',
-        body: body.body || '',
-        pinned: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    }, 201));
-  }
-  if (method === 'PUT' && path.startsWith('/api/notes/')) {
-    const id = parseInt(path.split('/').pop(), 10);
-    const body = opts.body ? JSON.parse(opts.body) : {};
-    return Promise.resolve(json({ note: { id, ...body } }));
-  }
-  if (method === 'DELETE' && path.startsWith('/api/notes/')) {
-    return Promise.resolve(json({ success: true }));
-  }
-
   // Writes and un-captured GETs: never persist. Return a benign empty shape so
   // views render instead of crashing. List-ish paths get [], everything else {}.
   if (method === 'GET') {
-    if (path === '/api/notes') return Promise.resolve(json({ notes: [] }));
-    const listish = /\/(collection|locations|decks|sets|search|users|compartments|notes)/.test(path);
+    const listish = /\/(collection|locations|decks|sets|search|users|compartments)/.test(path);
     return Promise.resolve(json(listish ? [] : {}));
   }
   return Promise.resolve(json({ message: 'Demo mode: changes are not saved.' }));

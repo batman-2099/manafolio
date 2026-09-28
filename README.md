@@ -14,7 +14,7 @@ Self-hosted collection, storage, and deck manager for Magic: The Gathering.
 
 Manafolio brings your Magic collection, physical storage, and decks together on a server you control. Keep exact printings and purchase records, find the box holding a copy, reserve cards for a night of play, and manage Arena inventory without mixing it with physical ownership.
 
-For step-by-step instructions, inventory explanations, backup warnings, and troubleshooting, open **How-to** after **Notes** in the app (**More → How-to** on a phone), or read the [Manafolio help and how-to guide](docs/USER_GUIDE.md). The in-app page includes full-guide search and chapter navigation; guide text is currently English.
+For step-by-step instructions, inventory explanations, backup warnings, and troubleshooting, open **How-to** in the app (**More → How-to** on a phone), or read the [Manafolio help and how-to guide](docs/USER_GUIDE.md). The in-app page includes full-guide search and chapter navigation; guide text is currently English.
 
 Manafolio was originally forked from [Bindarr](https://github.com/thenotoriousJeremy/bindarr) version 1.8.5, created by **thenotoriousJeremy and contributors**.
 
@@ -224,9 +224,11 @@ Discuss and edit the suggested draft, then explicitly choose **Add Deck**. Quest
 
 For a saved deck, save editor changes before **Improve with AI**. **Save Deck** replaces its name, description, cards, and commander while preserving identity, results, and settings; **Save as New Deck** creates a separate unchecked-out deck. Return a checked-out source before replacing it. Eligible source-deck copies remain available despite filters and their own reservation, but other decks' reservations still apply unless explicitly included for planning.
 
+Every generated or improved draft includes an editable **Strategy** with its game plan, opening-hand guidance, play sequencing, synergies, and win conditions. Saving a new deck puts the strategy in **Notes**. Saving an improvement appends it to existing notes without overwriting them; an identical strategy already at the end is not appended again.
+
 Saving rechecks ownership, quantities, copy limits, and cached rules atomically; failed saves leave existing data unchanged. No AI save moves cards or checks out a deck. Suggestions are not guaranteed tournament legal: cached rules may be incomplete or stale, and partner commanders and sideboards are not supported. Oversized inventories and incomplete or invalid responses are rejected rather than silently trimmed or partially saved; narrow filters or increase Ollama's model context when needed.
 
-**Data sharing and credentials.** Requests send eligible card metadata/counts, the session conversation, and the current draft—including manually edited draft descriptions—to the chosen provider. They do not send storage locations, container names/IDs, saved private notes, or other users' collections. Source-deck context excludes its saved description and private notes. ChatGPT sends data to OpenAI and uses your Codex limits; an Ollama service may process data locally or remotely depending on its configuration.
+**Data sharing and credentials.** Requests send eligible card metadata/counts, the session conversation, and the current draft—including manually edited draft descriptions and strategies—to the chosen provider. They do not send storage locations, container names/IDs, saved private notes, or other users' collections. Source-deck context excludes its saved description and private notes. ChatGPT sends data to OpenAI and uses your Codex limits; an Ollama service may process data locally or remotely depending on its configuration.
 
 Connect only to a trusted Manafolio server. The official [Codex app-server](https://developers.openai.com/codex/app-server/) integration requires a Unix server, including Docker, and disables model access to host files, commands, and external tools. Credentials are separated per user under `<database-directory>/codex/<user-id>/`, but administrators can access them. **Disconnect** removes that user's local Codex data. Collection JSON backups exclude credentials; whole-volume backups include them and must be protected. AI endpoints require browser sessions rather than API keys.
 

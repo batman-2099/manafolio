@@ -10,6 +10,8 @@ export const COLLECTION_SORT_CRITERIA = {
   'price-desc': [{ by: 'price', dir: 'desc' }],
   'price-asc': [{ by: 'price', dir: 'asc' }],
   'set-asc': [{ by: 'set', dir: 'asc' }, { by: 'number', dir: 'asc' }],
+  'set-oldest': [{ by: 'set', dir: 'asc' }, { by: 'number', dir: 'asc' }],
+  'set-newest': [{ by: 'set', dir: 'desc' }, { by: 'number', dir: 'asc' }],
   'number-asc': [{ by: 'number', dir: 'asc' }, { by: 'name', dir: 'asc' }],
   'rarity-desc': [{ by: 'rarity', dir: 'desc' }, { by: 'name', dir: 'asc' }],
   'rarity-asc': [{ by: 'rarity', dir: 'asc' }, { by: 'name', dir: 'asc' }],

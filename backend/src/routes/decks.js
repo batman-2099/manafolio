@@ -374,12 +374,15 @@ router.put('/:id/editor', async (req, res) => {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return res.status(400).json({ error: 'A complete deck editor draft is required' });
   }
-  const { name, description, format, category, accent_color, target_size, inventory_type, cards, commander_card_id } = body;
+  const { name, description, notes, format, category, accent_color, target_size, inventory_type, cards, commander_card_id } = body;
   if (typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'Deck name is required' });
   }
   if ([description, format, category, accent_color].some(value => typeof value !== 'string')) {
     return res.status(400).json({ error: 'Deck description, format, category and accent_color must be strings' });
+  }
+  if (notes !== undefined && typeof notes !== 'string') {
+    return res.status(400).json({ error: 'Deck notes must be a string' });
   }
   if (!Number.isInteger(target_size) || target_size < 1 || target_size > 300) {
     return res.status(400).json({ error: 'target_size must be between 1 and 300' });
@@ -434,9 +437,9 @@ router.put('/:id/editor', async (req, res) => {
         }
       }
       await db.run(
-        `UPDATE decks SET name = ?, description = ?, format = ?, category = ?, accent_color = ?,
+        `UPDATE decks SET name = ?, description = ?, notes = COALESCE(?, notes), format = ?, category = ?, accent_color = ?,
           target_size = ?, inventory_type = ?, commander_card_id = ? WHERE id = ? AND user_id = ?`,
-        [name.trim(), description, format, category, accent_color, target_size, inventory_type, commander_card_id, id, req.user.id]
+        [name.trim(), description, notes ?? null, format, category, accent_color, target_size, inventory_type, commander_card_id, id, req.user.id]
       );
       if (deck.checked_out) {
         // Preserve the checked-out composition and its reservations, even if inventory has since changed.
@@ -564,7 +567,7 @@ router.post('/:id/duplicate', async (req, res) => {
   const { id } = req.params;
   try {
     const deck = await db.get(
-      `SELECT name, description, game, format, category, accent_color, target_size, inventory_type, commander_card_id, sleeved, card_back_color, card_back_image
+      `SELECT name, description, notes, game, format, category, accent_color, target_size, inventory_type, commander_card_id, sleeved, card_back_color, card_back_image
        FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`,
       [id, req.user.id]
     );
@@ -572,9 +575,9 @@ router.post('/:id/duplicate', async (req, res) => {
 
     const duplicateId = await db.withTransaction(async () => {
       const result = await db.run(
-        `INSERT INTO decks (name, description, game, format, category, accent_color, target_size, inventory_type, commander_card_id, sleeved, card_back_color, card_back_image, user_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [`${deck.name} (Copy)`, deck.description, deck.game, deck.format, deck.category, deck.accent_color, deck.target_size, deck.inventory_type, deck.commander_card_id, deck.sleeved, deck.card_back_color, deck.card_back_image, req.user.id]
+        `INSERT INTO decks (name, description, notes, game, format, category, accent_color, target_size, inventory_type, commander_card_id, sleeved, card_back_color, card_back_image, user_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [`${deck.name} (Copy)`, deck.description, deck.notes ?? '', deck.game, deck.format, deck.category, deck.accent_color, deck.target_size, deck.inventory_type, deck.commander_card_id, deck.sleeved, deck.card_back_color, deck.card_back_image, req.user.id]
       );
       await db.run(
         `INSERT INTO deck_cards (deck_id, card_id, quantity, source_entry_id)

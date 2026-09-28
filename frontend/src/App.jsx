@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from 'react';
-import { LayoutDashboard, Database, MapPin, Settings as SettingsIcon, LogOut, ShieldAlert, Plus, Swords, StickyNote, BookOpen, MoreHorizontal, X } from 'lucide-react';
+import { LayoutDashboard, Database, MapPin, Settings as SettingsIcon, LogOut, ShieldAlert, Plus, Swords, BookOpen, MoreHorizontal, X } from 'lucide-react';
 import Login from './components/Login';
 import Logo from './components/Logo';
 import { pushBackGuard } from './utils/useBackGuard';
@@ -18,7 +18,6 @@ const SetupWizard = lazy(() => import('./components/SetupWizard'));
 const SharedCollection = lazy(() => import('./components/SharedCollection'));
 const SharedContainer = lazy(() => import('./components/SharedContainer'));
 const DeckBuilder = lazy(() => import('./components/DeckBuilder'));
-const Notes = lazy(() => import('./components/Notes'));
 const HowTo = lazy(() => import('./components/HowTo'));
 
 class ErrorBoundary extends React.Component {
@@ -440,8 +439,6 @@ function App() {
         );
       case 'deckbuilder':
         return <DeckBuilder key={deckViewKey} showToast={showToast} navigationGuardRef={navigationGuardRef} />;
-      case 'notes':
-        return <Notes showToast={showToast} />;
       case 'howto':
         return <HowTo />;
       case 'settings':
@@ -512,7 +509,7 @@ function App() {
           <button
             ref={moreTriggerRef}
             type="button"
-            className={`nav-tab nav-more-trigger ${['deckbuilder', 'notes', 'howto', 'settings', 'admin'].includes(activeTab) ? 'active' : ''}`}
+            className={`nav-tab nav-more-trigger ${['deckbuilder', 'howto', 'settings', 'admin'].includes(activeTab) ? 'active' : ''}`}
             aria-expanded={moreOpen}
             aria-controls="nav-secondary"
             onClick={() => setMoreOpen(open => !open)}
@@ -531,15 +528,6 @@ function App() {
             >
               <Swords size={18} />
               <span>{t('nav.deckBuilder')}</span>
-            </button>
-
-            <button
-              className={`nav-tab ${activeTab === 'notes' ? 'active' : ''}`}
-              aria-current={activeTab === 'notes' ? 'page' : undefined}
-              onClick={() => goTab('notes')}
-            >
-              <StickyNote size={18} />
-              <span>{t('nav.notes')}</span>
             </button>
 
             <button

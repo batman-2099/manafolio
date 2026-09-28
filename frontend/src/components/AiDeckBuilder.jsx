@@ -205,7 +205,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
           inventory_type: inventoryType, format, target_size: targetSize, prompt: content, colors, sets,
           messages,
           current_draft: draft ? {
-            name: draft.name, description: draft.description, commander_card_id: draft.commander_card_id,
+            name: draft.name, description: draft.description, strategy: draft.strategy, commander_card_id: draft.commander_card_id,
             cards: draft.cards.map(({ card_id, quantity }) => ({ card_id, quantity })),
             inventory_type: inventoryType, format, target_size: targetSize,
           } : null,
@@ -223,7 +223,8 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
       });
       if (signal.aborted) return;
       if (typeof data.message !== 'string' || !data.message.trim() || data.message.length > 8000
-        || (data.draft !== null && (!data.draft || !Array.isArray(data.draft.cards)))) {
+        || (data.draft !== null && (!data.draft || !Array.isArray(data.draft.cards)
+          || typeof data.draft.strategy !== 'string' || !data.draft.strategy.trim() || data.draft.strategy.length > 8000))) {
         throw new Error(t('aiDeckLog.invalid'));
       }
       if (data.draft !== null) setDraft(data.draft);
@@ -253,7 +254,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
       const data = await request(replace ? `/${sourceDeck.id}` : '', {
         method: replace ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, signal,
         body: JSON.stringify({
-          name: draft.name, description: draft.description, inventory_type: inventoryType,
+          name: draft.name, description: draft.description, strategy: draft.strategy, inventory_type: inventoryType,
           include_checked_out: inventoryType === 'collection' && includeCheckedOut,
           ...(sourceDeck ? { source_deck_id: sourceDeck.id } : {}),
           format, target_size: targetSize, commander_card_id: isCommander ? draft.commander_card_id : null,
@@ -416,6 +417,11 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
             <div className="form-group">
               <label htmlFor="ai-description">{t('deck.descriptionOptional')}</label>
               <textarea id="ai-description" className="input-control" rows={3} maxLength={4000} value={draft.description} onChange={event => setDraft(current => ({ ...current, description: event.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label htmlFor="ai-strategy">{t('aiDeck.strategy')}</label>
+              <textarea id="ai-strategy" className="input-control" rows={8} maxLength={8000} aria-describedby="ai-strategy-hint" style={{ fontSize: '1rem', resize: 'vertical' }} value={draft.strategy} onChange={event => setDraft(current => ({ ...current, strategy: event.target.value }))} />
+              <p id="ai-strategy-hint" style={{ color: 'var(--text-secondary)' }}>{t(sourceDeck ? 'aiDeck.improveStrategyHint' : 'aiDeck.strategyHint')}</p>
             </div>
             {isCommander && (
               <div className="form-group">

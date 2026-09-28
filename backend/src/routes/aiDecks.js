@@ -214,9 +214,13 @@ const saveDeck = endpoint(async (req, res) => {
   try {
     const id = await db.withTransaction(async () => {
       const source = await sourceDeck(req.user.id, draft.source_deck_id, draft);
+      let notes = draft.strategy;
       if (replacementId !== undefined) {
-        const current = await db.get('SELECT checked_out FROM decks WHERE id = ? AND user_id = ?', [replacementId, req.user.id]);
+        const current = await db.get('SELECT checked_out, notes FROM decks WHERE id = ? AND user_id = ?', [replacementId, req.user.id]);
         if (current.checked_out) fail('Return this deck before replacing it with an AI draft. You can still save it as a new deck.', 409);
+        const existingNotes = current.notes || '';
+        notes = !draft.strategy || existingNotes.endsWith(draft.strategy)
+          ? existingNotes : existingNotes ? `${existingNotes}\n\n${draft.strategy}` : draft.strategy;
       }
       const selected = new Set(draft.cards.map(card => card.card_id));
       const cards = await cardRules((await inventory(req.user.id, draft.inventory_type, { ...draft, sourceDeck: source })).filter(card => selected.has(card.id)));
@@ -226,14 +230,14 @@ const saveDeck = endpoint(async (req, res) => {
       if (replacementId !== undefined) {
         saved = new Map((await db.all('SELECT card_id, checked_out, source_entry_id FROM deck_cards WHERE deck_id = ?', [deckId]))
           .map(card => [card.card_id, card]));
-        await db.run('UPDATE decks SET name = ?, description = ?, commander_card_id = ? WHERE id = ?',
-          [draft.name, draft.description, draft.commander_card_id, deckId]);
+        await db.run('UPDATE decks SET name = ?, description = ?, commander_card_id = ?, notes = ? WHERE id = ?',
+          [draft.name, draft.description, draft.commander_card_id, notes, deckId]);
         await db.run('DELETE FROM deck_cards WHERE deck_id = ?', [deckId]);
       } else {
         const created = await db.run(`INSERT INTO decks
-          (user_id, name, description, game, inventory_type, format, target_size, commander_card_id)
-          VALUES (?, ?, ?, 'mtg', ?, ?, ?, ?)`,
-        [req.user.id, draft.name, draft.description, draft.inventory_type, draft.format, draft.target_size, draft.commander_card_id]);
+          (user_id, name, description, notes, game, inventory_type, format, target_size, commander_card_id)
+          VALUES (?, ?, ?, ?, 'mtg', ?, ?, ?, ?)`,
+        [req.user.id, draft.name, draft.description, notes, draft.inventory_type, draft.format, draft.target_size, draft.commander_card_id]);
         deckId = created.lastID;
       }
       for (const card of draft.cards) {

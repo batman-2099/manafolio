@@ -307,7 +307,7 @@ Ollama uses the selected HTTP(S) address or `OLLAMA_BASE_URL`, defaults to serve
 
 Gemini and OpenRouter use fixed official API endpoints and per-user/provider keys stored in the users table. Browser-session-only credential endpoints never return keys; account JSON exports omit them, while SQLite/volume backups include them. Users explicitly select a model; hosted requests do not fall back to a different model/provider. Structured responses still pass the shared inventory and draft validation before review or saving.
 
-Requests contain eligible card metadata/counts, conversation, and the current draft. Keep storage identities, saved private notes, other users' records, and saved source-deck descriptions out of provider context. User-edited draft descriptions are part of the sent draft. Suggestions are limited by cached rule data and provider output quality; invalid/incomplete or oversized requests are rejected, not silently trimmed into a different deck. See [the AI workflow and security instructions](README.md#get-an-ai-deck-recommendation).
+Requests contain eligible card metadata/counts, conversation, and the current draft, including editable descriptions and strategies. Keep storage identities, saved private notes, other users' records, and saved source-deck descriptions out of provider context. Model drafts require a nonempty `strategy` of at most 8,000 characters. Saving a new draft writes strategy to `decks.notes`; replacement appends it transactionally without overwriting existing notes or repeating an identical suffix. Suggestions are limited by cached rule data and provider output quality; invalid/incomplete or oversized requests are rejected, not silently trimmed into a different deck. See [the AI workflow and security instructions](README.md#get-an-ai-deck-recommendation).
 
 ## Frontend and Arcane Blue
 
@@ -321,11 +321,13 @@ Requests contain eligible card metadata/counts, conversation, and the current dr
 | `CameraScanner` | Camera/detection/capture, verification, candidate review, add flow |
 | `CollectionList`, `CardInspectorModal`, `RelatedTokens` | Inventory views, bulk operations, copy metadata, token references |
 | `LocationManager`, `CompartmentView`, `CreateContainerModal`, `SortFilterBuilder` | Storage gallery/layout, filing, rules, capacity, covers, archives |
-| `DeckBuilder`, `CheckoutWizardModal`, `AiDeckBuilder` | Local deck draft, play/pull list, draw simulation, AI drafts |
+| `DeckBuilder`, `CheckoutWizardModal`, `AiDeckBuilder` | Local deck draft, private deck notes, play/pull list, draw simulation, AI drafts |
 | `Settings`, `CodexSettings`, `AdminPanel`, `CatalogPanel` | Preferences, AI connections, user administration, scan assets |
-| `SharedCollection`, `SharedContainer`, `Notes` | Public sharing and private notes |
+| `SharedCollection`, `SharedContainer` | Public sharing |
 
 Pricing, sorting, names/languages, printing/rarity, card options, and shuffling reuse the helpers in `frontend/src/utils/`. `I18nProvider` and locale JSON provide translations with English fallback; shared tables and geometry prevent client/server domain drift.
+
+Private deck notes use `decks.notes`, separate from `description`, and save with the existing atomic deck editor draft. Duplication and complete account backups preserve them; AI prompts and public shares exclude them. The additive migration retains standalone account notes, whose former navigation entry and UI have been removed.
 
 ### Styling contract
 

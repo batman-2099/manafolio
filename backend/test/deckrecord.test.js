@@ -32,8 +32,17 @@ async function testRecord() {
       description TEXT, checked_out INTEGER DEFAULT 0, checked_out_at DATETIME,
       game TEXT DEFAULT 'mtg', inventory_type TEXT DEFAULT 'collection', created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
-    const physical = (await db.run(`INSERT INTO decks (name, user_id, checked_out, checked_out_at) VALUES ('Physical', 1, 1, '2026-09-22')`)).lastID;
+    const physical = (await db.run(`INSERT INTO decks (name, description, user_id, checked_out, checked_out_at) VALUES ('Physical', 'Existing description', 1, 1, '2026-09-22')`)).lastID;
+    await db.run(`CREATE TABLE notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, title TEXT DEFAULT '', body TEXT DEFAULT '',
+      pinned INTEGER DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await db.run("INSERT INTO notes (user_id, title, body, pinned) VALUES (1, 'Legacy note', 'Keep this standalone note', 1)");
+    const standaloneNotes = await db.all('SELECT * FROM notes');
     await db.initDb();
+    assert.deepStrictEqual(await db.get('SELECT notes, description FROM decks WHERE id = ?', [physical]),
+      { notes: '', description: 'Existing description' }, 'upgrades add empty notes without repurposing description');
+    assert.deepStrictEqual(await db.all('SELECT * FROM notes'), standaloneNotes, 'migration preserves standalone notes unchanged');
     assert.deepStrictEqual(await counts(physical), { wins: 0, losses: 0 });
     assert.strictEqual((await db.get('SELECT sleeved FROM decks WHERE id = ?', [physical])).sleeved, 0, 'upgraded decks start unsleeved');
     assert.deepStrictEqual(await db.get('SELECT card_back_color, card_back_image FROM decks WHERE id = ?', [physical]),

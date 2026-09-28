@@ -62,7 +62,7 @@ Collection, storage, and deck management do not require AI. If you use the AI bu
 
 - Eligible card printing IDs, names, available quantities, and rules metadata.
 - Your requested inventory, format, target size, planning options, and color/set filters.
-- Your prompt, the current conversation, and the current draft, including a description you edited manually.
+- Your prompt, the current conversation, and the current draft, including its description and strategy, whether AI-generated or manually edited.
 - When improving a saved deck, its inventory/format/size, commander, and card list. The source deck's saved description and private notes are not included automatically.
 
 Container filtering is applied on the server. The generated payload excludes container names/IDs, storage locations, saved private notes, and other users' collections. Anything you type or paste into a prompt or draft is still sent: do not enter secrets or personal information you do not want the provider to process.

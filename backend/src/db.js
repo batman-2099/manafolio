@@ -305,6 +305,7 @@ async function initDb() {
       user_id INTEGER NOT NULL,
       name TEXT NOT NULL,
       description TEXT,
+      notes TEXT NOT NULL DEFAULT '',
       checked_out INTEGER DEFAULT 0,
       checked_out_at DATETIME,
       game TEXT DEFAULT 'mtg',
@@ -623,6 +624,9 @@ async function initDb() {
   }
 
   const decksCols = await all(`PRAGMA table_info(decks)`);
+  if (!decksCols.some(c => c.name === 'notes')) {
+    await run(`ALTER TABLE decks ADD COLUMN notes TEXT NOT NULL DEFAULT ''`);
+  }
   if (!decksCols.some(c => c.name === 'game')) {
     await run(`ALTER TABLE decks ADD COLUMN game TEXT DEFAULT 'mtg'`);
   }

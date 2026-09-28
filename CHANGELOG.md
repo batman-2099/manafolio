@@ -4,6 +4,10 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- AI deck generation and improvement now include editable deck-specific strategies that save to Notes. Improvements retain existing notes, and saved private notes remain excluded from AI requests.
+- Removed standalone Notes from main navigation and added private per-deck Notes below the deck stats, constrained to the stats column beside Customize card back, using the existing Save and unsaved-change protection. Deck duplication and complete backups retain notes; existing standalone notebook data is preserved.
+- Added a subtle hover sheen to foil cards in Collection gallery and list views. Touch devices, reduced-motion preferences, and selection mode retain a static finish.
+- Added Set (Newest to Oldest) and Set (Oldest to Newest) sorting in Collection, retaining ascending collector-number order within each set.
 - Added a container type selector to Container Settings, preserving existing cards and configured capacity rather than applying creation defaults.
 - Made storage capacity advisory: moves and filing keep cards in the chosen eligible container rather than rejecting, rerouting, or automatically expanding it when full. Containers and pages/rows display an Over limit warning that clears when usage returns within capacity. Stacking occupancy, filing restrictions, locks, and inventory boundaries are preserved.
 - Moved Graded Slab to the last option in Add Cards, after Scan.

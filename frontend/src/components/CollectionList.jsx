@@ -392,7 +392,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
           <Field label={t('collection.sortBy')} id="collection-sort">
             <select id="collection-sort" className="select-control" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-              {['added-newest', 'added-oldest', 'name-asc', 'name-desc', 'price-desc', 'price-asc', 'qty-desc', 'set-asc', 'number-asc', 'type-asc', 'rarity-desc', 'rarity-asc', 'language-asc', 'favorite-first']
+              {['added-newest', 'added-oldest', 'name-asc', 'name-desc', 'price-desc', 'price-asc', 'qty-desc', 'set-newest', 'set-oldest', 'number-asc', 'type-asc', 'rarity-desc', 'rarity-asc', 'language-asc', 'favorite-first']
                 .map(key => <option key={key} value={key}>{t(`collection.sort.${key}`)}</option>)}
             </select>
           </Field>
@@ -789,7 +789,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                   )}
                   <CardImage card={item} className="tcg-card-image" loading="lazy" draggable={false} />
                   {getFoilOverlayClass(item.printing) && (
-                    <span className={getFoilOverlayClass(item.printing)} style={{ borderRadius: 'var(--radius-sm)' }} />
+                    <span aria-hidden="true" className={`${getFoilOverlayClass(item.printing)} collection-foil-overlay`} style={{ borderRadius: 'var(--radius-sm)' }} />
                   )}
                   {item.quantity > 1 && (
                     <span className="tcg-card-quantity-tag">x{item.quantity}</span>
@@ -857,7 +857,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                         >
                           <CardImage card={item} className="collection-row-thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} draggable={false} />
                           {getFoilOverlayClass(item.printing) && (
-                            <span className={getFoilOverlayClass(item.printing)} style={{ borderRadius: '4px' }} />
+                            <span aria-hidden="true" className={`${getFoilOverlayClass(item.printing)} collection-foil-overlay`} style={{ borderRadius: '4px' }} />
                           )}
                         </button>
                         <div style={{ minWidth: 0, flex: 1 }}>

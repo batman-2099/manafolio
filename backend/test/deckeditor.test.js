@@ -55,14 +55,15 @@ async function testEditor() {
       return response.body;
     };
     const save = (body, deckId = id, user = 1) => request('PUT', `${deckId}/editor`, body, user);
+    assert.strictEqual((await reload()).notes, '', 'new decks start with empty private notes');
     const draft = {
-      name: '  After  ', description: 'Saved draft', format: 'Commander / EDH', category: 'Competitive',
+      name: '  After  ', description: 'Saved draft', notes: '  Sideboard plans\nKeep two answers — 私的  ', format: 'Commander / EDH', category: 'Competitive',
       accent_color: '#3b82f6', target_size: 100, inventory_type: 'collection', commander_card_id: 'added',
       cards: [{ card_id: 'first', quantity: 3, pulled: false }, { card_id: 'added', quantity: 1, pulled: true }]
     };
     assert.strictEqual((await save(draft)).status, 200);
     let saved = await reload();
-    for (const key of ['description', 'format', 'category', 'accent_color', 'target_size', 'inventory_type', 'commander_card_id']) {
+    for (const key of ['description', 'notes', 'format', 'category', 'accent_color', 'target_size', 'inventory_type', 'commander_card_id']) {
       assert.strictEqual(saved[key], draft[key]);
     }
     assert.strictEqual(saved.name, 'After');
@@ -77,9 +78,30 @@ async function testEditor() {
         (error, rows) => error ? reject(error) : resolve(rows)
       ));
       assert.deepStrictEqual(persisted, [{ card_id: 'added', quantity: 1, checked_out: 1 }, { card_id: 'first', quantity: 3, checked_out: 0 }]);
+      const persistedNotes = await new Promise((resolve, reject) => reader.get(
+        'SELECT notes, description FROM decks WHERE id = ?', [id],
+        (error, row) => error ? reject(error) : resolve(row)
+      ));
+      assert.deepStrictEqual(persistedNotes, { notes: draft.notes, description: draft.description });
     } finally {
       await new Promise((resolve, reject) => reader.close(error => error ? reject(error) : resolve()));
     }
+
+    const olderDraft = { ...draft };
+    delete olderDraft.notes;
+    assert.strictEqual((await save(olderDraft)).status, 200);
+    assert.deepStrictEqual(await reload(), saved, 'older editor payloads preserve saved notes');
+    assert.strictEqual((await request('PUT', id, { name: 'After', description: draft.description })).status, 200);
+    assert.strictEqual((await reload()).notes, draft.notes, 'legacy metadata updates preserve notes');
+    const duplicate = await request('POST', `${id}/duplicate`, {});
+    assert.strictEqual(duplicate.status, 201);
+    assert.strictEqual((await request('GET', duplicate.body.id)).body.notes, draft.notes);
+    assert.strictEqual((await save({ ...draft, notes: '' })).status, 200);
+    assert.strictEqual((await reload()).notes, '', 'an empty string explicitly clears notes');
+    assert.strictEqual((await reload()).description, draft.description, 'clearing notes leaves description unchanged');
+    assert.strictEqual((await request('GET', duplicate.body.id)).body.notes, draft.notes, 'a copy keeps independent notes');
+    assert.strictEqual((await save(draft)).status, 200);
+    saved = await reload();
 
     const invalidDrafts = [
       { cards: [...draft.cards, { card_id: 'alternate', quantity: 2, pulled: false }] },
@@ -91,10 +113,11 @@ async function testEditor() {
       ...[0, 'true', null].map(pulled => ({ cards: [{ card_id: 'first', quantity: 1, pulled }] })),
       { commander_card_id: 'removed' }, { commander_card_id: 12 }, { commander_card_id: undefined },
       { format: 'Modern' }, { name: ' ' }, { description: {} }, { target_size: 301 }, { target_size: '100' },
+      ...[null, 12, false, {}, []].map(notes => ({ notes })),
       { inventory_type: 'wishlist' }
     ];
     for (const invalid of invalidDrafts) {
-      const result = await save({ ...draft, name: 'Must roll back', ...invalid });
+      const result = await save({ ...draft, name: 'Must roll back', notes: 'Must roll back notes', ...invalid });
       assert.strictEqual(result.status, 400, JSON.stringify(invalid));
       assert.strictEqual(typeof result.body.error, 'string');
       assert.deepStrictEqual(await reload(), saved, 'failed save must preserve metadata, cards, pull flags and commander');
@@ -103,6 +126,8 @@ async function testEditor() {
     assert.strictEqual((await save(draft, foreignDeck)).status, 404);
     assert.strictEqual((await save(draft, legacyDeck)).status, 404);
     assert.strictEqual((await save(draft, 999999)).status, 404);
+    assert.strictEqual((await request('GET', id, undefined, 2)).status, 404, 'another account cannot read private notes');
+    assert.strictEqual((await request('POST', `${id}/duplicate`, {}, 2)).status, 404);
     assert.deepStrictEqual(await reload(), saved);
     assert.deepStrictEqual(await db.get('SELECT * FROM decks WHERE id = ?', [foreignDeck]), foreignBefore);
     assert.deepStrictEqual(await db.all('SELECT card_id, quantity FROM deck_cards WHERE deck_id = ?', [foreignDeck]), [{ card_id: 'foreign', quantity: 1 }]);
