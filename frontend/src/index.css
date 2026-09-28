@@ -1724,6 +1724,11 @@ button.collection-card-trigger {
   animation: spin 1s linear infinite;
 }
 
+.ai-waiting-icon { flex-shrink: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .ai-waiting-icon { animation: none; }
+}
+
 .toast {
   position: fixed;
   bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));

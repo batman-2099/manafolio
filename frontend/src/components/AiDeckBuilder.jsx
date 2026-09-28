@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, LoaderCircle, Sparkles, Trash2 } from 'lucide-react';
 import { useT } from '../utils/i18n';
 import { readProgressStream } from '../utils/importStream';
 import MultiSelectDropdown from './MultiSelectDropdown';
@@ -397,8 +397,8 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
             <textarea id="ai-prompt" className="input-control" rows={3} maxLength={4000} required={needsMessage} aria-describedby="ai-conversation-hint ai-prompt-limit" value={prompt} onChange={event => setPrompt(event.target.value)} placeholder={t(needsMessage ? 'aiDeck.followUpPlaceholder' : sourceDeck ? 'aiDeck.improvePromptPlaceholder' : 'aiDeck.promptPlaceholder')} />
             <p id="ai-prompt-limit" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.promptLimit')} ({prompt.length}/4000)</p>
           </div>
-          <button className="btn btn-primary" type="submit" disabled={!!busy || !account?.connected || inventoryLoading || !!inventoryError || conversationFull || (needsMessage && !prompt.trim())}>
-            <Sparkles size={16} /> {t(busy === 'generate' ? 'aiDeck.generating' : needsMessage || prompt.trim() ? 'aiDeck.send' : 'aiDeck.generate')}
+          <button className="btn btn-primary" type="submit" aria-busy={busy === 'generate'} disabled={!!busy || !account?.connected || inventoryLoading || !!inventoryError || conversationFull || (needsMessage && !prompt.trim())}>
+            {busy === 'generate' ? <LoaderCircle size={16} className="spin-animation ai-waiting-icon" aria-hidden="true" /> : <Sparkles size={16} aria-hidden="true" />} {t(busy === 'generate' ? 'aiDeck.generating' : needsMessage || prompt.trim() ? 'aiDeck.send' : 'aiDeck.generate')}
           </button>
           </section>
         </fieldset>
