@@ -149,10 +149,18 @@ async function main() {
       assert.strictEqual((await ai('PUT', '/preferences', { ...preferences, reasoning_effort: 'high' })).status, 400);
       assert.strictEqual((await ai('PUT', '/preferences', { ...preferences, model: 'missing' })).status, 400);
       assert.deepStrictEqual((await ai('PUT', '/preferences', preferences)).body, preferences);
-      const response = await ai('POST', '/suggest', settings);
+      const power_level = provider === 'gemini' ? 3 : 4;
+      const response = await ai('POST', '/suggest', { ...settings, deck_type: 'control', power_level });
       assert.strictEqual(response.status, 200);
       assert.deepStrictEqual(response.body.draft.cards, valid.draft.cards);
       assert.strictEqual(response.body.draft.strategy, valid.draft.strategy);
+      const providerPrompt = provider === 'gemini' ? calls.at(-1).body.contents[0].parts[0].text : calls.at(-1).body.messages[0].content;
+      assert.deepStrictEqual(JSON.parse(providerPrompt.split('\n').at(-1)).request.deck_type,
+        require('../../shared/aiDeckTypes.json').find(type => type.id === 'control'),
+        'hosted providers receive the canonical selected archetype through the common prompt');
+      assert.deepStrictEqual(JSON.parse(providerPrompt.split('\n').at(-1)).request.power_level,
+        require('../../shared/aiDeckPowerLevels.json').find(target => target.level === power_level),
+        'hosted providers receive the canonical power target through the common prompt');
       const complete = replies[provider];
       const wrap = provider === 'gemini' ? candidates : choices;
       replies[provider] = wrap({ ...valid, draft: { ...valid.draft, cards: [{ card_id: 'mtg-not-owned', quantity: 1 }] } });

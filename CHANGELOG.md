@@ -2,7 +2,12 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.1.2
+
+- Added set symbols to the AI Deck Builder Set filter options and single-set selection, retaining readable names when symbols are unavailable. Symbol lookup normalizes prefixed set metadata IDs against unprefixed inventory set codes without altering filter values.
+- Added a required, single-choice Deck type selector to AI Deck setup with Any plus all 16 archetypes, explanations, and play styles. Any lets the AI choose an archetype suited to the available cards and request. The validated choice accompanies generation, improvements, and follow-up requests to every AI provider; changing it clears the current draft and conversation.
+- Changed AI Deck Builder's Include checked-out cards checkbox to a keyboard-accessible toggle that turns green when enabled; planning and reservation behavior are unchanged.
+- Added a 1–5 target-power slider to AI Deck setup: Exhibition, Core, Upgraded, Optimized, and cEDH, with descriptions and pace guidance. The AI aims for the chosen level within available cards and format rules, explains limitations, and does not promise a rating or turn count.
 
 - Deck Builder now shows a red **Missing cards** status in grid and table views when required copies are unavailable, including archived copies in checked-out decks. Added a matching status filter; the ready filter excludes decks with unavailable copies.
 

@@ -697,7 +697,7 @@ ChatGPT uses your Codex access and usage limits. Gemini's free-tier data-use ter
 ### Ask questions and create a suggested deck
 
 1. Open **Deck Builder → AI Deck Builder**.
-2. In **Deck setup**, choose **Owned inventory**, **Format**, and **Target Size**.
+2. In **Deck setup**, choose **Owned inventory**, **Format**, **Target Size**, and one **Deck type**. Choose **Any** to let the AI select an archetype suited to your cards and request, or choose Aggro, Midrange, Control, Combo, Tempo, Ramp, Burn, Go-Wide / Tokens, Voltron, Reanimator, Sacrifice / Aristocrats, Tribal / Typal, Mill, Prison / Stax, Toolbox, or Spellslinger. Selecting a type displays its explanation and play style.
 3. In **Card pool & filters**, optionally select colors/sets and, for Physical inventory, **Containers**. Empty filters include all eligible cards. Missing Physical copies are excluded; Arena is separate.
 4. Leave **Include checked-out cards** off unless intentionally planning with reserved copies. Turning it on does not release or share reservations.
 5. Enter a **Question or deck request**, then select **Send message**. With no typed request, **Generate suggestion** requests a deck from the selected inventory/settings.
@@ -705,11 +705,23 @@ ChatGPT uses your Codex access and usage limits. Gemini's free-tier data-use ter
 7. Ask follow-up questions or request revisions. Questions leave the draft unchanged; requests for changes use your current manual edits.
 8. Select **Add Deck** only when you want to save the reviewed draft.
 
+**Target power level** under Deck setup defaults to **2 — Core**. Move the slider to choose:
+
+| Level | Name | Goal | Pace |
+| --- | --- | --- | --- |
+| 1 | Exhibition | Theme/fun first | Very casual, usually 9+ turns |
+| 2 | Core | Normal casual Commander | Straightforward, usually 8+ turns |
+| 3 | Upgraded | Strong casual | Optimized synergy, usually 6+ turns |
+| 4 | Optimized | Very high power | Fast, efficient, potentially ~turn 4 |
+| 5 | cEDH | Competitive Commander | Fully optimized; can end any turns |
+
+The chosen level accompanies generation, improvements, and follow-up requests. The AI aims for it using eligible owned cards and the selected format, explains gaps when the target cannot be supported, and must not invent cards or quantities. This is Commander-oriented qualitative guidance, not a certified rating or a guarantee about when a game will end; it does not change the selected format.
+
 The reviewed strategy is saved to the new deck's **Notes**. You can edit it before saving; a manually cleared strategy saves no strategy text.
 
 **Expected result:** a saved, unchecked-out deck after successful validation—not a collection mutation or automatic checkout. Until Add Deck, the conversation/draft is not a saved deck. Saving rechecks ownership, quantities, copy limits, and cached rules; a failed save does not partially replace account data.
 
-Changing inventory, format, target size, checked-out inclusion, or filters clears the conversation and draft. Leaving the builder clears the session conversation and cancels an active request. **Clear conversation, keep draft** is the explicit way to reset the conversation without discarding the current draft. Each request permits up to 4,000 characters; the session limit is 40 messages. The request log records progress, not private model reasoning.
+Changing inventory, format, target size, deck type, target power level, checked-out inclusion, or filters clears the conversation and draft. The selected deck type and power level accompany every request, including follow-up questions and improvements, but do not change a saved deck's inventory or category. Leaving the builder clears the session conversation and cancels an active request. **Clear conversation, keep draft** is the explicit way to reset the conversation without discarding the current draft. Each request permits up to 4,000 characters; the session limit is 40 messages. The request log records progress, not private model reasoning.
 
 If no eligible cards match, adjust filters or ask questions without generating a deck. For oversized requests, narrow the pool; Ollama may need a larger configured model context. Review every suggestion: cached rules may be missing or stale, and the AI is not a guarantee of tournament legality. Partner commanders and sideboards are not supported.
 
@@ -717,7 +729,7 @@ If no eligible cards match, adjust filters or ask questions without generating a
 
 1. Open the saved deck and save all local edits.
 2. Select **Improve with AI**.
-3. Ask for advice or describe changes. Inventory, format, and target size stay fixed for this workflow.
+3. Choose one **Deck type**, then ask for advice or describe changes. Inventory, format, and target size stay fixed for this workflow.
 4. Review/edit the returned draft and choose:
    - **Save Deck** to replace the original's name, description, cards, and commander while retaining its identity, results, and settings. The reviewed strategy is appended to existing Notes without overwriting them; an identical strategy already at the end is not repeated.
    - **Save as New Deck** to keep the original and create a separate unchecked-out deck with the reviewed strategy in its Notes.

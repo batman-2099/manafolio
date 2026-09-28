@@ -61,7 +61,7 @@ The application does not include an advertising or third-party tracking analytic
 Collection, storage, and deck management do not require AI. If you use the AI builder or **Improve with AI**, the chosen provider receives:
 
 - Eligible card printing IDs, names, available quantities, and rules metadata.
-- Your requested inventory, format, target size, planning options, and color/set filters.
+- Your requested inventory, format, target size, selected deck type and its explanation/play style, target power level and its description/pace, planning options, and color/set filters.
 - Your prompt, the current conversation, and the current draft, including its description and strategy, whether AI-generated or manually edited.
 - When improving a saved deck, its inventory/format/size, commander, and card list. The source deck's saved description and private notes are not included automatically.
 

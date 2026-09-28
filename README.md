@@ -218,7 +218,9 @@ AI is optional. In **Settings → AI preferences**, choose and save a provider a
 - **Gemini:** create an API key in [Google AI Studio](https://aistudio.google.com/apikey), select Gemini, save the key, then choose and save an available model. Free-tier quotas and availability depend on your account and model; Google's free-tier data-use terms apply.
 - **OpenRouter:** create an [OpenRouter API key](https://openrouter.ai/settings/keys), select OpenRouter, save the key, then choose and save a structured-output model. Free models are subject to availability and quotas; other models can charge your account. Manafolio does not switch to another model on failure.
 
-Open **Deck Builder → AI Deck Builder**, select inventory, format, and target size, then describe a deck or ask a question. Filter eligible cards by color, set, and, for Physical, containers. Missing physical copies are excluded. **Include checked-out cards** allows planning with reserved copies, not sharing or releasing their reservations.
+Open **Deck Builder → AI Deck Builder**, select inventory, format, and target size, then choose one **Deck type** under **Deck setup**. Its explanation and play style appear below the selector and accompany requests to your AI provider. Describe a deck or ask a question. Filter eligible cards by color, set, and, for Physical, containers. Missing physical copies are excluded. **Include checked-out cards** allows planning with reserved copies, not sharing or releasing their reservations.
+
+Set **Target power level** from **1 — Exhibition** through **5 — cEDH**; it defaults to **2 — Core**. These Commander-oriented descriptions are goals, not certified ratings or guaranteed turn counts. The AI tries to match the target within your owned cards and selected format and explains when the pool cannot support it.
 
 Discuss and edit the suggested draft, then explicitly choose **Add Deck**. Questions do not replace the draft. Conversation is session-only; leaving cancels an active request, and changing inventory or filters clears the draft and conversation. Request logs show progress, not private model reasoning.
 
