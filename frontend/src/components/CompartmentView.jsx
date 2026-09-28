@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Lock, Edit3 } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { getPrintingBadgeStyle, getPrintingBadgeLabel, getFoilOverlayClass } from '../utils/cardPrinting';
 import { getCardRarityBorder, getRarityBadgeLabel, getRarityBadgeStyle } from '../utils/cardRarity';
 import { priceText } from '../utils/formatPrice';
@@ -262,7 +262,6 @@ export default function CompartmentView({
   allowStacking = false,
   sortOrder = 'custom',
   setsList = [],
-  highlightPositions = [], // Array of positions to highlight (1-indexed)
   highlightEntryIds = [], // Cards to highlight by entry_id (exact, packing-independent)
   targetActiveIndex = null,
   onCardClick = null,
@@ -275,7 +274,6 @@ export default function CompartmentView({
   hideFocusedCardInfo = false,
 
   // Storage Management Props (can be omitted for read-only view)
-  hideHeader = false,
   onRename = null,
   onSetCapacity = null,
   onRemove = null,
@@ -363,10 +361,6 @@ export default function CompartmentView({
   const slotCountBox = Math.max(compartment?.capacity || 1, cardsWithGhost.length);
   const filledCardsBox = Array.from({ length: slotCountBox }, (_, i) => cardsWithGhost[i] || null);
   
-  const initialActiveIndex = highlightPositions.length > 0 
-    ? Math.max(0, highlightPositions[0] - 1) 
-    : 0;
-    
   const [coverflowActiveIndex, setCoverflowActiveIndex] = useState(0);
   const lastTargetActiveRef = useRef(null);
   const totalCardsRef = useRef(0);
@@ -618,8 +612,7 @@ export default function CompartmentView({
               }
 
               const categoryStart = newDividers.length > 0;
-              const isHighlighted = highlightPositions.includes(pos);
-              const isTarget = isHighlighted || (card && !card.__ghost && highlightSet.has(card.entry_id));
+              const isTarget = card && !card.__ghost && highlightSet.has(card.entry_id);
 
               if (card && card.__ghost) {
                 return (
@@ -764,11 +757,10 @@ export default function CompartmentView({
       }
     }
     
-    const highestTargetIdx = highlightPositions.length > 0 ? Math.max(...highlightPositions) - 1 : -1;
     // While arranging, expose one trailing empty slot so a picked card can be
     // dropped at the end of the row (not just inserted before an existing card).
     const arrangePad = placementMode && pickedEntryId ? 1 : 0;
-    const renderLimit = Math.min(slotCountBox - 1, Math.max(lastFilledIdx, highestTargetIdx) + arrangePad);
+    const renderLimit = Math.min(slotCountBox - 1, lastFilledIdx + arrangePad);
 
     let currentCats = [];
     for (let i = 0; i <= renderLimit; i++) {
@@ -841,16 +833,6 @@ export default function CompartmentView({
       }
     }
     
-    // Also fix initialization on first render if targetActiveIndex wasn't provided
-    if (actualActiveIndex === 0 && initialActiveIndex > 0 && (targetActiveIndex === null || targetActiveIndex === undefined)) {
-      const targetIdx = renderedCards.findIndex(c => c.__slotNumber === initialActiveIndex + 1 && !c.__divider);
-      if (targetIdx !== -1 && actualActiveIndex !== targetIdx && lastTargetActiveRef.current !== 'init') {
-        lastTargetActiveRef.current = 'init';
-        actualActiveIndex = targetIdx;
-        setTimeout(() => setCoverflowActiveIndex(targetIdx), 0);
-      }
-    }
-
     const activeCardIndex = Math.min(actualActiveIndex, Math.max(0, renderedCards.length - 1));
     // ponytail: coverflow renders every slot's card div for nav/positioning, but
     // only load the image for cards near the active one — the rest are rotated
@@ -860,45 +842,6 @@ export default function CompartmentView({
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%', overflow: 'hidden' }}>
-        {!hideHeader && onRename && (
-          <div className="row-flash" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(0,0,0,0.1)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap' }}>
-            {editingLabel ? (
-              <input
-                autoFocus
-                className="input-control"
-                value={labelDraft}
-                onChange={(e) => setLabelDraft(e.target.value)}
-                onBlur={() => { if (editingLabel) { setEditingLabel(false); onRename(labelDraft); } }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { setEditingLabel(false); onRename(labelDraft); }
-                  else if (e.key === 'Escape') setEditingLabel(false);
-                }}
-                style={{ padding: '0.15rem 0.4rem', fontSize: '0.8rem', width: '150px' }}
-              />
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <strong onDoubleClick={() => { setLabelDraft(compartment.label || ''); setEditingLabel(true); }} title={t('compartment.renameHint')} style={{ cursor: 'pointer', fontSize: '0.85rem' }}>
-                  {compartment.display_label}
-                </strong>
-                <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => { setLabelDraft(compartment.label || ''); setEditingLabel(true); }} style={{ padding: 0, width: '20px', height: '20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} title={t('compartment.renamePageRow')}>
-                  <Edit3 size={11} />
-                </button>
-              </div>
-            )}
-            {onEditRules && (
-              <button type="button" className="btn btn-secondary" onClick={() => onEditRules(compartment)} title={t('compartment.acceptsHintRow')} style={{ fontSize: '0.6rem', padding: '0.2rem 0.5rem', marginLeft: 'auto', ...(compRuleCount > 0 ? { borderColor: 'var(--accent-red)', color: 'var(--text-strong)' } : {}) }}>
-                {acceptsLabel}
-              </button>
-            )}
-
-            {onToggleLock && (
-              <button type="button" className="btn btn-secondary" onClick={onToggleLock} disabled={containerLocked} title={t(containerLocked ? 'compartment.lockContainerRow' : compartment.locked ? 'compartment.lockedHintRow' : 'compartment.lockHintRow')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.6rem', padding: '0.2rem 0.5rem', opacity: containerLocked ? 0.5 : 1, ...((compartment.locked || containerLocked) ? { borderColor: 'var(--accent-yellow)', color: 'var(--accent-yellow)' } : {}) }}>
-                <Lock size={12} /> {t(compartment.locked ? 'compartment.locked' : 'compartment.lock')}
-              </button>
-            )}
-          </div>
-        )}
-
         {renderedCards.length === 0 ? (
           <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.8rem' }}>
             {t('compartment.emptyRow')}
@@ -949,7 +892,7 @@ export default function CompartmentView({
                 }
                 
                 const pos = card.__slotNumber;
-                const isTarget = highlightPositions.includes(pos) || (!card.__divider && !card.__empty && !card.__ghost && highlightSet.has(card.entry_id));
+                const isTarget = !card.__divider && !card.__empty && !card.__ghost && highlightSet.has(card.entry_id);
                 
                 const highlightStyle = isTarget ? { 
                   border: '2px solid var(--accent-green)', 

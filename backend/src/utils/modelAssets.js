@@ -25,6 +25,7 @@
 // cvScan.hasLocal.
 const fs = require('fs');
 const path = require('path');
+const { pipeline } = require('node:stream/promises');
 
 const MODEL_DIR = process.env.CV_MODEL_DIR || path.join(__dirname, '..', '..', 'data', 'models');
 const HF = 'https://huggingface.co';
@@ -83,27 +84,25 @@ function status() {
 
 // Stream to a temp file and rename, so an interrupted download cannot leave a
 // half file that the size check above would have to catch later.
-async function fetchAsset(a, onProgress) {
+async function fetchAsset(a, onProgress, { timeoutMs = 900000 } = {}) {
   const dest = assetPath(a);
-  if (isPresent(a)) return 'present';
   fs.mkdirSync(MODEL_DIR, { recursive: true });
   const res = await fetch(`${HF}/${a.repo}/resolve/main/${a.file}`, {
     headers: { 'User-Agent': 'Mozilla/5.0' },
-    redirect: 'follow', signal: AbortSignal.timeout(900000),
+    redirect: 'follow', signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${a.name}`);
   const tmp = `${dest}.tmp`;
-  const out = fs.createWriteStream(tmp);
   let got = 0;
   try {
-    for await (const chunk of res.body) {
-      got += chunk.length;
-      if (!out.write(chunk)) await new Promise(r => out.once('drain', r));
-      onProgress?.(got);
-    }
-    await new Promise((resolve, reject) => out.end(err => err ? reject(err) : resolve()));
+    await pipeline(res.body, async function* (chunks) {
+      for await (const chunk of chunks) {
+        got += chunk.length;
+        yield chunk;
+        onProgress?.(got);
+      }
+    }, fs.createWriteStream(tmp));
   } catch (e) {
-    out.destroy();
     fs.rmSync(tmp, { force: true });
     throw e;
   }
@@ -135,7 +134,8 @@ function start(what) {
     try {
       for (const a of wanted) {
         job.name = a.name;
-        const result = await fetchAsset(a, (got) => { job.done = base + got; });
+        const result = isPresent(a) ? 'present'
+          : await fetchAsset(a, (got) => { job.done = base + got; });
         if (result === 'fetched') fetched++;
         base += a.bytes;
         job.done = base;
@@ -159,4 +159,4 @@ function start(what) {
   return state();
 }
 
-module.exports = { MODELS, CATALOGS, LICENSE, MODEL_DIR, status, start, state, lastResult, isPresent };
+module.exports = { MODELS, CATALOGS, LICENSE, MODEL_DIR, status, start, state, lastResult, isPresent, fetchAsset };

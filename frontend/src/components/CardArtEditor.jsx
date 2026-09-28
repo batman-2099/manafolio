@@ -4,27 +4,6 @@ import { artUrl, noteArtChanged, useCardArtIndex } from '../utils/cardArt';
 import { getRepoUrl, issueUrl } from '../utils/repo';
 import { useT } from '../utils/i18n';
 
-// INCOMPLETE — not mounted anywhere, and not ready to be.
-//
-// ponytail: unfinished feature, no call site. To finish it: add the fourteen art.*
-// keys to frontend/src/locales/en.json (art.add, art.replace, art.remove,
-// art.contribute, art.saved, art.removed, art.tooLarge, art.notAnImage,
-// art.saveFailed, art.removeFailed, art.shareFailed, art.issueIntro,
-// art.issueAttach, art.issueRights), then render this in CardInspectorModal's
-// image column where the comment marks the spot.
-//
-// Why it is not mounted: NONE of those keys exist in any locale file, and
-// translate() falls back to the key itself (see utils/translate.js) — so every
-// control here renders its own key as its label: a button reading "art.add".
-// CHANGELOG 1.7.0 lists "per-card art overrides" as shipped, which is true of the
-// backend (POST/DELETE /api/card-art) and of DISPLAY (CardImage prefers
-// contributed art over provider art everywhere, inspector included). It is the
-// upload UI that never landed.
-//
-// Everything else here is done and was checked against the live endpoints: the
-// global fetch interceptor in App.jsx supplies the Bearer token, so the POST and
-// DELETE authenticate without this component doing anything.
-//
 // The controls under the inspector's card image for supplying art the upstream
 // APIs do not have, and for passing that art back so everyone else gets it too.
 //

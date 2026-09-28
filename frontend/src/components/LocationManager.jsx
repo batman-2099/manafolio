@@ -365,8 +365,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         if (compIdx !== -1) setActivePageIndex(compIdx);
       } else {
         setActiveCompartmentId(rec.compartment_id);
-        const posIdx = Math.floor(rec.position / 1000) - 1;
-        setCoverflowActiveIndex(Math.max(0, posIdx));
       }
       
       let attempts = 0;
@@ -391,7 +389,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const focusNavRef = useRef(null); // focusEntryId already navigated to (run-once guard)
 
   const [activeCompartmentId, setActiveCompartmentId] = useState(null);
-  const [, setCoverflowActiveIndex] = useState(0); // value unused; setter drives filing-snap resets
 
   const handleTouchStart = (e) => {
     if (!e.changedTouches || !e.changedTouches[0]) return;
@@ -427,7 +424,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     setActivePageIndex(0);
     setBinderActiveEntryId(null);
     if (!filingReadOnly) setFilingQueue([]);
-    setCoverflowActiveIndex(0);
     storage.exitSelectMode();
     setMoveMode(false);
     setPickedEntryId(null);
@@ -444,10 +440,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       setActiveCompartmentId(null);
     }
   }, [compartments, activeCompartmentId]);
-
-  useEffect(() => {
-    setCoverflowActiveIndex(0);
-  }, [activeCompartmentId]);
 
   useEffect(() => {
     if (activePageIndex >= compartments.length && compartments.length > 0) {
@@ -1037,19 +1029,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     handlePlaceSlot(pocket.compartmentId, pocket.slot, pocket.occupantEntryId, active.id);
   };
 
-  const handleDeleteCard = async (entryId) => {
-    if (selectedLoc?.locked) {
-      showToast(t('loc.lockedDeleteCards'), 'error');
-      return;
-    }
-    if (!window.confirm(t('loc.confirmRemoveCard'))) return;
-    try {
-      const res = await fetch(`/api/collection/${entryId}`, { method: 'DELETE' });
-      if (res.ok) { showToast(t('loc.cardRemoved'), 'success'); await refreshAll(); onUpdate(); }
-      else showToast(t('loc.errRemoveCard'), 'error');
-    } catch (err) { console.error(err); showToast(t('loc.errRemoveCardGeneric'), 'error'); }
-  };
-
   // Cards physically in the open container (any compartment).
   const cardsInActiveLocation = useMemo(
     () => allCards.filter(c => c.location_id === activeLocationId),
@@ -1104,6 +1083,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   }, [containerListCards, stackContainerCards, stackContainerByCondition, stackContainerByPrinting]);
 
   const displayContainerListCards = storage.selectMode ? containerListCards : processedContainerListCards;
+  const selectableContainerCards = containerViewMode === 'list' ? containerListCards : cardsInActiveLocation;
 
   const containerListSections = useMemo(() => {
     const field = CONTAINER_LIST_SORTS[containerSortBy]?.[0]?.by;
@@ -1899,7 +1879,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         {storage.selectMode && (
           <div className="glass-panel" style={{ padding: '0.6rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', background: 'rgba(255,71,71,0.08)' }}>
             <span style={{ fontWeight: 800, color: 'var(--text-strong)', fontSize: '0.8rem' }}>{storage.selectedIds.size} selected</span>
-            <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set(cardsInActiveLocation.map(c => c.entry_id)))}>Select all ({cardsInActiveLocation.length})</button>
+            <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set(selectableContainerCards.map(c => c.entry_id)))}>Select all ({selectableContainerCards.length})</button>
             <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set())}>{t('bulk.clear')}</button>
             <div style={{ width: '1px', height: '20px', background: 'var(--border-glass)' }} />
             {!isArchive && (
@@ -2173,7 +2153,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   onToggleLock: () => handleToggleCompartmentLock(c.id, !c.locked),
                   containerLocked: !!selectedLoc.locked,
                   onCardClick: setInspectorCard,
-                  onDeleteCard: handleDeleteCard,
                   onMoveCard: handleMoveCard,
                   recommendedSpot: currentRecSpot && currentRecSpot.compartment_id === c.id ? {
                     index: Math.floor(currentRecSpot.position / 1000) - 1,
@@ -2340,20 +2319,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     </div>
                     
                     <CompartmentView 
-                      hideHeader={true}
                       compartment={activeComp}
                       cards={cardsByCompartment.get(activeComp.id) || []}
                       locationType={selectedLoc.type}
                       sortOrder={selectedLoc.sort_order}
                       setsList={setsList}
                       moveTargets={compartments}
-                      onRename={(label) => handleRenameCompartment(activeComp.id, label)}
-                      onSetCapacity={(cap, input) => handleSetCapacity(activeComp.id, cap, false, input)}
-                      onRemove={() => handleRemoveCompartment(activeComp.id)}
-                      onToggleLock={() => handleToggleCompartmentLock(activeComp.id, !activeComp.locked)}
-                      containerLocked={!!selectedLoc.locked}
                       onCardClick={setInspectorCard}
-                      onDeleteCard={handleDeleteCard}
                       onMoveCard={handleMoveCard}
                       recommendedSpot={currentRecSpot && currentRecSpot.compartment_id === activeComp.id ? {
                         index: Math.floor(currentRecSpot.position / 1000) - 1,
@@ -2364,12 +2336,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       } : null}
                       focusEntryId={focusEntryId}
                       targetActiveIndex={currentRecSpot && currentRecSpot.compartment_id === activeComp.id ? Math.floor(currentRecSpot.position / 1000) - 1 : null}
-                      canRemove={compartments.length > 1 && (cardsByCompartment.get(activeComp.id) || []).length === 0}
                       selectMode={storage.selectMode}
                       selectedIds={storage.selectedIds}
                       onCardLongPress={storage.arm}
                       onCardToggle={storage.toggleSelect}
-                      onEditRules={openCompartmentRules}
                       placementMode={moveMode}
                       pickedEntryId={pickedEntryId}
                       onPickCard={handlePickCard}

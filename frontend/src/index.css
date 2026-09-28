@@ -2353,42 +2353,7 @@ button.collection-card-trigger {
 }
 
 
-/* Custom Row Selection and Coverflow Styles for Storage Box */
-.row-selection-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.row-tab-btn {
-  background: var(--bg-glass);
-  border: 1px solid var(--border-glass);
-  color: var(--text-secondary);
-  padding: 0.4rem 0.85rem;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 600;
-  transition: var(--transition-smooth);
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.row-tab-btn:hover {
-  background: var(--surface-2);
-  border-color: var(--border-glass-hover);
-  color: var(--text-strong);
-}
-
-.row-tab-btn.active {
-  background: rgba(255, 71, 71, 0.15);
-  border-color: var(--accent-red);
-  color: var(--text-strong);
-  box-shadow: 0 0 10px rgba(255, 71, 71, 0.2);
-}
-
+/* Coverflow Styles for Storage Box */
 .box-coverflow-container {
   position: relative;
   width: 100%;
@@ -2537,18 +2502,6 @@ button.collection-card-trigger {
   }
   main {
     margin-top: 0.25rem !important;
-  }
-}
-
-.back-btn-mobile {
-  display: none;
-}
-
-@media (max-width: 768px) {
-  .back-btn-mobile {
-    display: inline-flex !important;
-    align-items: center;
-    gap: 0.25rem;
   }
 }
 

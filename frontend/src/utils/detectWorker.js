@@ -28,7 +28,7 @@
 //   'onnxruntime-web/wasm'    the CPU backend alone, which is all this can reach.
 import * as ort from 'onnxruntime-web/wasm';
 import { sharpness } from './sharpness.js';
-import { createDetector } from '../../../shared/cardDetectPure.mjs';
+import { detectCard } from '../../../shared/cardDetectPure.mjs';
 import { orderQuad } from '../../../shared/imgproc.mjs';
 
 // Served by the backend from data/models. Single-threaded: multi-threaded wasm
@@ -64,7 +64,6 @@ function quadArea(q) {
 // turned auto-scan into a shutter that photographed empty desks. Fall back to the
 // contour detector that shipped before this: worse corners, but a real answer.
 let sessionPromise = null;
-let fallback = null;
 // Which execution provider actually bound, reported with every detection.
 let engine = 'cornelius';
 
@@ -96,18 +95,10 @@ async function getSession() {
   return sessionPromise;
 }
 
-function getFallback() {
-  if (!fallback) {
-    fallback = createDetector();
-  }
-  return fallback;
-}
-
 // The contour detector, in the shape this worker returns. `fill` stays the
 // quad's area fraction so the caller's gate means the same thing either way.
 function detectWithFallback(rgba, w, h, seq, why) {
-  const det = getFallback();
-  const card = det.detectCard(rgba, w, h);
+  const card = detectCard(rgba, w, h);
   if (!card) return { seq, detected: false, engine: 'contour', degraded: why };
   const quad = card.quad.map(p => ({ x: p.x / w, y: p.y / h }));
   return {

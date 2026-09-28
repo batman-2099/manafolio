@@ -4,6 +4,8 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Container list Select all now selects only cards matching the active search and filters, with a matching count; physical-layout selection remains container-wide.
+- Removed unreachable storage headers, unused highlighting/callback/state paths, orphaned styles, and stale art-editor comments. The contour detector now exports its stateless function directly, and model downloads share one streaming installer while retaining CLI upgrade checks and separate CLI/admin deadlines.
 - Stabilized Collection filter layout when Grading, Mana Value, or other option menus introduce a scrollbar.
 - AI deck generation and improvement now include editable deck-specific strategies that save to Notes. Improvements retain existing notes, and saved private notes remain excluded from AI requests.
 - Removed standalone Notes from main navigation and added private per-deck Notes below the deck stats, constrained to the stats column beside Customize card back, using the existing Save and unsaved-change protection. Deck duplication and complete backups retain notes; existing standalone notebook data is preserved.
