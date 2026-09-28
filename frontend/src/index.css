@@ -407,6 +407,17 @@ button, input, select, textarea {
   align-items: end;
 }
 .ci-storage-link[role="button"]:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
+.dashboard-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.dashboard-page .dashboard-timeline {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-glass);
+  border-radius: min(var(--radius-md), 12px);
+  padding: var(--space-6);
+}
+.dashboard-page .dashboard-details { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8); }
+.dashboard-page .dashboard-subsection { margin-top: 0; }
+.dashboard-page .dashboard-analytics-grid { gap: var(--space-8); }
+.dashboard-page .dashboard-filters { flex-wrap: wrap; }
 .dashboard-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -463,8 +474,12 @@ button, input, select, textarea {
   }
 }
 @media (max-width: 480px) {
-  .dashboard-summary { padding: var(--space-4); }
-  .dashboard-summary-primary, .dashboard-summary-secondary { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-summary { padding: var(--space-4); gap: var(--space-4); }
+  .dashboard-summary-primary, .dashboard-summary-secondary { gap: var(--space-4); }
+  .dashboard-summary-secondary { padding-block-start: var(--space-4); }
+  .dashboard-summary-value { font-size: 1.75rem; }
+  .dashboard-summary-secondary .dashboard-summary-value { font-size: 1.375rem; }
+  .dashboard-page .dashboard-timeline { padding: var(--space-4); }
 }
 .dashboard-timeline-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .sub-nav-tabs.dashboard-periods { display: flex; gap: var(--space-1); width: auto; max-width: 100%; }
@@ -481,7 +496,39 @@ button, input, select, textarea {
 .dashboard-page h3.section-heading { font-size: 1.0625rem; }
 .dashboard-data > summary, .dashboard-methodology > summary { min-height: 44px; align-content: center; cursor: pointer; color: var(--text-primary); }
 .dashboard-data th, .dashboard-data td { overflow-wrap: anywhere; }
-.dashboard-card-row { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--border-glass); border-radius: 0; color: inherit; font: inherit; text-align: left; }
+.dashboard-card-list { display: grid; }
+.dashboard-card-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2);
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border-glass);
+  border-radius: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.dashboard-card-row:hover { background: var(--surface-2); }
+.dashboard-card-row:last-child { border-bottom: 0; }
+.dashboard-card-description { min-width: 0; }
+.dashboard-card-name { font-size: 1rem; font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
+.dashboard-card-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); color: var(--text-secondary); font-size: 0.875rem; line-height: 1.5; }
+.dashboard-card-price { text-align: right; font-variant-numeric: tabular-nums; }
+.dashboard-card-price .dashboard-card-meta { justify-content: flex-end; }
+.dashboard-card-amount { color: var(--text-strong); font-size: 1rem; font-weight: 600; }
+.dashboard-card-amount > span { color: var(--text-secondary); font-size: 0.875rem; font-weight: 400; }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-card-row { transition: none; }
+}
+@media (max-width: 1023px) {
+  .dashboard-page .dashboard-details { grid-template-columns: minmax(0, 1fr); }
+}
 .deck-overview-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .deck-overview-actions .btn { font-size: 0.875rem; padding: 0.5rem; min-height: 44px; }
 .deck-overview-actions .btn-icon-only { min-width: 44px; }
@@ -2622,14 +2669,13 @@ button.collection-card-trigger {
   .dashboard-page .dashboard-donut { height: 300px !important; }
   .dashboard-donut .recharts-legend-wrapper { height: auto !important; }
   .dashboard-page .dashboard-card-clickable {
-    display: grid !important;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 0.35rem 0.75rem !important;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: var(--space-1) var(--space-3);
   }
   .dashboard-card-clickable > :first-child { grid-row: span 2; }
   .dashboard-card-description { min-width: 0; }
-  .dashboard-page .dashboard-card-description > :first-child { white-space: normal !important; overflow-wrap: anywhere; }
-  .dashboard-page .dashboard-card-price { grid-column: 2; text-align: left !important; }
+  .dashboard-page .dashboard-card-price { grid-column: 2; text-align: left; }
+  .dashboard-card-price .dashboard-card-meta { justify-content: flex-start; }
   .dashboard-page .set-progress-header { flex-wrap: wrap; gap: 0.25rem 0.75rem; }
 
   .deck-overview { min-width: 0; }

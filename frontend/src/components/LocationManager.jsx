@@ -1770,7 +1770,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   style={{ borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.35rem', width: '28px', height: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                   title={t('loc.gridView')}
                 >
-                  <LayoutGrid size={13} />
+                  <List size={13} />
                 </button>
                 <button
                   type="button"
@@ -1779,7 +1779,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   style={{ borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.35rem', width: '28px', height: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                   title={t('loc.detailView')}
                 >
-                  <List size={13} />
+                  <LayoutGrid size={13} />
                 </button>
               </div>
             )}

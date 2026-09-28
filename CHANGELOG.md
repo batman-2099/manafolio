@@ -10,6 +10,8 @@ Release history starts with Manafolio 2.0.
 - Added None/Single/Double/Triple sleeve settings to container creation, settings, and detail displays. Values persist with non-destructive migration and complete backups; capacity and card placement are unchanged.
 - Removed unused container-carousel/sidebar styles and consolidated unsorted-card rendering, scanner corner ordering, set-cache processing, and marketplace CSV mapping. Existing layouts, scanner safeguards, scannable-face counts, and format-specific collector-number precedence are preserved.
 - Deck Builder's Card Type sort now orders cards alphabetically by displayed name within each type, in both list and grid views.
+- Swapped the list and grid icons in the container view toolbar without changing view behavior or Unsorted controls.
+- Refined the dashboard with a compact two-column mobile summary, direct Collection/Add Cards actions, recent cards ahead of detailed analytics, quieter theme-aware surfaces, and readable card metadata. Inventory calculations, charts, and card inspection are unchanged.
 
 ## 2.1.0
 

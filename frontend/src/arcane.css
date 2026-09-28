@@ -164,7 +164,7 @@
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .box-coverflow-nav:hover { background: var(--arcane-active-bg, #23415e); }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .view-transition { animation: none; }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .form-group label { text-transform: none; letter-spacing: 0; }
-:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) :is(.dashboard-timeline, .dashboard-analytics, .login-form) {
+:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .login-form {
   background: linear-gradient(145deg, var(--arcane-dashboard-start, rgba(30, 53, 81, 0.94)), var(--arcane-dashboard-end, rgba(14, 27, 46, 0.96)));
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-lg);

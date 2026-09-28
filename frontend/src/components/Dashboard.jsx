@@ -100,6 +100,10 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
     <>
       <header className="page-heading">
         <h1 className="page-title">{t('nav.dashboard')}</h1>
+        <div className="dashboard-actions">
+          <button type="button" className="btn btn-secondary" onClick={() => onNavigate('collection')}>{t('nav.collection')}</button>
+          <button type="button" className="btn btn-primary" onClick={() => onNavigate('add-cards')}>{t('nav.addCards')}</button>
+        </div>
       </header>
       <div className="view-toolbar">
       <div className="sub-nav-tabs dashboard-filters" style={{ margin: 0 }}>
@@ -281,9 +285,106 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
 
       <section className="dashboard-analytics view-section" aria-labelledby="dashboard-analytics-title">
         <h2 id="dashboard-analytics-title" className="section-heading">{t('dash.analytics')}</h2>
-        <DashboardAnalytics analytics={stats.analytics} inventory={inventoryFilter} />
         <div className="dashboard-details">
-        {/* Left Column: Charts */}
+        {/* Card activity and set completion */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* Recent Additions */}
+          {recentAdditions.length > 0 && (
+            <div className="dashboard-subsection view-section">
+              <h3 className="section-heading">
+                {t(isArchive ? 'dash.archiveRecentAdditions' : 'dash.recentAdditions')}
+              </h3>
+              <div className="dashboard-card-list">
+                {recentAdditions.map((card, idx) => (
+                  <button
+                    type="button" key={idx}
+                    onClick={() => setInspectorCard(card)}
+                    className="dashboard-card-clickable dashboard-card-row"
+                  >
+                    <CardImage card={card} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px' }} />
+                    <div className="dashboard-card-description">
+                      <div className="dashboard-card-name">
+                        {getCardDisplayName(card.name, card.printed_name)}
+                      </div>
+                      <div className="dashboard-card-meta">
+                        <span>{card.set_name} • #{card.number}</span>
+                        {card.printing && card.printing !== 'Normal' && (
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, padding: '1px 4px', borderRadius: '3px', flexShrink: 0, ...getPrintingBadgeStyle(card.printing) }}>
+                            {getPrintingBadgeLabel(card.printing)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="dashboard-card-price">
+                      <div className="dashboard-card-amount">{priceText(card.price_trend)}<span> {t('dash.each')}</span></div>
+                      <div className="dashboard-card-meta">{card.quantity > 1 ? t('dash.qty', { qty: card.quantity }) : (card.added_at ? new Date(card.added_at).toLocaleDateString(locale) : '')}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Top Valuable Cards */}
+          <div className="dashboard-subsection view-section">
+            <h3 className="section-heading">
+              {t(isArchive ? 'dash.archiveTopValuable' : 'dash.topValuable')}
+            </h3>
+            <div className="dashboard-card-list">
+              {topValuable.map((card, idx) => (
+                <button
+                  type="button" key={idx}
+                  onClick={() => setInspectorCard(card)}
+                  className="dashboard-card-clickable dashboard-card-row"
+                >
+                  <CardImage card={card} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px' }} />
+                  <div className="dashboard-card-description">
+                    <div className="dashboard-card-name">
+                      {getCardDisplayName(card.name, card.printed_name)}
+                    </div>
+                    <div className="dashboard-card-meta">
+                      <span>{card.set_name} • {card.rarity}</span>
+                      {card.printing && card.printing !== 'Normal' && (
+                        <span style={{ fontSize: '0.55rem', fontWeight: 800, padding: '1px 4px', borderRadius: '3px', flexShrink: 0, ...getPrintingBadgeStyle(card.printing) }}>
+                          {getPrintingBadgeLabel(card.printing)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="dashboard-card-price">
+                    <div className="dashboard-card-amount">{priceText(card.price_trend)}<span> {t('dash.each')}</span></div>
+                    <div className="dashboard-card-meta">
+                      {card.quantity > 1 ? t('dash.qtyTotal', { qty: card.quantity, price: priceText(card.price_trend * card.quantity) }) : t('dash.qty', { qty: 1 })}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+
+          {/* Set Completion progress tracker */}
+          {setProgress.length > 0 && (
+            <div className="dashboard-subsection view-section">
+              <h3 className="section-heading">{t(isArchive ? 'dash.archiveSetProgress' : 'dash.setProgress')}</h3>
+              <div className="set-progress-grid" style={{ marginTop: '1rem' }}>
+                {setProgress.map((set, idx) => (
+                  <div key={idx} className="set-progress-item">
+                    <div className="set-progress-header">
+                      <span style={{ color: 'var(--text-strong)' }}>{set.setName}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{set.ownedUnique} / {set.totalCards} ({set.percent}%)</span>
+                    </div>
+                    <div className="set-progress-bar-bg">
+                      <div className="set-progress-bar-fill" style={{ width: `${set.percent}%` }}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        </div>
+        {/* Collection breakdowns */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
           {/* Card Value by Set Chart */}
@@ -399,113 +500,8 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
           </div>
         </div>
 
-        {/* Right Column: Mini Tables & Lists */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          
-          {/* Top Valuable Cards */}
-          <div className="dashboard-subsection view-section" style={{ flex: 1 }}>
-            <h3 className="section-heading">
-              {t(isArchive ? 'dash.archiveTopValuable' : 'dash.topValuable')}
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.25rem' }}>
-              {topValuable.map((card, idx) => (
-                <button
-                  type="button" key={idx}
-                  onClick={() => setInspectorCard(card)}
-                  style={{ 
-                    display: 'flex', 
-                    gap: '0.75rem', 
-                    alignItems: 'center', 
-                    padding: '0.5rem 0',
-                    cursor: 'pointer'
-                  }}
-                  className="dashboard-card-clickable dashboard-card-row"
-                >
-                  <CardImage card={card} style={{ width: '56px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }} />
-                  <div className="dashboard-card-description" style={{ flex: 1, overflow: 'hidden' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {getCardDisplayName(card.name, card.printed_name)}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <span>{card.set_name} • {card.rarity}</span>
-                      {card.printing && card.printing !== 'Normal' && (
-                        <span style={{ fontSize: '0.55rem', fontWeight: 800, padding: '1px 4px', borderRadius: '3px', flexShrink: 0, ...getPrintingBadgeStyle(card.printing) }}>
-                          {getPrintingBadgeLabel(card.printing)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="dashboard-card-price" style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 800, color: 'var(--accent-yellow)', fontSize: '0.95rem' }}>{priceText(card.price_trend)}<span style={{ fontSize: '0.6rem', fontWeight: 500, color: 'var(--text-muted)' }}> {t('dash.each')}</span></div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      {card.quantity > 1 ? t('dash.qtyTotal', { qty: card.quantity, price: priceText(card.price_trend * card.quantity) }) : t('dash.qty', { qty: 1 })}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Recent Additions */}
-          {recentAdditions.length > 0 && (
-            <div className="dashboard-subsection view-section" style={{ flex: 1 }}>
-              <h3 className="section-heading">
-                {t(isArchive ? 'dash.archiveRecentAdditions' : 'dash.recentAdditions')}
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '1.25rem' }}>
-                {recentAdditions.map((card, idx) => (
-                  <button
-                    type="button" key={idx}
-                    onClick={() => setInspectorCard(card)}
-                    style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', padding: '0.5rem 0', cursor: 'pointer' }}
-                    className="dashboard-card-clickable dashboard-card-row"
-                  >
-                    <CardImage card={card} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }} />
-                    <div className="dashboard-card-description" style={{ flex: 1, overflow: 'hidden' }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {getCardDisplayName(card.name, card.printed_name)}
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                        <span>{card.set_name} • #{card.number}</span>
-                        {card.printing && card.printing !== 'Normal' && (
-                          <span style={{ fontSize: '0.55rem', fontWeight: 800, padding: '1px 4px', borderRadius: '3px', flexShrink: 0, ...getPrintingBadgeStyle(card.printing) }}>
-                            {getPrintingBadgeLabel(card.printing)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="dashboard-card-price" style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--accent-yellow)', fontSize: '0.8rem' }}>{priceText(card.price_trend)}<span style={{ fontSize: '0.55rem', fontWeight: 500, color: 'var(--text-muted)' }}> {t('dash.each')}</span></div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{card.quantity > 1 ? t('dash.qty', { qty: card.quantity }) : (card.added_at ? new Date(card.added_at).toLocaleDateString(locale) : '')}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Set Completion progress tracker */}
-          {setProgress.length > 0 && (
-            <div className="dashboard-subsection view-section">
-              <h3 className="section-heading">{t(isArchive ? 'dash.archiveSetProgress' : 'dash.setProgress')}</h3>
-              <div className="set-progress-grid" style={{ marginTop: '1rem' }}>
-                {setProgress.map((set, idx) => (
-                  <div key={idx} className="set-progress-item">
-                    <div className="set-progress-header">
-                      <span style={{ color: 'var(--text-strong)' }}>{set.setName}</span>
-                      <span style={{ color: 'var(--text-secondary)' }}>{set.ownedUnique} / {set.totalCards} ({set.percent}%)</span>
-                    </div>
-                    <div className="set-progress-bar-bg">
-                      <div className="set-progress-bar-fill" style={{ width: `${set.percent}%` }}></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-        </div>
       </div>
+        <DashboardAnalytics analytics={stats.analytics} inventory={inventoryFilter} />
       </section>
 
       {/* Card Inspector Modal Overlay */}
