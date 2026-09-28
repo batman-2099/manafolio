@@ -582,6 +582,7 @@
   "deck.statusBattleReady": "Целевой размер достигнут",
   "deck.statusBuilding": "В сборке",
   "deck.statusBuildingCount": "Меньше целевого размера",
+  "deck.statusMissingCards": "Не хватает карт",
   "deck.statusReady": "Цель достигнута",
   "deck.tableView": "Вид таблицей",
   "deck.targetDeckSize": "Целевой размер колоды:",

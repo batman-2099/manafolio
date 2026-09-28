@@ -488,6 +488,8 @@ Open **Deck Builder** to reach **Your decks**. Search by deck name or descriptio
 
 A deck uses one **Deck Type**: **Physical** or **Arena**. Physical and Arena quantities are separate. Wishlist and Graveyard are not deck inventory. A saved deck definition is not a reservation: only a checked-out Physical deck reserves copies.
 
+**Missing cards** appears in red in both Grid and Table view when required copies are unavailable, even if the deck has reached its target size. This includes missing or archived copies, copies reserved by another deck, and shortages at a selected source. Arena decks use Arena ownership only. A checked-out deck keeps its Return action and reservations, but archived or missing reserved copies still show **Missing cards**. Use the matching status filter to find affected decks; the target-reached filter excludes them.
+
 In an open deck, the toolbar is followed by **Description**. The analytics and commander artwork are directly below Description: **Supertype Breakdown**, **Color & Land Distribution**, and **Deck Health & Rules**, including wins/losses. **Add Cards to Deck**, **Deck Cards**, and **Tokens** are below that overview—not in a separate analytics sidebar. Some charts appear only when the deck contains relevant cards.
 
 **Target reached** means the deck has reached its configured target count. It does not certify tournament legality, correct color identity, or a complete sideboard. Review format rules separately.

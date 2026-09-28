@@ -552,6 +552,7 @@
   "deck.statusBattleReady": "目標枚数に到達",
   "deck.statusBuilding": "調整中",
   "deck.statusBuildingCount": "目標枚数未満",
+  "deck.statusMissingCards": "不足カードあり",
   "deck.statusReady": "目標達成",
   "deck.tableView": "テーブル表示",
   "deck.targetDeckSize": "目標デッキ枚数:",

@@ -149,7 +149,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
   // Deck Selection Menu Controls
   const [deckSearchTerm, setDeckSearchTerm] = useState('');
-  const [deckStatusFilter, setDeckStatusFilter] = useState('all'); // 'all' | 'ready' | 'in_progress' | 'in_play'
+  const [deckStatusFilter, setDeckStatusFilter] = useState('all'); // 'all' | 'ready' | 'missing' | 'in_progress' | 'in_play'
   const [deckSortBy, setDeckSortBy] = useState('created_desc'); // 'created_desc' | 'created_asc' | 'name_asc' | 'cards_desc'
   const [deckSelectionViewMode, setDeckSelectionViewMode] = useState('table'); // 'grid' | 'table'
 
@@ -1026,7 +1026,8 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     const matchesGame = isGameEnabled(deck.game);
 
     let matchesStatus = true;
-    if (deckStatusFilter === 'ready') matchesStatus = deck.total_cards === (deck.target_size || 60);
+    if (deckStatusFilter === 'ready') matchesStatus = deck.total_cards === (deck.target_size || 60) && !(deck.missing_cards > 0);
+    else if (deckStatusFilter === 'missing') matchesStatus = deck.missing_cards > 0;
     else if (deckStatusFilter === 'in_progress') matchesStatus = (deck.total_cards || 0) < (deck.target_size || 60);
     else if (deckStatusFilter === 'in_play') matchesStatus = !!deck.checked_out;
 
@@ -1125,6 +1126,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   >
                     <option value="all">{t('deck.allStatuses')}</option>
                     <option value="ready">{t('deck.statusBattleReady')}</option>
+                    <option value="missing">{t('deck.statusMissingCards')}</option>
                     <option value="in_progress">{t('deck.statusBuildingCount')}</option>
                     <option value="in_play">{t('deck.inPlay')}</option>
                   </select>
@@ -1198,6 +1200,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 const targetSize = deck.target_size || 60;
                 const totalCards = deck.total_cards || 0;
                 const isComplete = totalCards >= targetSize;
+                const hasMissingCards = deck.missing_cards > 0;
                 const percent = Math.min(100, Math.round((totalCards / targetSize) * 100));
                 const accentColor = deck.accent_color || '#ef4444';
 
@@ -1336,12 +1339,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           fontWeight: 700,
                           padding: '0.2rem 0.5rem',
                           borderRadius: '12px',
-                          backgroundColor: isComplete ? 'rgba(74, 222, 128, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                          color: isComplete ? '#4ade80' : '#60a5fa',
-                          border: isComplete ? '1px solid rgba(74, 222, 128, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
+                          backgroundColor: hasMissingCards ? 'color-mix(in srgb, var(--text-negative) 15%, transparent)' : isComplete ? 'rgba(74, 222, 128, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                          color: hasMissingCards ? 'var(--text-negative)' : isComplete ? '#4ade80' : '#60a5fa',
+                          border: hasMissingCards ? '1px solid var(--text-negative)' : isComplete ? '1px solid rgba(74, 222, 128, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
                           whiteSpace: 'nowrap'
                         }}>
-                          {t(isComplete ? 'deck.statusReady' : 'deck.statusBuilding')}
+                          {t(hasMissingCards ? 'deck.statusMissingCards' : isComplete ? 'deck.statusReady' : 'deck.statusBuilding')}
                         </span>
                       </div>
 
@@ -1507,7 +1510,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           </div>
                         </td>
                         <td data-label={t('admin.colStatus')} style={{ padding: '0.75rem 1rem' }}>
-                          {deck.checked_out ? (
+                          {deck.missing_cards > 0 ? (
+                            <span style={{ fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: 'color-mix(in srgb, var(--text-negative) 15%, transparent)', color: 'var(--text-negative)', border: '1px solid var(--text-negative)' }}>
+                              {t('deck.statusMissingCards')}
+                            </span>
+                          ) : deck.checked_out ? (
                             <span style={{ fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid rgba(234,179,8,0.4)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <Gamepad2 size={11} /> {t('deck.inPlay')}
                             </span>

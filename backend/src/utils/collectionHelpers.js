@@ -86,6 +86,54 @@ async function checkedOutAllocation(userId, excludeDeckId = null) {
   return allocated;
 }
 
+// List status uses usable inventory, not the return guide (which keeps archived sources).
+async function deckMissingCards(decks, userId) {
+  const missing = new Map(decks.map(deck => [deck.id, 0]));
+  if (!decks.length) return missing;
+  const cards = await db.all(`SELECT dc.* FROM deck_cards dc JOIN decks d ON d.id = dc.deck_id
+    WHERE d.user_id = ? AND d.game = 'mtg' AND dc.quantity > 0`, [userId]);
+  const entriesByCard = new Map();
+  for (const entry of await physicalCardEntries(userId)) {
+    if (!entriesByCard.has(entry.card_id)) entriesByCard.set(entry.card_id, []);
+    entriesByCard.get(entry.card_id).push(entry);
+  }
+  const allocated = new Map();
+  const ownAllocations = new Map();
+  for (const source of await checkedOutSources(userId)) {
+    allocated.set(source.entry_id, (allocated.get(source.entry_id) || 0) + source.quantity);
+    if (!ownAllocations.has(source.deck_id)) ownAllocations.set(source.deck_id, new Map());
+    const own = ownAllocations.get(source.deck_id);
+    own.set(source.entry_id, (own.get(source.entry_id) || 0) + source.quantity);
+  }
+  const arena = new Map((await db.all(`SELECT c.card_id, SUM(c.quantity) AS quantity
+    FROM collection c JOIN card_cache cc ON cc.id = c.card_id AND cc.game = c.game
+    WHERE c.user_id = ? AND c.list_type = 'arena' AND c.game = 'mtg' AND c.quantity > 0
+    GROUP BY c.card_id`, [userId])).map(row => [row.card_id, row.quantity]));
+  const decksById = new Map(decks.map(deck => [deck.id, deck]));
+  for (const card of cards) {
+    const deck = decksById.get(card.deck_id);
+    if (!deck) continue;
+    let available = 0;
+    if (deck.inventory_type === 'arena') {
+      available = arena.get(card.card_id) || 0;
+    } else {
+      const entries = entriesByCard.get(card.card_id) || [];
+      const candidates = deck.checked_out
+        ? entries.filter(entry => entry.game === deck.game)
+        : sourceEntries(entries, card, deck.game);
+      for (const entry of candidates) {
+        const own = ownAllocations.get(deck.id)?.get(entry.entry_id) || 0;
+        const usable = Math.max(0, entry.quantity - (allocated.get(entry.entry_id) || 0) + own);
+        // A checked-out deck cannot silently replace an archived reserved copy.
+        available += deck.checked_out ? Math.min(own, usable) : usable;
+        if (available >= card.quantity) break;
+      }
+    }
+    missing.set(deck.id, missing.get(deck.id) + Math.max(0, card.quantity - available));
+  }
+  return missing;
+}
+
 function sourcePlacement(entry) {
   return {
     ...entry,
@@ -392,6 +440,7 @@ module.exports = {
   defaultCompartmentPlan,
   checkedOutAllocation,
   checkedOutSources,
+  deckMissingCards,
   deckCardSources,
   validateDeckSource,
   deckLocations,

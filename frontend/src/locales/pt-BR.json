@@ -572,6 +572,7 @@
   "deck.statusBattleReady": "Tamanho desejado atingido",
   "deck.statusBuilding": "Em construção",
   "deck.statusBuildingCount": "Abaixo do tamanho desejado",
+  "deck.statusMissingCards": "Cartas faltando",
   "deck.statusReady": "Meta atingida",
   "deck.tableView": "Visualização em tabela",
   "deck.targetDeckSize": "Tamanho alvo do baralho:",

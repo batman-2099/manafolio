@@ -552,6 +552,7 @@
   "deck.statusBattleReady": "목표 장수 도달",
   "deck.statusBuilding": "구성 중",
   "deck.statusBuildingCount": "목표 장수 미만",
+  "deck.statusMissingCards": "카드 부족",
   "deck.statusReady": "목표 달성",
   "deck.tableView": "표 보기",
   "deck.targetDeckSize": "목표 덱 크기:",

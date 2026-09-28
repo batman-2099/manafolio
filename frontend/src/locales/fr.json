@@ -572,6 +572,7 @@
   "deck.statusBattleReady": "Taille cible atteinte",
   "deck.statusBuilding": "En construction",
   "deck.statusBuildingCount": "Sous la taille cible",
+  "deck.statusMissingCards": "Cartes manquantes",
   "deck.statusReady": "Objectif atteint",
   "deck.tableView": "Vue en tableau",
   "deck.targetDeckSize": "Taille cible du deck :",

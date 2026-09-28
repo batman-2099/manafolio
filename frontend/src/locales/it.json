@@ -572,6 +572,7 @@
   "deck.statusBattleReady": "Dimensione obiettivo raggiunta",
   "deck.statusBuilding": "In costruzione",
   "deck.statusBuildingCount": "Sotto la dimensione obiettivo",
+  "deck.statusMissingCards": "Carte mancanti",
   "deck.statusReady": "Obiettivo raggiunto",
   "deck.tableView": "Vista a tabella",
   "deck.targetDeckSize": "Dimensione target del mazzo:",

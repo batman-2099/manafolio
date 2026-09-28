@@ -673,6 +673,7 @@
   "deck.returnCanceled": "Return canceled.",
   "deck.statusReady": "Target reached",
   "deck.statusBuilding": "Building",
+  "deck.statusMissingCards": "Missing cards",
   "deck.removeFromDeck": "Remove from deck",
   "deck.decreaseQty": "Decrease quantity",
   "deck.basicLands": "Basic Lands Exemptions:",

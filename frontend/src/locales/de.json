@@ -850,6 +850,7 @@
   "deck.statusBattleReady": "Zielgröße erreicht",
   "deck.statusBuilding": "Im Aufbau",
   "deck.statusBuildingCount": "Unter der Zielgröße",
+  "deck.statusMissingCards": "Fehlende Karten",
   "deck.statusReady": "Ziel erreicht",
   "deck.tableView": "Tabellenansicht",
   "deck.targetDeckSize": "Ziel-Deckgröße:",

@@ -2,6 +2,10 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Deck Builder now shows a red **Missing cards** status in grid and table views when required copies are unavailable, including archived copies in checked-out decks. Added a matching status filter; the ready filter excludes decks with unavailable copies.
+
 ## 2.1.1
 
 - Allowed whole-container archive/restore while cards belong to checked-out decks, preserving deck lists, reservations, and return locations. Locks remain enforced and archived cards remain excluded from available inventory.

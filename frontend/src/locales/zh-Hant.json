@@ -552,6 +552,7 @@
   "deck.statusBattleReady": "已達目標張數",
   "deck.statusBuilding": "建構中",
   "deck.statusBuildingCount": "未達目標張數",
+  "deck.statusMissingCards": "缺少卡牌",
   "deck.statusReady": "已達目標",
   "deck.tableView": "表格檢視",
   "deck.targetDeckSize": "目標套牌張數:",

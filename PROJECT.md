@@ -222,6 +222,8 @@ Deck definitions use one inventory; checked-out decks cannot switch inventory. `
 
 Physical checkout reserves quantities by setting `decks.checked_out` and `checked_out_at`; it does **not** move collection entries. Availability subtracts copies reserved by other checked-out Physical decks. Arena decks cannot check out.
 
+`GET /api/decks` includes `missing_cards`, the number of unavailable required copies, computed from batched inventory, deck requirements, and reservations. Draft Physical decks respect source groups and other decks' reservations; checked-out decks require their exact reserved copies to remain usable. Arena ownership stays separate. This status does not change the return guide or checkout state.
+
 `GET /api/decks/:id/cards/:cardId/sources` groups available Physical copies by location and compartment. The editor saves nullable `source_entry_id`: null selects automatically; an entry anchors the selected location/compartment, which must supply the entire quantity at checkout. New source assignments validate account/card/Physical identity. Existing stale anchors remain saveable but fail checkout explicitly instead of reverting to automatic selection.
 
 `GET /api/decks/:id/locations` provides specific entries, containers, compartments, slot positions, and missing counts for the pull list. Checkout records exact entries in `deck_card_allocations`; `checkedOutAllocation` uses those records so storage reserves the same copies even after other decks return. Startup materializes legacy reservations. Backup restore remaps source and allocation entry references. **Pulled** remains the per-deck-card checklist state (`deck_cards.checked_out`), distinct from the deck-level reservation flag.

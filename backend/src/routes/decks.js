@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../db');
 const cardApi = require('../utils/cardApi');
 const { parseCardRow, recordPrice } = require('../utils/priceHelpers');
-const { deckCardSources, validateDeckSource, deckLocations, reserveDeckSources } = require('../utils/collectionHelpers');
+const { deckCardSources, validateDeckSource, deckLocations, reserveDeckSources, deckMissingCards } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { FORMATS } = require('../utils/aiDecks');
 const scryfallApi = require('../scryfallApi');
@@ -49,7 +49,8 @@ router.get('/', async (req, res) => {
       ORDER BY d.created_at DESC
     `;
     const rows = await db.all(query, [req.user.id]);
-    res.json(rows);
+    const missing = await deckMissingCards(rows, req.user.id);
+    res.json(rows.map(deck => ({ ...deck, missing_cards: missing.get(deck.id) })));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to retrieve decks' });
