@@ -28,10 +28,10 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
   const isArchive = inventory === 'graveyard';
   const number = (value) => value.toLocaleString(locale);
   const distributionSeries = isArchive ? [
-    { key: 'owned', label: t('dash.archivedCopies'), color: '#8b5cf6' },
+    { key: 'owned', label: t('dash.archivedCopies'), color: '#a78bfa' },
   ] : [
-    { key: 'owned', label: t('dash.ownedCopies'), color: 'var(--accent-blue)' },
-    { key: 'decks', label: t('dash.savedDeckSlots'), color: 'var(--accent-yellow)' },
+    { key: 'owned', label: t('dash.ownedCopies'), color: '#60a5fa' },
+    { key: 'decks', label: t('dash.savedDeckSlots'), color: '#fbbf24' },
   ];
   const charts = [
     {
@@ -39,10 +39,10 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
       rows: analytics?.growth?.map(row => ({ ...row, name: new Date(`${row.month}-01T00:00:00Z`).toLocaleDateString(locale, { month: 'short', year: '2-digit', timeZone: 'UTC' }) })),
       category: t('dash.month'), empty: t(isArchive ? 'dash.noArchiveGrowth' : 'dash.noGrowth'), stacked: true,
       series: isArchive ? [
-        { key: 'graveyard', label: t('dash.archivedCopies'), color: '#8b5cf6' },
+        { key: 'graveyard', label: t('dash.archivedCopies'), color: '#a78bfa' },
       ] : [
-        { key: 'physical', label: t('dash.physical'), color: 'var(--accent-blue)' },
-        { key: 'arena', label: t('dash.arena'), color: 'var(--accent-yellow)' },
+        { key: 'physical', label: t('dash.physical'), color: '#60a5fa' },
+        { key: 'arena', label: t('dash.arena'), color: '#fbbf24' },
       ],
     },
     {

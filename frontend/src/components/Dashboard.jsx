@@ -11,18 +11,18 @@ import CardImage from './CardImage';
 import DashboardAnalytics, { ChartDataTable } from './DashboardAnalytics';
 
 const COLORS = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', 
-  '#ec4899', '#14b8a6', '#f43f5e', '#a855f7', '#6366f1'
+  '#60a5fa', '#4ade80', '#fbbf24', '#f87171', '#a78bfa',
+  '#f472b6', '#2dd4bf', '#fb923c', '#e879f9', '#818cf8'
 ];
 
 const TYPE_COLORS = {
   'Colorless': '#cbd5e1',
   'White': '#fef08a',
-  'Blue': '#3b82f6',
-  'Black': '#334155',
-  'Red': '#ef4444',
-  'Green': '#10b981',
-  'Land': '#d97706'
+  'Blue': '#60a5fa',
+  'Black': '#a78bfa',
+  'Red': '#f87171',
+  'Green': '#4ade80',
+  'Land': '#fbbf24'
 };
 
 function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEntryId, onUpdate, showToast }) {
@@ -404,7 +404,9 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                     labelStyle={{ color: 'var(--text-primary)' }}
                     formatter={v => [formatMoney(v), t('dash.value')]}
                   />
-                  <Bar dataKey="value" fill="var(--accent-red)" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                    {sets.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
               </div>

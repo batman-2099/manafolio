@@ -4,6 +4,7 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Added a brighter dashboard chart palette, multicolor set-value bars, and distinct blue/gold inventory comparison series across account themes. Chart values, labels, and accessible data tables are unchanged.
 - Added a rotating loading icon while waiting for AI deck responses, with a static reduced-motion fallback and an accessible busy state.
 - Replaced per-card Commander switches with a single dropdown beneath the commander artwork. It lists all creatures and planeswalkers in the deck, supports clearing the selection, and retains the existing Save workflow.
 - Added a Dragon Shield dropdown to Customize card back with 112 sleeve designs selected from the official collection. Standalone and multi-sleeve images are cropped to the back, previewed before Save, and stored as deck-local image copies; failed or cancelled downloads preserve the existing back.
