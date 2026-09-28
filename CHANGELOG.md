@@ -4,6 +4,7 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Stabilized Collection filter layout when Grading, Mana Value, or other option menus introduce a scrollbar.
 - AI deck generation and improvement now include editable deck-specific strategies that save to Notes. Improvements retain existing notes, and saved private notes remain excluded from AI requests.
 - Removed standalone Notes from main navigation and added private per-deck Notes below the deck stats, constrained to the stats column beside Customize card back, using the existing Save and unsaved-change protection. Deck duplication and complete backups retain notes; existing standalone notebook data is preserved.
 - Added a subtle hover sheen to foil cards in Collection gallery and list views. Touch devices, reduced-motion preferences, and selection mode retain a static finish.

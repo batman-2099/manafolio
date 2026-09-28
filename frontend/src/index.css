@@ -393,7 +393,7 @@ button, input, select, textarea {
 .collection-filter-heading, .collection-filter-footer { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex: none; }
 .collection-filter-heading { margin-bottom: 1rem; }
 .collection-filter-heading h2 { margin: 0; font-size: 1.25rem; }
-.collection-filter-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0.25rem; }
+.collection-filter-body { min-height: 0; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; padding: 0.25rem; }
 .collection-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
 .collection-filter-body label { font-size: 0.875rem !important; }
 .collection-filter-body label[for$="Opt"] { display: flex; align-items: center; min-height: 44px; }
