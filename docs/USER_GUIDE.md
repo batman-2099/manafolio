@@ -699,13 +699,41 @@ ChatGPT uses your Codex access and usage limits. Gemini's free-tier data-use ter
 ### Ask questions and create a suggested deck
 
 1. Open **Deck Builder → AI Deck Builder**.
-2. In **Deck setup**, choose **Owned inventory**, **Format**, **Target Size**, and one **Deck type**. Choose **Any** to let the AI select an archetype suited to your cards and request, or choose Aggro, Midrange, Control, Combo, Tempo, Ramp, Burn, Go-Wide / Tokens, Voltron, Reanimator, Sacrifice / Aristocrats, Tribal / Typal, Mill, Prison / Stax, Toolbox, or Spellslinger. Selecting a type displays its explanation and play style.
-3. In **Card pool & filters**, optionally select colors/sets and, for Physical inventory, **Containers**. Empty filters include all eligible cards. Missing Physical copies are excluded; Arena is separate.
-4. Leave **Include checked-out cards** off unless intentionally planning with reserved copies. Turning it on does not release or share reservations.
+2. In **Deck setup**, choose **Owned inventory** (Physical or Arena), **Format**, and **Target Size**. Choose one required **Deck type** and set **Target power level** before requesting a suggestion; see the option guides below. Wishlist and Graveyard cannot supply AI decks.
+3. In **Card pool & filters**, optionally select colors/sets and, for Physical inventory, **Containers**. Empty filters include all eligible cards. Set options show their Magic set symbols alongside readable names. Missing Physical copies are excluded; Arena is separate.
+4. Leave **Include checked-out cards** off unless intentionally planning with reserved copies. The toggle turns green when enabled. Turning it on does not release or share reservations; return those cards from their other decks before checking out this deck.
 5. Enter a **Question or deck request**, then select **Send message**. With no typed request, **Generate suggestion** requests a deck from the selected inventory/settings.
 6. Read the conversation and any **Review and edit draft**. Edit the name, description, strategy, quantities, removals, and commander as needed. The strategy covers opening hands, the game plan, synergies, and win conditions; review it against the actual cards. Read warnings and check the total against the target.
 7. Ask follow-up questions or request revisions. Questions leave the draft unchanged; requests for changes use your current manual edits.
 8. Select **Add Deck** only when you want to save the reviewed draft.
+
+#### Choose a deck type
+
+**Deck type** starts unselected and is required. Choose **Any** to let the AI select an archetype suited to your eligible cards and request, or choose a specific strategy. Its explanation and play style appear below the selector.
+
+| Deck type | When to choose it |
+| --- | --- |
+| Any | Let the available cards and your request determine the archetype |
+| Aggro | Cheap threats and fast, proactive attacks |
+| Midrange | Increasingly powerful threats with efficient answers |
+| Control | Disruption, card advantage, and a late-game finish |
+| Combo | Specific card interactions and an explosive winning turn |
+| Tempo | An early threat supported by disruption |
+| Ramp | Extra mana to cast large threats ahead of schedule |
+| Burn | Direct damage, often from spells |
+| Go-Wide / Tokens | Many creatures that overwhelm opponents |
+| Voltron | One creature strengthened by equipment, Auras, or counters |
+| Reanimator | Return expensive creatures from the in-game graveyard cheaply |
+| Sacrifice / Aristocrats | Sacrifice creatures for value or damage |
+| Tribal / Typal | Synergies within a creature type |
+| Mill | Empty an opponent's library as an alternate win condition |
+| Prison / Stax | Tax or restrict opponents' actions |
+| Toolbox | Flexible answers and tutors for different situations |
+| Spellslinger | Instants, sorceries, and rewards for casting them |
+
+Reanimator refers to the Magic gameplay zone, not Manafolio's archived **Graveyard** inventory. Deck type guides AI requests; it is separate from the saved deck's inventory type and category.
+
+#### Choose a target power level
 
 **Target power level** under Deck setup defaults to **2 — Core**. Move the slider to choose:
 
@@ -731,7 +759,7 @@ If no eligible cards match, adjust filters or ask questions without generating a
 
 1. Open the saved deck and save all local edits.
 2. Select **Improve with AI**.
-3. Choose one **Deck type**, then ask for advice or describe changes. Inventory, format, and target size stay fixed for this workflow.
+3. Choose one **Deck type** and a **Target power level**, then ask for advice or describe changes. Inventory, format, and target size stay fixed for this workflow. AI improvement is available for Physical and Arena decks, not Graveyard decks.
 4. Review/edit the returned draft and choose:
    - **Save Deck** to replace the original's name, description, cards, and commander while retaining its identity, results, and settings. The reviewed strategy is appended to existing Notes without overwriting them; an identical strategy already at the end is not repeated.
    - **Save as New Deck** to keep the original and create a separate unchecked-out deck with the reviewed strategy in its Notes.
