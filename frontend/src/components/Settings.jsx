@@ -484,7 +484,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
             <div>
               <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: '0.95rem' }}>{t('settings.shareLibrary')}</div>
-              <div id="settings-share-hint" style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t('settings.shareLibraryHint')}</div>
+              <div id="settings-share-hint" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>{t('settings.shareLibraryHint')}</div>
             </div>
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '44px', minHeight: '44px', cursor: 'pointer' }}>
               <input
@@ -571,7 +571,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
                 <div>
                   <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: '0.95rem' }}>{t('settings.showLocations')}</div>
-                  <div id="settings-share-locations-hint" style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t('settings.showLocationsHint')}</div>
+                  <div id="settings-share-locations-hint" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>{t('settings.showLocationsHint')}</div>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '44px', minHeight: '44px', cursor: 'pointer' }}>
                   <input
@@ -627,7 +627,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
           )}
 
           {!shareEnabled && (
-            <div style={{ display: 'flex', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
               <ShieldAlert size={16} style={{ color: 'var(--accent-red)', flexShrink: 0 }} />
               <span>{t('settings.privateNotice')}</span>
             </div>
@@ -831,7 +831,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
             <h3 id="settings-backup" tabIndex={-1} className="section-heading">{t('settings.backupTitle')}</h3>
           </div>
 
-          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
             {t('settings.backupHint')}
           </div>
 
@@ -942,7 +942,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
                 </label>
               ))}
             </div>
-            <p id="settings-theme-hint" style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+            <p id="settings-theme-hint" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
               {t('prefs.themeHint')}
             </p>
           </fieldset>

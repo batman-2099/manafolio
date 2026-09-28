@@ -498,7 +498,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
                 {translatedName(activeCard)}
               </p>
             )}
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 500 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', fontWeight: 500 }}>
               {activeCard.set_name}
               {/* Set code alongside the native set name: it reads the same in every
                   language, so it is the part you can search or quote. The collector
@@ -687,7 +687,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
               )}
 
               {activeCard.notes && (
-                <div className="view-section" style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 0, paddingTop: '0.75rem' }}>
+                <div className="view-section" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 0, paddingTop: '0.75rem' }}>
                   {activeCard.notes}
                 </div>
               )}

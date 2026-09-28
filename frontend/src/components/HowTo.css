@@ -35,7 +35,7 @@
 .howto-search-field input:focus-visible { outline: none; box-shadow: none; }
 .howto-search-field input::placeholder { color: var(--text-muted); }
 .howto-search-field input::-webkit-search-cancel-button { appearance: none; }
-.howto-language { margin-top: 0.75rem; font-size: 0.875rem; color: var(--text-secondary); }
+.howto-language { margin-top: 0.75rem; font-size: 0.9375rem; color: var(--text-secondary); }
 .howto-layout { display: grid; grid-template-columns: 16rem minmax(0, 1fr); align-items: start; gap: 3rem; }
 .howto-chapters { position: sticky; top: 1.5rem; max-height: calc(100dvh - 3rem); overflow-y: auto; padding: 0.25rem; }
 .howto-chapters h2 { font-size: 1rem; margin: 0 0 0.75rem 0.75rem; }

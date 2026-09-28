@@ -2157,7 +2157,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
             <span style={{ position: 'absolute', top: 3, left: autoAdd ? 19 : 3, width: 14, height: 14, borderRadius: '50%', background: autoAdd ? 'var(--accent-green)' : 'var(--bg-primary)' }} />
           </span>
         </button>
-        <p id="scan-auto-queue-hint" style={{ fontSize: '0.875rem', lineHeight: 1.5, color: 'var(--text-secondary)', margin: 0 }}>
+        <p id="scan-auto-queue-hint" style={{ fontSize: '0.9375rem', lineHeight: 1.5, color: 'var(--text-secondary)', margin: 0 }}>
           {t('scan.autoAddHint')}
         </p>
       </div>
@@ -2568,7 +2568,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                   {scanStatus}
                 </p>
               )}
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: 0, overflowWrap: 'anywhere' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', margin: 0, overflowWrap: 'anywhere' }}>
                 {t('scan.nameRead')}{' '}
                 <strong style={{ color: 'var(--text-strong)' }}>
                   {scanName?.text

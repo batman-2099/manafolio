@@ -63,7 +63,7 @@
 
 .deck-back-panel p {
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   line-height: 1.5;
 }
 
@@ -148,7 +148,7 @@
 }
 
 .deck-overview-section p {
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   line-height: 1.5;
   color: var(--text-secondary);
 }

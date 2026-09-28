@@ -1420,7 +1420,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               )}
               <span style={{ gridColumn: 2, gridRow: '1 / 4', alignSelf: 'center', textAlign: 'right', minWidth: '3.75rem', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', background: 'var(--surface-1)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 2px rgba(0,0,0,0.2)' }}>
                 <strong style={{ display: 'block', fontSize: '2rem', fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{location.total_cards || 0}</strong>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.3 }}>{t('collection.cardUnit', { count: location.total_cards || 0 })}</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', lineHeight: 1.3 }}>{t('collection.cardUnit', { count: location.total_cards || 0 })}</span>
               </span>
               {location.total_cards > location.total_capacity && (
                 <span className="storage-capacity-warning" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>

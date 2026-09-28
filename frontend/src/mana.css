@@ -64,7 +64,7 @@
 }
 
 .theme-choices { border: 0; min-width: 0; }
-.theme-choices legend { font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.75rem; }
+.theme-choices legend { font-size: 0.9375rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.75rem; }
 .theme-choice-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
 .theme-choice {
   --mana-image: url('/mana.svg');

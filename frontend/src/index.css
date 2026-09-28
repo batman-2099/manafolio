@@ -395,7 +395,7 @@ button, input, select, textarea {
 .collection-filter-heading h2 { margin: 0; font-size: 1.25rem; }
 .collection-filter-body { min-height: 0; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; padding: 0.25rem; }
 .collection-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
-.collection-filter-body label { font-size: 0.875rem !important; }
+.collection-filter-body label { font-size: 0.9375rem !important; }
 .collection-filter-body label[for$="Opt"] { display: flex; align-items: center; min-height: 44px; }
 .collection-filter-footer { padding-top: 1rem; border-top: 1px solid var(--border-glass); }
 .collection-filter-panel .btn { min-height: 44px; }
@@ -449,7 +449,7 @@ button, input, select, textarea {
 }
 .dashboard-summary dt {
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   font-weight: 500;
   line-height: 1.5;
 }
@@ -463,7 +463,7 @@ button, input, select, textarea {
   overflow-wrap: anywhere;
 }
 .dashboard-summary-secondary .dashboard-summary-value { font-size: clamp(1.5rem, 2.5vw, 2rem); }
-.dashboard-summary-note { color: var(--text-secondary); font-size: 0.875rem; line-height: 1.5; }
+.dashboard-summary-note { color: var(--text-secondary); font-size: 0.9375rem; line-height: 1.5; }
 @media (min-width: 1100px) {
   .dashboard-summary { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
   .dashboard-summary-secondary {
@@ -484,7 +484,7 @@ button, input, select, textarea {
 .dashboard-timeline-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .sub-nav-tabs.dashboard-periods { display: flex; gap: var(--space-1); width: auto; max-width: 100%; }
 .dashboard-periods button { min-height: 44px; min-width: 44px; padding: 0.5rem 0.75rem; }
-.dashboard-history-context { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: 0.875rem; color: var(--text-secondary); margin: var(--space-3) 0; }
+.dashboard-history-context { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: 0.9375rem; color: var(--text-secondary); margin: var(--space-3) 0; }
 .dashboard-history-context > span { display: inline-flex; align-items: center; gap: var(--space-1); }
 .dashboard-summary .positive,
 .dashboard-history-context .positive { color: var(--text-positive); }
@@ -518,11 +518,11 @@ button, input, select, textarea {
 .dashboard-card-row:last-child { border-bottom: 0; }
 .dashboard-card-description { min-width: 0; }
 .dashboard-card-name { font-size: 1rem; font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
-.dashboard-card-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); color: var(--text-secondary); font-size: 0.875rem; line-height: 1.5; }
+.dashboard-card-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); color: var(--text-secondary); font-size: 0.9375rem; line-height: 1.5; }
 .dashboard-card-price { text-align: right; font-variant-numeric: tabular-nums; }
 .dashboard-card-price .dashboard-card-meta { justify-content: flex-end; }
 .dashboard-card-amount { color: var(--text-strong); font-size: 1rem; font-weight: 600; }
-.dashboard-card-amount > span { color: var(--text-secondary); font-size: 0.875rem; font-weight: 400; }
+.dashboard-card-amount > span { color: var(--text-secondary); font-size: 0.9375rem; font-weight: 400; }
 @media (prefers-reduced-motion: reduce) {
   .dashboard-card-row { transition: none; }
 }
@@ -537,7 +537,7 @@ button, input, select, textarea {
   input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 1rem !important; }
   .collection-inventory-nav { display: none !important; }
   .collection-inventory-picker.form-group { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
-  .collection-inventory-picker label { font-size: 0.875rem; text-transform: none; letter-spacing: 0; }
+  .collection-inventory-picker label { font-size: 0.9375rem; text-transform: none; letter-spacing: 0; }
   .collection-inventory-picker select { min-width: 0; min-height: 44px; }
   .collection-filter-toolbar { gap: 0.5rem; }
   .collection-filter-toolbar .form-group { gap: 0.25rem; }
@@ -1239,7 +1239,7 @@ button.collection-card-trigger {
 }
 
 .tcg-card-meta {
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--text-secondary);
   display: flex;
   justify-content: space-between;

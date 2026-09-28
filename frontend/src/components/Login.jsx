@@ -151,7 +151,7 @@ function Login({ onLoginSuccess }) {
         {setupRequired && (
           <div style={{
             marginBottom: '1.5rem',
-            fontSize: '0.875rem',
+            fontSize: '0.9375rem',
             color: 'var(--text-secondary)',
             lineHeight: 1.5
           }}>
@@ -198,7 +198,7 @@ function Login({ onLoginSuccess }) {
 
             <div style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0 0.25rem 0', gap: '0.75rem' }}>
               <div style={{ flex: 1, height: '1px', background: 'var(--border-glass)' }} />
-              <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+              <span style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>
                 {t('login.orDivider')}
               </span>
               <div style={{ flex: 1, height: '1px', background: 'var(--border-glass)' }} />

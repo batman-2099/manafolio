@@ -18,7 +18,7 @@ import CardImage from './CardImage';
 import MultiSelectDropdown from './MultiSelectDropdown';
 import Modal from './Modal';
 
-const labelStyle = { fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' };
+const labelStyle = { fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-secondary)' };
 const PAGE_SIZE = 60;
 
 const SORT_CRITERIA = {
@@ -683,7 +683,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
         </div>
       {/* Result summary bar */}
       {!loading && !selectMode && (
-        <div role="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', fontSize: '0.875rem', color: 'var(--text-secondary)', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div role="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', fontSize: '0.9375rem', color: 'var(--text-secondary)', flexWrap: 'wrap', gap: '0.5rem' }}>
           <span><strong style={{ color: 'var(--text-strong)' }}>{displayCards.length}</strong> {t('collection.cardUnit', { count: displayCards.length })}</span>
           <span>{t('collection.totalValue')} <strong style={{ color: 'var(--text-strong)' }}>{priceText(totalValue)}</strong></span>
         </div>
@@ -802,7 +802,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                     <span>{item.set_name} • #{item.number}</span>
                     <span className="tcg-card-price">{priceText(item.price_trend, item.price_currency)}</span>
                   </span>
-                  <span style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                  <span style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>
                     <span className="collection-card-tag" style={getRarityBadgeStyle(item.rarity)}>{getRarityBadgeLabel(item.rarity)}</span>
                     <span>
                       {item.grader && item.grader !== 'Raw'
@@ -862,13 +862,13 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                         </button>
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <button type="button" className="collection-card-trigger" aria-pressed={selectMode ? selected : undefined} aria-haspopup={selectMode ? undefined : 'dialog'} onClick={(e) => activateCard(item, e)} {...pressHandlers(item.entry_id)} style={{ display: 'block', maxWidth: '100%', fontWeight: 700, color: 'var(--text-strong)', fontSize: '1rem', textAlign: 'left', cursor: 'pointer' }}>{getCardDisplayName(item.name, item.printed_name)}</button>
-                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem' }}>
+                          <div style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem' }}>
                             <span>{item.set_name} • #{item.number}</span>
                             <span style={{ fontSize: '0.875rem', fontWeight: 600, ...getRarityBadgeStyle(item.rarity) }}>
                               {getRarityBadgeLabel(item.rarity)}
                             </span>
                           </div>
-                          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                          <div style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>
                             {item.printing} • {item.condition}
                           </div>
                           {!selectMode && (
