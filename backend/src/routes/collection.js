@@ -37,7 +37,7 @@ async function attachOwnedQty(cards, userId, listType = 'collection') {
     `SELECT card_id, SUM(quantity) AS qty FROM collection
      WHERE user_id = ? AND list_type = ? AND card_id IN (${ids.map(() => '?').join(',')})
      GROUP BY card_id`,
-    [userId, listType === 'arena' ? 'arena' : 'collection', ...ids]
+    [userId, listType ?? 'collection', ...ids]
   );
   const owned = new Map(rows.map(r => [r.card_id, r.qty]));
   for (const c of cards) c.owned_qty = owned.get(c.id) || 0;
@@ -99,13 +99,14 @@ router.all('/search', searchLimiter, async (req, res) => {
   const { name: rawName, number: rawNumber, set: rawSet, scope = 'database', lang, prints, q, image, cropped, list_type } = query;
   const game = query.game === undefined ? 'mtg' : query.game;
   if (game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
+  if (list_type !== undefined && !LIST_TYPES.includes(list_type)) return res.status(400).json({ error: 'Invalid list_type' });
   const { name, number, set } = normalizeSearchParams({ name: rawName, number: rawNumber, set: rawSet, q });
   const page = Math.max(1, parseInt(query.page, 10) || 1);
   const limit = Math.min(250, Math.max(1, parseInt(query.limit, 10) || 60));
   try {
     let { cards, total } = await scryfallApi.searchCards({
       name, number, set, scope, userId: req.user.id, lang,
-      allPrints: prints === '1', page, limit,
+      allPrints: prints === '1', page, limit, listType: list_type,
     });
 
     // When an image from a camera scan is attached, score each candidate card
@@ -836,8 +837,8 @@ router.post('/scan-drafts/commit', async (req, res) => {
 router.post('/cards/related-tokens', async (req, res) => {
   try {
     const inventoryType = req.body?.inventory_type === undefined ? 'collection' : req.body.inventory_type;
-    if (!['collection', 'arena'].includes(inventoryType)) {
-      return res.status(400).json({ error: 'inventory_type must be collection or arena' });
+    if (!['collection', 'arena', 'graveyard'].includes(inventoryType)) {
+      return res.status(400).json({ error: 'inventory_type must be collection, arena or graveyard' });
     }
     const commanderId = req.body?.commander_card_id;
     if (commanderId != null && commanderId !== ''
@@ -1388,12 +1389,12 @@ router.post('/collection/bulk', async (req, res) => {
     if (action === 'add_to_deck') {
       const deckId = parseInt(value, 10);
       if (!deckId) return res.status(400).json({ error: 'Invalid deck_id' });
-      const deck = await db.get(`SELECT id FROM decks WHERE id = ? AND user_id = ?`, [deckId, req.user.id]);
+      const deck = await db.get(`SELECT id, inventory_type FROM decks WHERE id = ? AND user_id = ?`, [deckId, req.user.id]);
       if (!deck) return res.status(404).json({ error: 'Deck not found' });
 
       const rows = await db.all(
-        `SELECT card_id, SUM(quantity) as total_qty FROM collection WHERE id IN (${placeholders}) AND user_id = ? AND COALESCE(list_type, 'collection') != 'graveyard' GROUP BY card_id`,
-        [...ids, req.user.id]
+        `SELECT card_id, SUM(quantity) as total_qty FROM collection WHERE id IN (${placeholders}) AND user_id = ? AND COALESCE(list_type, 'collection') = ? GROUP BY card_id`,
+        [...ids, req.user.id, deck.inventory_type ?? 'collection']
       );
 
       let added = 0;

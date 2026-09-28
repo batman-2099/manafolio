@@ -1467,7 +1467,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         >
           <form onSubmit={handleCreateContainerDeck} aria-busy={creatingContainerDeck}>
             <h2 id="container-deck-title" style={{ marginTop: 0 }}>{t('deck.createDeck')}</h2>
-            <p id="container-deck-hint" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.5 }}>{t('loc.createDeckHint')}</p>
+            <p id="container-deck-hint" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.5 }}>{t(isArchive ? 'loc.createGraveyardDeckHint' : 'loc.createDeckHint')}</p>
             <div className="form-group">
               <label htmlFor="container-deck-name">{t('deck.deckName')}</label>
               <input id="container-deck-name" className="input-control" required maxLength={120} autoFocus disabled={creatingContainerDeck} value={containerDeckDraft.name} onChange={event => setContainerDeckDraft(draft => ({ ...draft, name: event.target.value }))} />
@@ -1714,7 +1714,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           
           {selectedLoc && (
             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-            {!isArchive && (
             <button
               type="button"
               className="btn btn-secondary"
@@ -1723,7 +1722,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             >
               <Layers size={14} aria-hidden="true" /> {t('deck.createDeck')}
             </button>
-            )}
             {!filingMode && !moveMode && (
               <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                 <button

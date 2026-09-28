@@ -214,6 +214,45 @@ async function testEditor() {
     assert.deepStrictEqual(empty.cards, []);
     assert.strictEqual(empty.commander_card_id, null);
     assert.strictEqual(empty.format, 'Modern');
+
+    // Archival is a definition-only transition; restoring must validate the destination inventory.
+    const archivedId = (await db.run(`INSERT INTO decks (name, user_id, format, inventory_type)
+      VALUES ('Archive editor', 1, 'Casual', 'collection')`)).lastID;
+    const source = await db.get("SELECT id FROM collection WHERE card_id = 'first' AND user_id = 1 AND list_type = 'collection'");
+    await db.run(`INSERT INTO deck_cards (deck_id, card_id, quantity, source_entry_id)
+      VALUES (?, 'first', 2, ?)`, [archivedId, source.id]);
+    const archiveDraft = {
+      name: 'Archive editor', description: 'Keep definition', notes: 'Keep private notes',
+      format: 'Casual', category: 'Casual', accent_color: '#123456', target_size: 60,
+      inventory_type: 'graveyard', commander_card_id: null,
+      cards: [{ card_id: 'first', quantity: 2, pulled: false, source_entry_id: source.id }]
+    };
+    const archiveInventory = await db.all('SELECT * FROM collection ORDER BY id');
+    await db.run('UPDATE decks SET checked_out = 1 WHERE id = ?', [archivedId]);
+    assert.strictEqual((await save(archiveDraft, archivedId)).status, 400);
+    assert.strictEqual((await db.get('SELECT inventory_type FROM decks WHERE id = ?', [archivedId])).inventory_type, 'collection');
+    assert.strictEqual((await db.get('SELECT source_entry_id FROM deck_cards WHERE deck_id = ?', [archivedId])).source_entry_id, source.id);
+    assert.strictEqual((await request('PUT', `${archivedId}/return`, {})).status, 200);
+    assert.strictEqual((await save(archiveDraft, archivedId)).status, 200);
+    const archivedDraft = { ...archiveDraft, cards: archiveDraft.cards.map(card => ({ ...card, source_entry_id: null })) };
+    let archiveSaved = (await request('GET', archivedId)).body;
+    assert.strictEqual(archiveSaved.inventory_type, 'graveyard');
+    assert.deepStrictEqual(archiveSaved.cards.map(card => [card.id, card.quantity, card.source_entry_id]), [['first', 2, null]]);
+    assert.strictEqual((await save({ ...archivedDraft, notes: 'Edited while missing' }, archivedId)).status, 200);
+    archiveSaved = (await request('GET', archivedId)).body;
+    assert.strictEqual(archiveSaved.notes, 'Edited while missing');
+    for (const inventoryType of ['collection', 'arena']) {
+      assert.strictEqual((await save({ ...archivedDraft, name: 'Must roll back', inventory_type: inventoryType }, archivedId)).status, 400);
+      assert.deepStrictEqual((await request('GET', archivedId)).body, archiveSaved);
+    }
+    assert.strictEqual((await save(archivedDraft, archivedId, 2)).status, 404);
+    assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), archiveInventory);
+    for (const inventoryType of ['collection', 'arena']) {
+      await db.run("UPDATE collection SET quantity = 2 WHERE card_id = 'first' AND user_id = 1 AND list_type = ?", [inventoryType]);
+      assert.strictEqual((await save({ ...archivedDraft, inventory_type: inventoryType }, archivedId)).status, 200);
+      assert.strictEqual((await request('GET', archivedId)).body.inventory_type, inventoryType);
+      assert.strictEqual((await save(archivedDraft, archivedId)).status, 200);
+    }
   } finally {
     if (server) await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     await new Promise((resolve, reject) => db.dbConnection.close(error => error ? reject(error) : resolve()));

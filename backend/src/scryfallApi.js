@@ -450,17 +450,17 @@ async function fetchWindow(q, lang, offset, limit, order) {
 // such count). Wrapping keeps the many early returns in the body unchanged.
 async function searchCards({
   name = '', number = '', set = '', scope = 'database', userId = null,
-  lang = null, allPrints = false, page = 1, limit = 60,
+  lang = null, allPrints = false, page = 1, limit = 60, listType = 'collection',
 } = {}) {
   const meta = { total: null };
-  const cards = await runSearch(meta, name, number, set, scope, userId, lang, allPrints, page, limit);
+  const cards = await runSearch(meta, name, number, set, scope, userId, lang, allPrints, page, limit, listType);
   return { cards, total: meta.total };
 }
 
 // Search MTG cards: local card_cache first (game='mtg'), then Scryfall.
 // `page` is 1-based over `limit`-sized pages; the caller keeps asking for the
 // next page while a full page comes back.
-async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', scope = 'database', userId = null, lang = null, allPrints = false, page = 1, limit = 60) {
+async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', scope = 'database', userId = null, lang = null, allPrints = false, page = 1, limit = 60, listType = 'collection') {
   const offset = (page - 1) * limit;
   const cleanName = (nameQuery || '').trim();
   const cleanNumber = (numberQuery || '').trim().replace(/^#/, '').split('/')[0].trim();
@@ -499,7 +499,7 @@ async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', 
   if (scope === 'collection') {
     if (!userId) return [];
     const { sql, params } = cardSearchSql.collectionQuery('mtg', {
-      userId, name: cleanName, number: cleanNumber, setList, limit, offset,
+      userId, name: cleanName, number: cleanNumber, setList, limit, offset, listType,
     });
     return (await db.all(sql, params)).map(parseCardRow);
   }

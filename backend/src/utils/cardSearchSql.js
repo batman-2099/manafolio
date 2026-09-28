@@ -47,14 +47,14 @@ function nameClause(prefix, name) {
 
 // What the user OWNS, across every language they own it in. `game` is bound, not
 // interpolated, so a caller cannot widen the query by passing something odd.
-function collectionQuery(game, { userId, name, number, setList = [], limit, offset }) {
+function collectionQuery(game, { userId, name, number, setList = [], limit, offset, listType = 'collection' }) {
   let sql = `
     SELECT cc.*, SUM(c.quantity) AS owned_qty
     FROM collection c
     JOIN card_cache cc ON c.card_id = cc.id
-    WHERE c.user_id = ? AND c.list_type = 'collection' AND cc.game = ?
+    WHERE c.user_id = ? AND c.list_type = ? AND cc.game = ?
   `;
-  const params = [userId, game];
+  const params = [userId, listType, game];
   for (const part of [nameClause('cc.', name), numberClause('cc.number', number), setSqlFilter(setList, 'cc')]) {
     if (!part) continue;
     sql += ` AND ${part.clause}`;

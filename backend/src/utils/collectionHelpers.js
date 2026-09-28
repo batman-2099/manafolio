@@ -105,17 +105,20 @@ async function deckMissingCards(decks, userId) {
     const own = ownAllocations.get(source.deck_id);
     own.set(source.entry_id, (own.get(source.entry_id) || 0) + source.quantity);
   }
-  const arena = new Map((await db.all(`SELECT c.card_id, SUM(c.quantity) AS quantity
+  const nonphysical = new Map();
+  for (const row of await db.all(`SELECT c.list_type, c.card_id, SUM(c.quantity) AS quantity
     FROM collection c JOIN card_cache cc ON cc.id = c.card_id AND cc.game = c.game
-    WHERE c.user_id = ? AND c.list_type = 'arena' AND c.game = 'mtg' AND c.quantity > 0
-    GROUP BY c.card_id`, [userId])).map(row => [row.card_id, row.quantity]));
+    WHERE c.user_id = ? AND c.list_type IN ('arena', 'graveyard') AND c.game = 'mtg' AND c.quantity > 0
+    GROUP BY c.list_type, c.card_id`, [userId])) {
+    nonphysical.set(`${row.list_type}:${row.card_id}`, row.quantity);
+  }
   const decksById = new Map(decks.map(deck => [deck.id, deck]));
   for (const card of cards) {
     const deck = decksById.get(card.deck_id);
     if (!deck) continue;
     let available = 0;
-    if (deck.inventory_type === 'arena') {
-      available = arena.get(card.card_id) || 0;
+    if (deck.inventory_type === 'arena' || deck.inventory_type === 'graveyard') {
+      available = nonphysical.get(`${deck.inventory_type}:${card.card_id}`) || 0;
     } else {
       const entries = entriesByCard.get(card.card_id) || [];
       const candidates = deck.checked_out
@@ -169,6 +172,10 @@ async function deckCardSources(userId, deckId, cardId, sourceEntryId = null) {
 
 async function validateDeckSource(userId, deckId, cardId, quantity, sourceEntryId, { mode = 'addition', savedSourceEntryId = null } = {}) {
   if (sourceEntryId == null) return;
+  const deck = await db.get('SELECT inventory_type FROM decks WHERE id = ? AND user_id = ?', [deckId, userId]);
+  if (!deck || (deck.inventory_type || 'collection') !== 'collection') {
+    throw Object.assign(new Error('Only Physical decks can select physical sources'), { status: 400 });
+  }
   if (mode === 'draft') {
     // Saved preferences can outlive inventory, including deleted-entry restore tombstones.
     if (sourceEntryId === savedSourceEntryId) return;
@@ -189,6 +196,9 @@ async function validateDeckSource(userId, deckId, cardId, quantity, sourceEntryI
 // The pull list and checkout share this plan. A return reads the recorded
 // entries, including missing copies, instead of allocating different cards.
 async function deckLocations(deck, userId) {
+  if ((deck.inventory_type || 'collection') !== 'collection') {
+    throw Object.assign(new Error('Only Physical decks have physical card locations'), { status: 400 });
+  }
   const cards = await db.all(`SELECT dc.*, cc.name, cc.printed_name FROM deck_cards dc
     JOIN card_cache cc ON cc.id = dc.card_id WHERE dc.deck_id = ? AND dc.quantity > 0`, [deck.id]);
   const entries = deck.checked_out

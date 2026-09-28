@@ -66,7 +66,7 @@ On narrow screens, use **More** for navigation items that are not shown in the b
 | Physical Collection | Paper cards you own. | Yes, for Physical workflows; availability still depends on missing/reserved status. | Yes. |
 | Arena | Digital cards recorded separately. | Yes, for Arena workflows only. | No. |
 | Wishlist | Cards you plan to acquire. | No. | Not an owned physical supply. |
-| Graveyard | Archived records retained for reference. | No; archived analytics are separate. | Separate Graveyard containers. |
+| Graveyard | Archived records retained for reference. | Graveyard deck definitions only; no owned totals or Physical/Arena supply. | Separate Graveyard containers. |
 
 - **Printing** means the particular set and collector number, not merely the card name. Finish, language, condition, and grading can distinguish your copies further.
 - **Unassigned Pile / Unsorted** means physical copies without a storage assignment. It is not an extra purchase list.
@@ -263,7 +263,7 @@ Open **Collection**, then use the inventory tabs or **Inventory** selector:
 | --- | --- |
 | **Collection** | Physical collection entries, including unfiled cards. |
 | **Arena** | Separately recorded digital copies. |
-| **Graveyard** | Archived cards, excluded from owned inventory and deck supply. |
+| **Graveyard** | Archived cards, excluded from owned inventory and Physical/Arena deck supply; usable in Graveyard deck definitions. |
 | **Unassigned Pile** | Physical Collection cards without a storage container; not a separate ownership type. |
 | **Wishlist** | Wanted cards, excluded from owned totals. |
 
@@ -467,6 +467,8 @@ Cards can remain in saved or checked-out decks. Transferring the container prese
 
 Graveyard has separate unassigned cards and storage; physical cards cannot be filed directly into archived containers or vice versa. Archived cards do not supply owned totals or physical/Arena decks. Graveyard containers are not available for public container sharing.
 
+Choose **Create Deck** in a Graveyard container to create an archived deck from its complete contents, regardless of current filters or selection. The container and card entries stay unchanged. Empty containers cannot create a deck.
+
 ### Storage troubleshooting
 
 | Problem | Check first |
@@ -486,9 +488,9 @@ Graveyard has separate unassigned cards and storage; physical cards cannot be fi
 
 Open **Deck Builder** to reach **Your decks**. Search by deck name or description, use the status filter, sort the list, and choose **Grid view** or **Table view**. Open a deck by selecting its card/row or **Open**.
 
-A deck uses one **Deck Type**: **Physical** or **Arena**. Physical and Arena quantities are separate. Wishlist and Graveyard are not deck inventory. A saved deck definition is not a reservation: only a checked-out Physical deck reserves copies.
+A deck uses one **Deck Type**: **Physical**, **Arena**, or **Graveyard**. Each uses only its matching inventory. Wishlist is not deck inventory. A saved deck definition is not a reservation: only a checked-out Physical deck reserves copies.
 
-**Missing cards** appears in red in both Grid and Table view when required copies are unavailable, even if the deck has reached its target size. This includes missing or archived copies, copies reserved by another deck, and shortages at a selected source. Arena decks use Arena ownership only. A checked-out deck keeps its Return action and reservations, but archived or missing reserved copies still show **Missing cards**. Use the matching status filter to find affected decks; the target-reached filter excludes them.
+**Missing cards** appears in red in both Grid and Table view when required copies are unavailable, even if the deck has reached its target size. Physical decks exclude archived copies and other decks' reservations; Arena decks use Arena ownership only; Graveyard decks use archived copies only. A checked-out Physical deck keeps its Return action and reservations, but archived or missing reserved copies still show **Missing cards**. Use the matching status filter to find affected decks; the target-reached filter excludes them.
 
 In an open deck, the toolbar is followed by **Description**. The analytics and commander artwork are directly below Description: **Supertype Breakdown**, **Color & Land Distribution**, and **Deck Health & Rules**, including wins/losses. **Add Cards to Deck**, **Deck Cards**, and **Tokens** are below that overview—not in a separate analytics sidebar. Some charts appear only when the deck contains relevant cards.
 
@@ -497,7 +499,7 @@ In an open deck, the toolbar is followed by **Description**. The analytics and c
 ### Create an empty deck
 
 1. In **Deck Builder**, select **Create Deck**.
-2. Choose **Deck Type → Physical** or **Arena**.
+2. Choose **Deck Type → Physical**, **Arena**, or **Graveyard**.
 3. Select **Format** and check **Target Size**. The target accepts 1–300 cards; selecting a Commander format in this creation form sets 100, while Standard/Modern/Pioneer selections set 60. Always check the value before creating.
 4. Enter **Deck Name**. Optionally select **Deck Category**, **Vault Accent Color**, and enter a description.
 5. Leave the import sections closed for an empty deck, then select **Create Deck**.
@@ -520,7 +522,7 @@ The selection is anchored to an existing collection copy and follows its current
 ### Add cards, change quantities, and save
 
 1. Open the deck and scroll below Description and the analytics to **Add Cards to Deck**.
-2. Search by card name using the search button, or select **Browse Collection** to browse the inventory corresponding to the deck's Physical/Arena type. Despite that button's name, an Arena deck uses Arena quantities.
+2. Search by card name using the search button, or select **Browse Collection** to browse the deck's matching Physical, Arena, or Graveyard inventory. Graveyard decks use archived cards only.
 3. Inspect the set and collector number before adding a printing. Select its add control.
 4. In **Deck Cards**, use **+** and **−** to change quantities. At one copy, the removal control becomes **Remove from deck**. Removing a card here does not delete owned copies.
 5. Use the centered display controls to choose **List** or **Grid**, adjust **Decrease card size** / **Increase card size**, and sort by **Card type**, **Location**, or **Pulled status**. Zoom works in both views and carries across view changes; in List it scales the card artwork, text, and row controls.
@@ -541,7 +543,7 @@ Return a checked-out deck before changing its card composition or inventory type
 
 **Expected result:** the saved profile and Description reflect your changes. **Apply Properties** alone is not a server save.
 
-Switching Physical/Arena does not transfer cards between inventories. The destination must already own the required quantities, and the deck must not be checked out. Moving away from a Commander/EDH/Brawl format clears the commander selection in the draft.
+To archive a deck, choose **Deck Type → Graveyard**, **Apply Properties**, then **Save**. This preserves the list, notes, and metadata without moving any collection cards; physical source preferences are cleared. Return a checked-out deck first. Missing archived copies do not block archiving. Restoring to Physical or Arena requires the destination to own the required quantities. Graveyard decks do not support checkout, physical source selection, or AI improvement. Moving away from a Commander/EDH/Brawl format clears the commander selection in the draft.
 
 ### Choose a commander
 
@@ -620,7 +622,7 @@ This deck-creation chooser creates a definition only. It does not buy or add own
 
 If you use the guide's **Cancel**/X, click outside it, or use its back action, Manafolio attempts to undo the checkout. Do not treat closing it as completion. After a network or undo error, inspect the deck's current status before trying again.
 
-Arena decks cannot be checked out, even if a checkout control is visible. Wishlist and Graveyard do not supply Physical checkout. If copies are missing or another deck needs the same quantities, resolve that situation rather than assuming a deck definition proves the cards are ready.
+Arena and Graveyard decks cannot be checked out, even if a checkout control is visible. Wishlist and Graveyard do not supply Physical checkout. If copies are missing or another deck needs the same quantities, resolve that situation rather than assuming a deck definition proves the cards are ready.
 
 ### Use Pulled without confusing it with checkout
 
@@ -891,7 +893,7 @@ Automatic snapshots in the same volume do not protect against losing that volume
 
 ### A card is owned but unavailable for a deck
 
-Check the deck's inventory first. Then check missing status, exact printing/quantity, and reservations belonging to other decks. Wishlist and Graveyard cannot supply deck ownership. Return the reserving Physical deck before expecting those copies to become available to another checkout.
+Check the deck's inventory first. Then check missing status, exact printing/quantity, and reservations belonging to other decks. Wishlist cannot supply deck ownership; Graveyard supplies only Graveyard definitions, not Physical or Arena decks. Return the reserving Physical deck before expecting those copies to become available to another checkout.
 
 ### A storage move is refused
 

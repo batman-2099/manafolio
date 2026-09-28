@@ -82,7 +82,7 @@ async function main() {
       const result = await request(body, 400);
       assert.match(result.error, /card_ids/);
     }
-    for (const inventory_type of ['wishlist', 'graveyard', '', null, 1]) {
+    for (const inventory_type of ['wishlist', '', null, 1]) {
       assert.match((await request({ card_ids: [cardId(1)], inventory_type }, 400)).error, /inventory_type/);
     }
     for (const commander_card_id of [false, 0, 1, {}, [], ' ', 'mtg-../../sets', id(1), 'unsupported-1', cardId(2)]) {
@@ -173,6 +173,9 @@ async function main() {
     arena[1].image_url = 'https://cards.scryfall.io/day.jpg';
     assert.deepStrictEqual(await request({ card_ids: [cardId(10)], inventory_type: 'arena' }), { tokens: arena },
       'Arena ownership is separate and has no physical storage, even on stale located rows');
+    const graveyard = await request({ card_ids: [cardId(10)], inventory_type: 'graveyard' });
+    assert.deepStrictEqual(graveyard.tokens.filter(token => token.owned).map(token => token.id), [cardId(9)],
+      'Graveyard token ownership excludes Physical, Arena, Wishlist and other accounts');
     assert.deepStrictEqual(await snapshot(), inventoryBefore, 'ownership lookups never mutate inventory or cached cards');
     await db.run(`DELETE FROM collection WHERE user_id = 1 AND card_id = ?`, [cardId(3)]);
     const alternate = (await request({ card_ids: [cardId(1)] })).tokens[0];

@@ -2,7 +2,7 @@
 
 ## Product scope
 
-Manafolio is a self-hosted, multi-user Magic: The Gathering collection, storage, and deck manager. Physical and Arena inventories are separate; Wishlist plans acquisitions and Graveyard retains archived records without supplying owned totals or decks. The React/Vite frontend and Express backend share one SQLite collection database. Docker packages the web application for desktop and phone browsers.
+Manafolio is a self-hosted, multi-user Magic: The Gathering collection, storage, and deck manager. Physical and Arena inventories are separate; Wishlist plans acquisitions and Graveyard retains archived records without supplying owned totals or Physical/Arena decks. Graveyard deck definitions can use archived cards but cannot reserve or check out copies. The React/Vite frontend and Express backend share one SQLite collection database. Docker packages the web application for desktop and phone browsers.
 
 Only Magic provider integrations are supported. Preserve existing records and their game identities when changing shared code; removing an integration must not delete or relabel stored collections.
 

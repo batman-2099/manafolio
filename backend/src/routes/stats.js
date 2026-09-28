@@ -173,9 +173,10 @@ router.get('/stats', async (req, res) => {
       const loc = row.location_name || 'Unassigned';
       locationCounts[loc] = (locationCounts[loc] || 0) + qty;
     });
-    const deckFilter = inventory === 'collection' || inventory === 'arena'
-      ? ` AND COALESCE(d.inventory_type, 'collection') = ?` : '';
-    const deckRows = inventory === 'graveyard' ? [] : await db.all(`
+    const deckFilter = ['collection', 'arena', 'graveyard'].includes(inventory)
+      ? ` AND COALESCE(d.inventory_type, 'collection') = ?`
+      : ` AND COALESCE(d.inventory_type, 'collection') IN ('collection', 'arena')`;
+    const deckRows = await db.all(`
       SELECT d.id, d.name AS deck_name, COALESCE(d.inventory_type, 'collection') AS inventory_type,
              d.wins, d.losses, dc.card_id, dc.quantity,
              cc.name, cc.types, cc.subtypes, cc.supertype, cc.color_identity, cc.cmc
@@ -184,7 +185,7 @@ router.get('/stats', async (req, res) => {
       LEFT JOIN card_cache cc ON cc.id = dc.card_id
       WHERE d.user_id = ? AND d.game = 'mtg'${deckFilter}
       ORDER BY d.id DESC
-    `, deckFilter ? [req.user.id, inventory] : [req.user.id]);
+    `, ['collection', 'arena', 'graveyard'].includes(inventory) ? [req.user.id, inventory] : [req.user.id]);
     const performanceByDeck = new Map();
     for (const row of deckRows) {
       if (!performanceByDeck.has(row.id)) {

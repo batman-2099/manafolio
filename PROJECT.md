@@ -78,13 +78,13 @@ The main persistent assets are the collection database and its sidecars, automat
 | Physical Collection | `collection` | Physical decks | Physical containers |
 | Arena | `arena` | Arena decks | None |
 | Wishlist | `wishlist` | No | None |
-| Graveyard | `graveyard` | No; separate archived statistics | Graveyard containers |
+| Graveyard | `graveyard` | Graveyard deck definitions only; separate archived statistics | Graveyard containers |
 
-`locations.inventory_type` is `collection` or `graveyard`; `decks.inventory_type` is `collection` or `arena`. These fields are related but are not interchangeable enums. Trade status is an `is_trade` flag, not a fifth inventory destination.
+`locations.inventory_type` is `collection` or `graveyard`; `decks.inventory_type` is `collection`, `arena`, or `graveyard`. These fields are related but are not interchangeable enums. Trade status is an `is_trade` flag, not a fifth inventory destination.
 
 A provider card ID identifies an exact printing in `card_cache`. A `collection.id`, exposed as `entry_id`, identifies a user's stored entry. Storage highlights, edits, and pull lists use **entry identity**, not `card_id + position`, which can collide across compartments. Add paths normally create individual-copy rows; quantity-bearing rows and aggregated display stacks also exist, so consumers must sum `quantity`, not count rows.
 
-Missing/Found is a flag on an entry, not deletion or archival. Individual inventory transfers clear incompatible placement. Archiving retains quantities and metadata but removes the cards from owned totals and deck supply. Restoring an individual card to Physical returns it to Unassigned Pile. A whole-container transfer instead preserves its layout and placements.
+Missing/Found is a flag on an entry, not deletion or archival. Individual inventory transfers clear incompatible placement. Archiving retains quantities and metadata but removes cards from owned totals and Physical/Arena deck supply. Archived cards can supply Graveyard deck definitions. Restoring an individual card to Physical returns it to Unassigned Pile. A whole-container transfer instead preserves its layout and placements.
 
 ### Main tables
 
@@ -220,7 +220,9 @@ Shared dispatch in `utils/cardApi.js` accepts Magic identities only. Removed int
 
 Deck definitions use one inventory; checked-out decks cannot switch inventory. `utils/deckRules.js` distinguishes inventory-constrained additions from availability-independent editor drafts while sharing copy-limit checks. Commander selection is a single existing card; the UI's commander workflow is not a promise of full tournament legality, partner commanders, or sideboards.
 
-Physical checkout reserves quantities by setting `decks.checked_out` and `checked_out_at`; it does **not** move collection entries. Availability subtracts copies reserved by other checked-out Physical decks. Arena decks cannot check out.
+Deck archiving changes only the definition's inventory, preserving list and metadata even without sufficient archived copies, and atomically clears physical source preferences. Restoring to Physical/Arena validates destination ownership. Graveyard additions/imports/search/availability/token ownership use archived copies only. Duplication and complete backups preserve Graveyard inventory; AI source-deck improvement rejects it.
+
+Physical checkout reserves quantities by setting `decks.checked_out` and `checked_out_at`; it does **not** move collection entries. Availability subtracts copies reserved by other checked-out Physical decks. Arena and Graveyard decks cannot check out.
 
 `GET /api/decks` includes `missing_cards`, the number of unavailable required copies, computed from batched inventory, deck requirements, and reservations. Draft Physical decks respect source groups and other decks' reservations; checked-out decks require their exact reserved copies to remain usable. Arena ownership stays separate. This status does not change the return guide or checkout state.
 
@@ -230,7 +232,7 @@ Physical checkout reserves quantities by setting `decks.checked_out` and `checke
 
 Return clears the deck-level reservation state. Checkout/check-in use the same stored location for pulling and re-filing. Return a deck before changing its composition or individually archiving its reserved copies. Whole-container archiving and storage reassignment retain reservations.
 
-`POST /api/decks/from-container` uses a physical container's complete saved contents, not the current UI selection/filter. It creates an unchecked-out definition without moving cards, and can include missing/reserved copies that must be resolved before play. Duplicating a deck copies its definition/metadata, not its checkout state or win/loss record.
+`POST /api/decks/from-container` uses a Physical or Graveyard container's complete saved contents, not the current UI selection/filter, and assigns the same deck inventory. It creates an unchecked-out definition without moving cards, and can include missing/reserved copies that must be resolved before Physical play. Duplicating a deck copies its definition/metadata and inventory, not its checkout state or win/loss record.
 
 ## Imports, exports, and backups
 

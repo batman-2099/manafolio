@@ -50,7 +50,7 @@ async function validateDeckAddition({ deckId, userId, cardId, newQty, dbClient, 
     }
   }
   if (mode !== 'draft') {
-    const inventoryType = deck.inventory_type === 'arena' ? 'arena' : 'collection';
+    const inventoryType = deck.inventory_type || 'collection';
     const ownedRow = await client.get(
       `SELECT COALESCE(SUM(quantity), 0) AS owned FROM collection
        WHERE card_id = ? AND user_id = ? AND list_type = ?`, [cardId, userId, inventoryType]

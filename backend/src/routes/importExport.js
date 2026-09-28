@@ -48,6 +48,10 @@ async function parseCompleteBackup(data) {
   if (!backup || backup.format !== 'manafolio-backup' || backup.version !== 1 || !arrays.every(key => Array.isArray(backup[key]))) {
     throw new Error('Invalid backup file');
   }
+  if (backup.decks.some(deck => !['collection', 'arena', 'graveyard'].includes(deck.inventory_type ?? 'collection')
+      || ((deck.inventory_type ?? 'collection') !== 'collection' && (deck.checked_out || deck.checked_out_at != null)))) {
+    throw new Error('Invalid backup deck inventory or checkout state');
+  }
   if (backup.decks.some(deck => ['wins', 'losses'].some(key => Object.hasOwn(deck, key)
       && (!Number.isInteger(deck[key]) || deck[key] < 0 || deck[key] > 2147483647)))) {
     throw new Error('Invalid backup deck record');
@@ -87,9 +91,10 @@ async function parseCompleteBackup(data) {
       || backup.deck_cards.some(card => card.source_entry_id != null && (
         !Number.isSafeInteger(card.source_entry_id) || card.source_entry_id === 0
         || (entries.has(card.source_entry_id) && entries.get(card.source_entry_id).card_id !== card.card_id)
-        || backup.decks.find(deck => deck.id === card.deck_id)?.inventory_type === 'arena'))
+        || (backup.decks.find(deck => deck.id === card.deck_id)?.inventory_type ?? 'collection') !== 'collection'))
       || allocations.some(source => !Number.isSafeInteger(source.entry_id) || source.entry_id === 0
         || !Number.isSafeInteger(source.quantity) || source.quantity < 1
+        || (backup.decks.find(deck => deck.id === source.deck_id)?.inventory_type ?? 'collection') !== 'collection'
         || !backup.deck_cards.some(card => card.deck_id === source.deck_id && card.card_id === source.card_id)
         || (entries.has(source.entry_id) && entries.get(source.entry_id).card_id !== source.card_id))) {
     throw new Error('Invalid backup deck sources');

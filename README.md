@@ -20,7 +20,7 @@ Manafolio was originally forked from [Bindarr](https://github.com/thenotoriousJe
 
 ## Features
 
-- **Four inventory destinations.** Track Physical and Arena copies separately, plan purchases in Wishlist, and archive cards in Graveyard without deleting their quantities or metadata. Wishlist and Graveyard do not inflate owned totals or supply decks.
+- **Four inventory destinations.** Track Physical and Arena copies separately, plan purchases in Wishlist, and archive cards in Graveyard without deleting their quantities or metadata. Wishlist and Graveyard do not inflate owned totals; archived cards supply only Graveyard deck definitions, never Physical or Arena decks.
 - **Collection detail.** Search Scryfall, track printing, finish, language, condition, purchase price and graded slabs, and mark copies Missing/Found without losing their last known locations. Filter, sort, stack duplicates, and switch between grid and table views.
 - **Dashboard.** Compare All Cards, Physical, and Arena quantities, value, recorded costs, collection growth, color identity, mana value, and saved deck performance. Graveyard has its own archived-card view. Accessible chart-data tables expose the underlying numbers.
 - **Physical storage.** Organize binders and boxes by page, row, and slot. Find unfiled cards in Unassigned Pile; move or auto-file copies, expand capacity, lock compartments, and choose card-art covers for containers. Graveyard containers keep archived storage separate.
@@ -151,11 +151,11 @@ Choose **Export view CSV** or **Export view TXT** in Collection. Export includes
 
 ### Create and import decks
 
-1. Open **Deck Builder → Create Deck** and choose **Physical** or **Arena** inventory.
-2. Build from owned cards or import a plain, ManaBox, or MTG Arena-style decklist, such as `4 Llanowar Elves (FDN) 227`. Decklist imports use only cards owned in that inventory.
+1. Open **Deck Builder → Create Deck** and choose **Physical**, **Arena**, or **Graveyard** inventory.
+2. Build from cards in that inventory or import a plain, ManaBox, or MTG Arena-style decklist, such as `4 Llanowar Elves (FDN) 227`. Graveyard decks use archived copies only.
 3. Review your draft and choose **Save**, immediately before **Draw Simulator**. Card additions/removals, quantities, Pulled status, commander, and applied properties are committed together. Imports and edits remain local until saved; an unsaved marker and leave confirmation protect the draft, and failed saves retain it for retry.
 
-**Edit Properties** can switch inventory when every card is owned at the destination and the deck is not checked out. **Duplicate deck** copies the list and metadata, not checkout state or wins/losses. Record results under **Deck Health & Rules**; these counters save independently of the editor.
+**Edit Properties → Deck Type → Graveyard → Apply Properties → Save** archives a deck definition without moving its cards. Its notes, list, and metadata remain; physical source preferences are cleared. Return checked-out decks first. Restoring to Physical or Arena requires the destination inventory to own every required copy. Graveyard decks cannot check out or use AI improvement. **Duplicate deck** retains inventory and metadata, not checkout state or wins/losses.
 
 Commander / EDH and Brawl support one **Commander** toggle; selecting another replaces it. The card inspector's **Create Commander Deck** starts a 100-card-target deck with that card as commander, using its inventory, without moving or checking out copies. Review format legality yourself.
 
@@ -179,7 +179,7 @@ Return the deck to release reservations before changing its card composition, in
 
 Open **Related tokens** in the card inspector or **Tokens** below a deck's cards; AI drafts have the same grid. Tiles show artwork, inventory-scoped ownership, physical locations (including Unassigned Pile), and **Created by** links to the relevant cards.
 
-Ownership matches names case-insensitively, including double-faced tokens' front names. Decks prefer owned matches from the commander's set or corresponding token set, then fall back to any set. Same-named tokens with different rules or stats can match: check artwork and text. Wishlist and Graveyard do not count; Arena has no physical locations.
+Ownership matches names case-insensitively, including double-faced tokens' front names. Decks prefer matches from the commander's set or corresponding token set, then fall back to any set within their inventory. Same-named tokens with different rules or stats can match: check artwork and text. Wishlist does not count; Graveyard token ownership is separate from Physical and Arena.
 
 Tokens are references, not additions to the deck: they do not change size, reserve copies, or enter deck exports. Scryfall supplies relations; failed lookups offer retry. No related tokens found does not prove a card cannot create copies or variable tokens.
 
@@ -199,15 +199,15 @@ In an unlocked container, select cards and use **Add to Deck…** to add quantit
 
 ### Create a deck from a storage container
 
-Open a physical container and choose **Create Deck**. This uses its complete saved contents, not the current filters or selection, combining printing quantities and setting the target size to the full count. Missing and checked-out copies are included in the definition, even from a locked container.
+Open a Physical or Graveyard container and choose **Create Deck**. This uses its complete saved contents, not the current filters or selection, combining printing quantities and setting the target size to the full count. The deck uses the container's inventory. Missing and checked-out copies may be included in the definition, even from a locked container.
 
-The container and reservations stay unchanged; the deck is **not checked out**. Review its format, size, and commander, and resolve missing or reserved copies before checkout. Empty containers and Graveyard containers cannot supply this workflow.
+The container and reservations stay unchanged; the deck is **not checked out**. Review its format, size, and commander. Physical decks must resolve missing or reserved copies before checkout; Graveyard decks cannot check out. Empty containers cannot supply this workflow.
 
 ### Store archived cards in Graveyard containers
 
 Open **Collection → Graveyard → Graveyard containers**, or select **Graveyard** in Storage. Archived inventory has separate containers, unassigned cards, layouts, capacity, locks, and covers, with the same filing controls.
 
-A container's **More → Move to Graveyard / Restore to Collection** transfers it and all contents atomically, retaining quantities, metadata, positions, layout, settings, and cover. Unlock the container and compartments first. Cards may remain in decks, including checked-out decks: deck lists, checkout state, and exact-copy reservations are preserved. Archived copies do not supply owned totals or new checkouts. Individual restores clear archived placement; whole-container restores preserve it. Deleting an archived container leaves its cards archived and unassigned. Graveyard containers cannot supply physical imports, decks, AI inventory, or public container shares.
+A container's **More → Move to Graveyard / Restore to Collection** transfers it and all contents atomically, retaining quantities, metadata, positions, layout, settings, and cover. Unlock the container and compartments first. Cards may remain in decks, including checked-out decks: deck lists, checkout state, and exact-copy reservations are preserved. Archived copies do not supply owned totals or new checkouts. Individual restores clear archived placement; whole-container restores preserve it. Deleting an archived container leaves its cards archived and unassigned. Graveyard containers can supply Graveyard deck definitions, but not physical imports, Physical/Arena decks, AI inventory, or public container shares.
 
 ### Get an AI deck recommendation
 

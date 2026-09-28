@@ -70,6 +70,7 @@ async function sourceDeck(userId, id, request) {
     `SELECT id, inventory_type, format, target_size, commander_card_id FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`,
     [id, userId]);
   if (!source) fail('Source deck not found.', 404);
+  inventoryType(source.inventory_type);
   if (!Object.hasOwn(FORMATS, source.format)) fail('The source deck has an unsupported Magic format. Edit its format before improving it with AI.');
   if (['inventory_type', 'format', 'target_size'].some(key => request[key] !== undefined && source[key] !== request[key])) {
     fail('The source deck inventory, format or target size changed. Reopen the AI builder to use its current settings.');

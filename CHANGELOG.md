@@ -2,6 +2,11 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Added Graveyard deck inventory: archive existing deck definitions without moving cards, create/edit/import decks using archived copies, or create a deck from a Graveyard container. Notes, metadata, duplication, and backups retain the inventory. Checked-out decks must be returned before archiving; Graveyard decks cannot reserve copies, check out, or use AI improvement. Restoring to Physical/Arena validates destination ownership.
+- Deck properties now show a direct Return-to-storage instruction when checkout makes Graveyard unavailable, with the explanation associated with the disabled option.
+
 ## 2.1.2
 
 - Added set symbols to the AI Deck Builder Set filter options and single-set selection, retaining readable names when symbols are unavailable. Symbol lookup normalizes prefixed set metadata IDs against unprefixed inventory set codes without altering filter values.

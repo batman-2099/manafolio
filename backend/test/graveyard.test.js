@@ -49,6 +49,47 @@ async function testGraveyard() {
     const change = (id, list_type, user = 1, status = 200) => request(`/collection/${id}`, 'PUT', { list_type }, user, status);
     const bulk = (entry_ids, value, status = 200) => request('/collection/bulk', 'POST', { entry_ids, action: 'list_type', value }, 1, status);
 
+    // Deck archival changes only the definition, even when the archive owns no copies.
+    for (const inventoryType of ['collection', 'arena']) {
+      const archiveDeck = (await db.run(`INSERT INTO decks
+        (name, description, notes, user_id, inventory_type, format, category, accent_color, target_size, commander_card_id, wins, losses)
+        VALUES (?, 'Public description', 'Private notes', 1, ?, 'Commander', 'Casual', '#123456', 100, 'archive-card', 7, 2)`,
+      [`Archived ${inventoryType}`, inventoryType])).lastID;
+      await db.run(`INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out, source_entry_id)
+        VALUES (?, 'archive-card', 4, 1, ?)`, [archiveDeck, inventoryType === 'collection' ? physical : null]);
+      const before = await db.get('SELECT * FROM decks WHERE id = ?', [archiveDeck]);
+      const cardsBefore = await db.all('SELECT * FROM deck_cards WHERE deck_id = ?', [archiveDeck]);
+      const inventoryBefore = await db.all('SELECT * FROM collection ORDER BY id');
+      const properties = { name: before.name, inventory_type: 'graveyard' };
+      await request(`/decks/${archiveDeck}`, 'PUT', properties, 2, 404);
+      await db.run('UPDATE decks SET checked_out = 1 WHERE id = ?', [archiveDeck]);
+      await request(`/decks/${archiveDeck}`, 'PUT', properties, 1, 400);
+      assert.deepStrictEqual(await db.all('SELECT * FROM deck_cards WHERE deck_id = ?', [archiveDeck]), cardsBefore);
+      await request(`/decks/${archiveDeck}/return`, 'PUT', {});
+      const returned = await db.get('SELECT * FROM decks WHERE id = ?', [archiveDeck]);
+      await request(`/decks/${archiveDeck}`, 'PUT', properties);
+      assert.deepStrictEqual(await db.get('SELECT * FROM decks WHERE id = ?', [archiveDeck]), { ...returned, inventory_type: 'graveyard' });
+      const archivedCards = await db.all('SELECT * FROM deck_cards WHERE deck_id = ?', [archiveDeck]);
+      assert.deepStrictEqual(archivedCards.map(card => [card.card_id, card.quantity, card.source_entry_id]), [['archive-card', 4, null]]);
+      assert.strictEqual((await request('/decks')).find(row => row.id === archiveDeck).missing_cards, 4);
+      for (const target of ['collection', 'arena']) {
+        await request(`/decks/${archiveDeck}`, 'PUT', { ...properties, name: 'Must roll back', inventory_type: target }, 1, 400);
+        assert.deepStrictEqual(await db.get('SELECT * FROM decks WHERE id = ?', [archiveDeck]), { ...returned, inventory_type: 'graveyard' });
+        assert.deepStrictEqual(await db.all('SELECT * FROM deck_cards WHERE deck_id = ?', [archiveDeck]), archivedCards);
+      }
+      await request(`/decks/${archiveDeck}/checkout`, 'PUT', {}, 1, 400);
+      await request(`/decks/${archiveDeck}/locations`, 'GET', undefined, 1, 400);
+      await request(`/decks/${archiveDeck}/cards/archive-card/sources`, 'GET', undefined, 1, 400);
+      assert.deepStrictEqual(await db.all('SELECT * FROM deck_card_allocations WHERE deck_id = ?', [archiveDeck]), []);
+      assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), inventoryBefore);
+      const copied = await request(`/decks/${archiveDeck}/duplicate`, 'POST', {}, 1, 201);
+      const copy = await request(`/decks/${copied.id}`);
+      assert.strictEqual(copy.inventory_type, 'graveyard');
+      for (const key of ['description', 'notes', 'format', 'category', 'accent_color', 'target_size', 'commander_card_id']) {
+        assert.strictEqual(copy[key], before[key]);
+      }
+      assert.deepStrictEqual(copy.cards.map(card => [card.id, card.quantity, card.source_entry_id]), [['archive-card', 4, null]]);
+    }
     await change(foreign, 'graveyard', 1, 404);
     await change(physical, 'invalid', 1, 400);
     await request('/collection?list_type=invalid', 'GET', undefined, 1, 400);
@@ -73,12 +114,42 @@ async function testGraveyard() {
     assert.deepStrictEqual(await inventory(1, 'collection'), []);
     assert.strictEqual((await inventory(1, 'arena'))[0].available_qty, 2);
     assert.strictEqual((await request('/collection/bulk', 'POST', { entry_ids: [physical], action: 'add_to_deck', value: deck })).affected, 0);
+    const emptyArchive = await request('/decks', 'POST', { name: 'Owned archive', inventory_type: 'graveyard' }, 1, 201);
+    const foreignArchive = (await db.run("INSERT INTO collection (card_id, user_id, quantity, list_type) VALUES ('spare-card', 2, 9, 'graveyard')")).lastID;
+    assert.strictEqual((await request(`/decks/${emptyArchive.id}`)).inventory_type, 'graveyard');
+    await request(`/decks/${emptyArchive.id}/cards`, 'POST', { card_id: 'archive-card', quantity: 3 });
+    await request(`/decks/${emptyArchive.id}/cards`, 'POST', { card_id: 'archive-card', quantity: 4 }, 1, 400);
+    await request(`/decks/${emptyArchive.id}/cards`, 'POST', { card_id: 'spare-card', quantity: 1 }, 1, 400);
+    await request(`/decks/${emptyArchive.id}/cards`, 'POST', { card_id: 'archive-card', quantity: 1 }, 2, 404);
+    const ownedArchive = await request(`/decks/${emptyArchive.id}`);
+    assert.deepStrictEqual(ownedArchive.cards.map(card => [card.id, card.quantity, card.owned_qty, card.locked_qty]), [['archive-card', 3, 3, 0]]);
+    assert.strictEqual((await request('/decks')).find(row => row.id === emptyArchive.id).missing_cards, 0);
+    assert.deepStrictEqual((await request('/search?scope=collection&name=Archive&list_type=graveyard')).map(card => [card.id, card.owned_qty]), [['archive-card', 3]]);
+    assert.deepStrictEqual(await request('/search?scope=collection&name=Spare&list_type=graveyard'), []);
+    assert.deepStrictEqual((await request('/search?scope=collection&name=Spare&list_type=graveyard', 'GET', undefined, 2)).map(card => [card.id, card.owned_qty]), [['spare-card', 9]]);
+    await db.run('DELETE FROM collection WHERE id = ?', [foreignArchive]);
+    const imported = await request('/decks', 'POST', {
+      name: 'Imported archive', inventory_type: 'graveyard', decklist_text: '3 Archive Card'
+    }, 1, 201);
+    assert.deepStrictEqual((await request(`/decks/${imported.id}`)).cards.map(card => [card.id, card.quantity]), [['archive-card', 3]]);
+    const beforeBadImport = await db.all('SELECT * FROM decks ORDER BY id');
+    await request('/decks', 'POST', { name: 'Unowned archive', inventory_type: 'graveyard', decklist_text: '4 Archive Card' }, 1, 400);
+    assert.deepStrictEqual(await db.all('SELECT * FROM decks ORDER BY id'), beforeBadImport);
 
     const backup = await request('/export?format=backup');
     assert.deepStrictEqual(backup.collection.find(row => row.id === physical), archived);
     await request('/import', 'POST', { format: 'backup', data: backup });
     const restoredArchive = await db.get(`SELECT * FROM collection WHERE user_id = 1 AND list_type = 'graveyard'`);
     assert.deepStrictEqual({ ...restoredArchive, id: physical }, archived, 'complete backup preserves archive state and metadata');
+    for (const inventoryType of ['collection', 'arena']) {
+      const restoredDefinition = await db.get('SELECT * FROM decks WHERE user_id = 1 AND name = ?', [`Archived ${inventoryType}`]);
+      assert.strictEqual(restoredDefinition.inventory_type, 'graveyard');
+      assert.strictEqual(restoredDefinition.notes, 'Private notes');
+      assert.strictEqual(restoredDefinition.description, 'Public description');
+      assert.strictEqual(restoredDefinition.commander_card_id, 'archive-card');
+      assert.deepStrictEqual(await db.all('SELECT card_id, quantity, source_entry_id FROM deck_cards WHERE deck_id = ?', [restoredDefinition.id]),
+        [{ card_id: 'archive-card', quantity: 4, source_entry_id: null }]);
+    }
     assert.strictEqual((await db.get('SELECT quantity FROM collection WHERE id = ?', [foreign])).quantity, 9);
     const restoredArena = await db.get(`SELECT id FROM collection WHERE user_id = 1 AND list_type = 'arena'`);
     await change(restoredArchive.id, 'collection');
@@ -91,7 +162,7 @@ async function testGraveyard() {
     assert.deepStrictEqual(await inventory(1, 'collection'), []);
 
     await change(restoredArchive.id, 'collection');
-    const restoredDeck = await db.get('SELECT id FROM decks WHERE user_id = 1');
+    const restoredDeck = await db.get("SELECT id FROM decks WHERE user_id = 1 AND name = 'Physical Deck'");
     await db.run('UPDATE decks SET checked_out = 1 WHERE id = ?', [restoredDeck.id]);
     const spare = (await db.run(`INSERT INTO collection (card_id, user_id) VALUES ('spare-card', 1)`)).lastID;
     const beforeGuard = await db.all('SELECT * FROM collection WHERE user_id = 1 ORDER BY id');
@@ -150,7 +221,13 @@ async function testGraveyard() {
     await request(`/locations/${archiveBox}/resort`, 'POST', {}, 1, 409);
     assert.strictEqual((await request(`/locations/${archiveBox}/recommend`, 'POST', { card_id: 'spare-card', list_type: 'graveyard' })).rejected, true);
     await request(`/locations/${archiveBox}`, 'PUT', { locked: false });
-    await request('/decks/from-container', 'POST', { location_id: archiveBox, name: 'Not a deck' }, 1, 404);
+    const containerInventory = await db.all('SELECT * FROM collection ORDER BY id');
+    const containerDeck = await request('/decks/from-container', 'POST', { location_id: archiveBox, name: 'Filed deck' }, 1, 201);
+    const filedDeck = await request(`/decks/${containerDeck.id}`);
+    assert.strictEqual(filedDeck.inventory_type, 'graveyard');
+    assert.deepStrictEqual(filedDeck.cards.map(card => [card.id, card.quantity, card.source_entry_id]), [['archive-card', 3, null]]);
+    await request('/decks/from-container', 'POST', { location_id: archiveBox, name: 'Foreign deck' }, 2, 404);
+    assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), containerInventory);
     await request('/import-container/move', 'POST', { location_id: archiveBox, card_id: 'spare-card', printing: 'Normal', requested: 1 }, 1, 400);
     await assert.rejects(inventory(1, 'collection', { container_ids: [archiveBox] }), /Container not found/);
     await db.run("UPDATE users SET share_enabled = 1, share_locations = 1, share_token = 'archive-owner' WHERE id = 1");
@@ -169,6 +246,10 @@ async function testGraveyard() {
     assert.deepStrictEqual({ ...restored, id: filed.id, location_id: filed.location_id, compartment_id: filed.compartment_id }, filed);
     assert.strictEqual(restoredBox.cover_card_id, 'archive-card');
     assert.strictEqual((await request(`/locations/${restoredBox.id}/compartments`))[0].count, 3);
+    const restoredFiledDeck = await db.get("SELECT * FROM decks WHERE user_id = 1 AND name = 'Filed deck'");
+    assert.strictEqual(restoredFiledDeck.inventory_type, 'graveyard');
+    assert.deepStrictEqual(await db.all('SELECT card_id, quantity, source_entry_id FROM deck_cards WHERE deck_id = ?', [restoredFiledDeck.id]),
+      [{ card_id: 'archive-card', quantity: 3, source_entry_id: null }]);
     await change(restored.id, 'arena');
     assert.deepStrictEqual(await db.get('SELECT list_type, location_id, compartment_id, position, quantity FROM collection WHERE id = ?', [restored.id]),
       { list_type: 'arena', location_id: null, compartment_id: null, position: 0, quantity: 3 });

@@ -40,10 +40,10 @@ const deckEditorState = (deck) => ({
   category: deck.category || 'Competitive',
   accent_color: deck.accent_color || '#eab308',
   target_size: Number(deck.target_size || NEW_DECK_DEFAULTS.targetSize),
-  inventory_type: deck.inventory_type === 'arena' ? 'arena' : 'collection',
+  inventory_type: deck.inventory_type || 'collection',
   cards: deck.cards.map(card => ({
-    card_id: card.id, quantity: card.quantity, pulled: !!card.checked_out,
-    source_entry_id: deck.inventory_type === 'arena' ? null : card.source_entry_id ?? null
+    card_id: card.id, quantity: card.quantity, pulled: deck.inventory_type === 'collection' && !!card.checked_out,
+    source_entry_id: deck.inventory_type === 'collection' ? card.source_entry_id ?? null : null
   }))
     .sort((a, b) => a.card_id.localeCompare(b.card_id)),
   commander_card_id: deck.commander_card_id || null
@@ -187,7 +187,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   );
   const [savingRecord, setSavingRecord] = useState(false);
 
-  const previewDeckCard = !showAiBuilder && activeDeck?.inventory_type !== 'arena'
+  const previewDeckCard = !showAiBuilder && activeDeck?.inventory_type === 'collection'
     ? activeDeck?.cards.find(card => card.id === previewCard?.id)
     : null;
   const sourceKey = previewDeckCard ? `${activeDeck.id}/${previewDeckCard.id}` : null;
@@ -385,6 +385,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
         setSearchResults([]);
         setImportComparison(null);
         setDeckCardLocations({});
+        setDeckCardSortBy('type');
       } catch (error) {
         showToast(error.message, 'error');
         return;
@@ -426,17 +427,16 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const loadDeckDetails = async (deckId) => {
     try {
       setLoading(true);
-      const [response, locationsResponse] = await Promise.all([
-        fetch(`/api/decks/${deckId}`),
-        fetch(`/api/decks/${deckId}/locations`)
-      ]);
+      const response = await fetch(`/api/decks/${deckId}`);
       if (!response.ok) throw new Error(t('deck.errLoadDetails'));
       const data = await response.json();
       if (!isGameEnabled(data.game)) throw new Error(t('deck.errLoadDetails'));
-      const locations = locationsResponse.ok ? await locationsResponse.json() : [];
-      setDeckLocationsError(!locationsResponse.ok && data.inventory_type !== 'arena');
+      const locationsResponse = data.inventory_type === 'collection' ? await fetch(`/api/decks/${deckId}/locations`) : null;
+      const locations = locationsResponse?.ok ? await locationsResponse.json() : [];
+      setDeckLocationsError(data.inventory_type === 'collection' && !locationsResponse?.ok);
       setDeckCardLocations(Object.fromEntries(locations.map(({ card_id, locations: cardLocations }) => [card_id, cardLocations])));
       setActiveDeck(data);
+      if (data.inventory_type !== 'collection') setDeckCardSortBy('type');
       setSavedEditorState(JSON.stringify(deckEditorState(data)));
       setDeckDraft(null);
       setSaveDeckError(null);
@@ -608,8 +608,8 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     if (e) e.preventDefault();
     try {
       setSearching(true);
-      const inventoryType = activeDeck?.inventory_type === 'arena' ? 'arena' : 'collection';
-      if (forceBrowse || !searchQuery.trim() || inventoryType === 'arena') {
+      const inventoryType = activeDeck?.inventory_type || 'collection';
+      if (forceBrowse || !searchQuery.trim() || inventoryType !== 'collection') {
         const cards = await loadInventoryCards(deckSearchGame, inventoryType);
         const query = searchQuery.trim().toLowerCase();
         setSearchResults(cards.filter(card => !query || card.name.toLowerCase().includes(query) || card.printed_name?.toLowerCase().includes(query)));
@@ -633,7 +633,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   // --- CHECKOUT / RETURN ---
   const handleCheckout = async (deck = null) => {
     const targetDeck = deck || activeDeck;
-    if (!targetDeck) return;
+    if (!targetDeck || targetDeck.inventory_type !== 'collection') return;
     if (editorBusy) return;
     if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
     try {
@@ -672,7 +672,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
   const handleReturn = async (deck = null) => {
     const targetDeck = deck || activeDeck;
-    if (!targetDeck) return;
+    if (!targetDeck || targetDeck.inventory_type !== 'collection') return;
     if (editorBusy) return;
     if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
     try {
@@ -792,8 +792,8 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     showToast(t('deck.buylistCopied'), 'success');
   };
 
-  const loadArenaImportCards = async () => {
-    const cards = await loadInventoryCards(activeDeck.game, 'arena');
+  const loadOwnedImportCards = async () => {
+    const cards = await loadInventoryCards(activeDeck.game, activeDeck.inventory_type);
     const byName = new Map();
     const byPrinting = new Map();
     for (const card of cards) {
@@ -826,7 +826,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     const results = [];
     let arenaCards = null;
     try {
-      if (activeDeck.inventory_type === 'arena') arenaCards = await loadArenaImportCards();
+      if (activeDeck.inventory_type !== 'collection') arenaCards = await loadOwnedImportCards();
     } catch (err) {
       console.error(err);
       setComparingImport(false);
@@ -1300,7 +1300,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                               color: deck.inventory_type === 'arena' ? '#c084fc' : '#4ade80',
                               border: deck.inventory_type === 'arena' ? '1px solid rgba(168,85,247,0.25)' : '1px solid rgba(74,222,128,0.25)'
                             }}>
-                              {deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}
+                              {deck.inventory_type === 'graveyard' ? t('collection.graveyard') : deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}
                             </span>
 
                             {deck.format && (
@@ -1384,7 +1384,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                       </span>
 
                       <div className="deck-overview-actions" style={{ display: 'flex', gap: '0.4rem' }}>
-                        {deck.checked_out ? (
+                        {deck.inventory_type === 'collection' && (deck.checked_out ? (
                           <button
                             className="btn btn-secondary"
                             style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid rgba(234,179,8,0.4)', color: '#eab308' }}
@@ -1402,7 +1402,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           >
                             <LogOut size={12} /> Checkout
                           </button>
-                        )}
+                        ))}
 
                         <button
                           className="btn btn-primary"
@@ -1486,7 +1486,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                             color: deck.inventory_type === 'arena' ? '#c084fc' : '#4ade80',
                             border: deck.inventory_type === 'arena' ? '1px solid rgba(168,85,247,0.25)' : '1px solid rgba(74,222,128,0.25)'
                           }}>
-                            {deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}
+                            {deck.inventory_type === 'graveyard' ? t('collection.graveyard') : deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}
                           </span>
                         </td>
                         <td data-label={t('filter.field.color_identity')} style={{ padding: '0.75rem 1rem' }}>
@@ -1530,7 +1530,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                         </td>
                         <td data-label={t('admin.colActions')} style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
                           <div className="deck-overview-actions" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
-                            {deck.checked_out ? (
+                            {deck.inventory_type === 'collection' && (deck.checked_out ? (
                               <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: 'inherit', color: '#eab308' }} onClick={() => handleReturn(deck)} disabled={checkingOut}>
                                 {t('deck.return')}
                               </button>
@@ -1538,7 +1538,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                               <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: 'inherit' }} onClick={() => handleCheckout(deck)} disabled={checkingOut}>
                                 {t('deck.checkout')}
                               </button>
-                            )}
+                            ))}
                             <button className="btn btn-primary" style={{ padding: '0.25rem 0.6rem', fontSize: 'inherit' }} onClick={() => loadDeckDetails(deck.id)}>
                               {t('deck.open')}
                             </button>
@@ -1583,7 +1583,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   <div className="sub-nav-tabs" style={{ margin: 0 }}>
                     <button type="button" className={`sub-nav-tab ${deckDraft.inventory_type === 'collection' ? 'active' : ''}`} onClick={() => setDeckDraft({ ...deckDraft, inventory_type: 'collection' })}>{t('deck.physical')}</button>
                     <button type="button" className={`sub-nav-tab ${deckDraft.inventory_type === 'arena' ? 'active' : ''}`} onClick={() => setDeckDraft({ ...deckDraft, inventory_type: 'arena' })}>{t('deck.arena')}</button>
+                    <button type="button" className={`sub-nav-tab ${deckDraft.inventory_type === 'graveyard' ? 'active' : ''}`} disabled={!!activeDeck.checked_out} aria-describedby={activeDeck.checked_out ? 'deck-inventory-hint' : undefined} onClick={() => setDeckDraft({ ...deckDraft, inventory_type: 'graveyard' })}>{t('collection.graveyard')}</button>
                   </div>
+                  {!!activeDeck.checked_out && <p id="deck-inventory-hint" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>{t('deck.returnBeforeEditing')}</p>}
                 </div>
                 <div className="deck-format-fields">
                   <label className="form-group" style={{ margin: 0 }}>
@@ -1644,6 +1646,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
               <div>
                 <h2 style={{ fontSize: '1.25rem', color: 'var(--text-strong)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   {activeDeck.name}
+                  {activeDeck.inventory_type === 'graveyard' && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t('collection.graveyard')}</span>}
                   <span style={{ fontSize: '0.8rem', color: totalDeckCardsCount === targetDeckCardsCount ? 'var(--accent-green)' : 'var(--accent-yellow)', fontWeight: 600 }}>
                     ({totalDeckCardsCount}/{targetDeckCardsCount} cards)
                   </span>
@@ -1676,7 +1679,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {activeDeck.game === 'mtg' && (
+              {activeDeck.game === 'mtg' && activeDeck.inventory_type !== 'graveyard' && (
                 <button
                   className="btn btn-secondary"
                   onClick={() => {
@@ -1700,7 +1703,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   category: activeDeck.category || 'Competitive',
                   accent_color: activeDeck.accent_color || '#eab308',
                   target_size: activeDeck.target_size || NEW_DECK_DEFAULTS.targetSize,
-                  inventory_type: activeDeck.inventory_type === 'arena' ? 'arena' : 'collection'
+                  inventory_type: activeDeck.inventory_type || 'collection'
                 })}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
               >
@@ -1724,7 +1727,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 <Download size={14} /> Import
               </button>
               {/* Checkout / Return button */}
-              {activeDeck.checked_out ? (
+              {activeDeck.inventory_type === 'collection' && (activeDeck.checked_out ? (
                 <button
                   className="btn btn-secondary"
                   onClick={() => handleReturn(activeDeck)}
@@ -1742,7 +1745,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 >
                   <LogOut size={14} /> Check Out for Play
                 </button>
-              )}
+              ))}
               <button className="btn btn-secondary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
                 <button className="btn btn-primary" onClick={startSimulator} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <Play size={14} /> Draw Simulator
@@ -1777,7 +1780,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     </ul>
                   ) : <p>{t('shared.noCards')}</p>}
                 </section>
-                {activeDeck.inventory_type !== 'arena' && (
+                {activeDeck.inventory_type === 'collection' && (
                   <section className="deck-overview-section" aria-labelledby="deck-containers-heading">
                     <h3 id="deck-containers-heading">
                       <MapPin size={18} aria-hidden="true" style={{ color: 'var(--accent-yellow)' }} />{t('deck.containersNeeded')}
@@ -2108,8 +2111,8 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                       style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', height: 'auto' }}
                     >
                       <option value="type">{t('deck.sortByType')}</option>
-                      <option value="location">{t('collection.fLocation')}</option>
-                      <option value="pulled">{t('deck.pulledStatus')}</option>
+                      {activeDeck.inventory_type === 'collection' && <option value="location">{t('collection.fLocation')}</option>}
+                      {activeDeck.inventory_type === 'collection' && <option value="pulled">{t('deck.pulledStatus')}</option>}
                     </select>
                     </div>
                   </div>
@@ -2153,10 +2156,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                                         <AlertTriangle size={13} /> {card.locked_decks ? t('deck.unavailableCopiesInDecks', { count: card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0)), decks: card.locked_decks }) : t('deck.unavailableCopies', { count: card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0)) })}
                                       </span>
                                     )}
+                                    {activeDeck.inventory_type === 'collection' && (
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', color: card.checked_out ? 'var(--accent-green)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 600 }}>
                                       <input type="checkbox" role="switch" className="deck-card-toggle" checked={!!card.checked_out} disabled={editorBusy} onChange={(e) => handlePulledChange(card.id, e.target.checked)} />
                                       {t('deck.pulled')}
                                     </label>
+                                    )}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
                                       <button
                                         className={`btn ${card.quantity === 1 ? 'btn-danger' : 'btn-secondary'} btn-icon-only`}
@@ -2208,10 +2213,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                                     </div>
                                   )}
                                   <div style={{ padding: '4px', display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
+                                    {activeDeck.inventory_type === 'collection' && (
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', color: card.checked_out ? 'var(--accent-green)' : 'var(--text-secondary)', fontSize: '0.65rem', fontWeight: 600 }}>
                                       <input type="checkbox" role="switch" className="deck-card-toggle" checked={!!card.checked_out} disabled={editorBusy} onChange={(e) => handlePulledChange(card.id, e.target.checked)} />
                                       {t('deck.pulled')}
                                     </label>
+                                    )}
                                     <div style={{ display: 'flex', gap: '2px' }}>
                                       <button aria-label={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')} className={`btn ${card.quantity === 1 ? 'btn-danger' : 'btn-secondary'} btn-icon-only`} style={{ width: '20px', height: '20px', fontSize: '0.7rem', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} disabled={editorBusy} onClick={() => handleUpdateCardQty(card.id, card.quantity - 1)} title={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')}>
                                         {card.quantity === 1 ? <Trash2 size={10} /> : '-'}
@@ -2288,7 +2295,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 <div className="sub-nav-tabs" style={{ margin: 0 }}>
                   <button type="button" className={`sub-nav-tab ${newDeckInventoryType === 'collection' ? 'active' : ''}`} onClick={() => setNewDeckInventoryType('collection')}>{t('deck.physical')}</button>
                   <button type="button" className={`sub-nav-tab ${newDeckInventoryType === 'arena' ? 'active' : ''}`} onClick={() => setNewDeckInventoryType('arena')}>{t('deck.arena')}</button>
+                  <button type="button" className={`sub-nav-tab ${newDeckInventoryType === 'graveyard' ? 'active' : ''}`} onClick={() => setNewDeckInventoryType('graveyard')}>{t('collection.graveyard')}</button>
                 </div>
+                {newDeckInventoryType === 'graveyard' && <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>{t('deck.graveyardCreateHint')}</p>}
               </div>
               {/* Format & Target Size Row */}
               <div className="deck-format-fields">

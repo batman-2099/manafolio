@@ -80,7 +80,10 @@ router.post('/', async (req, res) => {
   if (game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
   const deckGame = 'mtg';
   const targetSizeNum = parseInt(target_size, 10) || 60;
-  const inventoryType = inventory_type === 'arena' ? 'arena' : 'collection';
+  if (!['collection', 'arena', 'graveyard'].includes(inventory_type)) {
+    return res.status(400).json({ error: 'Invalid deck inventory type' });
+  }
+  const inventoryType = inventory_type;
 
   if (commander_card_id !== undefined) {
     if (typeof commander_card_id !== 'string' || !commander_card_id.trim()) {
@@ -123,7 +126,7 @@ router.post('/', async (req, res) => {
     });
     newDeckId = result.lastID;
     const addDeckCard = async (cardId, quantity) => {
-      if (inventoryType === 'arena') {
+      if (inventoryType !== 'collection') {
         const current = await db.get(`SELECT quantity FROM deck_cards WHERE deck_id = ? AND card_id = ?`, [newDeckId, cardId]);
         const check = await validateDeckAddition({ deckId: newDeckId, userId: req.user.id, cardId, newQty: (current?.quantity || 0) + quantity });
         if (!check.ok) {
@@ -177,9 +180,15 @@ router.post('/', async (req, res) => {
           if (match) {
             const qty = parseInt(match[1], 10);
             const cardName = match[2].trim();
-            const card = await db.get(`SELECT id FROM card_cache WHERE LOWER(name) = LOWER(?) AND game = ? LIMIT 1`, [cardName, deckGame]);
+            const card = await db.get(`SELECT id FROM card_cache WHERE LOWER(name) = LOWER(?) AND game = ?
+              AND (? != 'graveyard' OR EXISTS (
+                SELECT 1 FROM collection c WHERE c.card_id = card_cache.id AND c.user_id = ? AND c.list_type = 'graveyard' AND c.quantity > 0
+              )) LIMIT 1`, [cardName, deckGame, inventoryType, req.user.id]);
             if (card) {
               await addDeckCard(card.id, qty);
+            }
+            else if (inventoryType === 'graveyard') {
+              throw Object.assign(new Error(`${cardName} is not available in Graveyard inventory`), { status: 400 });
             }
           }
         }
@@ -194,7 +203,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Save the entire physical container as a deck definition, without moving or reserving copies.
+// Save a container as a deck definition, without moving or reserving copies.
 router.post('/from-container', async (req, res) => {
   const { location_id, name, format = 'Casual' } = req.body || {};
   if (!Number.isSafeInteger(location_id) || location_id < 1) {
@@ -209,21 +218,21 @@ router.post('/from-container', async (req, res) => {
 
   try {
     const id = await db.withTransaction(async () => {
-      const location = await db.get("SELECT id FROM locations WHERE id = ? AND user_id = ? AND inventory_type = 'collection'", [location_id, req.user.id]);
+      const location = await db.get("SELECT id, inventory_type FROM locations WHERE id = ? AND user_id = ? AND inventory_type IN ('collection', 'graveyard')", [location_id, req.user.id]);
       if (!location) throw Object.assign(new Error('Container not found'), { status: 404 });
       // Missing and checked-out copies still belong to the definition; checkout handles availability.
       const cards = await db.all(`
         SELECT c.card_id, SUM(c.quantity) AS quantity
         FROM collection c JOIN card_cache cc ON cc.id = c.card_id AND cc.game = 'mtg'
         WHERE c.location_id = ? AND c.user_id = ? AND c.game = 'mtg'
-          AND c.list_type = 'collection' AND c.quantity > 0
+          AND c.list_type = ? AND c.quantity > 0
         GROUP BY c.card_id
-      `, [location_id, req.user.id]);
-      if (!cards.length) throw Object.assign(new Error('Container has no physical Magic cards'), { status: 400 });
+      `, [location_id, req.user.id, location.inventory_type]);
+      if (!cards.length) throw Object.assign(new Error('Container has no Magic cards'), { status: 400 });
       const deck = await db.run(`
         INSERT INTO decks (user_id, name, description, game, format, inventory_type, target_size)
-        VALUES (?, ?, '', 'mtg', ?, 'collection', ?)
-      `, [req.user.id, name.trim(), format, cards.reduce((total, card) => total + card.quantity, 0)]);
+        VALUES (?, ?, '', 'mtg', ?, ?, ?)
+      `, [req.user.id, name.trim(), format, location.inventory_type, cards.reduce((total, card) => total + card.quantity, 0)]);
       for (const card of cards) {
         await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, ?)', [deck.lastID, card.card_id, card.quantity]);
       }
@@ -244,7 +253,7 @@ router.get('/:id', async (req, res) => {
     if (!deck) {
       return res.status(404).json({ error: 'Deck not found' });
     }
-    const inventoryType = deck.inventory_type === 'arena' ? 'arena' : 'collection';
+    const inventoryType = deck.inventory_type || 'collection';
 
     const cardsQuery = `
       SELECT
@@ -289,7 +298,7 @@ router.get('/:id/cards/:cardId/sources', async (req, res) => {
   try {
     const deck = await db.get(`SELECT id, inventory_type FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [req.params.id, req.user.id]);
     if (!deck) return res.status(404).json({ error: 'Deck not found' });
-    if (deck.inventory_type === 'arena') return res.status(400).json({ error: 'Arena decks have no physical card sources' });
+    if (deck.inventory_type !== 'collection') return res.status(400).json({ error: 'Only Physical decks have physical card sources' });
     const card = await db.get(`SELECT id FROM card_cache WHERE id = ? AND game = 'mtg'`, [req.params.cardId]);
     if (!card) return res.status(404).json({ error: 'Card not found' });
     const saved = await db.get(`SELECT source_entry_id FROM deck_cards WHERE deck_id = ? AND card_id = ?`, [deck.id, card.id]);
@@ -304,7 +313,7 @@ router.get('/:id/locations', async (req, res) => {
   try {
     const deck = await db.get(`SELECT id, game, inventory_type, checked_out FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [req.params.id, req.user.id]);
     if (!deck) return res.status(404).json({ error: 'Deck not found' });
-    if (deck.inventory_type === 'arena') return res.status(400).json({ error: 'Arena decks have no physical card locations' });
+    if (deck.inventory_type !== 'collection') return res.status(400).json({ error: 'Only Physical decks have physical card locations' });
     res.json(await deckLocations(deck, req.user.id));
   } catch (error) {
     console.error(error);
@@ -315,7 +324,7 @@ router.get('/:id/locations', async (req, res) => {
 // Update Deck Metadata
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, description = '', format, category, accent_color, target_size, inventory_type } = req.body;
+  const { name, description, format, category, accent_color, target_size, inventory_type } = req.body;
 
   if (!name || !String(name).trim()) {
     return res.status(400).json({ error: 'Deck name is required' });
@@ -326,46 +335,50 @@ router.put('/:id', async (req, res) => {
   }
 
   try {
-    const deck = await db.get(`SELECT inventory_type, checked_out FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [id, req.user.id]);
-    if (!deck) return res.status(404).json({ error: 'Deck not found or unauthorized' });
-    const inventoryType = inventory_type === undefined ? deck.inventory_type : inventory_type;
-    if (!['collection', 'arena'].includes(inventoryType)) return res.status(400).json({ error: 'Invalid deck inventory type' });
-    if (inventoryType !== deck.inventory_type) {
-      if (deck.checked_out) return res.status(400).json({ error: 'Return this deck before changing its inventory type' });
-      const selected = await db.get(`SELECT 1 FROM deck_cards WHERE deck_id = ? AND source_entry_id IS NOT NULL LIMIT 1`, [id]);
-      if (selected) return res.status(400).json({ error: 'Clear physical card sources before changing inventory type' });
-      const unavailable = await db.get(
-        `SELECT cc.name
-         FROM deck_cards dc
-         JOIN card_cache cc ON cc.id = dc.card_id
-         LEFT JOIN collection c ON c.card_id = dc.card_id AND c.user_id = ? AND c.list_type = ?
-         WHERE dc.deck_id = ?
-         GROUP BY dc.card_id
-         HAVING COALESCE(SUM(c.quantity), 0) < dc.quantity
-         LIMIT 1`,
-        [req.user.id, inventoryType, id]
+    await db.withTransaction(async () => {
+      const deck = await db.get(`SELECT inventory_type, checked_out FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [id, req.user.id]);
+      if (!deck) throw Object.assign(new Error('Deck not found or unauthorized'), { status: 404 });
+      const inventoryType = inventory_type === undefined ? deck.inventory_type : inventory_type;
+      if (!['collection', 'arena', 'graveyard'].includes(inventoryType)) {
+        throw Object.assign(new Error('Invalid deck inventory type'), { status: 400 });
+      }
+      if (inventoryType !== deck.inventory_type) {
+        if (deck.checked_out) throw Object.assign(new Error('Return this deck before changing its inventory type'), { status: 400 });
+        if (inventoryType === 'graveyard') {
+          await db.run('UPDATE deck_cards SET source_entry_id = NULL WHERE deck_id = ?', [id]);
+          await db.run('DELETE FROM deck_card_allocations WHERE deck_id = ?', [id]);
+        } else {
+          const selected = await db.get(`SELECT 1 FROM deck_cards WHERE deck_id = ? AND source_entry_id IS NOT NULL LIMIT 1`, [id]);
+          if (selected) throw Object.assign(new Error('Clear physical card sources before changing inventory type'), { status: 400 });
+          const unavailable = await db.get(
+            `SELECT cc.name
+             FROM deck_cards dc
+             JOIN card_cache cc ON cc.id = dc.card_id
+             LEFT JOIN collection c ON c.card_id = dc.card_id AND c.user_id = ? AND c.list_type = ?
+             WHERE dc.deck_id = ?
+             GROUP BY dc.card_id
+             HAVING COALESCE(SUM(c.quantity), 0) < dc.quantity
+             LIMIT 1`,
+            [req.user.id, inventoryType, id]
+          );
+          if (unavailable) throw Object.assign(new Error(`${unavailable.name} is not available in ${inventoryType === 'arena' ? 'Arena' : 'Physical'} inventory`), { status: 400 });
+        }
+      }
+
+      await db.run(
+        `UPDATE decks
+         SET name = ?, description = COALESCE(?, description), format = COALESCE(?, format), category = COALESCE(?, category),
+             accent_color = COALESCE(?, accent_color), target_size = COALESCE(?, target_size), inventory_type = ?,
+             commander_card_id = CASE WHEN ? THEN NULL ELSE commander_card_id END
+         WHERE id = ? AND user_id = ?`,
+        [String(name).trim(), description, format, category, accent_color, targetSize, inventoryType,
+          format != null && !/commander|edh|brawl/i.test(format), id, req.user.id]
       );
-      if (unavailable) return res.status(400).json({ error: `${unavailable.name} is not available in ${inventoryType === 'arena' ? 'Arena' : 'Physical'} inventory` });
-    }
-
-    const result = await db.run(
-      `UPDATE decks
-       SET name = ?, description = ?, format = COALESCE(?, format), category = COALESCE(?, category),
-           accent_color = COALESCE(?, accent_color), target_size = COALESCE(?, target_size), inventory_type = ?,
-           commander_card_id = CASE WHEN ? THEN NULL ELSE commander_card_id END
-       WHERE id = ? AND user_id = ?`,
-      [String(name).trim(), description, format, category, accent_color, targetSize, inventoryType,
-        format != null && !/commander|edh|brawl/i.test(format), id, req.user.id]
-    );
-
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Deck not found or unauthorized' });
-    }
-
+    });
     res.json({ message: 'Deck updated successfully' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to update deck' });
+    if (!error.status) console.error(error);
+    res.status(error.status || 500).json({ error: error.status ? error.message : 'Failed to update deck' });
   }
 });
 
@@ -388,7 +401,7 @@ router.put('/:id/editor', async (req, res) => {
   if (!Number.isInteger(target_size) || target_size < 1 || target_size > 300) {
     return res.status(400).json({ error: 'target_size must be between 1 and 300' });
   }
-  if (!['collection', 'arena'].includes(inventory_type)) {
+  if (!['collection', 'arena', 'graveyard'].includes(inventory_type)) {
     return res.status(400).json({ error: 'Invalid deck inventory type' });
   }
   if (!Array.isArray(cards)) {
@@ -426,6 +439,10 @@ router.put('/:id/editor', async (req, res) => {
     await db.withTransaction(async () => {
       const deck = await db.get(`SELECT inventory_type, checked_out FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [id, req.user.id]);
       if (!deck) throw Object.assign(new Error('Deck not found or unauthorized'), { status: 404 });
+      const archiving = inventory_type === 'graveyard' && deck.inventory_type !== 'graveyard';
+      if (inventory_type === 'graveyard' && !archiving && cards.some(card => card.source_entry_id != null)) {
+        throw Object.assign(new Error('Graveyard decks cannot select physical sources'), { status: 400 });
+      }
       const savedCards = await db.all(`SELECT card_id, quantity, source_entry_id FROM deck_cards WHERE deck_id = ? AND quantity > 0`, [id]);
       const saved = new Map(savedCards.map(card => [card.card_id, card]));
       if (deck.checked_out) {
@@ -448,15 +465,21 @@ router.put('/:id/editor', async (req, res) => {
           await db.run(`UPDATE deck_cards SET checked_out = ? WHERE deck_id = ? AND card_id = ?`, [card.pulled ? 1 : 0, id, card.card_id]);
         }
       } else {
+        if (archiving) await db.run('DELETE FROM deck_card_allocations WHERE deck_id = ?', [id]);
         await db.run(`DELETE FROM deck_cards WHERE deck_id = ?`, [id]);
         for (const card of cards) {
-          const check = await validateDeckAddition({ deckId: id, userId: req.user.id, cardId: card.card_id, newQty: card.quantity, mode: 'draft' });
-          if (!check.ok) throw Object.assign(new Error(check.error), { status: 400 });
-          await validateDeckSource(req.user.id, Number(id), card.card_id, card.quantity, card.source_entry_id,
+          // Archiving keeps the saved definition, including cards no longer owned.
+          if (!archiving || saved.get(card.card_id)?.quantity !== card.quantity) {
+            const mode = inventory_type !== deck.inventory_type && inventory_type !== 'graveyard' ? 'addition' : 'draft';
+            const check = await validateDeckAddition({ deckId: id, userId: req.user.id, cardId: card.card_id, newQty: card.quantity, mode });
+            if (!check.ok) throw Object.assign(new Error(check.error), { status: 400 });
+          }
+          const sourceEntryId = inventory_type === 'graveyard' ? null : card.source_entry_id ?? null;
+          await validateDeckSource(req.user.id, Number(id), card.card_id, card.quantity, sourceEntryId,
             { mode: 'draft', savedSourceEntryId: saved.get(card.card_id)?.source_entry_id });
           await db.run(
             `INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out, source_entry_id) VALUES (?, ?, ?, ?, ?)`,
-            [id, card.card_id, card.quantity, card.pulled ? 1 : 0, card.source_entry_id ?? null]
+            [id, card.card_id, card.quantity, card.pulled ? 1 : 0, sourceEntryId]
           );
         }
       }
@@ -720,7 +743,7 @@ router.put('/:id/checkout', async (req, res) => {
     await db.withTransaction(async () => {
       const deck = await db.get(`SELECT id, game, inventory_type, checked_out FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [id, req.user.id]);
       if (!deck) throw Object.assign(new Error('Deck not found or unauthorized'), { status: 404 });
-      if (deck.inventory_type === 'arena') throw Object.assign(new Error('Arena decks cannot be checked out'), { status: 400 });
+      if (deck.inventory_type !== 'collection') throw Object.assign(new Error('Only Physical decks can be checked out'), { status: 400 });
       if (deck.checked_out) return;
       await reserveDeckSources(deck, req.user.id);
       await db.run(`UPDATE decks SET checked_out = 1, checked_out_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
