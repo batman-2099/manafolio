@@ -173,7 +173,7 @@ For Physical decks, **Containers needed** beneath **Supertype Breakdown** lists 
 
 Save first, then choose **Check Out for Play**. Manafolio reserves the copies and creates a pull list grouped by container and compartment while retaining their stored positions. Other decks show unavailable quantities and the reserving deck's name. Mark cards **Pulled** as you gather them; sorting by **Pulled status** puts not-yet-pulled cards first.
 
-Return the deck to release reservations before changing its card composition, archiving its reserved copies, or reusing them for another checkout. Arena has separate ownership and no physical checkout or storage flow.
+Return the deck to release reservations before changing its card composition, individually archiving its reserved copies, or reusing them for another checkout. Whole-container archiving preserves existing reservations. Arena has separate ownership and no physical checkout or storage flow.
 
 ### Find tokens for a card or deck
 
@@ -207,7 +207,7 @@ The container and reservations stay unchanged; the deck is **not checked out**. 
 
 Open **Collection → Graveyard → Graveyard containers**, or select **Graveyard** in Storage. Archived inventory has separate containers, unassigned cards, layouts, capacity, locks, and covers, with the same filing controls.
 
-A container's **⋮ → Move to Graveyard / Restore to Collection** transfers it and all contents atomically, retaining quantities, metadata, positions, layout, settings, and cover. Unlock the container and compartments and return reserved copies first. Individual restores clear archived placement; whole-container restores preserve it. Deleting an archived container leaves its cards archived and unassigned. Graveyard containers cannot supply physical imports, decks, AI inventory, or public container shares.
+A container's **More → Move to Graveyard / Restore to Collection** transfers it and all contents atomically, retaining quantities, metadata, positions, layout, settings, and cover. Unlock the container and compartments first. Cards may remain in decks, including checked-out decks: deck lists, checkout state, and exact-copy reservations are preserved. Archived copies do not supply owned totals or new checkouts. Individual restores clear archived placement; whole-container restores preserve it. Deleting an archived container leaves its cards archived and unassigned. Graveyard containers cannot supply physical imports, decks, AI inventory, or public container shares.
 
 ### Get an AI deck recommendation
 

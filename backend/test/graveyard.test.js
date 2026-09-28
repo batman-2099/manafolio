@@ -232,9 +232,6 @@ async function testGraveyard() {
     await request(`/compartments/${transferComps[1].id}`, 'PATCH', { locked: false });
     const transferDeck = (await db.run(`INSERT INTO decks (name, user_id, checked_out) VALUES ('Transfer guard', 1, 1)`)).lastID;
     await db.run(`INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, 'archive-card', 999)`, [transferDeck]);
-    await rejectTransfer(transferBox, 'graveyard', 1, 409);
-    assert.strictEqual((await db.get('SELECT checked_out FROM decks WHERE id = ?', [transferDeck])).checked_out, 1);
-    await db.run('UPDATE decks SET checked_out = 0 WHERE id = ?', [transferDeck]);
 
     const beforeTransfer = await snapshot();
     assert.strictEqual((await transfer(transferBox, 'graveyard')).affected, 3);
@@ -245,6 +242,13 @@ async function testGraveyard() {
         ? { ...row, list_type: 'graveyard' } : row)
     };
     assert.deepStrictEqual(await snapshot(), expectedArchive, 'transfer preserves every field except inventory, including compartment-only placement');
+    assert.strictEqual((await db.get('SELECT checked_out FROM decks WHERE id = ?', [transferDeck])).checked_out, 1);
+    assert.strictEqual((await db.get('SELECT quantity FROM deck_cards WHERE deck_id = ?', [transferDeck])).quantity, 999);
+    const reservations = await db.all('SELECT * FROM deck_card_allocations WHERE deck_id = ?', [transferDeck]);
+    assert.ok(reservations.some(row => row.entry_id === transferEntry && row.quantity === 3), 'archive retains the exact checked-out copies');
+    assert.ok(!(await request('/collection')).some(row => row.entry_id === transferEntry), 'archived reservations do not supply physical inventory');
+    const returnLocations = await request(`/decks/${transferDeck}/locations`);
+    assert.ok(returnLocations.some(card => card.locations.some(location => location.entry_id === transferEntry)), 'return guide retains the archived copy location');
     assert.strictEqual((await request('/collection?list_type=graveyard')).find(row => row.entry_id === transferEntry).position, 4000);
     assert.ok(!(await request('/locations')).some(row => row.id === transferBox));
     assert.strictEqual((await request('/locations?inventory_type=graveyard')).find(row => row.id === transferBox).cover_card_id, 'archive-card');
@@ -260,6 +264,7 @@ async function testGraveyard() {
     await request(`/compartments/${transferComp}`, 'PATCH', { locked: false });
     assert.strictEqual((await transfer(transferBox, 'collection')).affected, 3);
     assert.deepStrictEqual(await snapshot(), beforeTransfer, 'roundtrip restores the exact container, layout, contents, quantities and metadata');
+    assert.deepStrictEqual(await db.all('SELECT * FROM deck_card_allocations WHERE deck_id = ?', [transferDeck]), reservations, 'restore preserves reservations');
 
     const emptyBox = (await create('Empty transfer', 'collection')).id;
     const beforeEmpty = await snapshot();

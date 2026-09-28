@@ -2,8 +2,9 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.1.1
 
+- Allowed whole-container archive/restore while cards belong to checked-out decks, preserving deck lists, reservations, and return locations. Locks remain enforced and archived cards remain excluded from available inventory.
 - Container list Select all now selects only cards matching the active search and filters, with a matching count; physical-layout selection remains container-wide.
 - Removed unreachable storage headers, unused highlighting/callback/state paths, orphaned styles, and stale art-editor comments. The contour detector now exports its stateless function directly, and model downloads share one streaming installer while retaining CLI upgrade checks and separate CLI/admin deadlines.
 - Stabilized Collection filter layout when Grading, Mana Value, or other option menus introduce a scrollbar.

@@ -211,7 +211,7 @@ Shared dispatch in `utils/cardApi.js` accepts Magic identities only. Removed int
 - Custom sorting preserves manual order; structured comparators support name, set/number, price, type/color, language, and finish ordering. The same categories drive storage dividers.
 - Capacity is advisory. Placement prefers eligible compartments with room, then accepts excess in the requested container; it never reroutes to another container or Unsorted solely because capacity is exceeded. The UI derives **Over limit** from usage exceeding configured capacity. Stacking counts distinct card/printing/language stacks per compartment rather than every copy.
 - Storage assignment must validate user ownership, the compartment's parent container, and matching inventory. Physical cards cannot silently land in Graveyard storage or vice versa.
-- Whole-container transfer changes the container and all contained entries atomically, preserving placement/configuration. It rejects locked containers/compartments and reserved copies. Individual archive/restore has different placement semantics.
+- Whole-container transfer changes the container and all contained entries atomically, preserving placement/configuration. It rejects locked containers/compartments but allows reserved copies, preserving deck state and exact allocations. Legacy checkout allocations are persisted before archiving so they cannot be reassigned when physical inventory changes. Individual archive/restore has different placement and reservation semantics.
 - ManaBox container import files matching **already-owned** physical copies; it does not add missing inventory. Follow-up move requests fill the remaining requested quantities without moving the same copies twice. Missing and nonphysical entries are excluded, and the destination must retain the required unlocked/custom/unrestricted layout.
 
 ## Deck editing, checkout, and check-in
@@ -226,7 +226,7 @@ Physical checkout reserves quantities by setting `decks.checked_out` and `checke
 
 `GET /api/decks/:id/locations` provides specific entries, containers, compartments, slot positions, and missing counts for the pull list. Checkout records exact entries in `deck_card_allocations`; `checkedOutAllocation` uses those records so storage reserves the same copies even after other decks return. Startup materializes legacy reservations. Backup restore remaps source and allocation entry references. **Pulled** remains the per-deck-card checklist state (`deck_cards.checked_out`), distinct from the deck-level reservation flag.
 
-Return clears the deck-level reservation state. Checkout/check-in use the same stored location for pulling and re-filing. Return a deck before changing its composition or archiving its reserved copies. Storage reassignment itself need not release a reservation.
+Return clears the deck-level reservation state. Checkout/check-in use the same stored location for pulling and re-filing. Return a deck before changing its composition or individually archiving its reserved copies. Whole-container archiving and storage reassignment retain reservations.
 
 `POST /api/decks/from-container` uses a physical container's complete saved contents, not the current UI selection/filter. It creates an unchecked-out definition without moving cards, and can include missing/reserved copies that must be resolved before play. Duplicating a deck copies its definition/metadata, not its checkout state or win/loss record.
 

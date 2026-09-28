@@ -456,10 +456,12 @@ Individual archiving clears the old physical placement. An individual physical r
 
 #### Move a whole container while keeping its layout
 
-1. Open the container. Unlock the container and every page/row, and return any reserved copies first.
+1. Open the container. Unlock the container and every page/row.
 2. Choose **More → Move to Graveyard** and confirm.
 3. Open Graveyard Storage and verify the same container, contents, and positions.
 4. To reverse the operation, open the archived container and choose **More → Restore to Collection**.
+
+Cards can remain in saved or checked-out decks. Transferring the container preserves deck lists, checkout status, exact-copy reservations, and return locations. Archived copies no longer supply owned totals or new checkouts; restoring the container does not release existing reservations.
 
 **Expected result:** the container and all its contents change inventory together, preserving quantities, metadata, positions, layout, sorting/filing configuration, and cover. This differs from restoring individual entries.
 
@@ -473,7 +475,7 @@ Graveyard has separate unassigned cards and storage; physical cards cannot be fi
 | Automatic filing leaves cards behind | They may not match the open container's rules or any unlocked page/row. Review the remaining Unsorted cards rather than assuming they were lost. |
 | The physical binder no longer matches the app | Sorting or filing may have shifted positions. Follow the re-file guide, or switch to Custom and arrange a fixed layout deliberately. |
 | A row/page cannot be removed | It must be the last removable empty compartment. The container also must be unlocked. |
-| A move/archive/restore is blocked | Check locks and reserved copies, and make sure the destination is in the correct inventory. |
+| A move/archive/restore is blocked | Check locks and inventory boundaries. Individual card archiving also requires returning reserved copies; whole-container transfers retain their reservations. |
 | ManaBox container import moved fewer copies than requested | It only files existing eligible physical copies. Expand the full summary for unresolved printings, other locations, and remaining quantities. |
 | Cards vanished after deleting a container | Look in Unsorted for that inventory. Deleting a container leaves its cards; deleting cards is a different action. |
 
@@ -879,7 +881,7 @@ Check the deck's inventory first. Then check missing status, exact printing/quan
 
 ### A storage move is refused
 
-Check the source and destination inventory, container/compartment locks, and filing restrictions. Capacity alone does not block a move; over-capacity storage is marked **Over limit**. For a ManaBox container import, distinguish importing ownership from moving already-owned copies. For archive/restore, return reserved copies and unlock the affected container and compartments first.
+Check the source and destination inventory, container/compartment locks, and filing restrictions. Capacity alone does not block a move; over-capacity storage is marked **Over limit**. For a ManaBox container import, distinguish importing ownership from moving already-owned copies. For individual card archive/restore, return reserved copies first. Whole-container transfers allow reserved copies but still require unlocking the container and compartments.
 
 ### The scanner cannot use the camera
 

@@ -10,7 +10,7 @@ const {
   rebalanceCompartmentByScheme,
   STACK_KEY_SQL
 } = require('../utils/compartmentSort');
-const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, checkedOutAllocation } = require('../utils/collectionHelpers');
+const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, checkedOutSources } = require('../utils/collectionHelpers');
 const { normalizeMtgColorIdentity } = require('../utils/mtgColors');
 
 const MANA_SYMBOLS = { White: 'W', Blue: 'U', Black: 'B', Red: 'R', Green: 'G', Colorless: 'C' };
@@ -192,13 +192,12 @@ router.post('/locations/:id/transfer', async (req, res) => {
       if (location.locked || await db.get('SELECT id FROM compartments WHERE location_id = ? AND locked = 1 LIMIT 1', [id])) {
         throw Object.assign(new Error('Unlock this container and its compartments before transferring'), { status: 409 });
       }
-      const entries = await db.all(`
-        SELECT id FROM collection WHERE user_id = ?
-          AND (location_id = ? OR compartment_id IN (SELECT id FROM compartments WHERE location_id = ?))
-      `, [req.user.id, id, id]);
-      const allocated = await checkedOutAllocation(req.user.id);
-      if (entries.some(entry => allocated.get(entry.id) > 0)) {
-        throw Object.assign(new Error('Check in the deck before transferring its checked-out cards.'), { status: 409 });
+      if (inventory_type === 'graveyard') {
+        // Persist legacy reservations before their copies leave physical inventory.
+        for (const source of await checkedOutSources(req.user.id)) {
+          await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+            [source.deck_id, source.card_id, source.entry_id, source.quantity]);
+        }
       }
       const updated = await db.run(`
         UPDATE collection SET list_type = ? WHERE user_id = ?
