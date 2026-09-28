@@ -1005,7 +1005,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const totalDeckCardsCount = activeDeck ? activeDeck.cards.reduce((sum, c) => sum + c.quantity, 0) : 0;
   const commanderCard = activeDeck?.cards.find(card => card.id === activeDeck.commander_card_id);
   const commanderChoices = activeDeck?.cards
-    .filter(card => cardGroup(card) === 'Creature' || card.id === activeDeck.commander_card_id)
+    .filter(card => ['Creature', 'Planeswalker'].includes(cardGroup(card)) || card.id === activeDeck.commander_card_id)
     .sort((a, b) => displayName(a).localeCompare(displayName(b))) || [];
   const targetDeckCardsCount = activeDeck?.target_size || 60;
   const supertypeData = getSupertypeChartData();

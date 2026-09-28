@@ -4,7 +4,7 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
-- Replaced per-card Commander switches with a single dropdown beneath the commander artwork. It lists all creatures in the deck, supports clearing the selection, and retains the existing Save workflow.
+- Replaced per-card Commander switches with a single dropdown beneath the commander artwork. It lists all creatures and planeswalkers in the deck, supports clearing the selection, and retains the existing Save workflow.
 - Added a Dragon Shield dropdown to Customize card back with 112 sleeve designs selected from the official collection. Standalone and multi-sleeve images are cropped to the back, previewed before Save, and stored as deck-local image copies; failed or cancelled downloads preserve the existing back.
 - Grouped Dragon Shield sleeve choices into alphabetized Plain color sleeves and Art sleeves sections.
 - Added None/Single/Double/Triple sleeve settings to container creation, settings, and detail displays. Values persist with non-destructive migration and complete backups; capacity and card placement are unchanged.
