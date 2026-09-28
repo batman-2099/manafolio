@@ -71,6 +71,12 @@ Organize decks and see which inventory supplies them.
 
 ![Manafolio Deck Builder showing sample decks](docs/images/manafolio-decks.webp)
 
+### AI Deck Builder
+
+Choose inventory filters, deck archetype, format, target size, and power level before starting a conversation. This screenshot shows demo setup options; live AI requests are disabled in the demo.
+
+![Manafolio AI Deck Builder options showing inventory filters, Aggro archetype guidance, and the target power-level slider](docs/images/manafolio-ai-options.webp)
+
 ## Install
 
 ### Docker
