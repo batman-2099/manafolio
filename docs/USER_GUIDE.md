@@ -354,12 +354,14 @@ Storage opens as a gallery. Search container names/types or sort by name/quantit
 
 The container toolbar shows its saved sleeve type. Change it through the **Container Settings** gear button → **Sleeved**, then **Save Settings**. This records the sleeve layers used for the container's cards; it does not change capacity, move cards, or alter deck sleeve settings. Existing containers default to **None**, and complete account backups retain the setting.
 
+Change **Type** through the **Container Settings** gear button, then **Save Settings**. Existing cards, pages/rows, capacities, and sleeve settings are retained; changing type does not apply the creation wizard's default layout.
+
 ### Choose between sort rules and filing rules
 
 - **Sort** answers “in what order?” Rules can order cards by name, set/number, value, finish, type/color, language, and other offered fields. Rule priority matters.
 - **Filing Rules (Allow/Deny List)** answers “which cards are allowed here?” Use **Add Rule**, **Require** or **Exclude**, a field, comparison, and value.
 - Container rules apply to the whole container. A row/page's **Accepts** control adds restrictions for that compartment.
-- Locks and available capacity also affect whether a card can be filed.
+- Locks affect whether a card can be filed. Capacity is advisory: eligible cards can be filed beyond the configured limit.
 
 For example, a binder can sort by set then collector number while accepting only one set. These are separate decisions: sorting by set does not by itself reject cards from other sets.
 
@@ -375,7 +377,7 @@ For example, a binder can sort by set then collector number while accepting only
 #### Guided filing
 
 1. Choose **Sort & File (into open container)**.
-2. The app finds cards that fit the open container's rules and capacity. Cards that do not fit remain unassigned.
+2. The app finds cards accepted by the open container's rules and unlocked pages/rows. Cards rejected by those restrictions remain unassigned; exceeding capacity does not prevent filing.
 3. Follow each recommendation. Use **Click to Locate** or the corresponding tap-to-locate control to find the suggested spot.
 4. Put the physical card there and choose **File**. Use **Skip** for a card you are not ready to place.
 5. Continue through the queue, or use **Exit filing** when you need to stop.
@@ -384,7 +386,7 @@ For example, a binder can sort by set then collector number while accepting only
 
 1. Choose **Auto-File All (into open container)**.
 2. Read the confirmation and count carefully. This is a filing operation for the open container, not an automatic search across all containers.
-3. If the container is full, the app may offer to add pages/rows. Accept only if that expanded capacity matches the storage you actually have.
+3. Full pages/rows still accept eligible cards. The app marks over-capacity storage **Over limit** without automatically expanding capacity or choosing another container.
 4. Confirm, then review the resulting locations and arrange the physical cards accordingly.
 
 **Scope:** both filing actions use the currently filtered Unsorted queue, and only file into the open container. Check the queue and confirmation count before proceeding. To file a hand-picked group instead, select the cards and use **File selected to…**.
@@ -414,6 +416,7 @@ Automatic sorting can renumber positions and shift later cards, especially in a 
 ### Capacity, stacking, and locks
 
 - **Add Page** or **Add Compartment** expands a container. **Container Settings** also exposes its page/row count and capacity; a row/page has **Change capacity** controls.
+- Capacity is a warning, not a move restriction. Cards moved into a full eligible container stay there. The gallery, container view, and affected page/row show **Over limit** with usage and capacity; the warning clears when usage falls back within the limit. Stacked storage counts distinct pockets per page/row, while unstacked storage counts copies.
 - Only the last empty row/page can be removed with the remove-last control. Remove or relocate its cards first.
 - Binder settings offer **Stack duplicates in one pocket**. That is a real storage-capacity setting, unlike Collection's display-only **Stack Duplicates**. Check that your actual pockets can safely hold the copies you record.
 - **More → Lock Container** prevents routine movement, arrangement, deletion, layout/settings changes, and automatic filing into that container. **Unlock Container** makes it editable again.
@@ -467,8 +470,8 @@ Graveyard has separate unassigned cards and storage; physical cards cannot be fi
 
 | Problem | Check first |
 | --- | --- |
-| A card will not file | Confirm the inventory, container/row locks, filing rules, and capacity. A rule rejection is different from a full container. |
-| Automatic filing leaves cards behind | They may not fit the open container's rules or available space. Review the remaining Unsorted cards rather than assuming they were lost. |
+| A card will not file | Confirm the inventory, container/row locks, and filing rules. Capacity alone does not block filing. |
+| Automatic filing leaves cards behind | They may not match the open container's rules or any unlocked page/row. Review the remaining Unsorted cards rather than assuming they were lost. |
 | The physical binder no longer matches the app | Sorting or filing may have shifted positions. Follow the re-file guide, or switch to Custom and arrange a fixed layout deliberately. |
 | A row/page cannot be removed | It must be the last removable empty compartment. The container also must be unlocked. |
 | A move/archive/restore is blocked | Check locks and reserved copies, and make sure the destination is in the correct inventory. |
@@ -875,7 +878,7 @@ Check the deck's inventory first. Then check missing status, exact printing/quan
 
 ### A storage move is refused
 
-Check the source and destination inventory, container/compartment locks, capacity, and filing restrictions. For a ManaBox container import, distinguish importing ownership from moving already-owned copies. For archive/restore, return reserved copies and unlock the affected container and compartments first.
+Check the source and destination inventory, container/compartment locks, and filing restrictions. Capacity alone does not block a move; over-capacity storage is marked **Over limit**. For a ManaBox container import, distinguish importing ownership from moving already-owned copies. For archive/restore, return reserved copies and unlock the affected container and compartments first.
 
 ### The scanner cannot use the camera
 

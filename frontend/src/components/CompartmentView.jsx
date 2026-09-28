@@ -313,7 +313,7 @@ export default function CompartmentView({
   // LocationManager provides one; nothing else that renders this view does.
   dropEnabled = false
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const isBinder = isBinderType(locationType);
   const isSelected = (entryId) => !!(selectedIds && selectedIds.has(entryId));
   const highlightSet = new Set(highlightEntryIds);
@@ -484,9 +484,6 @@ export default function CompartmentView({
         if (s > maxSlotFromCards) maxSlotFromCards = s;
       }
     });
-    // Don't let the recommendation grow the page past capacity — that rendered a
-    // phantom extra pocket (a 10th slot on a full 9-card page). Filing into a full
-    // page shifts the others; the displaced last card moves to the next page.
     const slotCount = Math.max(compartment.capacity || 1, maxSlotFromCards);
     const pockets = new Array(slotCount).fill(null);
     const unplaced = [];
@@ -507,7 +504,7 @@ export default function CompartmentView({
     });
 
     if (recommendedSpot && recommendedSpot.index >= 0) {
-      const recIdx = Math.min(recommendedSpot.index, pockets.length - 1);
+      const recIdx = recommendedSpot.index;
       const ghostObj = {
         __ghost: true,
         // Spread the card first so the ghost preview can resolve contributed art
@@ -520,16 +517,15 @@ export default function CompartmentView({
       if (!pockets[recIdx]) {
         pockets[recIdx] = ghostObj;
       } else {
-        // Occupied: insert and shift the rest down, but keep the page at its slot
-        // count — the card pushed off the end belongs to the next page.
-        const cap = pockets.length;
         pockets.splice(recIdx, 0, ghostObj);
-        if (pockets.length > cap) pockets.length = cap;
       }
     }
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', height: '100%' }}>
+        {compartment.count > compartment.capacity && (
+          <span className="storage-capacity-warning">{t('loc.overLimit', { used: compartment.count.toLocaleString(locale), capacity: compartment.capacity.toLocaleString(locale) })}</span>
+        )}
         {onRename && (
           <div className="row-flash" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
             {editingLabel ? (

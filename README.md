@@ -189,7 +189,7 @@ Open **Add Cards → Precon Deck**, search MTGJSON by name, set code, or type, a
 
 ### Import a ManaBox storage container
 
-Storage opens a searchable, sortable gallery. Create a container, choose its cover through **Container Settings → Choose container image**, and organize cards by layout or image list. Move selections between containers or back to Unsorted, or use automatic filing; capacity can expand after confirmation.
+Storage opens a searchable, sortable gallery. Create a container, choose its cover through **Container Settings → Choose container image**, and organize cards by layout or image list. Move selections between containers or back to Unsorted, or use automatic filing. Capacity is advisory: cards stay in the chosen eligible container even when full, and Storage marks containers/pages/rows **Over limit**. Add pages/rows or change capacity manually to match your physical storage.
 
 Choose **Import ManaBox container** and upload a `.txt` export. This creates a box named after the file and files matching, already-owned physical copies from Unsorted into its first row—it does not create missing collection cards.
 

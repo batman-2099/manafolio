@@ -348,13 +348,17 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
     cardsByCompId.get(c.compartment_id).push(c);
   });
 
-  // Stacking container: a duplicate rides in the pocket its twin already holds,
-  // so it claims no new slot and a full container still accepts it. Checked
-  // before the "everything is full" bail-out below for exactly that reason.
+  cardMetadata.price_trend = resolveCardPrice(cardMetadata);
+  const cardCat = getSortCategory(cardMetadata, location.sort_order);
+  const acceptsCard = c => compartmentAcceptsCard(c, cardMetadata) &&
+    (!(c.assignedFilters && c.assignedFilters.length > 0) ||
+      (cardCat && c.assignedFilters.includes(cardCat)));
+
+  // A duplicate shares its eligible twin's pocket without consuming a new slot.
   if (location.allow_stacking) {
     const key = stackKey(cardMetadata);
     const twin = allLocationCards.find(c =>
-      c.position > 0 && compartments.some(comp => comp.id === c.compartment_id) && stackKey(c) === key
+      c.position > 0 && compartments.some(comp => comp.id === c.compartment_id && acceptsCard(comp)) && stackKey(c) === key
     );
     if (twin) {
       const twinComp = compartments.find(comp => comp.id === twin.compartment_id);
@@ -381,32 +385,6 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
     return count - (!location.allow_stacking && current?.compartment_id === c.id ? current.quantity : 0);
   };
   const hasFreeSpace = (c) => countOf(c) + slotsNeeded <= c.capacity;
-  const allCompartmentsFull = !compartments.some(hasFreeSpace);
-
-  if (allCompartmentsFull) {
-    const otherLocations = await dbClient.all(
-      `SELECT * FROM locations WHERE user_id = ? AND id != ? AND inventory_type = ? AND locked = 0 ORDER BY id ASC`,
-      [location.user_id, location.id, location.inventory_type || 'collection']
-    );
-    for (const otherLoc of otherLocations) {
-      const otherComps = await loadCompartments(dbClient, otherLoc.id, location.user_id);
-      const hasSpace = otherComps.some(c => !c.locked && c.free >= (otherLoc.allow_stacking ? 1 : (cardMetadata.quantity || 1)));
-      if (hasSpace) {
-        const rec = await recommendSlot(dbClient, otherLoc, cardMetadata, otherComps);
-        if (rec) {
-          return {
-            ...rec,
-            location_id: otherLoc.id,
-            reason: `"${location.name}" is full — overflowed to "${otherLoc.name}". ${rec.reason || ''}`.trim()
-          };
-        }
-      }
-    }
-    return null;
-  }
-
-  cardMetadata.price_trend = resolveCardPrice(cardMetadata);
-  const cardCat = getSortCategory(cardMetadata, location.sort_order);
 
   const dynamicCatsByCompId = new Map();
   compartments.forEach(c => {
@@ -458,21 +436,16 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
 
 
   if (pool.length === 0 || !pool.some(hasFreeSpace)) {
-    pool = compartments.filter(c =>
-      compartmentAcceptsCard(c, cardMetadata) &&
-      (!(c.assignedFilters && c.assignedFilters.length > 0) ||
-      (cardCat && c.assignedFilters.includes(cardCat)))
-    );
+    pool = compartments.filter(acceptsCard);
   }
 
-  if (pool.length === 0 || !pool.some(hasFreeSpace)) {
-    return null;
-  }
+  if (pool.length === 0) return null;
 
   pool.sort((a, b) => a.idx - b.idx);
 
   if (location.sort_order === 'custom') {
-    const usableCandidates = pool.filter(hasFreeSpace);
+    const available = pool.filter(hasFreeSpace);
+    const usableCandidates = available.length ? available : pool;
     const best = usableCandidates.find(c => {
       const cats = dynamicCatsByCompId.get(c.id) || [];
       return cardCat && cats.includes(cardCat);
@@ -483,7 +456,9 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
 
     if (!best) return null;
     const bestCards = cardsByCompId.get(best.id) || [];
-    let reason = 'Manual order — next open slot';
+    const nextPosition = bestCards.reduce((max, card) =>
+      Math.max(max, (card.position || 0) + (location.allow_stacking ? 1 : (card.quantity || 1)) * 1000), 1000);
+    let reason = 'Manual order — next slot';
     if (cardCat && (best.assignedFilters || []).includes(cardCat)) {
       reason = `${compartmentLabel(best, location.type)} is assigned to "${cardCat}"`;
     } else if (cardCat && (dynamicCatsByCompId.get(best.id) || []).includes(cardCat)) {
@@ -492,7 +467,7 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
     return {
       location_id: location.id,
       compartment_id: best.id,
-      position: (bestCards.length + 1) * 1000,
+      position: nextPosition,
       label: `${compartmentLabel(best, location.type)} (in ${location.name})`,
       reason
     };
@@ -520,6 +495,10 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
   const sorted = sortCards([...existingCardsInPool, newCard], location.sort_order, location.foil_sorting);
   const targetIndex = sorted.findIndex(c => c.entry_id === -1);
   if (targetIndex === -1) return null;
+  const slotsBefore = (cards, index) => location.allow_stacking
+    ? new Set(cards.slice(0, index).map(stackKey)).size
+    : cards.slice(0, index).reduce((sum, card) => sum + (card.quantity || 1), 0);
+  const targetSlot = slotsBefore(sorted, targetIndex);
 
   let scheme = SORT_SCHEME_LABELS[location.sort_order] || location.sort_order;
   if (typeof scheme === 'string' && scheme.startsWith('[')) {
@@ -550,20 +529,21 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
     const cc = cardsByCompId.get(comp.id) || [];
     const ls = sortCards([...cc, newCard], location.sort_order, location.foil_sorting);
     const idx = ls.findIndex(c => c.entry_id === -1);
-    return idx === -1 ? cc.length : idx;
+    return slotsBefore(ls, idx === -1 ? ls.length : idx);
   };
 
   let cursor = 0;
   for (let i = 0; i < pool.length; i++) {
     const compartment = pool[i];
-    if (targetIndex < cursor + compartment.capacity) {
+    if (targetSlot < cursor + compartment.capacity || i === pool.length - 1) {
       let target = compartment;
       let seq = localSeq(target);
       if (!hasFreeSpace(target)) {
-        const spill = pool.slice(i + 1).find(hasFreeSpace);
-        if (!spill) return null;
-        target = spill;
-        seq = localSeq(spill);
+        const spill = pool.slice(i + 1).find(hasFreeSpace) || pool.find(hasFreeSpace);
+        if (spill) {
+          target = spill;
+          seq = localSeq(spill);
+        }
       }
       // Neighbours in the TARGET compartment's own order (handles spill), so the
       // "file it after X" hint names the physical card the new one sits behind.
@@ -610,6 +590,12 @@ async function rebalanceCompartmentByScheme(database, compartmentId, sortOrder, 
 
   if (!cards || cards.length === 0) return;
   const sorted = sortCards(cards, sortOrder, foilSorting);
+  const location = await dbClient.get(
+    `SELECT l.allow_stacking FROM compartments cp JOIN locations l ON l.id = cp.location_id WHERE cp.id = ?`,
+    [compartmentId]
+  );
+  const stackPositions = new Map();
+  let nextSlot = 1;
 
   const CHUNK_SIZE = 100;
   for (let i = 0; i < sorted.length; i += CHUNK_SIZE) {
@@ -618,8 +604,14 @@ async function rebalanceCompartmentByScheme(database, compartmentId, sortOrder, 
     const params = [];
     const ids = [];
 
-    chunk.forEach((card, idx) => {
-      const newPos = (i + idx + 1) * 1000;
+    chunk.forEach(card => {
+      const key = location?.allow_stacking ? stackKey(card) : null;
+      let newPos = key && stackPositions.get(key);
+      if (!newPos) {
+        newPos = nextSlot * 1000;
+        nextSlot += key ? 1 : (card.quantity || 1);
+        if (key) stackPositions.set(key, newPos);
+      }
       posCaseStr += `WHEN ? THEN ? `;
       params.push(card.id, newPos);
       ids.push(card.id);

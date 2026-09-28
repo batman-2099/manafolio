@@ -125,10 +125,8 @@ async function testGraveyard() {
     await request(`/collection/${spare}`, 'PUT', { location_id: archiveBox }, 1, 400);
     await request(`/collection/${spare}/place`, 'POST', { compartment_id: archiveComp, slot: 1 }, 1, 400);
     await request(`/compartments/${archiveComp}`, 'PATCH', { capacity: 2 });
-    await request(`/collection/${restoredArchive.id}`, 'PUT', { compartment_id: archiveComp }, 1, 400);
-    assert.strictEqual((await db.get('SELECT location_id FROM collection WHERE id = ?', [restoredArchive.id])).location_id, null);
-    await request(`/compartments/${archiveComp}`, 'PATCH', { capacity: 20 });
     await request(`/collection/${restoredArchive.id}`, 'PUT', { compartment_id: archiveComp });
+    assert.strictEqual((await request(`/locations/${archiveBox}/compartments`))[0].capacity, 2);
     await request(`/collection/${restoredArchive.id}`, 'PUT', { notes: 'Still archived' });
     let filed = await db.get('SELECT * FROM collection WHERE id = ?', [restoredArchive.id]);
     assert.deepStrictEqual([filed.list_type, filed.location_id, filed.compartment_id, filed.quantity], ['graveyard', archiveBox, archiveComp, 3]);
@@ -150,7 +148,7 @@ async function testGraveyard() {
     await request(`/locations/${archiveBox}/resort`, 'POST', {});
     await request(`/locations/${archiveBox}`, 'PUT', { locked: true });
     await request(`/locations/${archiveBox}/resort`, 'POST', {}, 1, 409);
-    assert.strictEqual((await request(`/locations/${archiveBox}/recommend`, 'POST', { card_id: 'spare-card', list_type: 'graveyard' })).full, true);
+    assert.strictEqual((await request(`/locations/${archiveBox}/recommend`, 'POST', { card_id: 'spare-card', list_type: 'graveyard' })).rejected, true);
     await request(`/locations/${archiveBox}`, 'PUT', { locked: false });
     await request('/decks/from-container', 'POST', { location_id: archiveBox, name: 'Not a deck' }, 1, 404);
     await request('/import-container/move', 'POST', { location_id: archiveBox, card_id: 'spare-card', printing: 'Normal', requested: 1 }, 1, 400);

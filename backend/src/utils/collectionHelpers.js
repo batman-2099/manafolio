@@ -235,9 +235,6 @@ async function resolveCompartmentAndPosition(opts) {
       countParams.push(excludeEntryId);
     }
     const countRow = await db.get(countQuery, countParams);
-    if ((countRow.cnt || 0) + (compartment.allow_stacking ? 1 : quantity) > compartment.capacity) {
-      throw Object.assign(new Error('COMPARTMENT_FULL'), { status: 400 });
-    }
 
     const label = `${compartmentLabel(compartment, compartment.loc_type)} (in ${compartment.loc_name})`;
     if (position !== undefined) return { compartment_id: compartmentId, position, label, location_id: compartment.loc_id };
@@ -268,7 +265,7 @@ async function resolveCompartmentAndPosition(opts) {
   }
 
   const recommended = await recommendSlot(db, location, cardMetadata);
-  if (!recommended) return { compartment_id: null, position: 0, full: true };
+  if (!recommended) return { compartment_id: null, position: 0, rejected: true };
   return { compartment_id: recommended.compartment_id, position: recommended.position, location_id: recommended.location_id, label: recommended.label };
 }
 

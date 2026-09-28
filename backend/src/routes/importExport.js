@@ -709,10 +709,6 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
     }
     if (entry.compartment_id) sources.add(entry.compartment_id);
   }
-  await db.run(`
-    UPDATE compartments SET capacity = MAX(capacity, ?) WHERE id = ?
-      AND location_id IN (SELECT id FROM locations WHERE user_id = ?)
-  `, [slot, compartmentId, userId]);
   for (const source of sources) await rebalanceCompartmentPositions(db, source, userId);
 }
 
@@ -803,6 +799,7 @@ router.post('/import-container', async (req, res) => {
         ));
       }
       count = report.reduce((total, item) => total + item.moved, 0);
+      await db.run(`UPDATE compartments SET capacity = ? WHERE id = ?`, [Math.max(1, count), compartment.lastID]);
     });
 
     const missing = requested - count;

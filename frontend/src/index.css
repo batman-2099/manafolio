@@ -1703,6 +1703,22 @@ button.collection-card-trigger {
   border: 1px solid var(--border-glass);
 }
 
+.storage-capacity-warning {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-negative);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
 /* Loading animations */
 .spinner {
   border: 3px solid rgba(255, 255, 255, 0.1);

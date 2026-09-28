@@ -11,7 +11,7 @@ const cardApi = require('../utils/cardApi');
 const { searchLimiter } = require('../middleware/auth');
 const { resolveCardPrice, parseCardRow, recordPrice } = require('../utils/priceHelpers');
 const { parseSetList } = require('../utils/setQuery');
-const { compartmentLabel, isBinderType, rebalanceCompartmentByScheme, stackKey, STACK_KEY_SQL } = require('../utils/compartmentSort');
+const { compartmentLabel, isBinderType, rebalanceCompartmentByScheme, stackKey } = require('../utils/compartmentSort');
 const { checkedOutAllocation, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, setStackQuantity, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { splitPrice } = require('../utils/splitPrice');
@@ -657,7 +657,6 @@ async function addCardToCollection(user, body, preparedCard = null) {
       placement: resolved.compartment_id
         ? await describePlacement(db, lastInsertedId, req.user.id)
         : null,
-      container_full: !!resolved.full,
       rule_rejected: !!resolved.rejected
     };
   }
@@ -1144,7 +1143,6 @@ router.put('/collection/:id', async (req, res) => {
     let finalCompartmentId = listChanged ? null : entry.compartment_id;
     let finalLocationId = listChanged ? null : entry.location_id;
     let finalPosition = listChanged ? 0 : entry.position;
-    let resolvedFull = false;
     let resolvedRejected = false;
 
     if (location_id !== undefined || compartment_id !== undefined) {
@@ -1162,7 +1160,6 @@ router.put('/collection/:id', async (req, res) => {
       finalCompartmentId = resolved.compartment_id;
       finalLocationId = resolved.compartment_id ? resolved.location_id : null;
       finalPosition = resolved.position;
-      resolvedFull = !!resolved.full;
       resolvedRejected = !!resolved.rejected;
     }
 
@@ -1274,7 +1271,7 @@ router.put('/collection/:id', async (req, res) => {
     }
 
     const finalPlacement = isMoving && finalCompartmentId ? await describePlacement(db, id, req.user.id) : null;
-    res.json({ message: 'Collection entry updated successfully', placement: finalPlacement, container_full: resolvedFull, rule_rejected: resolvedRejected });
+    res.json({ message: 'Collection entry updated successfully', placement: finalPlacement, rule_rejected: resolvedRejected });
   } catch (error) {
     if (error.status) return res.status(error.status).json({ error: error.message });
     console.error(error);
@@ -1329,14 +1326,6 @@ router.post('/collection/:id/place', async (req, res) => {
 
     if (!Number.isInteger(slot) || slot < 1) return res.status(400).json({ error: 'Invalid slot' });
 
-    if (entry.compartment_id !== compartment_id) {
-      // Slots used, not cards held, once copies are allowed to share a pocket.
-      const cnt = await db.get(
-        `SELECT ${comp.allow_stacking ? `COUNT(DISTINCT ${STACK_KEY_SQL})` : 'COALESCE(SUM(quantity), 0)'} AS n
-         FROM collection WHERE compartment_id = ? AND user_id = ? AND COALESCE(list_type, 'collection') = ?`, [compartment_id, req.user.id, entry.list_type]);
-      if (cnt.n + (comp.allow_stacking ? 1 : entry.quantity) > comp.capacity) return res.status(400).json({ error: 'COMPARTMENT_FULL' });
-    }
-
     const sourceComp = entry.compartment_id;
     if (isBinder) {
       await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
@@ -1344,13 +1333,13 @@ router.post('/collection/:id/place', async (req, res) => {
     } else {
       await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
         [compartment_id, comp.loc_id, slot * 1000 - 500, id, req.user.id]);
-      await rebalanceCompartmentByScheme(db, compartment_id, req.user.id, { sort_order: 'custom' });
+      await rebalanceCompartmentByScheme(db, compartment_id, 'custom');
     }
 
     if (sourceComp && sourceComp !== compartment_id) {
       const src = await db.get(`SELECT l.type AS loc_type FROM compartments c JOIN locations l ON c.location_id = l.id WHERE c.id = ?`, [sourceComp]);
       if (src && !isBinderType(src.loc_type)) {
-        await rebalanceCompartmentByScheme(db, sourceComp, req.user.id, { sort_order: 'custom' });
+        await rebalanceCompartmentByScheme(db, sourceComp, 'custom');
       }
     }
 

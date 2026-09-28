@@ -1772,6 +1772,8 @@
   "loc.allowStackingHint": "Mehrere Exemplare derselben Karte teilen eine Hülle und zeigen eine Anzahl, sodass eine Seite entsprechend mehr verschiedene Karten fasst.",
   "loc.cardsStoredLabel": "Gespeicherte Karten",
   "loc.slotsUsedLabel": "Belegte Plätze",
+  "loc.overLimit": "Über dem Limit: {used} / {capacity}",
+  "loc.noEligibleCompartment": "Keine entsperrte Seite oder Reihe nimmt diese Karte an.",
   "compartment.stackedHere": "{count} Exemplare in dieser Hülle gestapelt",
   "settings.linkContainer": "Freigabelinks für Container",
   "settings.copied.container": "Öffentlicher Container-Link in die Zwischenablage kopiert.",

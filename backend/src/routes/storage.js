@@ -76,7 +76,7 @@ router.get('/locations', async (req, res) => {
              -- container the duplicates sharing a pocket are one occupant, so
              -- counting cards there would report a nine-pocket page as overfull.
              (SELECT CASE WHEN l.allow_stacking
-                       THEN COUNT(DISTINCT ${STACK_KEY_SQL})
+                       THEN COUNT(DISTINCT COALESCE(compartment_id, 0) || '|' || ${STACK_KEY_SQL})
                        ELSE COALESCE(SUM(quantity), 0) END
                 FROM collection
                 WHERE user_id = l.user_id AND COALESCE(list_type, 'collection') = l.inventory_type
@@ -550,7 +550,7 @@ router.post('/locations/:id/recommend', async (req, res) => {
     }
 
     const recommendation = await recommendSlot(db, location, cardMetadata);
-    if (!recommendation) return res.json({ full: true });
+    if (!recommendation) return res.json({ rejected: true });
     res.json(recommendation);
   } catch (error) {
     if (error.status) return res.status(error.status).json({ error: error.message });
@@ -585,7 +585,7 @@ router.post('/locations/:id/recommend-batch', async (req, res) => {
 
       const recommended = await recommendSlot(db, location, entry, workingCompartments, mockCards);
       if (!recommended) {
-        recommendations.push({ entry, recommended: null, full: true });
+        recommendations.push({ entry, recommended: null, rejected: true });
         continue;
       }
 

@@ -7,7 +7,7 @@ import { getCardRarityBorder, getRarityBadgeStyle, getRarityBadgeLabel } from '.
 import CardInspectorModal from './CardInspectorModal';
 import AddToDeckSelect from './AddToDeckSelect';
 import { useMultiSelect } from '../utils/useMultiSelect';
-import { isBinderType as computeIsBinder, binderSpread, MTG_FORMATS } from '../utils/cardOptions';
+import { isBinderType as computeIsBinder, binderSpread, MTG_FORMATS, containerTypeKey } from '../utils/cardOptions';
 import { displayName } from '../utils/languages';
 import CompartmentView, { FocusedCardInfo, getSortCategories } from './CompartmentView';
 import { SortBuilder, FilterBuilder } from './SortFilterBuilder';
@@ -164,7 +164,7 @@ function ContainerImportReview({ report, onClose, onMove, movingItem, expanded, 
 }
 
 function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId, setSelectedLocationId, focusEntryId, inventoryType = 'collection', onInventoryTypeChange }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const isArchive = inventoryType === 'graveyard';
   const [locations, setLocations] = useState([]);
   const [activeLocationId, setActiveLocationId] = useState(null);
@@ -230,6 +230,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [sortDraft, setSortDraft] = useState([]);
   const [filterDraft, setFilterDraft] = useState([]);
   const [nameDraft, setNameDraft] = useState('');
+  const [typeDraft, setTypeDraft] = useState('');
   const [sleevedDraft, setSleevedDraft] = useState(0);
   const [capacityDraft, setCapacityDraft] = useState('');
   const [countDraft, setCountDraft] = useState('');
@@ -888,7 +889,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     } catch (err) { console.error(err); showToast(t('loc.errLockGeneric'), 'error'); }
   };
 
-  // Lock/unlock a whole container: filing (and overflow) skip it entirely.
+  // Lock/unlock a whole container: automatic filing skips it entirely.
   const handleToggleContainerLock = async () => {
     if (!selectedLoc) return;
     const next = !selectedLoc.locked;
@@ -981,7 +982,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         setPickedEntryId(null);
         await refreshAll(); onUpdate();
       } else {
-        showToast(data.error === 'COMPARTMENT_FULL' ? 'That page/row is full.' : (data.error || 'Failed to place card.'), 'error');
+        showToast(data.error || t('loc.errPlace'), 'error');
       }
     } catch (err) { console.error(err); showToast(t('loc.errPlace'), 'error'); }
   };
@@ -1149,43 +1150,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     } catch (err) { console.error(err); showToast(t('loc.errRowRulesGeneric'), 'error'); }
   };
 
-  const offerContainerExpansion = async (cardsToFit) => {
-    if (!selectedLoc || selectedLoc.locked) return false;
-    const capacity = Math.max(1, compartments.at(-1)?.capacity || (isBinderType ? 9 : 400));
-    const compartmentsToAdd = Math.ceil(cardsToFit / capacity);
-    const unit = isBinderType ? t('loc.pageLower') : t('loc.rowLower');
-    if (!window.confirm(t('loc.confirmExpandToFit', { name: selectedLoc.name, count: compartmentsToAdd, unit, cards: cardsToFit }))) {
-      return false;
-    }
-
-    try {
-      for (let i = 0; i < compartmentsToAdd; i++) {
-        const response = await fetch(`/api/locations/${selectedLoc.id}/compartments`, { method: 'POST' });
-        if (!response.ok) throw new Error('Failed to add compartment');
-      }
-      await Promise.all([fetchCompartments(selectedLoc.id), fetchLocations()]);
-      return true;
-    } catch (error) {
-      console.error(error);
-      showToast(t('loc.errExpandToFit'), 'error');
-      return false;
-    }
-  };
-
   const handleApplyAll = async () => {
     if (!activeLocationId || unsortedCards.length === 0) return;
     const target = locations.find(l => l.id === activeLocationId);
     if (!window.confirm(t('loc.confirmAutoFile', { count: unsortedCards.length, name: target?.name }))) return;
     try {
-      const recommendationRes = await fetch(`/api/locations/${activeLocationId}/recommend-batch`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entry_ids: unsortedCards.map(c => c.entry_id) })
-      });
-      if (recommendationRes.ok) {
-        const recommendations = await recommendationRes.json();
-        const fullCount = recommendations.filter(item => item.full).length;
-        if (fullCount > 0) await offerContainerExpansion(fullCount);
-      }
       const res = await fetch(`/api/locations/${activeLocationId}/apply-all`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entry_ids: unsortedCards.map(c => c.entry_id) })
@@ -1200,8 +1169,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     if (unsortedCards.length === 0 || !activeLocationId) return;
     const target = locations.find(l => l.id === activeLocationId);
     try {
-      // Scope the walkthrough to the open container only — file just the cards
-      // that fit its rules and capacity; the rest stay in the Unsorted queue.
+      // Scope the walkthrough to cards accepted by this container's rules.
       const res = await fetch(`/api/locations/${activeLocationId}/recommend-batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1210,10 +1178,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       if (!res.ok) { showToast(t('loc.errFilingMode'), 'error'); return; }
       const data = await res.json();
       const placeable = data.filter(d => d.recommended);
-      const fullCount = data.filter(d => d.full).length;
-      if (fullCount > 0 && await offerContainerExpansion(fullCount)) {
-        return startFilingMode();
-      }
       const noRoom = data.filter(d => !d.recommended);
 
       if (placeable.length === 0) {
@@ -1324,6 +1288,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       rule_config: filterDraft.length > 0 ? JSON.stringify({ rules: filterDraft }) : null,
       allow_stacking: stackingDraft,
       sleeved: sleevedDraft,
+      type: typeDraft,
     };
     const trimmedName = (nameDraft || '').trim();
     if (trimmedName && trimmedName !== selectedLoc.name) fields.name = trimmedName;
@@ -1477,6 +1442,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 <strong style={{ display: 'block', fontSize: '2rem', fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{location.total_cards || 0}</strong>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.3 }}>{t('collection.cardUnit', { count: location.total_cards || 0 })}</span>
               </span>
+              {location.total_cards > location.total_capacity && (
+                <span className="storage-capacity-warning" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+                  {t('loc.overLimit', { used: location.total_cards.toLocaleString(locale), capacity: location.total_capacity.toLocaleString(locale) })}
+                </span>
+              )}
             </div>
           </button>
           </div>
@@ -1620,6 +1590,16 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               />
             </label>
 
+            <div className="form-group">
+              <label htmlFor="container-type">{t('container.step.type')}</label>
+              <select id="container-type" className="input-control" value={typeDraft} onChange={event => setTypeDraft(event.target.value)}>
+                {!containerTypeKey(typeDraft) && <option value={typeDraft}>{typeDraft}</option>}
+                {['Binder', 'Toploader Binder', 'Box', 'Toploader Box', 'Graded Slab Box', 'Display Shelf / Stand', 'Deck Box', 'Tin / Case', 'Other'].map(type => (
+                  <option key={type} value={type}>{t(`container.type.${containerTypeKey(type)}`)}</option>
+                ))}
+              </select>
+            </div>
+
             <label htmlFor="container-sleeved" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
               {t('deck.sleeved')}
               <select id="container-sleeved" className="input-control" value={sleevedDraft} onChange={(e) => setSleevedDraft(Number(e.target.value))}>
@@ -1686,6 +1666,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               <span style={{ color: 'var(--text-muted)' }}>{t(selectedLoc.allow_stacking ? 'loc.slotsUsedLabel' : 'loc.cardsStoredLabel')}</span>
               <strong style={{ fontSize: '0.9rem', color: 'var(--text-strong)' }}>{selectedLoc.total_cards || 0} / {selectedLoc.total_capacity || 0}</strong>
             </div>
+            {selectedLoc.total_cards > selectedLoc.total_capacity && (
+              <span className="storage-capacity-warning">{t('loc.overLimit', { used: selectedLoc.total_cards.toLocaleString(locale), capacity: selectedLoc.total_capacity.toLocaleString(locale) })}</span>
+            )}
 
             <div style={{ background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #d97706', padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
               <strong>{t('loc.reorganizeWarningTitle')}</strong>
@@ -1864,6 +1847,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     setFilterDraft(fDraft);
 
                     setNameDraft(selectedLoc.name || '');
+                    setTypeDraft(selectedLoc.type);
                     setSleevedDraft(selectedLoc.sleeved ?? 0);
                     setStackingDraft(!!selectedLoc.allow_stacking);
                     setCountDraft(String(compartments.length));
@@ -2047,7 +2031,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 >
                   {compartments.map((c, idx) => (
                     <option key={c.id} value={idx}>
-                      {c.display_label || t('loc.pageName', { number: idx + 1 })} ({idx + 1}/{compartments.length})
+                      {c.display_label || t('loc.pageName', { number: idx + 1 })} ({idx + 1}/{compartments.length}){c.count > c.capacity ? ` · ${t('loc.overLimit', { used: c.count.toLocaleString(locale), capacity: c.capacity.toLocaleString(locale) })}` : ''}
                     </option>
                   ))}
                   <option value="__add_new__" disabled={!!selectedLoc.locked}>+ {t('loc.addPage')}</option>
@@ -2309,13 +2293,16 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                           }}
                           style={{ fontSize: '0.8rem', padding: '0.2rem 0.4rem' }}
                         >
-                          {compartments.map(c => <option key={c.id} value={c.id}>{c.display_label}</option>)}
+                          {compartments.map(c => <option key={c.id} value={c.id}>{c.display_label}{c.count > c.capacity ? ` · ${t('loc.overLimit', { used: c.count.toLocaleString(locale), capacity: c.capacity.toLocaleString(locale) })}` : ''}</option>)}
                           <option value="__add_new__" disabled={!!selectedLoc.locked}>+ {t('loc.addRow')}</option>
                         </select>
                         <button className="btn btn-secondary btn-icon-only" aria-label={t('common.next')} disabled={activeCompIdx >= compartments.length - 1} onClick={() => setActiveCompartmentId(compartments[activeCompIdx + 1]?.id)} style={{ width: '24px', height: '24px', padding: 0 }}>
                           &rarr;
                         </button>
                       </div>
+                      {activeComp.count > activeComp.capacity && (
+                        <span className="storage-capacity-warning">{t('loc.overLimit', { used: activeComp.count.toLocaleString(locale), capacity: activeComp.capacity.toLocaleString(locale) })}</span>
+                      )}
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <button
@@ -2431,10 +2418,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     return (
                       <div style={{ background: 'rgba(255, 71, 71, 0.15)', border: '1px solid #ff4747', borderRadius: 'var(--radius-sm)', padding: '0.75rem', width: '100%', textAlign: 'center' }}>
                         <strong style={{ fontSize: '0.9rem', color: 'var(--text-strong)' }}>
-                          {filingQueue[filingIndex].rejected ? t('loc.rejectedRule') : t('loc.containerFull')}
+                          {t('loc.noEligibleCompartment')}
                         </strong>
                         <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                          {t(filingQueue[filingIndex].rejected ? 'loc.skipRejected' : 'loc.skipNoRoom')}
+                          {t('loc.skipRejected')}
                         </div>
                       </div>
                     );

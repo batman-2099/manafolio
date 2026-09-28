@@ -195,6 +195,7 @@ async function testContainerImport() {
     assert.strictEqual(review.statusCode, 201);
     assert.deepStrictEqual([review.body.items[0].moved, review.body.items[0].unmoved, review.body.items[0].movable], [1, 9, 9],
       'all finishes of checked-out copies can change storage; locks, missing, other owners, other games and nonphysical lists stay excluded');
+    const originalCapacity = await db.get('SELECT capacity FROM compartments WHERE location_id = ?', [review.body.id]);
     const payload = { location_id: review.body.id, card_id: 'mtg-5', printing: 'Normal', requested: 10 };
     const move = (body = payload, user = 1) => invoke(moveContainer, body, user);
     const counts = response => [response.body.moved, response.body.unmoved, response.body.movable];
@@ -220,7 +221,8 @@ async function testContainerImport() {
     assert.deepStrictEqual(await inventory(), inventoryBeforeMove);
     const placed = await db.all('SELECT position FROM collection WHERE location_id = ? ORDER BY position', [review.body.id]);
     assert.deepStrictEqual(placed.map(row => row.position), Array.from({ length: 10 }, (_, index) => (index + 1) * 1000));
-    assert.strictEqual((await db.get('SELECT capacity FROM compartments WHERE location_id = ?', [review.body.id])).capacity, 10);
+    assert.deepStrictEqual(await db.get('SELECT capacity FROM compartments WHERE location_id = ?', [review.body.id]), originalCapacity,
+      'moving more copies preserves the chosen container limit so overflow remains visible');
     assert.deepStrictEqual(await db.get('SELECT * FROM decks WHERE id = ?', [deck]), deckBefore);
     assert.deepStrictEqual(await db.all('SELECT * FROM deck_cards WHERE deck_id = ?', [deck]), deckCardsBefore);
     assert.deepStrictEqual(counts(await move()), [10, 0, 0]);

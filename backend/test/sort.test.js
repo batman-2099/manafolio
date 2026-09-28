@@ -124,7 +124,7 @@ async function main() {
     `A1: a card sorting into a full page must spill to the next page with room (got compartment ${rec.compartment_id}, expected ${page2.lastID})`
   );
 
-  // General invariant: never recommend a compartment that is already full.
+  // Prefer an available compartment while this container still has one.
   const cnt = await db.get(`SELECT COUNT(*) as n FROM collection WHERE compartment_id = ? AND user_id = ?`, [rec.compartment_id, userId]);
   const comp = await db.get(`SELECT capacity FROM compartments WHERE id = ?`, [rec.compartment_id]);
   assert(cnt.n < comp.capacity, `recommended compartment is already full (${cnt.n}/${comp.capacity})`);

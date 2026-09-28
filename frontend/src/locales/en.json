@@ -1926,6 +1926,8 @@
   "loc.allowStackingHint": "Copies of the same card share a pocket and show a count, so a page holds that many more distinct cards.",
   "loc.cardsStoredLabel": "Cards stored",
   "loc.slotsUsedLabel": "Slots used",
+  "loc.overLimit": "Over limit: {used} / {capacity}",
+  "loc.noEligibleCompartment": "No unlocked page or row accepts this card.",
   "compartment.stackedHere": "{count} copies stacked in this pocket",
   "settings.linkContainer": "Container Share Links",
   "settings.copied.container": "Copied public container link to clipboard.",
