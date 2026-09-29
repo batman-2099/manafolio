@@ -24,6 +24,7 @@ export default function AddToDeckSelect({
   return (
     <select
       className={className}
+      aria-label={placeholder ?? t('deck.addToDeck')}
       value=""
       disabled={disabled}
       onChange={(e) => { if (e.target.value) onAdd(e.target.value); e.target.value = ''; }}

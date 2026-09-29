@@ -20,6 +20,7 @@ import Modal from './Modal';
 
 const labelStyle = { fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-secondary)' };
 const PAGE_SIZE = 60;
+const EMPTY_COLLECTION = [];
 
 const SORT_CRITERIA = {
   ...COLLECTION_SORT_CRITERIA,
@@ -39,10 +40,10 @@ function Field({ label, id, children }) {
 
 function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter, setSelectedCardFilter, onNavigate, setSelectedLocationId, setFocusEntryId }) {
   const { t } = useT();
-  const [collection, setCollection] = useState([]);
+  const [collectionState, setCollectionState] = useState(null);
+  const [collectionRefresh, setCollectionRefresh] = useState(0);
   const [locations, setLocations] = useState([]);
   const [setsList, setSetsList] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (selectedCardFilter) {
@@ -83,6 +84,12 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [notCheckedOutOnly, setNotCheckedOutOnly] = useState(false);
 
+  const collectionScope = `${subTab}:${tradeOnly}`;
+  const hasCollection = collectionState?.scope === collectionScope && collectionState.data !== null;
+  const collection = hasCollection ? collectionState.data : EMPTY_COLLECTION;
+  const loading = collectionState?.scope !== collectionScope || collectionState.loading;
+  const error = collectionState?.scope === collectionScope && collectionState.error;
+
   // Stacking state (default to stacked)
   const [stackCards, setStackCards] = useState(true);
   const [stackByCondition, setStackByCondition] = useState(false);
@@ -92,7 +99,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   const {
     selectMode, setSelectMode, selectedIds, setSelectedIds, toggleSelect, selectAt, clearSelection, exitSelectMode,
     bulkMoveTarget, setBulkMoveTarget, pressHandlers, longPressFired, runBulk,
-  } = useMultiSelect({ showToast, onChanged: () => { onUpdate(); fetchCollection(); } });
+  } = useMultiSelect({ showToast, onChanged: onUpdate });
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -101,32 +108,28 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   }, [subTab, setSelectedIds, setBulkMoveTarget]);
 
   useEffect(() => {
-    fetchCollection();
-    fetchSets();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statsTrigger, subTab, tradeOnly]);
-
-  const fetchCollection = async () => {
-    try {
-      setLoading(true);
-      let url = '/api/collection?list_type=collection';
-      if (subTab === 'wishlist' || subTab === 'arena' || subTab === 'graveyard') url = `/api/collection?list_type=${subTab}`;
-      if (tradeOnly) {
-        url += '&is_trade=1';
-      }
-
-      const response = await fetch(url);
-      if (response.ok) {
+    const controller = new AbortController();
+    setCollectionState(previous => ({ scope: collectionScope, data: previous?.scope === collectionScope ? previous.data : null, loading: true, error: false }));
+    const load = async () => {
+      try {
+        const listType = subTab === 'unsorted' ? 'collection' : subTab;
+        const params = new URLSearchParams({ list_type: listType });
+        if (tradeOnly) params.set('is_trade', '1');
+        const response = await fetch(`/api/collection?${params}`, { signal: controller.signal });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
-        setCollection(data);
+        if (!controller.signal.aborted) setCollectionState({ scope: collectionScope, data, loading: false, error: false });
+      } catch {
+        if (!controller.signal.aborted) setCollectionState(previous => ({ ...previous, loading: false, error: true }));
       }
-    } catch (err) {
-      console.error(err);
-      showToast(t('collection.errLoad'), 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    load();
+    return () => controller.abort();
+  }, [statsTrigger, collectionRefresh, subTab, tradeOnly, collectionScope]);
+
+  useEffect(() => {
+    fetchSets();
+  }, [statsTrigger]);
 
   useEffect(() => {
     let cancelled = false;
@@ -334,7 +337,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
     [displayCards]
   );
 
-  const paginationControls = !loading && pageCount > 1 && (
+  const paginationControls = hasCollection && pageCount > 1 && (
     <nav aria-label={t('collection.pagination')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '0.75rem', margin: '1rem 0' }}>
       <button type="button" className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} style={{ minHeight: '44px' }}>
         {t('collection.previousPage')}
@@ -682,10 +685,22 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
           </div>
         </div>
       {/* Result summary bar */}
-      {!loading && !selectMode && (
+      {hasCollection && !selectMode && (
         <div role="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', fontSize: '0.9375rem', color: 'var(--text-secondary)', flexWrap: 'wrap', gap: '0.5rem' }}>
           <span><strong style={{ color: 'var(--text-strong)' }}>{displayCards.length}</strong> {t('collection.cardUnit', { count: displayCards.length })}</span>
           <span>{t('collection.totalValue')} <strong style={{ color: 'var(--text-strong)' }}>{priceText(totalValue)}</strong></span>
+        </div>
+      )}
+
+      {error ? (
+        <div className="read-state read-state-error">
+          <p role="alert">{t('collection.errLoad')}{hasCollection && <> {t('common.staleData')}</>}</p>
+          <button type="button" className="btn btn-secondary" onClick={() => setCollectionRefresh(value => value + 1)}>{t('dash.retry')}</button>
+        </div>
+      ) : loading && (
+        <div className={`read-state${hasCollection ? '' : ' read-state-initial'}`} role="status">
+          <div className="spinner" aria-hidden="true"></div>
+          <p>{t(hasCollection ? 'common.refreshing' : 'common.loading')}</p>
         </div>
       )}
 
@@ -728,7 +743,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
           <PackPriceSplitter
             entryIds={Array.from(selectedIds)}
             showToast={showToast}
-            onApplied={() => { clearSelection(); onUpdate(); fetchCollection(); }}
+            onApplied={() => { clearSelection(); onUpdate(); }}
           />
               <select className="select-control" value={bulkMoveTarget} onChange={(e) => setBulkMoveTarget(e.target.value)} style={{ fontSize: '0.72rem', maxWidth: '170px', padding: '0.3rem 0.4rem' }}>
                 <option value="">{t('bulk.moveToContainer')}</option>
@@ -751,9 +766,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       )}
 
 
-      {loading ? (
-        <div className="spinner"></div>
-      ) : displayCards.length === 0 ? (
+      {!hasCollection ? null : displayCards.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem 0' }}>
           <p>{t(hasUserFilters ? 'collection.noMatches' : 'collection.emptyInventory')}</p>
           {hasUserFilters ? (
@@ -853,7 +866,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                           aria-haspopup={selectMode ? undefined : 'dialog'}
                           onClick={(e) => activateCard(item, e)}
                           {...pressHandlers(item.entry_id)}
-                          style={{ position: 'relative', width: '36px', height: '50px', flexShrink: 0, overflow: 'hidden', borderRadius: '4px', cursor: 'pointer', touchAction: 'pan-y', ...getCardRarityBorder(item.rarity) }}
+                          style={{ position: 'relative', width: '56px', height: '78px', flexShrink: 0, overflow: 'hidden', borderRadius: '4px', cursor: 'pointer', touchAction: 'pan-y', ...getCardRarityBorder(item.rarity) }}
                         >
                           <CardImage card={item} className="collection-row-thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} draggable={false} />
                           {getFoilOverlayClass(item.printing) && (

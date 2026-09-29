@@ -109,7 +109,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   } = useMultiSelect({ showToast });
   const [bulkAdding, setBulkAdding] = useState(false);
 
-  // Set-code autocomplete, sourced from the sets already cached in the DB.
+  // Set suggestions, sourced from the sets already cached in the DB.
   const [knownSets, setKnownSets] = useState([]);
   const [setsOpen, setSetsOpen] = useState(false);
 
@@ -360,6 +360,7 @@ function CardSearch({ onAddSuccess, showToast }) {
           printing,
           language,
           purchase_price: parseFloat(purchasePrice) || 0,
+          list_type: addToArena ? 'arena' : 'collection',
           game
         })
       });
@@ -707,7 +708,7 @@ function CardSearch({ onAddSuccess, showToast }) {
 
   // Helper to determine location type layout guidance
   return (
-    <div>
+    <div className="card-search">
       {/* Search Header Panel */}
       <div className="glass-panel" style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -716,7 +717,7 @@ function CardSearch({ onAddSuccess, showToast }) {
         <form onSubmit={handleSearch} style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label htmlFor="search-card-name" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.cardName')}</label>
+              <label className="control-label" htmlFor="search-card-name">{t('search.cardName')}</label>
               <div style={{ position: 'relative' }}>
                 <input
                   id="search-card-name"
@@ -734,10 +735,10 @@ function CardSearch({ onAddSuccess, showToast }) {
 
           {/* auto-fit rather than a fixed 2 columns: language made this row three
               fields wide, and they have to stay usable on a phone. */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
+          <div className="search-filter-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               {/* The language of the cards being searched for, not the app's. */}
-              <label htmlFor="search-language" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.language')}</label>
+              <label className="control-label" htmlFor="search-language">{t('search.language')}</label>
               <select
                 id="search-language"
                 className="select-control"
@@ -756,7 +757,7 @@ function CardSearch({ onAddSuccess, showToast }) {
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label htmlFor="search-card-number" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.cardNumber')}</label>
+              <label className="control-label" htmlFor="search-card-number">{t('search.cardNumber')}</label>
               <input
                 id="search-card-number"
                 type="text"
@@ -766,17 +767,15 @@ function CardSearch({ onAddSuccess, showToast }) {
                 onChange={(e) => setNumberQuery(e.target.value)}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', position: 'relative' }}
+            <div className="search-sets-field" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', position: 'relative' }}
               onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setSetsOpen(false); }}
               onKeyDown={event => { if (event.key === 'Escape') setSetsOpen(false); }}>
-              <label htmlFor="search-set-codes" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.sets')}</label>
+              <label className="control-label" htmlFor="search-set-codes">{t('search.sets')}</label>
               <input
                 id="search-set-codes"
                 type="text"
                 className="input-control"
                 autoComplete="off"
-                aria-expanded={setsOpen}
-                aria-controls="known-set-codes"
                 placeholder={t('search.setsPlaceholderMtg')}
                 value={setCodeQuery}
                 onFocus={() => setSetsOpen(true)}
@@ -791,7 +790,7 @@ function CardSearch({ onAddSuccess, showToast }) {
                 ))}
               </div>
               {setsOpen && (
-                <div id="known-set-codes" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: '260px', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)' }}>
+                <section id="known-set-codes" aria-label={t('search.setSuggestions')} style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: '260px', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)' }}>
                   {knownSets.filter(set => {
                     const term = setCodeQuery.split(/[\s,]+/).at(-1).toLowerCase();
                     return !term || set.code.toLowerCase().includes(term) || set.name.toLowerCase().includes(term);
@@ -806,12 +805,12 @@ function CardSearch({ onAddSuccess, showToast }) {
                       {set.name} ({set.code.toUpperCase()})
                     </button>
                   ))}
-                </div>
+                </section>
               )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+          <div className="search-actions" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
             <button type="submit" className="btn btn-primary" disabled={loading || loadingMore} aria-busy={loading} style={{ flex: '1 1 220px' }}>
               {loading
                 ? <span className="spinner" aria-hidden="true" style={{ width: 18, height: 18, margin: 0, borderWidth: 2, borderColor: 'currentColor', borderTopColor: 'transparent' }} />
@@ -821,6 +820,7 @@ function CardSearch({ onAddSuccess, showToast }) {
             <button
               type="button"
               className={`btn ${rapidMode ? 'btn-primary' : 'btn-secondary'}`}
+              aria-pressed={rapidMode}
               onClick={() => {
                 const next = !rapidMode;
                 setRapidMode(next);
@@ -832,34 +832,34 @@ function CardSearch({ onAddSuccess, showToast }) {
               <Zap size={18} />
               {t(rapidMode ? 'search.rapidOn' : 'search.rapid')}
             </button>
-            <button type="button" className="btn btn-secondary" onClick={() => textImportInput.current?.click()} disabled={importingText} style={{ flex: '0 1 auto' }}>
-              <Download size={18} />
-              {importingText ? t('settings.importing') : t('deck.chooseManaBoxFile')}
-            </button>
-            <input ref={textImportInput} type="file" accept=".txt,text/plain" onChange={event => handleImportFile(event, 'manabox')} style={{ display: 'none' }} />
-            <button type="button" className="btn btn-secondary" onClick={() => csvImportInput.current?.click()} disabled={importingText} style={{ flex: '0 1 auto' }}>
-              <Download size={18} />
-              {importingText ? t('settings.importing') : t('search.chooseCsvFile')}
-            </button>
-            <input ref={csvImportInput} type="file" accept=".csv,text/csv" onChange={event => handleImportFile(event, 'internal')} style={{ display: 'none' }} />
-            <button
-              type="button"
-              role="switch"
-              aria-checked={addToArena}
-              className="btn btn-secondary"
-              style={addToArena ? { background: 'var(--accent-green)', borderColor: 'var(--accent-green)', color: 'var(--bg-primary)' } : undefined}
-              onClick={() => setAddToArena(current => !current)}
-            >
-              {t('search.addToArena')}
-              <span aria-hidden="true" style={{ width: 28, height: 16, borderRadius: 999, background: addToArena ? 'var(--text-on-accent)' : 'var(--text-muted)', position: 'relative', flexShrink: 0 }}>
-                <span style={{ position: 'absolute', top: 2, left: addToArena ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: addToArena ? 'var(--accent-green)' : 'var(--bg-primary)', transition: 'left 0.2s' }} />
-              </span>
-            </button>
           </div>
           <span role="status" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap' }}>
             {loading ? t('common.loading') : ''}
           </span>
         </form>
+        <div className="search-destination">
+          <label className="control-label" htmlFor="search-destination">{t('search.destination')}</label>
+          <select id="search-destination" className="select-control" aria-describedby="search-destination-hint" value={addToArena ? 'arena' : 'collection'} onChange={event => setAddToArena(event.target.value === 'arena')}>
+            <option value="collection">{t('nav.collection')}</option>
+            <option value="arena">{t('collection.arena')}</option>
+          </select>
+          <p id="search-destination-hint">{t('search.destinationHint')}</p>
+        </div>
+        <section className="search-import-actions" aria-labelledby="search-import-title">
+          <h3 id="search-import-title" className="section-heading">{t('search.importTitle')}</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => textImportInput.current?.click()} disabled={importingText}>
+              <Download size={18} aria-hidden="true" />
+              {importingText ? t('settings.importing') : t('deck.chooseManaBoxFile')}
+            </button>
+            <input ref={textImportInput} type="file" accept=".txt,text/plain" onChange={event => handleImportFile(event, 'manabox')} style={{ display: 'none' }} />
+            <button type="button" className="btn btn-secondary" onClick={() => csvImportInput.current?.click()} disabled={importingText}>
+              <Download size={18} aria-hidden="true" />
+              {importingText ? t('settings.importing') : t('search.chooseCsvFile')}
+            </button>
+            <input ref={csvImportInput} type="file" accept=".csv,text/csv" onChange={event => handleImportFile(event, 'internal')} style={{ display: 'none' }} />
+          </div>
+        </section>
       </div>
 
       {/* Rapid add: type a number, press Enter, next. */}
@@ -875,9 +875,12 @@ function CardSearch({ onAddSuccess, showToast }) {
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="search-entry-controls" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end', flexWrap: 'wrap' }}>
+            <div className="form-group" style={{ flex: '1 1 180px', margin: 0 }}>
+              <label className="control-label" htmlFor="rapid-card-number">{t('csvMapping.collectorNumber')}</label>
             <input
               ref={rapidInputRef}
+              id="rapid-card-number"
               type="text"
               inputMode="numeric"
               className="input-control"
@@ -889,15 +892,25 @@ function CardSearch({ onAddSuccess, showToast }) {
               disabled={!setCodeQuery}
               onChange={(e) => setRapidNumber(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRapidAdd(); } }}
-              style={{ flex: '1 1 180px', fontSize: '1.1rem', fontWeight: 700 }}
+              style={{ width: '100%', fontSize: '1.1rem', fontWeight: 700 }}
             />
-            <select className="select-control" value={condition} onChange={(e) => setCondition(e.target.value)} style={{ fontSize: '0.75rem', maxWidth: '150px' }}>
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="control-label" htmlFor="rapid-condition">{t('card.condition')}</label>
+            <select id="rapid-condition" className="select-control" value={condition} onChange={(e) => setCondition(e.target.value)}>
               {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <select className="select-control" value={printing} onChange={(e) => setPrinting(e.target.value)} style={{ fontSize: '0.75rem', maxWidth: '150px' }}>
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="control-label" htmlFor="rapid-printing">{t('card.printing')}</label>
+            <select id="rapid-printing" className="select-control" value={printing} onChange={(e) => setPrinting(e.target.value)}>
               {getPrintings().map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="control-label" htmlFor="rapid-quantity">{t('card.quantity')}</label>
             <input
+              id="rapid-quantity"
               type="number"
               min="1"
               className="input-control"
@@ -906,6 +919,7 @@ function CardSearch({ onAddSuccess, showToast }) {
               title={t('search.copiesPerEnter')}
               style={{ width: '80px', fontSize: '0.75rem' }}
             />
+            </div>
             {rapidBusy && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('search.adding')}</span>}
           </div>
 
@@ -954,16 +968,16 @@ function CardSearch({ onAddSuccess, showToast }) {
         <div className="glass-panel" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.filterType')}</label>
-              <select className="select-control" value={filterType} onChange={e => setFilterType(e.target.value)}>
+              <label className="control-label" htmlFor="search-filter-type">{t('search.filterType')}</label>
+              <select id="search-filter-type" className="select-control" value={filterType} onChange={e => setFilterType(e.target.value)}>
                 <option value="">{t('collection.allTypes')}</option>
                 {uniqueTypes.map(type => <option key={type} value={type}>{type}</option>)}
               </select>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.filterRarity')}</label>
-              <select className="select-control" value={filterRarity} onChange={e => setFilterRarity(e.target.value)}>
+              <label className="control-label" htmlFor="search-filter-rarity">{t('search.filterRarity')}</label>
+              <select id="search-filter-rarity" className="select-control" value={filterRarity} onChange={e => setFilterRarity(e.target.value)}>
                 <option value="">{t('collection.allRarities')}</option>
                 {uniqueRarities.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
@@ -971,16 +985,16 @@ function CardSearch({ onAddSuccess, showToast }) {
 
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.sortBy')}</label>
-              <select className="select-control" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+              <label className="control-label" htmlFor="search-sort">{t('search.sortBy')}</label>
+              <select id="search-sort" className="select-control" value={sortBy} onChange={e => setSortBy(e.target.value)}>
                 {['relevance', 'name-asc', 'name-desc', 'price-asc', 'price-desc', 'number-asc', 'number-desc']
                   .map(key => <option key={key} value={key}>{t(`search.sort.${key}`)}</option>)}
               </select>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.cardsPerPage')}</label>
-              <select className="select-control" value={pageSize} onChange={e => changePageSize(parseInt(e.target.value, 10))}>
+              <label className="control-label" htmlFor="search-page-size">{t('search.cardsPerPage')}</label>
+              <select id="search-page-size" className="select-control" value={pageSize} onChange={e => changePageSize(parseInt(e.target.value, 10))}>
                 {[30, 60, 120, 250].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
             </div>
@@ -1012,13 +1026,22 @@ function CardSearch({ onAddSuccess, showToast }) {
           <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={() => setSelectedIds(new Set(filteredAndSortedCards.map(c => c.id)))}>{t('bulk.selectAll', { count: filteredAndSortedCards.length })}</button>
           <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={clearSelection}>{t('bulk.clear')}</button>
           <div style={{ width: '1px', height: '22px', background: 'var(--border-glass)' }} />
-          <select className="select-control" value={condition} onChange={(e) => setCondition(e.target.value)} style={{ fontSize: '0.72rem', maxWidth: '150px', padding: '0.3rem 0.4rem' }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="control-label" htmlFor="search-bulk-condition">{t('card.condition')}</label>
+          <select id="search-bulk-condition" className="select-control" value={condition} onChange={(e) => setCondition(e.target.value)}>
             {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          <select className="select-control" value={printing} onChange={(e) => setPrinting(e.target.value)} style={{ fontSize: '0.72rem', maxWidth: '150px', padding: '0.3rem 0.4rem' }}>
+          </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="control-label" htmlFor="search-bulk-printing">{t('card.printing')}</label>
+          <select id="search-bulk-printing" className="select-control" value={printing} onChange={(e) => setPrinting(e.target.value)}>
             {getPrintings().map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
+          </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="control-label" htmlFor="search-bulk-quantity">{t('card.quantity')}</label>
           <input
+            id="search-bulk-quantity"
             type="number"
             min="1"
             className="input-control"
@@ -1027,6 +1050,7 @@ function CardSearch({ onAddSuccess, showToast }) {
             title={t('search.copiesEachSelected')}
             style={{ fontSize: '0.72rem', width: '70px', padding: '0.3rem 0.4rem' }}
           />
+          </div>
           <button
             className="btn btn-primary"
             style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
@@ -1049,6 +1073,16 @@ function CardSearch({ onAddSuccess, showToast }) {
                 key={card.id}
                 className="tcg-card"
                 style={{ cursor: 'pointer', touchAction: 'pan-y' }}
+                role="button"
+                tabIndex={0}
+                aria-label={`${t(selectMode ? 'collection.select' : 'search.quickAdd')}: ${displayName(card)}`}
+                aria-pressed={selectMode ? isSelected : undefined}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleCardClick(card, event);
+                  }
+                }}
                 onClick={(e) => handleCardClick(card, e)}
                 {...pressHandlers(card.id)}
               >
@@ -1145,14 +1179,14 @@ function CardSearch({ onAddSuccess, showToast }) {
                   {' • '}#{selectedCard.number})
                 </p>
               </div>
-              <button className="btn btn-secondary btn-icon-only" onClick={closeDrawer} style={{ borderRadius: '50%', flexShrink: 0 }}>
+              <button type="button" aria-label={t('common.close')} className="btn btn-secondary btn-icon-only" onClick={closeDrawer} style={{ borderRadius: '50%', flexShrink: 0 }}>
                 <X size={18} />
               </button>
             </div>
 
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: 'rgba(255, 255, 255, 0.02)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
               {/* Tap the art to enlarge, same as the collection inspector. */}
-              <div
+              <button type="button" className="ci-image-wrap" aria-label={t('inspector.zoomHint')} aria-haspopup="dialog"
                 onClick={() => setIsFullScreen(true)}
                 title={t('inspector.zoomHint')}
                 style={{ position: 'relative', flexShrink: 0, cursor: 'pointer', lineHeight: 0 }}
@@ -1167,7 +1201,7 @@ function CardSearch({ onAddSuccess, showToast }) {
                 }}>
                   <Maximize2 size={11} />
                 </div>
-              </div>
+              </button>
               <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('search.tcgMarketPrice', { printing })}</div>
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-yellow)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{priceText(resolveCardPrice(selectedCard, printing), selectedCard.price_currency)}</div>
@@ -1189,7 +1223,7 @@ function CardSearch({ onAddSuccess, showToast }) {
                 <div className="quick-add-footer-actions">
                   <button type="button" className="btn btn-secondary" onClick={closeDrawer}>{t('common.cancel')}</button>
                   <button type="submit" value="wishlist" className="btn btn-secondary">{t('search.addToWishlist')}</button>
-                  <button type="submit" value="collection" className="btn btn-primary">{t('search.addToCollection')}</button>
+                  <button type="submit" value="collection" className="btn btn-primary">{t(addToArena ? 'search.addToArena' : 'search.addToCollection')}</button>
                 </div>
               </div>
             </form>
@@ -1206,6 +1240,7 @@ function CardSearch({ onAddSuccess, showToast }) {
             <div>
               <h2 style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('manaboxPreview.title')}</h2>
               <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{manaBoxPreview.filename}</p>
+              <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)' }}>{t('csvPreview.destination', { destination: t(manaBoxPreview.listType === 'arena' ? 'collection.arena' : 'nav.collection') })}</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', fontSize: '0.8rem' }}>
               {[
@@ -1238,7 +1273,7 @@ function CardSearch({ onAddSuccess, showToast }) {
             <div>
               <h2 style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('csvPreview.title')}</h2>
               <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{csvPreview.filename}</p>
-              <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{t('csvPreview.destination', { destination: t(csvPreview.listType === 'arena' ? 'collection.arena' : 'search.addToCollection') })}</p>
+              <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{t('csvPreview.destination', { destination: t(csvPreview.listType === 'arena' ? 'collection.arena' : 'nav.collection') })}</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.8rem' }}>
               {[

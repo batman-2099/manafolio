@@ -1008,7 +1008,7 @@
   "search.sort.price-desc": "價格（由高到低）",
   "search.sort.relevance": "相關度",
   "search.sortBy": "排序方式",
-  "search.submit": "搜尋網路 API",
+  "search.submit": "搜尋卡牌",
   "search.tcgMarketPrice": "TCG 市場參考價 ({printing})",
   "search.title": "搜尋 {game} 卡牌",
   "search.undo": "復原",

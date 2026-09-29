@@ -31,7 +31,7 @@ async function request(path, options, fallback) {
   return data;
 }
 
-export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onPreview }) {
+export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onPreview, onOpenAiSettings }) {
   const { t, locale } = useT();
   const [account, setAccount] = useState(null);
   const [accountError, setAccountError] = useState('');
@@ -307,13 +307,70 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
         </span>
         {account && !account.connected && <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.connectInSettings')}</p>}
         {accountError && <p role="alert" style={{ color: 'var(--status-error)' }}>{accountError}</p>}
+        <button type="button" className="btn btn-secondary" disabled={!!busy} onClick={onOpenAiSettings}>{t('aiDeck.openSettings')}</button>
       </section>
 
       <div>
         <fieldset disabled={!!busy} style={{ ...fieldsetStyle, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '1.25rem', alignItems: 'start' }}>
-          <section className="glass-panel" aria-labelledby="ai-pool-title" style={{ minWidth: 0 }}>
-            <h3 id="ai-pool-title" style={{ marginBottom: '1rem' }}>{t('aiDeck.poolTitle')}</h3>
+          <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.resetWarning')}</p>
+          <div className="ai-deck-setup">
+          <section aria-labelledby="ai-setup-title" style={{ minWidth: 0 }}>
+            <h3 id="ai-setup-title" style={{ marginBottom: '1rem' }}>{t('aiDeck.setupTitle')}</h3>
+          <div style={{ ...rowStyle, alignItems: 'start' }}>
+            <div className="form-group" style={{ flex: '1 1 180px' }}>
+              <label htmlFor="ai-inventory">{t('aiDeck.inventory')}</label>
+              <select id="ai-inventory" className="input-control" disabled={!!sourceDeck} value={inventoryType} onChange={event => { clearInventory(); setContainerIds([]); setColors([]); setSets([]); setIncludeCheckedOut(false); setInventoryType(event.target.value); setFormat(event.target.value === 'arena' ? 'Standard' : 'Commander / EDH'); setTargetSize(event.target.value === 'arena' ? 60 : 100); }}>
+                <option value="collection">{t('aiDeck.physical')}</option><option value="arena">MTG Arena</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ flex: '1 1 180px' }}>
+              <label htmlFor="ai-format">{t('deck.format')}</label>
+              <select id="ai-format" className="input-control" disabled={!!sourceDeck} value={format} onChange={event => { clearDraft(); setFormat(event.target.value); setTargetSize(/commander|edh|brawl/i.test(event.target.value) ? 100 : 60); }}>
+                {sourceDeck && !FORMATS[inventoryType].includes(format) && <option>{format}</option>}
+                {FORMATS[inventoryType].map(value => <option key={value}>{value}</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ flex: '1 1 100px' }}>
+              <label htmlFor="ai-target">{t('deck.targetSize')}</label>
+              <input id="ai-target" form="ai-conversation-form" className="input-control" type="number" min="1" max="250" step="1" required readOnly={!!sourceDeck || isCommander} value={targetSize} onChange={event => { clearDraft(); setTargetSize(event.target.value === '' ? '' : Number(event.target.value)); }} />
+            </div>
+          </div>
+            <div className="form-group" style={{ marginTop: '1rem' }}>
+              <label htmlFor="ai-deck-type">{t('aiDeck.playStyle')} ({t('aiDeck.deckTypeRequired')})</label>
+              <select id="ai-deck-type" name="deck_type" form="ai-conversation-form" className="input-control" required value={deckType} aria-describedby={deckType ? 'ai-deck-type-description ai-deck-type-style' : undefined} onChange={event => { clearDraft(); setDeckType(event.target.value); }}>
+                {DECK_TYPES.map(type => <option key={type.id} value={type.id}>{t(`aiDeckType.${type.id}.name`)}</option>)}
+              </select>
+              {deckType && <section style={{ marginTop: '0.75rem', overflowWrap: 'anywhere' }}>
+                <p id="ai-deck-type-description">{t(`aiDeckType.${deckType}.description`)}</p>
+                <p id="ai-deck-type-style" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{t(`aiDeckType.${deckType}.style`)}</p>
+              </section>}
+            </div>
+            <div className="form-group" style={{ marginTop: '1rem', minWidth: 0, overflowWrap: 'anywhere' }}>
+              <label htmlFor="ai-power-level">{t('aiDeck.powerLevel')}: {powerLevel} — {powerLevelName}</label>
+              <input
+                id="ai-power-level"
+                name="power_level"
+                form="ai-conversation-form"
+                type="range"
+                min="1"
+                max="5"
+                step="1"
+                value={powerLevel}
+                aria-valuetext={`${powerLevel} — ${powerLevelName}`}
+                aria-describedby="ai-power-description ai-power-pace ai-power-hint"
+                onChange={event => { clearDraft(); setPowerLevel(Number(event.target.value)); }}
+                style={{ display: 'block', width: '100%', minHeight: 44, margin: 0, accentColor: 'var(--accent-green)' }}
+              />
+              <div aria-hidden="true" style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                {POWER_LEVELS.map(({ level }) => <span key={level}>{level}</span>)}
+              </div>
+              <p id="ai-power-description" style={{ marginTop: '0.75rem' }}>{t(`aiDeckPowerLevel.${powerLevel}.description`)}</p>
+              <p id="ai-power-pace" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}><strong>{t('aiDeck.pace')}:</strong> {t(`aiDeckPowerLevel.${powerLevel}.pace`)}</p>
+            </div>
+          </section>
+          <section aria-labelledby="ai-pool-title">
+            <h3 id="ai-pool-title">{t('aiDeck.poolTitle')}</h3>
+            <div style={{ paddingBlock: '0.75rem' }}>
           {inventoryType === 'collection' && (
             <div className="form-group">
               <fieldset disabled={locationsLoading || !!locationsError} style={fieldsetStyle} aria-describedby="ai-container-hint">
@@ -326,8 +383,6 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
                   onChange={value => { if (!busy) { clearInventory(); setContainerIds(value); } }}
                 />
               </fieldset>
-              <p id="ai-container-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.containerHint')}</p>
-              {sourceDeck && <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.improveContainerHint')}</p>}
               {locationsLoading && <p role="status">{t('common.loading')}</p>}
               {locationsError && <p role="alert">{locationsError} <button type="button" className="btn btn-secondary" onClick={() => setLocationsRevision(value => value + 1)}>{t('aiDeck.retry')}</button></p>}
             </div>
@@ -348,7 +403,6 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
                   <span style={{ position: 'absolute', top: 2, left: includeCheckedOut ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: includeCheckedOut ? 'var(--accent-green)' : 'var(--bg-primary)' }} />
                 </span>
               </button>
-              <p id="ai-checked-out-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.includeCheckedOutHint')}</p>
             </div>
           )}
           <fieldset disabled={inventoryLoading || !!inventoryError} style={fieldsetStyle} aria-describedby="ai-filter-hint">
@@ -377,68 +431,27 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
               </div>
             </div>
           </fieldset>
-          <p id="ai-filter-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.filterHint')}</p>
+            </div>
+          </section>
+          </div>
+          <div>
           <p role="status">{inventoryLoading ? t('common.loading') : t('aiDeck.matchingCounts', counts)}</p>
           {inventoryError && <p role="alert">{inventoryError} <button type="button" className="btn btn-secondary" onClick={() => { clearInventory(); setInventoryRevision(value => value + 1); }}>{t('aiDeck.retry')}</button></p>}
           {!inventoryLoading && !inventoryError && counts.available === 0 && <p>{t(colors.length || sets.length || containerIds.length ? 'aiDeck.emptyFilters' : 'aiDeck.emptyInventory')}</p>}
-          </section>
-          <section className="glass-panel" aria-labelledby="ai-setup-title" style={{ minWidth: 0 }}>
-            <h3 id="ai-setup-title" style={{ marginBottom: '1rem' }}>{t('aiDeck.setupTitle')}</h3>
-          <div style={{ ...rowStyle, alignItems: 'start' }}>
-            <div className="form-group" style={{ flex: '1 1 180px' }}>
-              <label htmlFor="ai-inventory">{t('aiDeck.inventory')}</label>
-              <select id="ai-inventory" className="input-control" disabled={!!sourceDeck} value={inventoryType} onChange={event => { clearInventory(); setContainerIds([]); setColors([]); setSets([]); setIncludeCheckedOut(false); setInventoryType(event.target.value); setFormat(event.target.value === 'arena' ? 'Standard' : 'Commander / EDH'); setTargetSize(event.target.value === 'arena' ? 60 : 100); }}>
-                <option value="collection">{t('aiDeck.physical')}</option><option value="arena">MTG Arena</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ flex: '1 1 180px' }}>
-              <label htmlFor="ai-format">{t('deck.format')}</label>
-              <select id="ai-format" className="input-control" disabled={!!sourceDeck} value={format} onChange={event => { clearDraft(); setFormat(event.target.value); setTargetSize(/commander|edh|brawl/i.test(event.target.value) ? 100 : 60); }}>
-                {sourceDeck && !FORMATS[inventoryType].includes(format) && <option>{format}</option>}
-                {FORMATS[inventoryType].map(value => <option key={value}>{value}</option>)}
-              </select>
-            </div>
-            <div className="form-group" style={{ flex: '1 1 100px' }}>
-              <label htmlFor="ai-target">{t('deck.targetSize')}</label>
-              <input id="ai-target" form="ai-conversation-form" className="input-control" type="number" min="1" max="250" step="1" required readOnly={!!sourceDeck || isCommander} value={targetSize} onChange={event => { clearDraft(); setTargetSize(event.target.value === '' ? '' : Number(event.target.value)); }} />
-            </div>
+            {inventoryType === 'collection' && (
+              <p id="ai-checked-out-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.includeCheckedOutHint')}</p>
+            )}
           </div>
+          <section>
+            <h3>{t('aiDeck.eligibilityDetails')}</h3>
+            <div className="deck-details-content">
             <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.inventoryHint')}</p>
-            <div className="form-group" style={{ marginTop: '1rem' }}>
-              <label htmlFor="ai-deck-type">{t('aiDeck.deckType')} ({t('aiDeck.deckTypeRequired')})</label>
-              <select id="ai-deck-type" name="deck_type" form="ai-conversation-form" className="input-control" required value={deckType} aria-describedby={deckType ? 'ai-deck-type-description ai-deck-type-style' : undefined} onChange={event => { clearDraft(); setDeckType(event.target.value); }}>
-                {DECK_TYPES.map(type => <option key={type.id} value={type.id}>{t(`aiDeckType.${type.id}.name`)}</option>)}
-              </select>
-              {deckType && <div style={{ marginTop: '0.75rem', overflowWrap: 'anywhere' }}>
-                <p id="ai-deck-type-description">{t(`aiDeckType.${deckType}.description`)}</p>
-                <p id="ai-deck-type-style" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}><strong>{t('aiDeck.playStyle')}:</strong> {t(`aiDeckType.${deckType}.style`)}</p>
-              </div>}
-            </div>
-            <div className="form-group" style={{ marginTop: '1rem', minWidth: 0, overflowWrap: 'anywhere' }}>
-              <label htmlFor="ai-power-level">{t('aiDeck.powerLevel')}: {powerLevel} — {powerLevelName}</label>
-              <input
-                id="ai-power-level"
-                name="power_level"
-                form="ai-conversation-form"
-                type="range"
-                min="1"
-                max="5"
-                step="1"
-                value={powerLevel}
-                aria-valuetext={`${powerLevel} — ${powerLevelName}`}
-                aria-describedby="ai-power-description ai-power-pace ai-power-hint"
-                onChange={event => { clearDraft(); setPowerLevel(Number(event.target.value)); }}
-                style={{ display: 'block', width: '100%', minHeight: 44, margin: 0, accentColor: 'var(--accent-green)' }}
-              />
-              <div aria-hidden="true" style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                {POWER_LEVELS.map(({ level }) => <span key={level}>{level}</span>)}
-              </div>
-              <p id="ai-power-description" style={{ marginTop: '0.75rem' }}>{t(`aiDeckPowerLevel.${powerLevel}.description`)}</p>
-              <p id="ai-power-pace" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}><strong>{t('aiDeck.pace')}:</strong> {t(`aiDeckPowerLevel.${powerLevel}.pace`)}</p>
+              <p id="ai-container-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.containerHint')}</p>
+              {sourceDeck && <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.improveContainerHint')}</p>}
+          <p id="ai-filter-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.filterHint')}</p>
               <p id="ai-power-hint" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{t('aiDeck.powerLevelHint')}</p>
             </div>
           </section>
-          </div>
         </fieldset>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1.25rem', alignItems: 'start' }}>
@@ -446,7 +459,11 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
         <fieldset disabled={!!busy} style={fieldsetStyle}>
           <section className="glass-panel" aria-labelledby="ai-conversation-title" style={{ minWidth: 0 }}>
             <h3 id="ai-conversation-title">{t('aiDeck.conversationTitle')}</h3>
-            <p id="ai-conversation-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.conversationHint')}</p>
+            <p id="ai-conversation-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.privacySummary')}</p>
+            <section>
+              <h3>{t('aiDeck.conversationDetails')}</h3>
+              <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.conversationHint')}</p>
+            </section>
             {messages.length > 0 && <>
               <div ref={conversationContainer} role="log" aria-labelledby="ai-conversation-title" aria-live="polite" aria-relevant="additions" tabIndex={0} style={{ maxHeight: 'min(400px, 50dvh)', overflowY: 'auto', overflowWrap: 'anywhere', overscrollBehavior: 'contain', padding: '0.75rem', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)' }}>
                 {messages.map((message, index) => (

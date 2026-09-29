@@ -1008,7 +1008,7 @@
   "search.sort.price-desc": "가격(높은 순)",
   "search.sort.relevance": "관련도",
   "search.sortBy": "정렬 기준",
-  "search.submit": "인터넷 API 검색",
+  "search.submit": "카드 검색",
   "search.tcgMarketPrice": "TCG 시장 가격 ({printing})",
   "search.title": "{game} 카드 검색",
   "search.undo": "되돌리기",

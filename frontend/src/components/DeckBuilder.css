@@ -1,3 +1,32 @@
+.deck-gallery,
+.deck-gallery-header {
+  min-width: 0;
+}
+
+.deck-editor-header {
+  padding: 1rem;
+}
+
+.deck-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-block: 0.5rem;
+}
+
+.deck-details-content {
+  display: grid;
+  min-width: 0;
+  gap: 1.25rem;
+  padding-block: 0.5rem;
+}
+
+.ai-deck-setup {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
 .deck-card-previews {
   display: grid;
   gap: 1rem;

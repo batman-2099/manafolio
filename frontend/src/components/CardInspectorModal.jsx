@@ -692,8 +692,6 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
                 </div>
               )}
 
-              <RelatedTokens cardIds={[activeCard.card_id || activeCard.id]} inventoryType={activeCard.list_type === 'arena' ? 'arena' : 'collection'} />
-
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {activeCard.list_type === 'graveyard' ? (
                   <>
@@ -751,6 +749,8 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
                   <Trash2 size={16} />
                 </button>
               </div>
+              <RelatedTokens compact cardIds={[activeCard.card_id || activeCard.id]} inventoryType={activeCard.list_type === 'arena' ? 'arena' : 'collection'} />
+
               {/* Price Panel */}
               <div style={{ borderTop: '1px solid var(--border-glass)', borderBottom: '1px solid var(--border-glass)', padding: '0.75rem 0', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                 <div>

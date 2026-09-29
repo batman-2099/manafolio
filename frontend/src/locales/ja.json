@@ -1008,7 +1008,7 @@
   "search.sort.price-desc": "価格（高い順）",
   "search.sort.relevance": "関連度",
   "search.sortBy": "並び替え",
-  "search.submit": "インターネット API を検索",
+  "search.submit": "カードを検索",
   "search.tcgMarketPrice": "TCG市場価格 ({printing})",
   "search.title": "{game} のカードを検索",
   "search.undo": "取り消す",

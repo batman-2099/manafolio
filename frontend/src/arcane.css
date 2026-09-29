@@ -26,9 +26,9 @@
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 18px;
-  --shadow-glow: 0 12px 28px rgba(0, 4, 15, 0.32), inset 0 1px 0 rgba(180, 220, 255, 0.08);
-  --shadow-accent: 0 3px 14px var(--accent-blue-glow);
-  --bg-gradient: radial-gradient(ellipse at 12% 0%, rgba(37, 100, 166, 0.24), transparent 55%), radial-gradient(ellipse at 95% 70%, rgba(30, 65, 113, 0.2), transparent 55%);
+  --shadow-glow: 0 8px 24px rgba(0, 4, 15, 0.24);
+  --shadow-accent: none;
+  --bg-gradient: none;
 }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) :is(h1, h2, h3, h4, h5):not(.logo-text) {
   font-family: var(--font-main);
@@ -41,24 +41,6 @@
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .page-title:not(.logo-text) {
   font-family: 'Cinzel', Georgia, serif;
 }
-:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .app-header {
-  flex-wrap: wrap;
-  gap: 1rem;
-  padding-bottom: 1rem;
-  margin-bottom: 1.5rem;
-  border-bottom-color: var(--border-glass);
-}
-:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .app-header > div:last-child { margin-left: auto; }
-:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .nav-tabs {
-  order: 3;
-  width: 100%;
-  border-radius: 0;
-  padding: 0;
-  gap: 0.25rem;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-}
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) :is(.nav-tab, .sub-nav-tab) {
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -66,20 +48,20 @@
   font-weight: 500;
 }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) :is(.nav-tab.active, .sub-nav-tab.active) {
-  background: var(--arcane-nav-bg, linear-gradient(180deg, #305779, #203b59));
+  background: var(--surface-3);
   border-color: var(--arcane-nav-border, #638daf);
   color: var(--text-strong);
-  box-shadow: inset 0 1px 0 var(--arcane-highlight, #a6d9ff33), var(--shadow-accent);
+  box-shadow: none;
 }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .sub-nav-tabs {
   border-radius: var(--radius-sm);
   background: var(--input-bg);
 }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .glass-panel {
-  background: linear-gradient(145deg, var(--arcane-panel-start, rgba(30, 53, 81, 0.96)), var(--bg-glass));
+  background: var(--bg-secondary);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-glow);
+  box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -96,19 +78,19 @@
   box-shadow: none;
 }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .btn-primary {
-  background: var(--arcane-primary-bg, linear-gradient(180deg, #b2e3ff, #7ec5f6));
+  background: var(--accent-red);
   color: var(--arcane-primary-text, #091b30);
   border: 1px solid var(--arcane-primary-border, #a5dcff);
-  box-shadow: inset 0 1px 0 #ffffff66, 0 4px 16px var(--accent-red-glow);
+  box-shadow: none;
 }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .btn-primary:hover {
-  background: var(--arcane-primary-hover-bg, linear-gradient(180deg, #d0efff, #99d7ff));
+  background: color-mix(in srgb, var(--accent-red) 82%, white);
   border-color: var(--arcane-primary-hover-border, #b7e4ff);
-  box-shadow: inset 0 1px 0 #ffffff66, 0 4px 20px var(--accent-red-glow);
+  box-shadow: none;
   transform: none;
 }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .btn-secondary {
-  background: var(--arcane-secondary-bg, linear-gradient(180deg, #20364e, #14253a));
+  background: var(--surface-1);
   border-color: var(--arcane-control-border, #526b86);
   color: var(--arcane-secondary-text, #e0edf9);
 }
@@ -173,24 +155,7 @@
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .tcg-card-inner {
   box-shadow: 0 5px 12px rgba(var(--arcane-shadow-rgb, 0, 4, 15), 0.4);
 }
-@media (min-width: 769px) {
-  :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .app-container { padding: 1.5rem 2rem; }
-  :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .nav-tab { padding: 0.65rem 0.75rem; }
-}
 @media (max-width: 768px) {
-  :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .app-header { gap: 0.5rem; margin-bottom: 1rem; padding-bottom: 0.75rem; }
-  :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .logo-text { font-size: 1.35rem; }
-  :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .logo-icon { width: 32px; height: 32px; }
-  :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .nav-tabs {
-    width: auto;
-    gap: 0.1rem;
-    padding: 0.25rem 0.25rem max(0.25rem, env(safe-area-inset-bottom, 0px));
-    background: var(--bg-primary);
-    border-top: 1px solid var(--border-glass);
-    box-shadow: none;
-  }
-  :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .nav-tab { font-size: 0.7rem; padding: 0.4rem 0.2rem; }
-  :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .nav-secondary .nav-tab { font-size: 1rem; padding: 0.65rem 0.75rem; }
   :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .glass-panel { padding: 1rem; }
 }
 

@@ -1,11 +1,12 @@
 import { useEffect, useId, useState } from 'react';
 import CardImage from './CardImage';
+import CardImageZoom from './CardImageZoom';
 import { getSlotNumber } from '../utils/getSlotNumber';
 import { useT } from '../utils/i18n';
 
 const MTG_CARD_ID = /^mtg-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default function RelatedTokens({ cardIds = [], title, inventoryType = 'collection', commanderCardId }) {
+export default function RelatedTokens({ cardIds = [], title, inventoryType = 'collection', commanderCardId, compact = false }) {
   const { t } = useT();
   const headingId = useId();
   const idsKey = [...new Set((Array.isArray(cardIds) ? cardIds : [])
@@ -14,6 +15,7 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
   const resultKey = `${inventoryType}:${commanderCardId || ''}:${idsKey}`;
   const [result, setResult] = useState({ key: '', status: 'loading', tokens: [] });
   const [attempt, setAttempt] = useState(0);
+  const [previewToken, setPreviewToken] = useState(null);
 
   useEffect(() => {
     if (!idsKey) return;
@@ -51,7 +53,7 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
   const status = result.key === resultKey ? result.status : 'loading';
 
   return (
-    <section aria-labelledby={headingId} style={{ minWidth: 0, borderTop: '1px solid var(--border-glass)', paddingTop: '1rem' }}>
+    <section className={compact ? 'related-tokens-compact' : undefined} aria-labelledby={headingId} style={{ minWidth: 0, borderTop: '1px solid var(--border-glass)', paddingTop: '1rem' }}>
       <h3 id={headingId} style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>{title ?? t('relatedTokens.title')}</h3>
       {status === 'loading' && <p role="status">{t('relatedTokens.loading')}</p>}
       {status === 'error' && (
@@ -63,10 +65,17 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
       {status === 'ready' && (result.tokens.length === 0 ? (
         <p role="status" style={{ color: 'var(--text-muted)' }}>{t('relatedTokens.empty')}</p>
       ) : (
-        <ul className="card-grid" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        <ul className={compact ? 'related-token-list' : 'card-grid'} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {result.tokens.map(token => (
-            <li key={token.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 0, background: 'var(--surface-1)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '0.5rem', overflowWrap: 'anywhere' }}>
-              <CardImage card={{ ...token, id: token.matched_card_id || token.id }} game="mtg" loading="lazy" style={{ width: '100%', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
+            <li key={token.id} className={compact ? 'related-token-item' : undefined} style={compact ? { minWidth: 0, overflowWrap: 'anywhere' } : { display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 0, background: 'var(--surface-1)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '0.5rem', overflowWrap: 'anywhere' }}>
+              {compact ? (
+                <button type="button" className="related-token-art ci-image-wrap" aria-label={`${t('deck.previewArt')}: ${token.name}`} aria-haspopup="dialog" onClick={() => setPreviewToken({ ...token, id: token.matched_card_id || token.id })}>
+                  <CardImage card={{ ...token, id: token.matched_card_id || token.id }} game="mtg" loading="lazy" style={{ width: '100%', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
+                  <span>{t('deck.previewArt')}</span>
+                </button>
+              ) : (
+                <CardImage card={{ ...token, id: token.matched_card_id || token.id }} game="mtg" loading="lazy" style={{ width: '100%', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
+              )}
               <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{token.name}</span>
@@ -101,6 +110,7 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
           ))}
         </ul>
       ))}
+      {previewToken && <CardImageZoom card={previewToken} onClose={() => setPreviewToken(null)} />}
     </section>
   );
 }

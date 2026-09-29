@@ -169,7 +169,7 @@ Below Description, one summary panel groups **Supertype Breakdown**, **Color & L
 
 Under Wins and Losses, **Sleeved** records **None**, **Single**, **Double**, or **Triple** for that deck. Changes save immediately without saving or discarding other deck edits; the selection is retained in deck duplicates and complete account backups.
 
-Click the **card back** beneath the commander to preview a solid sleeve color or upload a PNG, JPEG, or WebP image. **Save** stores that deck's choice independently of other edits; **Cancel** leaves it unchanged, and the default option restores the Magic card back. Custom images are resized, kept with the deck in the database, and preserved in duplicates and complete account backups.
+In the always-visible top overview, click the **card back** beneath the commander to preview a solid sleeve color or upload a PNG, JPEG, or WebP image. **Save** stores that deck's choice independently of other edits; **Cancel** leaves it unchanged, and the default option restores the Magic card back. Custom images are resized, kept with the deck in the database, and preserved in duplicates and complete account backups.
 
 You can also enter a direct **Image URL** and choose **Load image** before saving. The browser downloads and resizes a copy; your server does not fetch arbitrary URLs. If the image host blocks cross-origin downloads, download the file yourself and use the upload option.
 
@@ -195,7 +195,7 @@ Open **Add Cards → Precon Deck**, search MTGJSON by name, set code, or type, a
 
 ### Import a ManaBox storage container
 
-Storage opens a searchable, sortable gallery. Create a container, choose its cover through **Container Settings → Choose container image**, and organize cards by layout or image list. Move selections between containers or back to Unsorted, or use automatic filing. Capacity is advisory: cards stay in the chosen eligible container even when full, and Storage marks containers/pages/rows **Over limit**. Add pages/rows or change capacity manually to match your physical storage.
+Storage opens a searchable, sortable gallery. Create a container, choose its cover through **More → Container Settings → Choose container image**, and organize cards by layout or image list. Move selections between containers or back to Unsorted, or use automatic filing. Capacity is advisory: cards stay in the chosen eligible container even when full, and Storage marks containers/pages/rows **Over limit**. Add pages/rows or change capacity manually to match your physical storage.
 
 Choose **Import ManaBox container** and upload a `.txt` export. This creates a box named after the file and files matching, already-owned physical copies from Unsorted into its first row—it does not create missing collection cards.
 
@@ -228,7 +228,7 @@ AI is optional. In **Settings → AI preferences**, choose and save a provider a
 - **Gemini:** create an API key in [Google AI Studio](https://aistudio.google.com/apikey), select Gemini, save the key, then choose and save an available model. Free-tier quotas and availability depend on your account and model; Google's free-tier data-use terms apply.
 - **OpenRouter:** create an [OpenRouter API key](https://openrouter.ai/settings/keys), select OpenRouter, save the key, then choose and save a structured-output model. Free models are subject to availability and quotas; other models can charge your account. Manafolio does not switch to another model on failure.
 
-Open **Deck Builder → AI Deck Builder**, select inventory, format, and target size, then choose one **Deck type** under **Deck setup**. Its explanation and play style appear below the selector and accompany requests to your AI provider. Describe a deck or ask a question. Filter eligible cards by color, set, and, for Physical, containers. Missing physical copies are excluded. **Include checked-out cards** allows planning with reserved copies, not sharing or releasing their reservations.
+Open **Deck Builder → AI Deck Builder**, select inventory, format, and target size, then choose one **Play style** under **Deck setup**. Its explanation and pace appear below the selector and accompany requests to your AI provider. Use **Open AI settings** to jump to connection preferences. Describe a deck or ask a question. Use the always-visible **Card pool & filters** to filter eligible cards by color, set, and, for Physical, containers. Missing physical copies are excluded. **Include checked-out cards** allows planning with reserved copies, not sharing or releasing their reservations.
 
 Set **Target power level** from **1 — Exhibition** through **5 — cEDH**; it defaults to **2 — Core**. These Commander-oriented descriptions are goals, not certified ratings or guaranteed turn counts. The AI tries to match the target within your owned cards and selected format and explains when the pool cannot support it.
 

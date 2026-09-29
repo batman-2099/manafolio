@@ -106,16 +106,16 @@ Start with the printing, not just the card name. Two copies of the same Magic ca
 - **Wishlist** records cards you want, not copies you own.
 - **Graveyard** preserves archived records without counting them as owned. Add a card through the usual workflow, then archive it if needed; it is not a scanner destination.
 
-The **Add to Arena** switch in **Search & Add** affects ordinary single-card additions, Rapid add, and collection-file imports. Set it before choosing an import file. Leaving it off selects physical Collection. It does not turn Precon Deck or Scan Cards into Arena-import workflows.
+The **Add cards to** selector in **Search & Add** chooses **Collection** (physical) or **Arena** for single-card additions, bulk additions, Rapid add, and collection-file imports. Set it before choosing an import file. It does not turn Precon Deck or Scan Cards into Arena-import workflows.
 
 ### Add a card by searching
 
 1. Open **Add Cards → Search & Add**.
-2. Enter a name in **CARD NAME**, or use **CARD NUMBER (OPTIONAL)** with a set code. Choose **LANGUAGE** for the printing you are looking for—not the interface language.
-3. Use **SET(S) - COMMA FOR MULTIPLE (OPTIONAL)** to narrow the search, for example `fdn`, or multiple comma-separated set codes. The suggestions can help identify the correct set.
-4. Choose **Search Internet API**. Open a result; a search with exactly one result can open its add form directly. Compare the artwork, set, collector number, and language.
+2. Enter a name in **Card name**, or use **Card number (optional)** with a set code. Choose **Language** for the printing you are looking for—not the interface language.
+3. Use **Sets (optional, comma-separated)** to narrow the search, for example `fdn`, or multiple comma-separated set codes. The suggestions can help identify the correct set.
+4. Choose **Search cards**. Open a result; a search with exactly one result can open its add form directly. Compare the artwork, set, collector number, and language.
 5. In **Add Card to Collection**, set **Quantity**, **Purchase Price**, **Condition**, **Printing**, and **Language**. Use the grading fields if this is a slab; leave the grader as raw for an ordinary card.
-6. Choose **Add to Collection**, or **Add to Wishlist** if you do not own it yet. When **Add to Arena** is on, the **Add to Collection** action saves to Arena despite the button's wording.
+6. Choose **Add to Collection** or **Add to Arena**, matching your selected destination, or **Add to Wishlist** if you do not own it yet.
 7. Open Collection in the corresponding inventory and check the new entry. Physical additions are initially unassigned; filing them is a separate step.
 
 **Expected result:** a saved entry for the chosen printing and destination, with the quantity and copy details you supplied.
@@ -129,7 +129,7 @@ Changing the language in an add form can resolve a different printing, rather th
 Rapid add is useful when you have a pile from one known set and do not want to reopen the add form for every card.
 
 1. In **Search & Add**, enter one set code in the set field and choose the search language.
-2. Set **Add to Arena** appropriately.
+2. Choose the destination in **Add cards to**.
 3. Choose **Rapid add**. The button changes to **Rapid add on**.
 4. Check the condition, printing/finish, and **Copies added per Enter**. These settings apply to subsequent rapid additions.
 5. Type a collector number in **Card number, then Enter** and press Enter.
@@ -147,8 +147,8 @@ Use this workflow when you want to **add inventory**. It is different from **Sto
 #### ManaBox text export
 
 1. Open **Add Cards → Search & Add**.
-2. Set **Add to Arena** before selecting the file: off for physical Collection, on for Arena.
-3. Choose **Choose .txt file** and select your ManaBox `.txt` export.
+2. Choose **Collection** or **Arena** in **Add cards to** before selecting the file.
+3. Under **Import cards**, choose **Choose .txt file** and select your ManaBox `.txt` export.
 4. Read **ManaBox Import Summary**. Check **Cards**, **Normal**, **Foils**, and the number of distinct printings.
 5. Choose **Commit import**, or **Cancel** to leave without importing.
 6. Watch **Import activity (latest 200 events)**, then review **Import Complete**.
@@ -156,7 +156,7 @@ Use this workflow when you want to **add inventory**. It is different from **Sto
 
 #### CSV, including Manafolio-style and Arena collection exports
 
-1. Choose the destination with **Add to Arena**, then choose **Choose CSV File**.
+1. Choose the destination in **Add cards to**, then choose **Choose CSV File** under **Import cards**.
 2. In **CSV Import Review**, verify **Destination**, **Cards**, and **Copies**.
 3. Under **Match CSV columns**, check the mapping for card name, quantity, set code, collector number, condition, printing/foil, language, purchase price, and card ID. Select **Not used** for an irrelevant column.
 4. Choose **Update preview** after changing the mappings. Read and correct **Errors**; importing is disabled while the preview reports errors.
@@ -349,11 +349,11 @@ Storage describes where cards are physically kept. It does not create inventory 
 
 **Expected result:** an empty named container with the chosen layout. It does not add cards to Collection.
 
-Storage opens as a gallery. Search container names/types or sort by name/quantity, then open a container. Select the **Container Settings** gear button on its toolbar. **Choose container image** selects a card-art cover; **Automatic image** returns to an automatic cover.
+Storage opens as a gallery. Search container names/types or sort by name/quantity, then open a container. Select **More → Container Settings** on its toolbar. **Choose container image** selects a card-art cover; **Automatic image** returns to an automatic cover. The container's **More** menu also contains creation and import actions; page navigation, views, selection, and Arrange remain directly available.
 
-The container toolbar shows its saved sleeve type. Change it through the **Container Settings** gear button → **Sleeved**, then **Save Settings**. This records the sleeve layers used for the container's cards; it does not change capacity, move cards, or alter deck sleeve settings. Existing containers default to **None**, and complete account backups retain the setting.
+The container toolbar shows its saved sleeve type. Change it through **More → Container Settings → Sleeved**, then **Save Settings**. This records the sleeve layers used for the container's cards; it does not change capacity, move cards, or alter deck sleeve settings. Existing containers default to **None**, and complete account backups retain the setting.
 
-Change **Type** through the **Container Settings** gear button, then **Save Settings**. Existing cards, pages/rows, capacities, and sleeve settings are retained; changing type does not apply the creation wizard's default layout.
+Change **Type** through **More → Container Settings**, then **Save Settings**. Existing cards, pages/rows, capacities, and sleeve settings are retained; changing type does not apply the creation wizard's default layout.
 
 ### Choose between sort rules and filing rules
 
@@ -405,7 +405,7 @@ To take cards out of a container but keep the records, select them and choose **
 
 ### Arrange fixed positions manually
 
-1. Select the **Container Settings** gear button and remove all sort rules if you want **Custom** order. Save the settings.
+1. Select **More → Container Settings** and remove all sort rules if you want **Custom** order. Save the settings.
 2. Choose **Arrange**.
 3. Tap a card, then the destination. In a binder, tap an empty pocket to place it or an occupied pocket to swap. Row layouts prompt you to drop before another card or into an empty slot.
 4. Repeat, moving the physical cards to match, then choose **Done Arranging**.
@@ -467,7 +467,7 @@ Cards can remain in saved or checked-out decks. Transferring the container prese
 
 Graveyard has separate unassigned cards and storage; physical cards cannot be filed directly into archived containers or vice versa. Archived cards do not supply owned totals or physical/Arena decks. Graveyard containers are not available for public container sharing.
 
-Choose **Create Deck** in a Graveyard container to create an archived deck from its complete contents, regardless of current filters or selection. The container and card entries stay unchanged. Empty containers cannot create a deck.
+Choose **More → Create Deck** in a Graveyard container to create an archived deck from its complete contents, regardless of current filters or selection. The container and card entries stay unchanged. Empty containers cannot create a deck.
 
 ### Storage troubleshooting
 
@@ -494,7 +494,7 @@ Graveyard decks are hidden from the deck list by default. Turn on **Show Graveya
 
 **Missing cards** appears in red in both Grid and Table view when required copies are unavailable, even if the deck has reached its target size. Physical decks exclude archived copies and other decks' reservations; Arena decks use Arena ownership only; Graveyard decks use archived copies only. A checked-out Physical deck keeps its Return action and reservations, but archived or missing reserved copies still show **Missing cards**. Use the matching status filter to find affected decks; the target-reached filter excludes them.
 
-In an open deck, the toolbar is followed by **Description**. The analytics and commander artwork are directly below Description: **Supertype Breakdown**, **Color & Land Distribution**, and **Deck Health & Rules**, including wins/losses. **Add Cards to Deck**, **Deck Cards**, and **Tokens** are below that overview—not in a separate analytics sidebar. Some charts appear only when the deck contains relevant cards.
+An open deck keeps its tools, Description, analytics, commander, private Notes, sleeves, card back, and wins/losses visible above **Add Cards to Deck**, **Deck Cards**, and **Tokens**. These top sections are not collapsible. Properties, imports, exports, and other deck actions are directly available beneath the header. Some charts appear only when the deck contains relevant cards.
 
 **Target reached** means the deck has reached its configured target count. It does not certify tournament legality, correct color identity, or a complete sideboard. Review format rules separately.
 
@@ -527,7 +527,7 @@ The selection is anchored to an existing collection copy and follows its current
 
 ### Add cards, change quantities, and save
 
-1. Open the deck and scroll below Description and the analytics to **Add Cards to Deck**.
+1. Open the deck and scroll below the overview to **Add Cards to Deck**.
 2. Search by card name using the search button, or select **Browse Collection** to browse the deck's matching Physical, Arena, or Graveyard inventory. Graveyard decks use archived cards only.
 3. Inspect the set and collector number before adding a printing. Select its add control.
 4. In **Deck Cards**, use **+** and **−** to change quantities. At one copy, the removal control becomes **Remove from deck**. Removing a card here does not delete owned copies.
@@ -542,7 +542,7 @@ Return a checked-out deck before changing its card composition or inventory type
 
 ### Change deck properties
 
-1. Open the deck and select **Edit Properties**.
+1. Open the deck and select **Edit Properties** near the top.
 2. Edit **Deck Name**, **Deck Type**, **Format**, **Target Size**, **Deck Category**, **Vault Accent Color**, or the description.
 3. Select **Apply Properties** to apply the form to the local editor draft.
 4. Select **Save** in the deck toolbar to persist it.
@@ -555,16 +555,16 @@ To archive a deck, choose **Deck Type → Graveyard**, **Apply Properties**, the
 
 1. Create or edit the deck to use a Commander/EDH/Brawl format, and apply those properties.
 2. Add the intended commander creature as a card in **Deck Cards**.
-3. Choose it from the **Commander** dropdown in the overview, beneath the commander artwork when one is selected. The dropdown lists all creatures in the deck, not only legendary creatures, and remains available when no commander is selected. Choose **No commander** to clear the selection.
+3. Choose it from the **Commander** dropdown in the top overview, beneath the commander artwork when one is selected. The dropdown lists all creatures in the deck, not only legendary creatures, and remains available when no commander is selected. Choose **No commander** to clear the selection.
 4. Select **Save**.
 
-**Expected result:** the card is marked **Commander**, and its artwork appears in the overview below Description, alongside the analytics. Select the artwork to preview it.
+**Expected result:** the card is marked **Commander**, and its artwork appears in the top overview, alongside the analytics. Select the artwork to preview it.
 
 The commander is one existing deck-card entry, not an additional copy outside the list. The UI supports a single commander selection; do not assume partner commanders, sideboard zones, or comprehensive Commander legality checks.
 
 ### Customize a deck's card back
 
-1. Open the deck and select **Customize card back** beneath its back image.
+1. In the deck's top overview, select **Customize card back** beneath its back image.
 2. Choose a **Dragon Shield sleeve** to download and preview its back, or use a solid color, an uploaded image, or a direct image URL.
 3. Review the preview, then select **Save** in the dialog. **Cancel** leaves the saved back unchanged.
 
@@ -598,7 +598,7 @@ This deck-creation chooser creates a definition only. It does not buy or add own
 
 ### Import into an existing deck
 
-1. Open an unchecked-out deck and select **Import**.
+1. Open an unchecked-out deck and select **Import** near the top.
 2. In **Import & Compare with Collection**, paste quantity/name lines such as `4 Lightning Bolt`.
 3. Select **Compare with Collection**.
 4. Review **Collection Availability Breakdown** and the **Owned**, **Partial**, and **Missing** results. These are inventory matches, not a guarantee that copies are free from other decks' reservations.
@@ -609,7 +609,7 @@ This deck-creation chooser creates a definition only. It does not buy or add own
 
 ### Export a decklist or buylist
 
-1. Open the deck and select **Export**.
+1. Open the deck and select **Export** near the top.
 2. In **Export Decklist**, choose **MTG Arena**, **Plain text (qty + name)**, or **Buylist – cards you still need**.
 3. Review the generated text and select **Copy to Clipboard**.
 4. For the buylist, optionally select **Copy & Open TCGplayer**, then paste into TCGplayer Mass Entry yourself.
@@ -658,7 +658,7 @@ Arena and Graveyard decks cannot be checked out, even if a checkout control is v
 ### Create a container from a deck
 
 1. Open a saved, nonempty Physical or Graveyard deck and save any editor changes.
-2. Select **Create Container** and review the proposed box name.
+2. Select **Create Container** near the top and review the proposed box name.
 3. Confirm creation to file available matching copies into a new **Deck Box** in the deck's inventory.
 4. Review the moved and missing quantities. Missing means copies could not be filed—not that new copies were added. Open Storage to find the box and physically arrange the cards to match.
 
@@ -678,7 +678,7 @@ Partial availability still creates the box and reports shortages. Use a differen
 
 ### Record wins and losses
 
-1. Open the deck and find **Wins** and **Losses** in **Deck Health & Rules**, below Description.
+1. Find **Wins** and **Losses** in **Deck Health & Rules** in the top overview.
 2. Use **Add a win** or **Add a loss** after a result.
 3. Use **Remove a win** or **Remove a loss** to correct a mistake. Counts cannot go below zero.
 
@@ -699,7 +699,7 @@ AI is not required for ordinary deck editing. Configure it only if you want to s
 
 ### Connect a provider
 
-1. Open **Settings → AI connection & preferences**.
+1. Open **Settings → AI connection & preferences**, or choose **Open AI settings** in AI Deck Builder to jump directly to that section.
 2. Under **AI provider**, choose one provider and complete its connection:
    - **ChatGPT:** select **Connect ChatGPT**, open the verification link, enter the **Verification code**, and complete OpenAI's device flow. Your account needs Codex access; device-code authorization may need enabling in ChatGPT security settings. Return to Manafolio and wait for the connected state. If verification expires, connect again.
    - **Ollama:** enter **Ollama server address**, or leave it blank for the server default. Select **Check connection** and choose an installed model. Models are not downloaded for you. The address is reached from the Manafolio server, so `localhost` is that server/container, not your browser.
@@ -716,19 +716,19 @@ ChatGPT uses your Codex access and usage limits. Gemini's free-tier data-use ter
 ### Ask questions and create a suggested deck
 
 1. Open **Deck Builder → AI Deck Builder**.
-2. In **Deck setup**, choose **Owned inventory** (Physical or Arena), **Format**, and **Target Size**. Choose one required **Deck type** and set **Target power level** before requesting a suggestion; see the option guides below. Wishlist and Graveyard cannot supply AI decks.
-3. In **Card pool & filters**, optionally select colors/sets and, for Physical inventory, **Containers**. Empty filters include all eligible cards. Set options show their Magic set symbols alongside readable names. Missing Physical copies are excluded; Arena is separate.
+2. In **Deck setup**, choose **Owned inventory** (Physical or Arena), **Format**, and **Target Size**. Choose one required **Play style** and set **Target power level** before requesting a suggestion; see the option guides below. Wishlist and Graveyard cannot supply AI decks.
+3. In **Card pool & filters**, optionally select colors/sets and, for Physical inventory, **Containers**. All setup options and guidance remain visible without expanding sections. Empty filters include all eligible cards. Set options show their Magic set symbols alongside readable names. Missing Physical copies are excluded; Arena is separate.
 4. Leave **Include checked-out cards** off unless intentionally planning with reserved copies. The toggle turns green when enabled. Turning it on does not release or share reservations; return those cards from their other decks before checking out this deck.
 5. Enter a **Question or deck request**, then select **Send message**. With no typed request, **Generate suggestion** requests a deck from the selected inventory/settings.
 6. Read the conversation and any **Review and edit draft**. Edit the name, description, strategy, quantities, removals, and commander as needed. The strategy covers opening hands, the game plan, synergies, and win conditions; review it against the actual cards. Read warnings and check the total against the target.
 7. Ask follow-up questions or request revisions. Questions leave the draft unchanged; requests for changes use your current manual edits.
 8. Select **Add Deck** only when you want to save the reviewed draft.
 
-#### Choose a deck type
+#### Choose a play style
 
-**Deck type** defaults to **Any**, letting the AI select an archetype suited to your eligible cards and request. Choose a specific strategy if you prefer. Its explanation and play style appear below the selector.
+**Play style** defaults to **Any**, letting the AI select an archetype suited to your eligible cards and request. Choose a specific strategy from the dropdown if you prefer. Its explanation and pace appear below the selector.
 
-| Deck type | When to choose it |
+| Play style | When to choose it |
 | --- | --- |
 | Any | Let the available cards and your request determine the archetype |
 | Aggro | Cheap threats and fast, proactive attacks |
@@ -748,7 +748,7 @@ ChatGPT uses your Codex access and usage limits. Gemini's free-tier data-use ter
 | Toolbox | Flexible answers and tutors for different situations |
 | Spellslinger | Instants, sorceries, and rewards for casting them |
 
-Reanimator refers to the Magic gameplay zone, not Manafolio's archived **Graveyard** inventory. Deck type guides AI requests; it is separate from the saved deck's inventory type and category.
+Reanimator refers to the Magic gameplay zone, not Manafolio's archived **Graveyard** inventory. Play style guides AI requests; it is separate from the saved deck's inventory type and category.
 
 #### Choose a target power level
 
@@ -872,7 +872,7 @@ For full server recovery, ask the operator to maintain protected persistent-data
 
 ## Keep private Notes
 
-Each deck has its own **Notes** section below the deck stats in **Deck Builder**. Notes are separate from the deck description and card-entry notes.
+Each deck has its own **Notes** section below the stats in the top overview of **Deck Builder**. Notes are separate from the deck description and card-entry notes.
 
 1. Open a deck and enter reminders, matchup plans, or upgrade ideas in **Notes**.
 2. Select **Save** beneath the field or in the deck toolbar. Both save the whole deck draft, including any card or property changes.

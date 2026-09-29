@@ -4,6 +4,19 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Enlarged Collection and Deck Builder list thumbnails to 56 × 78px at default scale, preserving Deck Builder zoom controls.
+- Storage's card grid now defaults to Storage order instead of Name (A–Z); other sorting options remain available.
+- Matched Storage's scalable card grid to Deck Builder: 110px base column width, 275px at maximum zoom, matching spacing, and narrow-container width protection.
+- Extended Collection's existing foil finish to the background of foil gallery cards and list rows. Non-foil cards are unchanged; backgrounds remain static, preserving the existing reduced-motion and touch behavior.
+- Moved the deck Description directly above Notes, beneath the statistics in the always-visible overview.
+- Restored the deck view's tools, description, statistics, commander, Notes, and appearance sections above card editing. These sections stay directly visible, not hidden behind disclosures.
+- Replaced Dashboard Color Distribution and Rarity Distribution pie charts with vertical column charts. Counts, category colors, tooltips, inventory filters, empty states, and accessible data tables are unchanged; narrow screens can scroll the charts horizontally.
+- Labeled the AI archetype dropdown Play style and removed the separate noninteractive heading, making the selection control explicit without changing request values.
+- AI Deck Builder keeps setup options, card-pool filters, and guidance visible without collapsible sections; only the generation log remains collapsible.
+- Applied the rendered UI audit: binder controls use a compact toolbar and More menu, AI setup links directly to connection settings, and inspector actions precede compact related-token previews.
+- Separated card search, imports, and explicit Collection/Arena destination controls; bulk additions now honor that destination. Added missing control labels, corrected set-search semantics, named chart segments, and repaired login/scanner document structure.
+- Collection, storage, and dashboard history now distinguish failed requests from successful empty results, provide Retry, announce loading, and retain clearly marked same-scope data during refresh. Stale responses cannot cross inventory/period changes.
+- Shared navigation geometry across themes, prevented narrow-screen label wrapping, enlarged mobile controls, and replaced redundant panel/button gradients and shadows with solid theme surfaces.
 - Added Graveyard deck inventory: archive existing deck definitions without moving cards, create/edit/import decks using archived copies, or create a deck from a Graveyard container. Notes, metadata, duplication, and backups retain the inventory. Checked-out decks must be returned before archiving; Graveyard decks cannot reserve copies, check out, or use AI improvement. Restoring to Physical/Arena validates destination ownership.
 - Deck properties now show a direct Return-to-storage instruction when checkout makes Graveyard unavailable, with the explanation associated with the disabled option.
 - Increased existing 14px secondary labels, hints, and metadata to 15px across dashboard, collection, storage, inspector, scanning, settings, login, and help views, retaining primary text and control sizes.

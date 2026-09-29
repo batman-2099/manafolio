@@ -14,7 +14,7 @@ import { useT } from '../utils/i18n';
 
 const MAX_BYTES = 8 * 1024 * 1024; // matches backend/src/cardArt.js
 
-const btn = { fontSize: '0.7rem', padding: '0.3rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' };
+const btn = { padding: '0.3rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' };
 
 export default function CardArtEditor({ card, hasProviderArt, showToast, onChanged }) {
   const { t } = useT();

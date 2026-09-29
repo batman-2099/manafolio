@@ -10,9 +10,18 @@ import themes from '../../../shared/themes.json';
 import './Settings.css';
 
 
-function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
+function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }) {
   const { locale, setLocale, t } = useT();
   const revealRef = useScrollReveal();
+  useEffect(() => {
+    if (!initialSection) return;
+    const frame = requestAnimationFrame(() => {
+      const heading = document.getElementById(initialSection);
+      heading?.focus({ preventScroll: true });
+      heading?.scrollIntoView({ block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [initialSection]);
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

@@ -243,16 +243,11 @@
   --bg-gradient: radial-gradient(ellipse at 12% 0%, color-mix(in srgb, var(--accent-red) 12%, transparent), transparent 55%), radial-gradient(ellipse at 95% 70%, color-mix(in srgb, var(--accent-blue) 8%, transparent), transparent 55%);
 
   /* Layered controls share geometry with Arcane Blue, not its blue literals. */
-  --arcane-nav-bg: linear-gradient(180deg, var(--surface-3), var(--surface-2));
   --arcane-nav-border: var(--border-glass-hover);
   --arcane-highlight: color-mix(in srgb, var(--text-strong) 20%, transparent);
-  --arcane-panel-start: var(--surface-2);
-  --arcane-primary-bg: linear-gradient(180deg, var(--accent-yellow), var(--accent-red));
-  --arcane-primary-hover-bg: linear-gradient(180deg, var(--text-strong), var(--accent-yellow));
   --arcane-primary-text: var(--text-on-accent);
   --arcane-primary-border: var(--accent-yellow);
   --arcane-primary-hover-border: var(--text-strong);
-  --arcane-secondary-bg: linear-gradient(180deg, var(--surface-2), var(--surface-1));
   --arcane-control-border: var(--border-glass-hover);
   --arcane-secondary-text: var(--text-primary);
   --arcane-focus: var(--accent-yellow);
@@ -356,7 +351,7 @@ button, input, select, textarea {
   gap: var(--space-4);
   margin-bottom: var(--space-4);
 }
-.page-title { font-size: 1.5rem; line-height: 1.3; margin: 0; }
+.page-title { font-family: 'Cinzel', Georgia, serif; font-size: 1.5rem; line-height: 1.3; margin: 0; }
 .section-heading { font-size: 1.125rem; line-height: 1.4; margin: 0 0 var(--space-3); }
 .view-toolbar {
   display: flex;
@@ -382,6 +377,38 @@ button, input, select, textarea {
 .login-form .form-group label { text-transform: none; letter-spacing: 0; }
 .view-toolbar :is(.btn, select, input),
 .page-heading .btn { min-height: 44px; }
+.read-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding-block: var(--space-4); color: var(--text-secondary); }
+.read-state p { margin: 0; }
+.read-state-initial { min-height: 10rem; justify-content: center; }
+.read-state-error { border-block: 1px solid var(--border-glass); }
+.control-label { font-size: 0.9375rem; font-weight: 600; color: var(--text-secondary); line-height: 1.4; }
+.search-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3); }
+.search-actions, .search-import-actions, .search-entry-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.search-import-actions { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border-glass); }
+.search-destination { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); }
+.search-destination select { max-width: 20rem; }
+.search-destination p { color: var(--text-secondary); max-width: 65ch; }
+.ci-image-col .btn { font-size: 0.875rem; min-height: 44px; }
+.related-tokens-compact .related-token-list { display: grid; gap: var(--space-3); }
+.related-tokens-compact .related-token-item { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
+.storage-workspace-toolbar { gap: var(--space-3); }
+.storage-workspace-identity .sub-nav-tabs { width: auto; }
+.storage-workspace-identity .sub-nav-tab { min-height: 44px; padding: 0.5rem 0.75rem; }
+.storage-workspace-actions .btn { padding-inline: 0.65rem; }
+.storage-page-nav { min-width: 0; }
+.storage-page-nav select { min-width: 0; }
+@media (max-width: 768px) {
+  .storage-workspace-identity, .storage-workspace-actions { width: 100%; }
+  .storage-workspace-identity > select { flex: 1; }
+  .storage-page-nav { flex-basis: 100%; }
+  .storage-page-nav select { flex: 1; }
+}
+.related-tokens-compact .related-token-art { width: 76px; padding: 0; background: transparent; border: 0; color: var(--text-primary); cursor: pointer; }
+.related-tokens-compact .related-token-art img { width: 100%; }
+@media (max-width: 768px) {
+  .search-sets-field { grid-column: 1 / -1; }
+  .card-search :is(input:not([type="checkbox"]), select, button) { min-height: 44px; }
+}
 .collection-inventory-nav {
   flex-wrap: nowrap;
   overflow-x: auto;
@@ -622,21 +649,16 @@ button.collection-card-trigger {
   z-index: 30;
 }
 
-/* Glassmorphic Panel Component */
+/* Shared content surface; elevation belongs to overlays, not every section. */
 .glass-panel {
-  background: var(--bg-glass);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-glow);
+  box-shadow: none;
   padding: 1.5rem;
   transition: var(--transition-smooth);
 }
 
-.glass-panel:hover {
-  border-color: var(--border-glass-hover);
-}
 
 .ai-response {
   background: #000000;
@@ -652,10 +674,13 @@ button.collection-card-trigger {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
   border-bottom: 1px solid var(--border-glass);
   padding-bottom: 1rem;
 }
+.header-account { margin-left: auto; }
 
 .logo-section {
   display: flex;
@@ -779,11 +804,11 @@ button.collection-card-trigger {
 }
 
 .form-group label {
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .input-control, .select-control {
@@ -859,11 +884,12 @@ button.collection-card-trigger {
 .nav-tabs {
   position: relative;
   display: flex;
-  background: var(--bg-glass);
-  border: 1px solid var(--border-glass);
-  padding: 0.35rem;
-  border-radius: var(--radius-md);
-  margin-bottom: 2rem;
+  order: 3;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
   gap: 0.25rem;
 }
 
@@ -914,7 +940,7 @@ button.collection-card-trigger {
      content scrolling behind the bar. */
   background: var(--bg-secondary);
   border: 1px solid var(--border-glass-hover);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: none;
 }
 
 @media (min-width: 769px) {
@@ -929,14 +955,11 @@ button.collection-card-trigger {
   .nav-tabs {
     min-width: 0;
     flex-wrap: wrap;
-    border-radius: var(--radius-sm);
-    gap: 0.5rem;
-    padding: 0.5rem;
   }
   
   .nav-tab {
     flex-direction: row;
-    padding: 0.75rem 1.25rem;
+    padding: 0.65rem 0.75rem;
     font-size: 0.95rem;
     gap: 0.6rem;
   }
@@ -967,7 +990,9 @@ button.collection-card-trigger {
 
 /* Mobile responsive tab-bar pinning */
 @media (max-width: 768px) {
-  .app-header { flex-wrap: wrap; gap: 0.5rem; }
+  .app-header { flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; padding-bottom: 0.75rem; }
+  .logo-text { font-size: 1.35rem; }
+  .logo-icon { width: 32px; height: 32px; }
   .header-account { min-width: 0; max-width: 100%; margin-left: auto; }
   .header-greeting { min-width: 0; overflow-wrap: anywhere; }
   .header-account > button, .header-greeting > svg { flex-shrink: 0; }
@@ -984,6 +1009,7 @@ button.collection-card-trigger {
     padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
   }
   .nav-tabs {
+    width: auto;
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     position: fixed;
@@ -1003,13 +1029,26 @@ button.collection-card-trigger {
     -webkit-backdrop-filter: blur(20px);
     /* Clear the home indicator / gesture bar under the pinned tab bar. */
     padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
+    gap: 0;
   }
   .nav-tab {
     min-width: 0;
     min-height: 56px;
-    padding: 0.35rem 0.2rem;
-    font-size: 0.65rem;
-    overflow-wrap: anywhere;
+    padding: 0.35rem 0;
+    font-size: 0.7rem;
+    overflow-wrap: normal;
+  }
+  .nav-tab > span {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .btn, summary.btn {
+    min-height: 44px;
+  }
+  .btn-icon-only {
+    min-width: 44px;
   }
   .nav-tab.nav-more-trigger {
     display: flex;
@@ -1138,6 +1177,7 @@ button.collection-card-trigger {
 }
 
 /* Charts and Distributions styling */
+.dashboard-distribution-chart { overflow-x: auto; }
 .chart-container {
   height: 250px;
   width: 100%;
@@ -1411,12 +1451,12 @@ button.collection-card-trigger {
     align-items: center !important;
     gap: 0.6rem !important;
   }
-  .card-inspector .ci-image-wrap {
+  .card-inspector .ci-image-col .ci-image-wrap {
     max-width: 180px !important;
     width: 55% !important;
   }
   /* In edit mode on mobile, keep the image preview compact so the form gets top billing */
-  .card-inspector.mode-edit .ci-image-wrap {
+  .card-inspector.mode-edit .ci-image-col .ci-image-wrap {
     max-width: 110px !important;
     width: 32% !important;
   }
@@ -1581,7 +1621,7 @@ button.collection-card-trigger {
   min-width: 0;
   margin-top: 1rem;
 }
-.scan-review h3, .scan-review h4 { color: var(--text-strong); margin: 0; }
+.scan-review h2, .scan-review h3 { color: var(--text-strong); margin: 0; }
 .scan-review p { color: var(--text-secondary); margin: 0.4rem 0; overflow-wrap: anywhere; }
 .scan-review-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
 .scan-review-header > div { flex: 1 1 24rem; min-width: 0; }
@@ -2322,14 +2362,20 @@ button.collection-card-trigger {
 }
 
 /* Static foil finish identifies the printing without moving over the artwork. */
+.tcg-card:has(.collection-foil-overlay),
+.collection-table tr:has(.collection-foil-overlay),
 .holo-shine-overlay {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
   background: linear-gradient(115deg,
     rgba(136, 116, 214, 0.12),
     rgba(116, 192, 214, 0.08) 40%,
     rgba(219, 201, 144, 0.12));
+}
+.tcg-card:has(.collection-foil-overlay) { border-radius: var(--radius-sm); }
+.tcg-card:has(.collection-foil-overlay) .tcg-card-info { padding: 0 0.5rem 0.5rem; }
+.holo-shine-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   pointer-events: none;
   z-index: 5;
 }
@@ -2658,8 +2704,6 @@ button.collection-card-trigger {
   .dashboard-details > div, .dashboard-details .glass-panel { min-width: 0; }
   .dashboard-set-chart { overflow-x: auto; }
   .dashboard-set-chart-inner { min-width: 320px; }
-  .dashboard-page .dashboard-donut { height: 300px !important; }
-  .dashboard-donut .recharts-legend-wrapper { height: auto !important; }
   .dashboard-page .dashboard-card-clickable {
     grid-template-columns: 48px minmax(0, 1fr);
     gap: var(--space-1) var(--space-3);

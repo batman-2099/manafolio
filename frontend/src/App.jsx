@@ -98,6 +98,7 @@ function App() {
   const sessionRevision = useRef(0);
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [settingsSection, setSettingsSection] = useState(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const navRef = useRef(null);
   const moreTriggerRef = useRef(null);
@@ -129,6 +130,7 @@ function App() {
     if (tab !== activeTab && navigationGuardRef.current?.() === false) return false;
     if (moreOpen) moreTriggerRef.current?.focus();
     setMoreOpen(false);
+    setSettingsSection(null);
     if (tab === 'storage') setStorageInventoryType(inventoryType);
     if (tab === activeTab) return true;
     const prev = activeTab;
@@ -438,11 +440,11 @@ function App() {
           />
         );
       case 'deckbuilder':
-        return <DeckBuilder key={deckViewKey} showToast={showToast} navigationGuardRef={navigationGuardRef} />;
+        return <DeckBuilder key={deckViewKey} showToast={showToast} navigationGuardRef={navigationGuardRef} onOpenAiSettings={() => { if (goTab('settings')) setSettingsSection('codex-settings-title'); }} />;
       case 'howto':
         return <HowTo />;
       case 'settings':
-        return <Settings user={user} onUpdateUser={handleUpdateUser} onSaveTheme={handleSaveTheme} showToast={showToast} />;
+        return <Settings user={user} initialSection={settingsSection} onUpdateUser={handleUpdateUser} onSaveTheme={handleSaveTheme} showToast={showToast} />;
       case 'admin':
         return <AdminPanel user={user} onUpdateUser={handleUpdateUser} showToast={showToast} />;
       default:

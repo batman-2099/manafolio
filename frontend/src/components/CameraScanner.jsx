@@ -2690,7 +2690,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
       <section className="glass-panel scan-review" aria-labelledby="scan-review-title">
         <div className="scan-review-header">
           <div>
-            <h3 id="scan-review-title">{t('scan.reviewTitle')} ({scanDrafts.length})</h3>
+            <h2 id="scan-review-title">{t('scan.reviewTitle')} ({scanDrafts.length})</h2>
             <p>{t('scan.reviewHint')}</p>
           </div>
           <button type="button" className="btn btn-secondary" disabled={!scanDrafts.length || draftsLoading || draftsError || draftBusy || draftAction !== null || isDrawerOpen} onClick={() => actOnDrafts('clear')}>
@@ -2715,7 +2715,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
             <li key={draft.draft_id} className="scan-review-card" aria-busy={draftAction === draft.draft_id || draftAction === `foil-${draft.draft_id}` || draftAction === 'commit'}>
               <img src={draft.image_url} alt={getCardDisplayName(draft.name, draft.printed_name)} width="250" height="350" loading="lazy" />
               <div className="scan-review-details">
-                <h4>{getCardDisplayName(draft.name, draft.printed_name)}</h4>
+                <h3>{getCardDisplayName(draft.name, draft.printed_name)}</h3>
                 <p>{draft.set_name} · #{draft.number}</p>
                 <p>{draft.quantity}× · {draft.condition} · {draft.printing} · {draft.language}</p>
                 <p>{t('card.purchasePrice')}: {priceText(draft.purchase_price, draft.price_currency)}</p>

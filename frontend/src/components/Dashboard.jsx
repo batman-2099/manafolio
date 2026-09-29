@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { getCardDisplayName } from '../utils/langHelper';
 import { priceText, currencySymbol } from '../utils/formatPrice';
@@ -30,9 +30,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
   // Money and dates follow the interface language, not the browser's: a user who
   // picked German sees 1.234,56 and 3.8.2026 even on an en-US browser.
   const money = (n) => (n || 0).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [statsState, setStatsState] = useState(null);
   const [statsRefresh, setStatsRefresh] = useState(0);
   const [timePeriod, setTimePeriod] = useState('30d');
   const gameFilter = defaultGameFilter();
@@ -41,60 +39,58 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
   const valueColor = isArchive ? '#8b5cf6' : 'var(--accent-green)';
   
   // Timeline Chart State
-  const [historyData, setHistoryData] = useState([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyState, setHistoryState] = useState(null);
+  const [historyRefresh, setHistoryRefresh] = useState(0);
+  const statsScope = `${gameFilter}:${inventoryFilter}`;
+  const stats = statsState?.scope === statsScope ? statsState.data : null;
+  const loading = statsState?.scope !== statsScope || statsState.loading;
+  const error = statsState?.scope === statsScope && statsState.error;
+  const historyScope = `${statsScope}:${timePeriod}`;
+  const historyData = historyState?.scope === historyScope ? historyState.data : null;
+  const loadingHistory = historyState?.scope !== historyScope || historyState.loading;
+  const historyError = historyState?.scope === historyScope && historyState.error;
 
   // Clickable Card Inspector State
   const [inspectorCard, setInspectorCard] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError(null);
+    setStatsState(previous => ({ scope: statsScope, data: previous?.scope === statsScope ? previous.data : null, loading: true, error: false }));
     const params = new URLSearchParams({ inventory: inventoryFilter });
     if (gameFilter) params.set('game', gameFilter);
     const load = async () => {
       try {
         const response = await fetch(`/api/stats?${params}`, { signal: controller.signal });
-        if (!response.ok) throw new Error(t('dash.errStats'));
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
-        if (!controller.signal.aborted) setStats(data);
-      } catch (err) {
-        if (!controller.signal.aborted) setError(err.message);
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) setStatsState({ scope: statsScope, data, loading: false, error: false });
+      } catch {
+        if (!controller.signal.aborted) setStatsState(previous => ({ ...previous, loading: false, error: true }));
       }
     };
     load();
     return () => controller.abort();
-  }, [statsTrigger, statsRefresh, gameFilter, inventoryFilter, t]);
+  }, [statsTrigger, statsRefresh, gameFilter, inventoryFilter, statsScope]);
 
   useEffect(() => {
     const controller = new AbortController();
-    setHistoryData([]);
-    if (loading || !stats || stats.summary.totalCards === 0) {
-      setLoadingHistory(false);
-      return () => controller.abort();
-    }
-    setLoadingHistory(true);
+    if (!stats || stats.summary.totalCards === 0) return () => controller.abort();
+    setHistoryState(previous => ({ scope: historyScope, data: previous?.scope === historyScope ? previous.data : null, loading: true, error: false }));
     const params = new URLSearchParams({ period: timePeriod, inventory: inventoryFilter });
     if (gameFilter) params.set('game', gameFilter);
     const load = async () => {
       try {
         const response = await fetch(`/api/stats/history?${params}`, { signal: controller.signal });
-        if (response.ok) {
-          const data = await response.json();
-          if (!controller.signal.aborted) setHistoryData(data);
-        }
-      } catch (err) {
-        if (!controller.signal.aborted) console.error('Error loading history timeline:', err);
-      } finally {
-        if (!controller.signal.aborted) setLoadingHistory(false);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (!controller.signal.aborted) setHistoryState({ scope: historyScope, data, loading: false, error: false });
+      } catch {
+        if (!controller.signal.aborted) setHistoryState(previous => ({ ...previous, loading: false, error: true }));
       }
     };
     load();
     return () => controller.abort();
-  }, [timePeriod, stats, loading, gameFilter, inventoryFilter]);
+  }, [timePeriod, stats, historyRefresh, gameFilter, inventoryFilter, historyScope]);
 
   const renderFilters = () => (
     <>
@@ -119,18 +115,27 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
     </>
   );
 
-  if (loading) {
-    return <div className="dashboard-page">{renderFilters()}<div role="status" aria-label={t('dash.loading')} className="spinner"></div></div>;
+  const statsStatus = error ? (
+    <div className="read-state read-state-error">
+      <p role="alert">{t('dash.errLoad', { error: t('dash.errStats') })}{stats && <> {t('common.staleData')}</>}</p>
+      <button type="button" className="btn btn-secondary" onClick={() => setStatsRefresh(value => value + 1)}>{t('dash.retry')}</button>
+    </div>
+  ) : loading ? (
+    <div className={`read-state${stats ? '' : ' read-state-initial'}`} role="status">
+      <div className="spinner" aria-hidden="true"></div>
+      <p>{t(stats ? 'common.refreshing' : 'dash.loading')}</p>
+    </div>
+  ) : null;
+
+  if (loading && !stats) {
+    return <div className="dashboard-page">{renderFilters()}{statsStatus}</div>;
   }
 
-  if (error) {
+  if (error && !stats) {
     return (
       <div className="dashboard-page">
         {renderFilters()}
-        <div className="dashboard-empty" style={{ color: 'var(--text-secondary)' }}>
-          <p role="alert">{t('dash.errLoad', { error })}</p>
-          <button className="btn btn-primary" onClick={() => setStatsRefresh(value => value + 1)} style={{ marginTop: '1rem' }}>{t('dash.retry')}</button>
-        </div>
+        {statsStatus}
       </div>
     );
   }
@@ -141,6 +146,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
     return (
       <div className="dashboard-page">
         {renderFilters()}
+        {statsStatus}
         <div className="dashboard-empty" style={{ padding: '1.5rem 0', color: 'var(--text-secondary)' }}>
           <h2 style={{ color: 'var(--text-strong)', marginBottom: '0.5rem' }}>
             {isArchive ? t('dash.emptyArchiveTitle') : isFiltered ? t('dash.emptyFilteredTitle', { game: gameName }) : t('dash.emptyTitle')}
@@ -199,6 +205,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
   return (
     <div className="dashboard-page">
       {renderFilters()}
+      {statsStatus}
       {isArchive && <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.5 }}>{t('dash.archiveValueNote')}</p>}
 
       <div className="dashboard-summary">
@@ -245,7 +252,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
         </div>
         <div className="dashboard-history-context">
           <span>{t(isArchive ? 'dash.archiveTimelineRange' : 'dash.timelineRange', { range: timePeriod.toUpperCase() })}</span>
-          {!change?.available ? <span>{t('dash.noPriceHistory')}</span> : (
+          {!change?.available ? (!historyError && !loadingHistory && <span>{t('dash.noPriceHistory')}</span>) : (
             <span className={change.abs >= 0 ? 'positive' : 'negative'}>
               <TrendingUp aria-hidden="true" size={14} style={{ transform: change.abs >= 0 ? 'none' : 'rotate(180deg)' }} />
               {change.abs >= 0 ? '+' : ''}{currencySymbol()}{money(change.abs)} ({change.abs >= 0 ? '+' : ''}{change.pct}%)
@@ -253,11 +260,20 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
           )}
         </div>
         {isArchive && <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>{t('dash.archiveTimelineNote')}</p>}
-        <div className="chart-container" style={{ height: '240px', position: 'relative' }}>
-          {loadingHistory ? (
-            <div role="status" aria-label={t('dash.loading')} className="spinner" style={{ position: 'absolute', top: '45%', left: '45%' }}></div>
-          ) : historyData.length < 2 ? (
-            <div className="chart-empty">{t('dash.notEnoughHistory')}</div>
+        {historyError ? (
+          <div className="read-state read-state-error">
+            <p role="alert">{t('dash.errHistory')}{historyData && <> {t('common.staleData')}</>}</p>
+            <button type="button" className="btn btn-secondary" onClick={() => setHistoryRefresh(value => value + 1)}>{t('dash.retry')}</button>
+          </div>
+        ) : loadingHistory && (
+          <div className="read-state" role="status">
+            <div className="spinner" aria-hidden="true"></div>
+            <p>{t(historyData ? 'common.refreshing' : 'common.loading')}</p>
+          </div>
+        )}
+        <div className="chart-container" style={{ height: '240px', position: 'relative' }} aria-busy={loadingHistory}>
+          {!historyData ? null : historyData.length < 2 ? (
+            !historyError && <div className="chart-empty">{t('dash.notEnoughHistory')}</div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={historyData} role="img" aria-labelledby="dashboard-timeline-title" margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
@@ -280,7 +296,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
             </ResponsiveContainer>
           )}
         </div>
-        {!loadingHistory && historyData.length > 0 && <ChartDataTable titleId="dashboard-timeline-title" title={timelineTitle} category={t('dash.date')} categoryKey="date" formatCategory={formatDate} rows={historyData} series={[{ key: 'value', label: t(isArchive ? 'dash.archivedValue' : 'dash.portfolioValue') }]} format={formatMoney} />}
+        {historyData?.length > 0 && <ChartDataTable titleId="dashboard-timeline-title" title={timelineTitle} category={t('dash.date')} categoryKey="date" formatCategory={formatDate} rows={historyData} series={[{ key: 'value', label: t(isArchive ? 'dash.archivedValue' : 'dash.portfolioValue') }]} format={formatMoney} />}
       </section>
 
       <section className="dashboard-analytics view-section" aria-labelledby="dashboard-analytics-title">
@@ -416,43 +432,32 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
-            {/* Type Distribution Donut Chart */}
+            {/* Color distribution columns */}
             <div className="dashboard-subsection view-section">
               <h3 id="dashboard-type-title" className="section-heading">{typeTitle}</h3>
-              <div className="chart-container dashboard-donut" style={{ height: '220px' }}>
+              <div className="chart-container dashboard-distribution-chart" role="region" aria-labelledby="dashboard-type-title" tabIndex={0}>
                 {typeChartData.length === 0 ? (
                   <div className="chart-empty">{t('dash.noTypeData')}</div>
                 ) : (
+                <div style={{ height: '100%', minWidth: Math.max(360, typeChartData.length * 85) }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart role="img" aria-labelledby="dashboard-type-title">
-                    <Pie
-                      data={typeChartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
+                  <BarChart data={typeChartData} role="img" aria-labelledby="dashboard-type-title" margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
+                    <XAxis dataKey="name" stroke="var(--text-secondary)" tickLine={false} interval={0} style={{ fontSize: '0.8rem' }} />
+                    <YAxis allowDecimals={false} domain={[0, 'auto']} stroke="var(--text-secondary)" width={45} />
+                    <Bar dataKey="value" maxBarSize={48} radius={[4, 4, 0, 0]}>
                       {typeChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+                        <Cell key={`cell-${index}`} fill={entry.color} aria-label={`${entry.name}: ${entry.value}`} />
                       ))}
-                    </Pie>
+                    </Bar>
                     <Tooltip 
                       contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }}
                       itemStyle={{ color: 'var(--text-strong)' }}
                       labelStyle={{ color: 'var(--text-strong)' }}
                       formatter={(v) => [v, t('dash.cards')]}
                     />
-                    <Legend 
-                      verticalAlign="bottom" 
-                      height={36} 
-                      iconSize={10} 
-                      style={{ fontSize: '0.75rem' }} 
-                      formatter={(value) => <span style={{ color: 'var(--text-secondary)' }}>{value}</span>}
-                    />
-                  </PieChart>
+                  </BarChart>
                 </ResponsiveContainer>
+                </div>
                 )}
               </div>
               {typeChartData.length > 0 && <ChartDataTable titleId="dashboard-type-title" title={typeTitle} category={t(gameFilter === 'mtg' ? 'collection.fColor' : 'sort.by.type')} rows={typeChartData} series={[{ key: 'value', label: t('dash.cards') }]} />}
@@ -461,40 +466,29 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
             {/* Rarity Distribution Chart */}
             <div className="dashboard-subsection view-section">
               <h3 id="dashboard-rarity-title" className="section-heading">{rarityTitle}</h3>
-              <div className="chart-container dashboard-donut" style={{ height: '220px' }}>
+              <div className="chart-container dashboard-distribution-chart" role="region" aria-labelledby="dashboard-rarity-title" tabIndex={0}>
                 {rarityChartData.length === 0 ? (
                   <div className="chart-empty">{t('dash.noRarityData')}</div>
                 ) : (
+                <div style={{ height: '100%', minWidth: Math.max(360, rarityChartData.length * 100) }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart role="img" aria-labelledby="dashboard-rarity-title">
-                    <Pie
-                      data={rarityChartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={45}
-                      outerRadius={78}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
+                  <BarChart data={rarityChartData} role="img" aria-labelledby="dashboard-rarity-title" margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
+                    <XAxis dataKey="name" stroke="var(--text-secondary)" tickLine={false} interval={0} style={{ fontSize: '0.8rem' }} />
+                    <YAxis allowDecimals={false} domain={[0, 'auto']} stroke="var(--text-secondary)" width={45} />
+                    <Bar dataKey="value" maxBarSize={48} radius={[4, 4, 0, 0]}>
                       {rarityChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                        <Cell key={`cell-${index}`} fill={entry.fill} aria-label={`${entry.name}: ${entry.value}`} />
                       ))}
-                    </Pie>
+                    </Bar>
                     <Tooltip 
                       contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }}
                       itemStyle={{ color: 'var(--text-strong)' }}
                       labelStyle={{ color: 'var(--text-strong)' }}
                       formatter={(v) => [v, t('dash.cards')]}
                     />
-                    <Legend 
-                      verticalAlign="bottom" 
-                      height={36} 
-                      iconSize={10} 
-                      style={{ fontSize: '0.75rem' }} 
-                      formatter={(value) => <span style={{ color: 'var(--text-secondary)', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>}
-                    />
-                  </PieChart>
+                  </BarChart>
                 </ResponsiveContainer>
+                </div>
                 )}
               </div>
               {rarityChartData.length > 0 && <ChartDataTable titleId="dashboard-rarity-title" title={rarityTitle} category={t('sort.by.rarity')} rows={rarityChartData} series={[{ key: 'value', label: t('dash.cards') }]} />}

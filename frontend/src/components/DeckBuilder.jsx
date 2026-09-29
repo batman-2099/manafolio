@@ -89,7 +89,7 @@ function ManaCounts({ deck }) {
   );
 }
 
-function DeckBuilder({ showToast, navigationGuardRef }) {
+function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const { t } = useT();
   const [decks, setDecks] = useState([]);
   const [activeDeck, setActiveDeck] = useState(null);
@@ -1065,6 +1065,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
           sourceDeck={aiSourceDeck}
           onPreview={setPreviewCard}
           onClose={closeAiBuilder}
+          onOpenAiSettings={onOpenAiSettings}
           onSaved={async id => {
             closeAiBuilder();
             showToast(t(id === aiSourceDeck?.id ? 'aiDeck.saved' : 'deck.created'), 'success');
@@ -1075,10 +1076,10 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       )}
       {/* 1. SELECTION MENU VIEW OF ALL DECKS */}
       {viewMode === 'list' && !showAiBuilder && (
-        <div className="deck-overview" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="deck-gallery" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
           {/* Top Banner Header & Primary Action */}
-          <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', padding: '1.25rem 1.5rem', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+          <div className="deck-gallery-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.4rem', color: 'var(--text-strong)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
                 <Layers size={22} style={{ color: 'var(--accent-yellow)' }} />
@@ -1100,7 +1101,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
           </div>
 
           {/* Search, Filters, Sorting & View Toolbar */}
-          <div className="glass-panel deck-overview-toolbar" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem 1.25rem' }}>
+          <div className="deck-overview-toolbar" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
               
               {/* Search input */}
@@ -1651,7 +1652,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             </Modal>
           )}
 
-          <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', position: 'relative', overflow: 'hidden' }}>
+          <div className="glass-panel deck-editor-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', position: 'relative', overflow: 'hidden' }}>
             
             {/* Checked out banner */}
             {activeDeck.checked_out ? (
@@ -1705,6 +1706,33 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {/* Checkout / Return button */}
+              {activeDeck.inventory_type === 'collection' && (activeDeck.checked_out ? (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => handleReturn(activeDeck)}
+                  disabled={editorBusy}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', border: '1px solid rgba(234,179,8,0.4)', color: '#eab308' }}
+                >
+                  <PackageCheck size={14} /> Return to Storage
+                </button>
+              ) : (
+                <button
+                  className={`btn ${hasUnsavedChanges ? 'btn-secondary' : 'btn-primary'}`}
+                  onClick={() => handleCheckout(activeDeck)}
+                  disabled={editorBusy}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <LogOut size={14} /> Check Out for Play
+                </button>
+              ))}
+              <button className="btn btn-primary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
+                <button className="btn btn-secondary" onClick={startSimulator} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <Play size={14} /> Draw Simulator
+                </button>
+            </div>
+          </div>
+            <div className="deck-tools">
               {activeDeck.game === 'mtg' && activeDeck.inventory_type !== 'graveyard' && (
                 <button
                   className="btn btn-secondary"
@@ -1766,40 +1794,34 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   {hasUnsavedChanges && <p id="deck-container-save-first" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>{t('deck.saveFirst')}</p>}
                 </div>
               )}
-              {/* Checkout / Return button */}
-              {activeDeck.inventory_type === 'collection' && (activeDeck.checked_out ? (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => handleReturn(activeDeck)}
-                  disabled={editorBusy}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', border: '1px solid rgba(234,179,8,0.4)', color: '#eab308' }}
-                >
-                  <PackageCheck size={14} /> Return to Storage
-                </button>
-              ) : (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => handleCheckout(activeDeck)}
-                  disabled={editorBusy}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                >
-                  <LogOut size={14} /> Check Out for Play
-                </button>
-              ))}
-              <button className="btn btn-secondary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
-                <button className="btn btn-primary" onClick={startSimulator} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Play size={14} /> Draw Simulator
-                </button>
             </div>
-          </div>
           {saveDeckError && !previewDeckCard && <p role="alert" className="deck-source-error">{saveDeckError} {t('deck.saveRetryHint')}</p>}
 
-          <section className="glass-panel" aria-labelledby="deck-description-heading">
-            <h3 id="deck-description-heading" style={{ marginBottom: '0.75rem' }}>{t('deck.description')}</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-              {activeDeck.description || '—'}
-            </p>
-          </section>
+
+
+          {/* Checked out info banner */}
+          {!!activeDeck.checked_out && (
+            <div style={{
+              background: 'rgba(234,179,8,0.06)',
+              border: '1px solid rgba(234,179,8,0.25)',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.85rem 1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              fontSize: '0.85rem',
+              color: '#eab308'
+            }}>
+              <span style={{ fontSize: '1.25rem' }}>🎮</span>
+              <div>
+                <strong>{t('deck.checkedOutBanner')}</strong>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  {t('deck.checkedOutHint')}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className={`deck-summary-layout${commanderCard || activeDeck.game === 'mtg' ? ' deck-summary-layout--commander' : ''}`}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
             <div className="deck-overview">
@@ -1946,6 +1968,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 </section>
               </div>
             </div>
+          <section className="glass-panel" aria-labelledby="deck-description-heading">
+            <h3 id="deck-description-heading" style={{ marginBottom: '0.75rem' }}>{t('deck.description')}</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              {activeDeck.description || '—'}
+            </p>
+          </section>
           <section className="glass-panel" aria-labelledby="deck-notes-heading">
             <h3 id="deck-notes-heading" style={{ marginBottom: '0.75rem' }}>
               <label htmlFor="deck-notes">{t('nav.notes')}</label>
@@ -2001,31 +2029,6 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 />}
               </div>
           </div>
-
-
-          {/* Checked out info banner */}
-          {!!activeDeck.checked_out && (
-            <div style={{
-              background: 'rgba(234,179,8,0.06)',
-              border: '1px solid rgba(234,179,8,0.25)',
-              borderRadius: 'var(--radius-md)',
-              padding: '0.85rem 1.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              fontSize: '0.85rem',
-              color: '#eab308'
-            }}>
-              <span style={{ fontSize: '1.25rem' }}>🎮</span>
-              <div>
-                <strong>{t('deck.checkedOutBanner')}</strong>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  {t('deck.checkedOutHint')}
-                </div>
-              </div>
-            </div>
-          )}
-
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1.5rem', alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
               
@@ -2177,7 +2180,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                               {list.map(card => (
                                 <div key={card.id} className="deck-card-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', background: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? 'rgba(127,29,29,0.16)' : 'rgba(255,255,255,0.01)', borderRadius: 'var(--radius-sm)', border: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? '1px solid var(--accent-red)' : '1px solid var(--border-glass)', gap: '0.6rem' }}>
                                   <button type="button" aria-label={`${t('deck.previewArt')}: ${displayName(card)}`} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', minWidth: 0, flex: '1 1 14rem', padding: 0, border: 0, background: 'transparent', textAlign: 'left' }} onClick={() => setPreviewCard(card)}>
-                                    <CardImage card={card} src={card.image_url?.replace(/^(https:\/\/cards\.scryfall\.io)\/normal\//, '$1/small/')} loading="lazy" style={{ width: 32 * deckListImageScale, height: 44 * deckListImageScale, objectFit: 'cover', borderRadius: '2px', flexShrink: 0 }} />
+                                    <CardImage card={card} src={card.image_url?.replace(/^(https:\/\/cards\.scryfall\.io)\/normal\//, '$1/small/')} loading="lazy" style={{ width: 56 * deckListImageScale, height: 78 * deckListImageScale, objectFit: 'cover', borderRadius: '2px', flexShrink: 0 }} />
                                     <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
                                       {activeDeck.commander_card_id === card.id && <div className="deck-commander-tag" style={{ backgroundColor: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '2px 6px', fontSize: '0.7rem', fontWeight: 800 }}>{t('deck.commander')}</div>}
                                       <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(card)}</div>

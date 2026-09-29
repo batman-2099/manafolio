@@ -125,7 +125,7 @@ function Login({ onLoginSuccess }) {
   };
 
   return (
-    <div style={{
+    <main style={{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -353,7 +353,7 @@ function Login({ onLoginSuccess }) {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
 
