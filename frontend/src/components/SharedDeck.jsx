@@ -54,7 +54,7 @@ export default function SharedDeck({ shareToken }) {
 
   const printing = card => [card.set_name || card.set_id, card.number != null && card.number !== '' ? `#${card.number}` : null].filter(Boolean).join(' · ');
   const commander = data?.cards.find(card => card.id === data.deck.commander_card_id);
-  const colors = MANA_SYMBOLS.filter(([symbol, name]) => data?.cards.some(card => card.color_identity?.some(color => color === symbol || color === name)));
+  const colors = MANA_SYMBOLS.filter(([symbol, name]) => commander?.color_identity?.some(color => color === symbol || color === name));
 
   return (
     <main className="app-container shared-deck">
@@ -77,13 +77,12 @@ export default function SharedDeck({ shareToken }) {
       ) : data && (
         <>
           <section className="glass-panel shared-deck-overview" aria-labelledby="shared-deck-title">
-            {commander && <CardImage className="shared-deck-commander-image" card={commander} alt={`${t('deck.commander')}: ${displayName(commander)}`} />}
             <h1 id="shared-deck-title">{data.deck.name}</h1>
             <p>{t('sharedDeck.readOnly')}</p>
             <dl className="shared-deck-metadata">
               {data.deck.format && <div><dt>{t('deck.format')}</dt><dd>{data.deck.format}</dd></div>}
               {data.deck.category && <div><dt>{t('deck.category')}</dt><dd>{data.deck.category}</dd></div>}
-              {data.cards.length > 0 && <div>
+              {commander && <div>
                 <dt>{t('filter.field.color_identity')}</dt>
                 <dd className="shared-deck-colors">
                   {colors.length ? colors.map(([symbol, name, x]) => (
@@ -105,13 +104,19 @@ export default function SharedDeck({ shareToken }) {
               <div><dt>{t('deck.losses')}</dt><dd>{Number(data.deck.losses ?? 0).toLocaleString(locale)}</dd></div>
             </dl>
             {data.deck.description && <div className="shared-deck-description"><h2>{t('deck.description')}</h2><p>{data.deck.description}</p></div>}
-            <div style={{ gridColumn: '1 / -1' }}>
+            <div>
               <button className="btn btn-secondary" disabled={!data.cards.length} onClick={() => downloadBlob(
                 new Blob([buildDeckExport(data.cards)], { type: 'text/plain;charset=utf-8' }),
                 `${data.deck.name.replace(/[<>:"/\\|?*]/g, '_') || 'deck'}.txt`
               )}>{t('sharedDeck.exportTxt')}</button>
             </div>
           </section>
+          {commander && (
+            <section aria-labelledby="shared-deck-commander-title">
+              <h2 id="shared-deck-commander-title">{t('deck.commander')}</h2>
+              <CardImage className="shared-deck-commander-image" card={commander} alt={`${t('deck.commander')}: ${displayName(commander)}`} />
+            </section>
+          )}
           <section aria-labelledby="shared-deck-cards-title">
             <h2 id="shared-deck-cards-title">{t('sharedDeck.cards')}</h2>
             <p className="shared-deck-card-hint">{t('sharedDeck.previewHint')}</p>

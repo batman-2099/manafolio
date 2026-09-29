@@ -2,6 +2,10 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Moved shared-deck commander artwork into its own section immediately above Cards. Color Identity now uses only the commander's colors and is hidden when no commander is selected.
+
 ## 2.1.3
 
 - Added **Export** to public shared decks, downloading card quantities and names as a plain TXT decklist without requiring sign-in.

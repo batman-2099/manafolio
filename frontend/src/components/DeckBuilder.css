@@ -640,23 +640,15 @@
   gap: 1rem;
 }
 
-.shared-deck-overview:has(.shared-deck-commander-image) {
-  grid-template-columns: minmax(0, 1fr) clamp(80px, 20vw, 160px);
-}
-
 .shared-deck-commander-image {
-  grid-column: 2;
-  grid-row: 1 / span 3;
-  align-self: start;
-  width: 100%;
+  display: block;
+  width: min(100%, 240px);
+  margin-top: 1rem;
   aspect-ratio: 488 / 680;
   object-fit: contain;
   border-radius: 8px;
 }
 
-.shared-deck-overview .shared-deck-description {
-  grid-column: 1 / -1;
-}
 
 .shared-deck-colors,
 .shared-deck-colors > span {
