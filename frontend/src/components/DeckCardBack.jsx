@@ -3,14 +3,26 @@ import Modal from './Modal';
 import { useT } from '../utils/i18n';
 import { useBackGuard } from '../utils/useBackGuard';
 import dragonShieldSleeves from '../data/dragonShieldSleeves.json';
+import ultimateGuardSleeves from '../data/ultimateGuardSleeves.json';
+import ultraProSleeves from '../data/ultraProSleeves.json';
 
 // Magic artwork © Wizards of the Coast. Bundled from Scryfall's standard card back:
 // https://backs.scryfall.io/normal/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg
 const DEFAULT_BACK = `${import.meta.env.BASE_URL}mtg-card-back.webp`;
-const sleeveGroups = { plain: [], art: [] };
-for (const sleeve of dragonShieldSleeves) {
-  const group = /(?:Classic|Matte|Matte Dual) Sleeves$/.test(sleeve.name) ? 'plain' : 'art';
-  sleeveGroups[group].push(sleeve);
+const sleeves = [
+  ...dragonShieldSleeves,
+  ...ultimateGuardSleeves.map(sleeve => ({ ...sleeve, image: `${import.meta.env.BASE_URL}${sleeve.image}` })),
+  ...ultraProSleeves,
+];
+const sleeveGroups = [
+  { provider: 'Dragon Shield', plain: [], art: [] },
+  { provider: 'Ultimate Guard', plain: [], art: [] },
+  { provider: 'Ultra PRO', plain: [], art: [] },
+];
+for (const sleeve of sleeves) {
+  const provider = sleeve.id.startsWith('ultimate-guard-') ? 1 : sleeve.id.startsWith('ultra-pro-') ? 2 : 0;
+  const group = sleeve.group || (/(?:Classic|Matte|Matte Dual) Sleeves$/.test(sleeve.name) ? 'plain' : 'art');
+  sleeveGroups[provider][group].push(sleeve);
 }
 
 async function prepareImage(file, crop) {
@@ -21,11 +33,14 @@ async function prepareImage(file, crop) {
     const y = (crop?.y ?? 0) * bitmap.height;
     const width = (crop?.width ?? 1) * bitmap.width;
     const height = (crop?.height ?? 1) * bitmap.height;
-    const scale = Math.min(1, 488 / width, 680 / height);
+    const rotated = crop?.rotate === 90;
+    const scale = Math.min(1, 488 / (rotated ? height : width), 680 / (rotated ? width : height));
     const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(width * scale));
-    canvas.height = Math.max(1, Math.round(height * scale));
-    canvas.getContext('2d').drawImage(bitmap, x, y, width, height, 0, 0, canvas.width, canvas.height);
+    canvas.width = Math.max(1, Math.round((rotated ? height : width) * scale));
+    canvas.height = Math.max(1, Math.round((rotated ? width : height) * scale));
+    const context = canvas.getContext('2d');
+    if (rotated) context.setTransform(0, 1, -1, 0, canvas.width, 0);
+    context.drawImage(bitmap, x, y, width, height, 0, 0, rotated ? canvas.height : canvas.width, rotated ? canvas.width : canvas.height);
     const image = canvas.toDataURL('image/webp', 0.82);
     if (!image.startsWith('data:image/webp;base64,') || image.length >= 500_000) throw new Error('size');
     return image;
@@ -142,22 +157,23 @@ export default function DeckCardBack({ deck, disabled, onSaved, onBusy }) {
         <p>{t('deck.cardBackHint')}</p>
         <fieldset disabled={saving || processing}>
           <label htmlFor="deck-back-sleeve">{t('deck.cardBackSleeve')}</label>
-          <select id="deck-back-sleeve" className="select-control" value={selectedSleeve?.id || ''} aria-describedby="deck-back-sleeve-hint" onChange={event => {
-            const sleeve = dragonShieldSleeves.find(({ id }) => id === event.target.value);
+          <select id="deck-back-sleeve" className="select-control" value={selectedSleeve?.id || ''} onChange={event => {
+            const sleeve = sleeves.find(({ id }) => id === event.target.value);
             if (sleeve) {
               setImageUrl('');
-              importUrl(sleeve.image, sleeve);
+              importUrl(new URL(sleeve.image, window.location.href).href, sleeve);
             }
           }}>
             <option value="" disabled>{t('deck.cardBackSleeveChoose')}</option>
-            <optgroup label={t('deck.cardBackSleevePlain')}>
-              {sleeveGroups.plain.map(sleeve => <option key={sleeve.id} value={sleeve.id}>{sleeve.name}</option>)}
-            </optgroup>
-            <optgroup label={t('deck.cardBackSleeveArt')}>
-              {sleeveGroups.art.map(sleeve => <option key={sleeve.id} value={sleeve.id}>{sleeve.name}</option>)}
-            </optgroup>
+            {sleeveGroups.flatMap(({ provider, plain, art }) => [
+              plain.length > 0 && <optgroup key={`${provider}-plain`} label={`${provider} — ${t('deck.cardBackSleevePlain')}`}>
+                {plain.map(sleeve => <option key={sleeve.id} value={sleeve.id}>{sleeve.name}</option>)}
+              </optgroup>,
+              art.length > 0 && <optgroup key={`${provider}-art`} label={`${provider} — ${t('deck.cardBackSleeveArt')}`}>
+                {art.map(sleeve => <option key={sleeve.id} value={sleeve.id}>{sleeve.name}</option>)}
+              </optgroup>,
+            ])}
           </select>
-          <p id="deck-back-sleeve-hint">{t('deck.cardBackSleeveHint')}</p>
           {selectedSleeve && <a href={selectedSleeve.url} target="_blank" rel="noopener noreferrer">{t('deck.cardBackSleeveSource')}</a>}
           <label htmlFor="deck-back-color">{t('deck.cardBackColor')}</label>
           <input id="deck-back-color" type="color" value={draft.color || '#334155'} onChange={event => { setDraft({ color: event.target.value, image: null }); setSelectedSleeve(null); setError(null); }} />

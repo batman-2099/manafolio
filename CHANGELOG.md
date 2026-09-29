@@ -4,6 +4,8 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Added 256 Ultra PRO Magic sleeve designs to the card-back picker, including all ten Guilds of Ravnica variants. Official images are cropped on selection, with sideways sleeves rotated without clipping; existing Save/Cancel and failed-download recovery are preserved.
+- Added 67 Ultimate Guard sleeve-back previews alongside Dragon Shield in the existing card-back picker, grouped by supplier and plain/art designs. Cropped previews are bundled to avoid the shop's cross-origin download restrictions; saved backs and explicit Save/Cancel behavior are unchanged.
 - Fixed Invalid Date labels in dashboard valuation timelines: history responses now return ISO calendar dates for every range, with localized formatting left to the browser.
 - Dashboard Deck performance now shows only decks with at least one recorded win or loss; all-zero records are hidden without changing saved decks.
 - Removed Total Invested and Unrealized Gain from dashboard summaries, including archived cost comparisons; card totals and estimated value remain, and purchase records are unchanged.

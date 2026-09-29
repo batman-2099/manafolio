@@ -573,12 +573,12 @@ The commander is one existing deck-card entry, not an additional copy outside th
 ### Customize a deck's card back
 
 1. In the deck's top overview, select **Customize card back** beneath its back image.
-2. Choose a **Dragon Shield sleeve** to download and preview its back, or use a solid color, an uploaded image, or a direct image URL.
+2. Choose a **Card sleeve** from the Dragon Shield, Ultimate Guard, or Ultra PRO groups to preview its back, or use a solid color, an uploaded image, or a direct image URL.
 3. Review the preview, then select **Save** in the dialog. **Cancel** leaves the saved back unchanged.
 
-The Dragon Shield dropdown is a bundled selection from the [official sleeve collection](https://www.dragonshield.com/collections/card-sleeves), not a live shop inventory. Images with `solo_sleeve` or `sleeves` filenames are selected and cropped to the sleeve back; packaging, custom-design placeholders, and transparent sleeves showing sample cards are excluded. Products without a suitable matching image are not listed.
+The dropdown contains selected designs from the official [Dragon Shield](https://www.dragonshield.com/collections/card-sleeves), [Ultimate Guard](https://ultimateguard.com/en/Card-Sleeves/), and [Ultra PRO Magic Deck Protectors](https://ultrapro.com/collections/magic-the-gathering-deck-protectors) collections, not live shop inventories. Packaging, transparent sleeves showing sample cards, and incompatible sizes are excluded. Dragon Shield and Ultra PRO images are cropped when loaded; sideways Ultra PRO sleeves are rotated to fit the portrait card back without cutting off the artwork. The 67 Ultimate Guard previews (38 plain and 29 Magic art designs) are bundled, cropped and straightened from the complete frontmost sleeve in official product images; Katana, Cortex and Cortex Matte colors are included. Product links identify the original designs, and sleeve artwork remains the property of its respective rights holders.
 
-Selecting a sleeve contacts Dragon Shield's image CDN. If downloading fails, the previous preview stays intact; select the sleeve again to retry. Saving stores a resized image with the deck, so displaying the saved back does not require another Dragon Shield download. Card-back changes do not save other deck drafts.
+Selecting a Dragon Shield or Ultra PRO sleeve contacts its image CDN. Ultimate Guard previews load from your Manafolio server because the shop's image server does not permit cross-origin browser downloads; only following its official-shop link contacts Ultimate Guard. If loading fails, the previous preview stays intact; select the sleeve again to retry. Saving stores a resized image with the deck, so displaying the saved back does not require another provider download. Card-back changes do not save other deck drafts.
 
 ### Import while creating a deck
 
