@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const db = require('../db');
 const cardApi = require('../utils/cardApi');
 const { parseCardRow, recordPrice } = require('../utils/priceHelpers');
@@ -11,6 +12,58 @@ const mtgjsonApi = require('../mtgjsonApi');
 const { normalizeCardBack } = require('../utils/cardBack');
 
 const router = express.Router();
+
+// Share management stays account-scoped; the public capability only grants reading.
+router.route('/:id/share').all((req, res, next) => {
+  if (!/^[1-9]\d*$/.test(req.params.id) || !Number.isSafeInteger(Number(req.params.id))) {
+    return res.status(400).json({ error: 'Invalid deck ID' });
+  }
+  next();
+}).get(async (req, res) => {
+  try {
+    const deck = await db.get(`SELECT s.token FROM decks d LEFT JOIN deck_shares s ON s.deck_id = d.id
+      WHERE d.id = ? AND d.user_id = ? AND d.game = 'mtg'`, [req.params.id, req.user.id]);
+    if (!deck) return res.status(404).json({ error: 'Deck not found' });
+    res.json({ url: deck.token ? `/share/deck/${deck.token}` : null });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to retrieve deck share' });
+  }
+}).post(async (req, res) => {
+  try {
+    const share = await db.withTransaction(async () => {
+      const deck = await db.get(`SELECT id FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`,
+        [req.params.id, req.user.id]);
+      if (!deck) return null;
+      const existing = await db.get('SELECT token FROM deck_shares WHERE deck_id = ?', [deck.id]);
+      if (existing) return existing;
+      const token = crypto.randomBytes(32).toString('hex');
+      await db.run('INSERT INTO deck_shares (deck_id, token) VALUES (?, ?)', [deck.id, token]);
+      return { token };
+    });
+    if (!share) return res.status(404).json({ error: 'Deck not found' });
+    res.json({ url: `/share/deck/${share.token}` });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to share deck' });
+  }
+}).delete(async (req, res) => {
+  try {
+    const found = await db.withTransaction(async () => {
+      const deck = await db.get(`SELECT id FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`,
+        [req.params.id, req.user.id]);
+      if (!deck) return false;
+      await db.run('DELETE FROM deck_shares WHERE deck_id = ?', [deck.id]);
+      return true;
+    });
+    if (!found) return res.status(404).json({ error: 'Deck not found' });
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to revoke deck share' });
+  }
+});
+
 
 // Get User Decks
 router.get('/', async (req, res) => {

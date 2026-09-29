@@ -5,6 +5,35 @@ const { compartmentLabel } = require('../utils/compartmentSort');
 
 const router = express.Router();
 
+router.get('/decks/:token', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  if (!/^[a-f0-9]{64}$/.test(req.params.token)) {
+    return res.status(404).json({ error: 'Shared deck not found' });
+  }
+  try {
+    const result = await db.withTransaction(async () => {
+      const row = await db.get(`SELECT d.id, u.username AS owner, d.name, d.description,
+        d.game, d.format, d.category, d.wins, d.losses, d.commander_card_id
+        FROM deck_shares s JOIN decks d ON d.id = s.deck_id JOIN users u ON u.id = d.user_id
+        WHERE s.token = ? AND d.game = 'mtg'`, [req.params.token]);
+      if (!row) return null;
+      const { id, owner, ...deck } = row;
+      const cards = await db.all(`SELECT cc.id, cc.name, cc.printed_name, cc.set_id, cc.set_name,
+        cc.number, cc.image_url, cc.game, cc.supertype, cc.types, cc.subtypes, cc.rarity,
+        cc.cmc, cc.color_identity, dc.quantity
+        FROM deck_cards dc JOIN card_cache cc ON cc.id = dc.card_id
+        WHERE dc.deck_id = ? AND cc.game = 'mtg'
+        ORDER BY cc.name, cc.id`, [id]);
+      return { owner, deck, cards: cards.map(parseCardRow) };
+    });
+    if (!result) return res.status(404).json({ error: 'Shared deck not found' });
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to retrieve shared deck' });
+  }
+});
+
 // One container, laid out the way its owner sees it: its pages or rows, and the
 // slot each card sits in — so a shared binder reads as a binder and a shared box
 // as a box, instead of collapsing to a flat card list.

@@ -808,11 +808,24 @@ Open **Settings** and use its section links to jump to the relevant panel.
 4. Leave **Show Card Locations** off unless you want to disclose where cards are kept. Turning it on also enables **Container Share Links** for eligible Physical containers.
 5. To stop access, disable **Share My Library**. To invalidate links already distributed while continuing to share, select **Regenerate Link** and confirm.
 
-**Expected result:** unauthenticated, read-only views available to anyone who possesses the current token while sharing is enabled. Standard sharing shows Physical cards; trade sharing shows Physical cards marked for trade; Wishlist has its own view. Arena and Graveyard are not public share inventories.
+**Expected result:** unauthenticated, read-only views available to anyone who possesses the current token while sharing is enabled. Standard sharing shows Physical cards; trade sharing shows Physical cards marked for trade; Wishlist has its own view. Arena and Graveyard are not exposed by collection sharing.
 
 **Privacy warning:** these are bearer links, not invited-user permissions. All three list links use the same share token; a trade or Wishlist link is a view selector, not a restriction preventing its holder from opening the standard Physical share. Do not use it as a way to expose only a hand-picked subset of an otherwise private account.
 
 Public data includes the account username, card names/printings, quantities, condition, finish, language, and displayed values, including per-copy valuations. Purchase prices and private notes are not exposed. Enabling locations reveals container information; container links expose the corresponding Physical layout and cards. Anyone who can open a link can retain what they see, so later disabling sharing cannot retract screenshots or saved copies. **Regenerate Link** invalidates existing standard/trade/Wishlist/container links using that token. Shared links include your active theme when copied; theme parameters change appearance, not permissions.
+
+### Share one deck
+
+1. Open a saved deck in **Deck Builder** and select **Share deck** in its top actions.
+2. Save any draft changes first, then create and copy the link.
+3. Send the URL to someone who should see the deck. They do not need an account.
+4. To stop access, open **Share deck** again and revoke its link. A subsequently created link is new; the old URL stays invalid.
+
+**Expected result:** a read-only view of this deck alone: your username, saved deck name and description, format/category, wins and losses, commander, card printings, artwork, and quantities. Saved changes appear at the same URL. The description is public; private **Notes**, custom deck backs, storage locations, owned-copy availability, reservations, and prices are not shown. Sharing does not add cards to anyone's collection or grant editing access.
+
+Each deck has its own bearer link. Physical, Arena, and Graveyard deck definitions can be shared independently of **Share My Library** and **Show Card Locations**; changing those collection controls does not revoke deck links. Anyone with a deck link can forward it or retain a copy. Revocation and deck deletion stop new access, not copies already made.
+
+Duplicated decks and decks restored from an account JSON backup start without share links. Full database backups retain links and can restore their prior state. The demonstration site cannot create public deck links.
 
 ### Change your local password
 

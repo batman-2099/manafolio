@@ -2,8 +2,15 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.1.3
 
+- Added **Export** to public shared decks, downloading card quantities and names as a plain TXT decklist without requiring sign-in.
+- Shared deck info now displays saved Wins and Losses instead of Target Size; records remain read-only for visitors.
+- Removed the redundant Game System field from shared deck info.
+- Shared deck info now shows its combined card color identity with mana symbols, accessible localized labels, and hover names, including Colorless for nonempty colorless decks.
+- Shared decks show the commander's card image at the top-right of the deck info panel, with responsive sizing and no placeholder for decks without a commander.
+- Deck share links now use the current site's origin, preserving its protocol, hostname, and port rather than inheriting the backend address or Public Base URL.
+- Added **Share deck** with independent, revocable read-only URLs for saved Physical, Arena, and Graveyard decks. Public pages show only that deck's saved metadata, description, commander, printings, and quantities; private Notes, storage, ownership availability, and prices stay private. Collection sharing remains independent, and duplication/account JSON backups do not copy deck-link credentials.
 - Enlarged Collection and Deck Builder list thumbnails to 56 × 78px at default scale, preserving Deck Builder zoom controls.
 - Storage's card grid now defaults to Storage order instead of Name (A–Z); other sorting options remain available.
 - Matched Storage's scalable card grid to Deck Builder: 110px base column width, 275px at maximum zoom, matching spacing, and narrow-container width protection.

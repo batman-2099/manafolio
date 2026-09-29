@@ -531,3 +531,235 @@
     min-height: 44px;
   }
 }
+
+.deck-share-panel {
+  display: grid;
+  gap: 1rem;
+  width: 560px;
+  max-width: 100%;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.5rem;
+}
+
+.deck-share-panel p,
+.shared-deck p {
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.deck-share-heading,
+.deck-share-actions,
+.shared-deck-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.deck-share-heading h2 {
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.deck-share-heading .btn {
+  flex-shrink: 0;
+}
+
+.deck-share-panel .form-group {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  min-width: 0;
+}
+
+.deck-share-panel input {
+  min-width: 0;
+  width: 100%;
+  font-size: 1rem;
+}
+
+.deck-share-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.deck-share-revoke {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-glass);
+}
+
+.deck-share-panel .btn,
+.shared-deck .btn {
+  min-height: 44px;
+}
+
+.deck-share-panel :is(button, input, a):focus-visible,
+.shared-deck :is(button, a):focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 3px;
+}
+
+.shared-deck {
+  display: grid;
+  align-content: start;
+  gap: 1.5rem;
+  min-width: 0;
+  padding-bottom: 3rem;
+  overflow-wrap: anywhere;
+}
+
+.shared-deck-header {
+  flex-wrap: wrap;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.shared-deck a {
+  color: var(--text-primary);
+}
+
+.shared-deck-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.shared-deck-overview,
+.shared-deck-state {
+  display: grid;
+  gap: 1rem;
+}
+
+.shared-deck-overview:has(.shared-deck-commander-image) {
+  grid-template-columns: minmax(0, 1fr) clamp(80px, 20vw, 160px);
+}
+
+.shared-deck-commander-image {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: start;
+  width: 100%;
+  aspect-ratio: 488 / 680;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.shared-deck-overview .shared-deck-description {
+  grid-column: 1 / -1;
+}
+
+.shared-deck-colors,
+.shared-deck-colors > span {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.shared-deck-colors svg {
+  flex-shrink: 0;
+}
+
+.shared-deck-state {
+  justify-items: start;
+}
+
+.shared-deck h1 {
+  color: var(--text-strong);
+  font-size: 1.75rem;
+}
+
+.shared-deck h2 {
+  color: var(--text-strong);
+  font-size: 1.25rem;
+}
+
+.shared-deck-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  margin: 0;
+}
+
+.shared-deck-metadata dt {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.shared-deck-metadata dd {
+  margin: 0.25rem 0 0;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.shared-deck-description p {
+  white-space: pre-wrap;
+  margin-top: 0.5rem;
+}
+
+.shared-deck-card-hint {
+  padding-block: 0.5rem 1rem;
+}
+
+.shared-deck-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
+  gap: 1.25rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.shared-deck-card {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  text-align: start;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.shared-deck-card:hover .shared-deck-card-name {
+  text-decoration: underline;
+}
+
+.shared-deck-card-name,
+.shared-deck-commander {
+  color: var(--text-strong);
+}
+
+.shared-deck-card img,
+.shared-deck-preview > img {
+  width: 100%;
+  aspect-ratio: 488 / 680;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+
+.shared-deck-preview {
+  display: grid;
+  gap: 0.75rem;
+  width: 440px;
+  max-width: 100%;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1rem;
+}

@@ -17,6 +17,7 @@ const AdminPanel = lazy(() => import('./components/AdminPanel'));
 const SetupWizard = lazy(() => import('./components/SetupWizard'));
 const SharedCollection = lazy(() => import('./components/SharedCollection'));
 const SharedContainer = lazy(() => import('./components/SharedContainer'));
+const SharedDeck = lazy(() => import('./components/SharedDeck'));
 const DeckBuilder = lazy(() => import('./components/DeckBuilder'));
 const HowTo = lazy(() => import('./components/HowTo'));
 
@@ -147,6 +148,9 @@ function App() {
   };
 
   // Detect public share route on load
+  const [deckShareToken] = useState(() =>
+    window.location.pathname.match(/^\/share\/deck\/([a-zA-Z0-9_-]+)$/)?.[1] || null
+  );
   const [shareToken] = useState(() => {
     const path = window.location.pathname;
     const match = path.match(/^\/share\/([a-zA-Z0-9_-]+)$/);
@@ -159,19 +163,19 @@ function App() {
 
   // The browser value is only a first-paint cache; the account owns the theme.
   useLayoutEffect(() => {
-    const selected = shareToken
+    const selected = shareToken || deckShareToken
       ? new URLSearchParams(window.location.search).get('theme')
       : token && user?.theme;
     const theme = themes.includes(selected) ? selected : 'dark';
     document.documentElement.setAttribute('data-theme', theme);
-    if (!shareToken) {
+    if (!shareToken && !deckShareToken) {
       try { localStorage.setItem('theme', theme); } catch { /* storage may be blocked */ }
     }
-  }, [token, user?.theme, shareToken]);
+  }, [token, user?.theme, shareToken, deckShareToken]);
 
   // Reload the account on session restoration, including changes made on another device.
   useEffect(() => {
-    if (!token || shareToken) return;
+    if (!token || shareToken || deckShareToken) return;
     let cancelled = false;
     const revision = sessionRevision.current;
     fetch('/api/auth/me')
@@ -183,7 +187,7 @@ function App() {
       })
       .catch(err => { if (!cancelled) console.error('Session refresh failed:', err); });
     return () => { cancelled = true; };
-  }, [token, shareToken]);
+  }, [token, shareToken, deckShareToken]);
 
   const showToast = useCallback((message, kind = 'status') => {
     setToast({ id: ++toastIdRef.current, message, kind });
@@ -366,6 +370,10 @@ function App() {
   const triggerRefresh = () => {
     setStatsTrigger(prev => prev + 1);
   };
+
+  if (deckShareToken) {
+    return <Suspense fallback={<ChunkFallback />}><SharedDeck shareToken={deckShareToken} /></Suspense>;
+  }
 
   // Render shared collection view if URL matches /share/:token. ?container=<id>
   // narrows it to one binder or box, drawn as that container rather than a list.

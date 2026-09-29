@@ -87,6 +87,10 @@ Collection sharing and location sharing are off by default. Enabling collection 
 
 Location sharing is a separate opt-in. It exposes container names and allows public container layouts, including compartments and card positions. Treat share links as access credentials; recipients can forward them. Disable sharing or regenerate the share token to invalidate access through the old link. Neither action recalls screenshots, downloads, or copies others have already made.
 
+Deck sharing is a separate, per-deck opt-in and does not enable collection or location sharing. A deck link discloses your username and that deck's saved name, description, format, category, wins, losses, commander, card printings, artwork, and quantities. Physical, Arena, and Graveyard deck definitions can be shared, including cards you do not own. Private Notes, custom deck backs, storage locations, owned-copy availability, reservations, prices, and purchase details are excluded. Anyone with the link can read and forward it; later saved deck changes appear at the same link. Revoke the individual link or delete the deck to stop access, without recalling copies already retained by recipients.
+
+Deck links are not copied by deck duplication or account JSON export/restore; restored decks need new links. Full database backups contain these access credentials, so restoring an older database can restore its links.
+
 Read-only API keys also grant access to account data; give them only to trusted clients and revoke them when no longer needed. Exported CSV, decklists, account JSON, and database backups are files under your control. Sending one to another person or posting it in a support issue is a separate disclosure.
 
 ## Retention, deletion, and operator responsibilities

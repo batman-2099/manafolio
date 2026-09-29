@@ -1,5 +1,5 @@
-import { useState, useEffect, useLayoutEffect } from 'react';
-import { Plus, Minus, Trash2, Copy, X, ChevronLeft, Play, BarChart2, Search, LogOut, PackageCheck, LayoutGrid, List, Download, Upload, Eye, Filter, CheckCircle, AlertTriangle, Layers, Zap, Swords, Gamepad2, SlidersHorizontal, ArrowRight, FolderPlus, FileText, MapPin } from 'lucide-react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { Plus, Minus, Trash2, Copy, X, ChevronLeft, Play, BarChart2, Search, LogOut, PackageCheck, LayoutGrid, List, Download, Upload, Eye, Filter, CheckCircle, AlertTriangle, Layers, Zap, Swords, Gamepad2, SlidersHorizontal, ArrowRight, FolderPlus, FileText, MapPin, Share2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { shuffleArray } from '../utils/shuffle';
 import { displayName } from '../utils/languages';
@@ -168,6 +168,16 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState('mtga');
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareUrl, setShareUrl] = useState(null);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareError, setShareError] = useState(null);
+  const [shareStatus, setShareStatus] = useState('');
+  const [shareRetry, setShareRetry] = useState(0);
+  const shareInputRef = useRef(null);
+  const shareCreateRef = useRef(null);
+  const shareTriggerRef = useRef(null);
   const [importText, setImportText] = useState('');
   const [importComparison, setImportComparison] = useState(null);
   const [comparingImport, setComparingImport] = useState(false);
@@ -205,6 +215,66 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     : null;
   const selectedSourceUnavailable = sourcesReady && selectedSourceId !== null
     && (!selectedSource || selectedSource.available < previewDeckCard.quantity);
+
+  useEffect(() => {
+    if (!showShareModal || !activeDeck?.id) return;
+    const controller = new AbortController();
+    setShareUrl(null);
+    setShareStatus('');
+    setShareError(null);
+    setShareLoading(true);
+    const loadShare = async () => {
+      try {
+        if (import.meta.env.VITE_DEMO) throw new Error(t('deck.shareDemoUnavailable'));
+        const response = await fetch(`/api/decks/${activeDeck.id}/share`, { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok || !(data.url === null || typeof data.url === 'string')) throw new Error(t('deck.shareLoadError'));
+        if (!controller.signal.aborted) setShareUrl(data.url ? new URL(data.url, window.location.origin).href : null);
+      } catch (error) {
+        if (!controller.signal.aborted) setShareError(error.message === t('deck.shareDemoUnavailable') ? error.message : t('deck.shareLoadError'));
+      } finally {
+        if (!controller.signal.aborted) setShareLoading(false);
+      }
+    };
+    loadShare();
+    return () => controller.abort();
+  }, [showShareModal, activeDeck?.id, shareRetry, t]);
+
+  useEffect(() => {
+    if (showShareModal && !shareLoading) (shareInputRef.current || shareCreateRef.current)?.focus();
+  }, [showShareModal, shareLoading, shareUrl]);
+
+  const copyShareLink = async () => {
+    setShareStatus('');
+    setShareError(null);
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareStatus(t('deck.shareCopied'));
+    } catch {
+      shareInputRef.current?.focus();
+      shareInputRef.current?.select();
+      setShareError(t('deck.shareCopyError'));
+    }
+  };
+
+  const updateShareLink = async (revoke = false) => {
+    if (shareBusy || shareLoading || (!revoke && hasUnsavedChanges)) return;
+    if (revoke && !window.confirm(t('deck.shareConfirmRevoke'))) return;
+    setShareBusy(true);
+    setShareError(null);
+    setShareStatus('');
+    try {
+      const response = await fetch(`/api/decks/${activeDeck.id}/share`, { method: revoke ? 'DELETE' : 'POST' });
+      const data = await response.json();
+      if (!response.ok || (revoke ? data.success !== true : typeof data.url !== 'string' || !data.url)) throw new Error();
+      setShareUrl(revoke ? null : new URL(data.url, window.location.origin).href);
+      setShareStatus(t(revoke ? 'deck.shareRevoked' : 'deck.shareCreated'));
+    } catch {
+      setShareError(t(revoke ? 'deck.shareRevokeError' : 'deck.shareCreateError'));
+    } finally {
+      setShareBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!sourceKey) {
@@ -306,6 +376,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   useBackGuard(!!deckDraft, () => refreshingInventory ? false : setDeckDraft(null));
   useBackGuard(showImportModal, () => setShowImportModal(false));
   useBackGuard(showExportModal, () => setShowExportModal(false));
+  useBackGuard(showShareModal, () => shareBusy ? false : setShowShareModal(false));
   useBackGuard(!!importSummary, () => setImportSummary(null));
   useBackGuard(showAiBuilder, closeAiBuilder);
   useBackGuard(!!previewCard, () => setPreviewCard(null));
@@ -1727,6 +1798,14 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 </button>
               ))}
               <button className="btn btn-primary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
+              {activeDeck.game === 'mtg' && (
+                <button className="btn btn-secondary" disabled={editorBusy || savingRecord} onClick={event => {
+                  shareTriggerRef.current = event.currentTarget;
+                  setShowShareModal(true);
+                }}>
+                  <Share2 size={14} aria-hidden="true" /> {t('deck.share')}
+                </button>
+              )}
                 <button className="btn btn-secondary" onClick={startSimulator} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <Play size={14} /> Draw Simulator
                 </button>
@@ -2650,6 +2729,47 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 100% { background-position: 200% center; }
               }
             `}</style>
+          </div>
+        </Modal>
+      )}
+
+      {showShareModal && activeDeck && (
+        <Modal onClose={() => { if (!shareBusy) setShowShareModal(false); }} returnFocus={shareTriggerRef.current} aria-labelledby="deck-share-title" aria-describedby="deck-share-hint">
+          <div className="glass-panel deck-share-panel">
+            <div className="deck-share-heading">
+              <h2 id="deck-share-title">{t('deck.share')}</h2>
+              <button className="btn btn-secondary btn-icon-only" disabled={shareBusy} aria-label={t('common.close')} onClick={() => setShowShareModal(false)}><X size={18} aria-hidden="true" /></button>
+            </div>
+            <p id="deck-share-hint">{t('deck.shareHint')}</p>
+            <p>{t('deck.sharePrivacy')}</p>
+            {hasUnsavedChanges && <p id="deck-share-save-first" role="status">{t('deck.shareSaveFirst')}</p>}
+            {shareLoading ? <p role="status">{t('common.loading')}</p> : (
+              <>
+                {shareUrl && (
+                  <div className="form-group">
+                    <label htmlFor="deck-share-url">{t('deck.shareLink')}</label>
+                    <input ref={shareInputRef} id="deck-share-url" className="input-control" value={shareUrl} readOnly onFocus={event => event.target.select()} />
+                    <div className="deck-share-actions">
+                      <button className="btn btn-primary" disabled={shareBusy} onClick={copyShareLink}><Copy size={16} aria-hidden="true" /> {t('deck.shareCopy')}</button>
+                      <a className="btn btn-secondary" href={shareUrl} target="_blank" rel="noopener noreferrer">{t('deck.shareOpen')}</a>
+                    </div>
+                  </div>
+                )}
+                {!shareUrl && !shareError && (
+                  <button ref={shareCreateRef} className="btn btn-primary" disabled={shareBusy || hasUnsavedChanges} aria-describedby={hasUnsavedChanges ? 'deck-share-save-first' : undefined} onClick={() => updateShareLink()}>
+                    {t(shareBusy ? 'deck.shareCreating' : 'deck.shareCreate')}
+                  </button>
+                )}
+                {shareUrl && (
+                  <div className="deck-share-revoke">
+                    <p>{t('deck.shareRevokeHint')}</p>
+                    <button className="btn btn-danger" disabled={shareBusy} onClick={() => updateShareLink(true)}>{t(shareBusy ? 'deck.shareRevoking' : 'deck.shareRevoke')}</button>
+                  </div>
+                )}
+              </>
+            )}
+            {shareError && <div role="alert"><p>{shareError}</p>{!shareUrl && !import.meta.env.VITE_DEMO && <button className="btn btn-secondary" disabled={shareBusy || shareLoading} onClick={() => setShareRetry(value => value + 1)}>{t('deck.shareRetry')}</button>}</div>}
+            <p role="status" aria-live="polite">{shareStatus}</p>
           </div>
         </Modal>
       )}

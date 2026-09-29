@@ -40,6 +40,10 @@ window.fetch = (input, opts = {}) => {
   const method = (opts.method || 'GET').toUpperCase();
   const path = (url.replace(/^https?:\/\/[^/]+/, '').split('?')[0].replace(/\/+$/, '')) || '/';
 
+  if (/^\/api\/decks\/\d+\/share$/.test(path) || path.startsWith('/api/shared/decks/')) {
+    return Promise.resolve(json({ error: 'Public deck sharing is unavailable in the demo.' }, 503));
+  }
+
   if (path.startsWith('/api/ai-decks/')) {
     const params = new URL(url, window.location.origin).searchParams;
     const body = opts.body ? JSON.parse(opts.body) : {};

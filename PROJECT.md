@@ -133,7 +133,7 @@ File names in this table are under `backend/src/routes/`. The table groups actua
 | Mount | Module | Responsibilities |
 | --- | --- | --- |
 | `/api/auth` | `auth.js` | Config/bootstrap, registration/login/logout/me, OIDC, account settings/theme, API keys |
-| `/api/shared` | `shared.js` | Opt-in public collection and container views by share token |
+| `/api/shared` | `shared.js` | Opt-in public collection/container views and independently shared deck definitions |
 | `/api/admin` | `admin.js` | Users, seed data, catalogs/build/stop/progress, model assets, backup management |
 | `/api/card-art` | `cardArt.js` | Public art index/images; authenticated upload/delete |
 | `/api` | `collection.js` | Search, scan coverage/match, certification lookup, collection CRUD/bulk operations/placement/value, printing localization, related tokens, MTGJSON precons/import |
@@ -142,7 +142,7 @@ File names in this table are under `backend/src/routes/`. The table groups actua
 | `/api` | `importExport.js` | `/export`, `/import/preview`, `/import`, `/import-container`, `/import-container/move` |
 | `/api` | `notes.js` | `/notes` CRUD |
 | `/api/sets` | `sets.js` | Magic set catalog |
-| `/api/decks` | `decks.js` | CRUD, from-container, complete editor save, records, commander, duplicate, cards/Pulled, checkout/return, locations |
+| `/api/decks` | `decks.js` | CRUD, from-container, complete editor save, records, commander, duplicate, cards/Pulled, checkout/return, locations, per-deck share-link management |
 | `/api/ai-decks` | `aiDecks.js` | AI connection/preferences/models, eligible inventory, streamed suggestions, validated create/replace |
 | `/api/settings` | `settings.js` | Effective settings/version, administrator changes and Scryfall bulk download |
 
@@ -154,6 +154,7 @@ The built frontend is served from `frontend/dist`. Non-API paths fall back to th
 - CORS allows configured public origins plus localhost/private-LAN origins. It is not authentication or an outbound network policy.
 - Phone cameras require HTTPS. Built-in TLS supports persistent self-signed material or operator-provided certificates; use trusted TLS for remote access. Behind a TLS proxy, configure `TRUST_PROXY` correctly for rate limits.
 - Public sharing is explicitly opt-in. Collection sharing and location disclosure have separate controls; Graveyard containers are not public physical-container shares.
+- Deck sharing uses independent `deck_shares` capabilities, not the account's collection token. Owner-scoped `GET/POST/DELETE /api/decks/:id/share` manages a 32-byte random token; public `GET /api/shared/decks/:token` returns only saved deck metadata and card printings/quantities, with `Cache-Control: no-store`. Notes, ownership, storage, reservations, and prices are excluded. Foreign-key cascade invalidates links on deck deletion; duplication and account JSON backup/restore exclude capabilities. Full database backups retain them.
 - Treat database files, volume backups, provider tokens, TLS keys, and Codex account directories as sensitive. Client-side session tokens also require protection against script injection.
 
 ## Database transactions and persistence
@@ -315,7 +316,7 @@ Requests contain eligible card metadata/counts, conversation, and the current dr
 
 ## Frontend and Arcane Blue
 
-`App.jsx` holds session/user state and tab navigation, lazily loads major views, and wraps API fetches with a Bearer header and session-aware logout handling. `/share/:token` and shared-container views are unauthenticated surfaces. The web client uses relative `/api` requests to its server; the demonstration build installs fixture-backed behavior before rendering and is not a writable server.
+`App.jsx` holds session/user state and tab navigation, lazily loads major views, and wraps API fetches with a Bearer header and session-aware logout handling. `/share/:token`, shared-container views, and `/share/deck/:token` are unauthenticated surfaces. The web client uses relative `/api` requests to its server; the demonstration build installs fixture-backed behavior before rendering and is not a writable server.
 
 | Components | Responsibility |
 | --- | --- |
@@ -327,7 +328,7 @@ Requests contain eligible card metadata/counts, conversation, and the current dr
 | `LocationManager`, `CompartmentView`, `CreateContainerModal`, `SortFilterBuilder` | Storage gallery/layout, filing, rules, capacity, covers, archives |
 | `DeckBuilder`, `CheckoutWizardModal`, `AiDeckBuilder` | Local deck draft, private deck notes, play/pull list, draw simulation, AI drafts |
 | `Settings`, `CodexSettings`, `AdminPanel`, `CatalogPanel` | Preferences, AI connections, user administration, scan assets |
-| `SharedCollection`, `SharedContainer` | Public sharing |
+| `SharedCollection`, `SharedContainer`, `SharedDeck` | Public read-only sharing |
 
 Pricing, sorting, names/languages, printing/rarity, card options, and shuffling reuse the helpers in `frontend/src/utils/`. `I18nProvider` and locale JSON provide translations with English fallback; shared tables and geometry prevent client/server domain drift.
 

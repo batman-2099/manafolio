@@ -320,6 +320,14 @@ async function initDb() {
     )
   `);
 
+  // Separate capabilities never enter deck duplicates or account backup exports.
+  await run(`
+    CREATE TABLE IF NOT EXISTS deck_shares (
+      deck_id INTEGER PRIMARY KEY REFERENCES decks(id) ON DELETE CASCADE,
+      token TEXT UNIQUE NOT NULL
+    )
+  `);
+
   await run(`
     CREATE TABLE IF NOT EXISTS deck_cards (
       deck_id INTEGER NOT NULL,
