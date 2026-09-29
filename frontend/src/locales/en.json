@@ -851,6 +851,7 @@
   "loc.containerCreated": "Storage container created!",
   "deck.inventoryType": "Deck Type",
   "deck.graveyardCreateHint": "Create an archived deck list even without owning its cards. Missing copies are checked against Graveyard inventory. No reservations or checkout.",
+  "deck.showGraveyard": "Show Graveyard decks",
   "deck.physical": "Physical",
   "deck.arena": "Arena",
   "deck.duplicateDeck": "Duplicate deck",

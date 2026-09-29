@@ -490,6 +490,8 @@ Open **Deck Builder** to reach **Your decks**. Search by deck name or descriptio
 
 A deck uses one **Deck Type**: **Physical**, **Arena**, or **Graveyard**. Each uses only its matching inventory. Wishlist is not deck inventory. A saved deck definition is not a reservation: only a checked-out Physical deck reserves copies.
 
+Graveyard decks are hidden from the deck list by default. Turn on **Show Graveyard decks**, immediately after **Sort By**, to include them alongside Physical and Arena decks in Grid or Table view. Search, status filters, and sorting still apply.
+
 **Missing cards** appears in red in both Grid and Table view when required copies are unavailable, even if the deck has reached its target size. Physical decks exclude archived copies and other decks' reservations; Arena decks use Arena ownership only; Graveyard decks use archived copies only. A checked-out Physical deck keeps its Return action and reservations, but archived or missing reserved copies still show **Missing cards**. Use the matching status filter to find affected decks; the target-reached filter excludes them.
 
 In an open deck, the toolbar is followed by **Description**. The analytics and commander artwork are directly below Description: **Supertype Breakdown**, **Color & Land Distribution**, and **Deck Health & Rules**, including wins/losses. **Add Cards to Deck**, **Deck Cards**, and **Tokens** are below that overview—not in a separate analytics sidebar. Some charts appear only when the deck contains relevant cards.

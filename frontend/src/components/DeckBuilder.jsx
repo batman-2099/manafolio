@@ -154,6 +154,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const [deckSearchTerm, setDeckSearchTerm] = useState('');
   const [deckStatusFilter, setDeckStatusFilter] = useState('all'); // 'all' | 'ready' | 'missing' | 'in_progress' | 'in_play'
   const [deckSortBy, setDeckSortBy] = useState('created_desc'); // 'created_desc' | 'created_asc' | 'name_asc' | 'cards_desc'
+  const [showGraveyardDecks, setShowGraveyardDecks] = useState(false);
   const [deckSelectionViewMode, setDeckSelectionViewMode] = useState('table'); // 'grid' | 'table'
 
   // Draw Simulator States
@@ -1032,6 +1033,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
   // --- SELECTION MENU METRICS & FILTERING ---
   const filteredDecks = decks.filter(deck => {
+    if (!showGraveyardDecks && deck.inventory_type === 'graveyard') return false;
     const q = deckSearchTerm.trim().toLowerCase();
     const matchesSearch = !q ||
       deck.name.toLowerCase().includes(q) ||
@@ -1162,6 +1164,14 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     <option value="cards_desc">{t('deck.sortMostCards')}</option>
                   </select>
                 </div>
+                <button type="button" role="switch" aria-checked={showGraveyardDecks} className="btn btn-secondary"
+                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', height: 'auto', ...(showGraveyardDecks ? { background: 'var(--accent-green)', borderColor: 'var(--accent-green)', color: 'var(--bg-primary)' } : {}) }}
+                  onClick={() => setShowGraveyardDecks(current => !current)}>
+                  {t('deck.showGraveyard')}
+                  <span aria-hidden="true" style={{ width: 28, height: 16, borderRadius: 999, background: showGraveyardDecks ? 'var(--text-on-accent)' : 'var(--text-muted)', position: 'relative', flexShrink: 0 }}>
+                    <span style={{ position: 'absolute', top: 2, left: showGraveyardDecks ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: showGraveyardDecks ? 'var(--accent-green)' : 'var(--bg-primary)' }} />
+                  </span>
+                </button>
               </div>
 
               {/* View Mode Toggle: Grid vs Table */}
