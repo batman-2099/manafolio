@@ -819,7 +819,7 @@ Public data includes the account username, card names/printings, quantities, con
 1. Open a saved deck in **Deck Builder** and select **Share deck** in its top actions.
 2. Save any draft changes first, then create and copy the link.
 3. Send the URL to someone who should see the deck. They do not need an account.
-4. To stop access, open **Share deck** again and revoke its link. A subsequently created link is new; the old URL stays invalid.
+4. Opening **Share deck** again shows the current link. Choose **Generate new link** and confirm to replace it immediately; the old URL stops working. Use **Revoke link** to stop sharing without creating a replacement.
 
 **Expected result:** a read-only view of this deck alone: your username, saved deck name and description, format/category, wins and losses, commander, card printings, artwork, and quantities. Saved changes appear at the same URL. The description is public; private **Notes**, custom deck backs, storage locations, owned-copy availability, reservations, and prices are not shown. Sharing does not add cards to anyone's collection or grant editing access.
 

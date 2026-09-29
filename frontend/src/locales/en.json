@@ -736,6 +736,8 @@
   "deck.shareRevoking": "Revoking link…",
   "deck.shareRevoked": "Link revoked. The old link no longer opens this deck.",
   "deck.shareRevokeHint": "Revoking stops future access through this link. Creating another link gives you a new URL.",
+  "deck.shareRegenerate": "Generate new link",
+  "deck.shareConfirmRegenerate": "Generate a new deck link? The old link will stop working. Share the new URL with anyone who should still have access.",
   "deck.shareConfirmRevoke": "Revoke this deck link? Anyone using it will lose access. A new link will have a different URL.",
   "deck.shareLoadError": "Could not load this deck's sharing status. Retry to check its current link.",
   "deck.shareCreateError": "Could not confirm link creation. Retry to check the current link before creating another.",

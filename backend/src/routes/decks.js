@@ -30,15 +30,19 @@ router.route('/:id/share').all((req, res, next) => {
     res.status(500).json({ error: 'Failed to retrieve deck share' });
   }
 }).post(async (req, res) => {
+  if (req.body?.regenerate !== undefined && typeof req.body.regenerate !== 'boolean') {
+    return res.status(400).json({ error: 'Invalid regenerate option' });
+  }
   try {
     const share = await db.withTransaction(async () => {
       const deck = await db.get(`SELECT id FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`,
         [req.params.id, req.user.id]);
       if (!deck) return null;
       const existing = await db.get('SELECT token FROM deck_shares WHERE deck_id = ?', [deck.id]);
-      if (existing) return existing;
+      if (existing && !req.body?.regenerate) return existing;
       const token = crypto.randomBytes(32).toString('hex');
-      await db.run('INSERT INTO deck_shares (deck_id, token) VALUES (?, ?)', [deck.id, token]);
+      await db.run(`INSERT INTO deck_shares (deck_id, token) VALUES (?, ?)
+        ON CONFLICT(deck_id) DO UPDATE SET token = excluded.token`, [deck.id, token]);
       return { token };
     });
     if (!share) return res.status(404).json({ error: 'Deck not found' });

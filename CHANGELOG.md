@@ -4,6 +4,8 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Shared deck cards now sort by card type in Deck Builder order, then alphabetically within each type.
+- Share deck keeps displaying the existing link and now offers **Generate new link**, with confirmation and atomic replacement that invalidates the old URL.
 - Moved shared-deck commander artwork into its own section immediately above Cards. Color Identity now uses only the commander's colors and is hidden when no commander is selected.
 
 ## 2.1.3

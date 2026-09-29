@@ -15,6 +15,12 @@ const MANA_SYMBOLS = [
   ['R', 'Red', -160], ['G', 'Green', -55],
 ];
 
+const CARD_TYPES = ['Creature', 'Planeswalker', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Battle', 'Land'];
+const cardTypeRank = card => {
+  const rank = CARD_TYPES.findIndex(type => card.subtypes?.includes(type));
+  return rank < 0 ? CARD_TYPES.length : rank;
+};
+
 export default function SharedDeck({ shareToken }) {
   const { t, locale } = useT();
   const [data, setData] = useState(null);
@@ -122,7 +128,7 @@ export default function SharedDeck({ shareToken }) {
             <p className="shared-deck-card-hint">{t('sharedDeck.previewHint')}</p>
             {data.cards.length === 0 ? <p>{t('sharedDeck.empty')}</p> : (
               <ul className="shared-deck-cards">
-                {data.cards.map(card => (
+                {[...data.cards].sort((a, b) => cardTypeRank(a) - cardTypeRank(b) || displayName(a).localeCompare(displayName(b))).map(card => (
                   <li key={card.id}>
                     <button className="shared-deck-card" onClick={event => setPreview({ card, trigger: event.currentTarget })} aria-label={`${t('sharedDeck.previewCard', { name: displayName(card), quantity: card.quantity, printing: printing(card) })}${card.id === data.deck.commander_card_id ? ` · ${t('deck.commander')}` : ''}`}>
                       <CardImage card={card} alt="" loading="lazy" />

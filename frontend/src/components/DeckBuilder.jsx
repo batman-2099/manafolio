@@ -257,14 +257,17 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     }
   };
 
-  const updateShareLink = async (revoke = false) => {
-    if (shareBusy || shareLoading || (!revoke && hasUnsavedChanges)) return;
-    if (revoke && !window.confirm(t('deck.shareConfirmRevoke'))) return;
+  const updateShareLink = async (revoke = false, regenerate = false) => {
+    if (shareBusy || shareLoading || (!revoke && !regenerate && hasUnsavedChanges)) return;
+    if ((revoke || regenerate) && !window.confirm(t(regenerate ? 'deck.shareConfirmRegenerate' : 'deck.shareConfirmRevoke'))) return;
     setShareBusy(true);
     setShareError(null);
     setShareStatus('');
     try {
-      const response = await fetch(`/api/decks/${activeDeck.id}/share`, { method: revoke ? 'DELETE' : 'POST' });
+      const response = await fetch(`/api/decks/${activeDeck.id}/share`, {
+        method: revoke ? 'DELETE' : 'POST',
+        ...(regenerate ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ regenerate: true }) } : {})
+      });
       const data = await response.json();
       if (!response.ok || (revoke ? data.success !== true : typeof data.url !== 'string' || !data.url)) throw new Error();
       setShareUrl(revoke ? null : new URL(data.url, window.location.origin).href);
@@ -2763,6 +2766,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 {shareUrl && (
                   <div className="deck-share-revoke">
                     <p>{t('deck.shareRevokeHint')}</p>
+                    <button className="btn btn-secondary" disabled={shareBusy} onClick={() => updateShareLink(false, true)}>{t(shareBusy ? 'common.loading' : 'deck.shareRegenerate')}</button>
                     <button className="btn btn-danger" disabled={shareBusy} onClick={() => updateShareLink(true)}>{t(shareBusy ? 'deck.shareRevoking' : 'deck.shareRevoke')}</button>
                   </div>
                 )}

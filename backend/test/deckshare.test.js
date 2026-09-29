@@ -109,8 +109,23 @@ async function testSharing() {
     assert.notStrictEqual(recreated, token);
     assert.strictEqual((await publicDeck(token)).status, 404);
     assert.strictEqual((await publicDeck(recreated)).status, 200);
+    assert.strictEqual((await request('POST', `/decks/${id}/share`, { regenerate: 'true' })).status, 400);
+    assert.strictEqual((await request('POST', `/decks/${id}/share`, { regenerate: true }, 2)).status, 404);
+    assert.strictEqual(tokenOf(await manage('GET')), recreated);
+    await db.run(`CREATE TRIGGER fail_share_rotation BEFORE UPDATE ON deck_shares BEGIN SELECT RAISE(ABORT, 'rotation failure'); END`);
+    assert.strictEqual((await request('POST', `/decks/${id}/share`, { regenerate: true })).status, 500);
+    assert.strictEqual((await publicDeck(recreated)).status, 200);
+    await db.run('DROP TRIGGER fail_share_rotation');
+    const rotated = await request('POST', `/decks/${id}/share`, { regenerate: true });
+    assert.strictEqual(rotated.status, 200);
+    assert.notStrictEqual(tokenOf(rotated), recreated);
+    assert.strictEqual((await publicDeck(recreated)).status, 404);
+    assert.strictEqual((await publicDeck(tokenOf(rotated))).status, 200);
+    assert.deepStrictEqual(await manage('GET'), rotated);
+    assert.deepStrictEqual(await manage('POST'), rotated);
     assert.strictEqual((await request('DELETE', `/decks/${id}`)).status, 200);
     assert.strictEqual((await publicDeck(recreated)).status, 404);
+    assert.strictEqual((await publicDeck(tokenOf(rotated))).status, 404);
     // Even a hand-edited backup cannot inject credentials into restored definitions.
     backup.body.deck_shares = [{ deck_id: id, token }];
     backup.body.decks[0].share_token = token;
