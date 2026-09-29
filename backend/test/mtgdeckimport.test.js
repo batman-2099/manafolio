@@ -140,6 +140,20 @@ async function testMtgDeckImport() {
       { types: 3, copies: 5 },
       'creating from an MTGJSON precon must retain commander, main-board, and sideboard quantities'
     );
+    await db.run("INSERT INTO users (id, username, password_hash, share_token) VALUES (2, 'unowned-precon', 'unused', 'unowned-precon-token')");
+    for (const inventory_type of ['collection', 'arena', 'graveyard']) {
+      const unowned = response();
+      await createDeck({
+        body: { name: 'Unowned precon', inventory_type, precon_file: 'ExampleDeck_TST' },
+        user: { id: 2 }
+      }, unowned);
+      assert.strictEqual(unowned.statusCode, 201, JSON.stringify(unowned.body));
+      assert.deepStrictEqual(
+        await db.get('SELECT COUNT(*) AS types, SUM(quantity) AS copies FROM deck_cards WHERE deck_id = ?', [unowned.body.id]),
+        { types: 3, copies: 5 }
+      );
+    }
+    assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM collection WHERE user_id = 2')).count, 0);
   } finally {
     mtgjsonApi.client.get = originalGet;
     mtgjsonApi.resetDeckListCache();

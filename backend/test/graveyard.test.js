@@ -132,9 +132,17 @@ async function testGraveyard() {
       name: 'Imported archive', inventory_type: 'graveyard', decklist_text: '3 Archive Card'
     }, 1, 201);
     assert.deepStrictEqual((await request(`/decks/${imported.id}`)).cards.map(card => [card.id, card.quantity]), [['archive-card', 3]]);
-    const beforeBadImport = await db.all('SELECT * FROM decks ORDER BY id');
-    await request('/decks', 'POST', { name: 'Unowned archive', inventory_type: 'graveyard', decklist_text: '4 Archive Card' }, 1, 400);
-    assert.deepStrictEqual(await db.all('SELECT * FROM decks ORDER BY id'), beforeBadImport);
+    const inventoryBeforeCreation = await db.all('SELECT * FROM collection ORDER BY id');
+    for (const inventory_type of ['collection', 'arena', 'graveyard']) {
+      const unowned = await request('/decks', 'POST', {
+        name: 'Unowned definition', inventory_type, decklist_text: '4 Archive Card\n1 Spare Card'
+      }, 1, 201);
+      const definition = await request(`/decks/${unowned.id}`);
+      assert.deepStrictEqual(definition.cards.map(card => [card.id, card.quantity]).sort(), [['archive-card', 4], ['spare-card', 1]]);
+      assert.strictEqual(definition.checked_out, 0);
+      await request(`/decks/${unowned.id}/checkout`, 'PUT', {}, 1, 400);
+    }
+    assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), inventoryBeforeCreation);
 
     const backup = await request('/export?format=backup');
     assert.deepStrictEqual(backup.collection.find(row => row.id === physical), archived);

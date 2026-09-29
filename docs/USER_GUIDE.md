@@ -39,7 +39,7 @@ The guide text is currently English. Tables scroll horizontally on narrow screen
 3. Complete the setup wizard if offered. Scanning and optional provider credentials can be configured later; manual collection management does not require them.
 4. In **Settings → Preferences**, choose your interface language, theme, and preferred views.
 5. Add a small, known batch of cards before importing an entire collection. Check exact printings, quantities, language, finish, and destination.
-6. Create a storage container if you are organizing physical cards. Add a deck once the relevant cards are owned in the correct inventory.
+6. Create a storage container if you are organizing physical cards. You can create a deck before owning its cards; resolve missing Physical copies before checkout.
 7. Download a complete account backup after checking your initial data.
 
 **Unexpected owner-creation screen after an upgrade?** Stop. Do not create a replacement account. Ask the administrator to check the database path and persistent-volume mount against the [migration procedure](../README.md#migrate-an-existing-installation).
@@ -505,6 +505,10 @@ In an open deck, the toolbar is followed by **Description**. The analytics and c
 5. Leave the import sections closed for an empty deck, then select **Create Deck**.
 6. Open the created deck from **Your decks** and add cards.
 
+**Cancel**, the **×** close button, or Escape discards the creation draft. Reopening **Create Deck** starts with empty text, default settings, and no selected precon or imported list.
+
+While creation is saving, wait for it to finish before closing the dialog. A failure appears inside the dialog and keeps your entries for correction and retry. Physical, Arena, and Graveyard deck creation can include unowned cards: imports must still resolve valid card identities and satisfy the applicable deck rules. Missing copies remain visible without adding inventory or reservations.
+
 **Expected result:** a saved deck profile, initially without cards and not checked out. Creating a deck does not create owned copies.
 
 ### Choose where a deck's copies come from
@@ -576,17 +580,17 @@ Use this path when starting a deck definition from text or a published precon.
    - Plain text uses quantity and name, for example `4 Lightning Bolt`. This creation path matches names already in the server's card catalog; unmatched or unrecognized lines can be omitted. It is not the existing-deck comparison workflow.
    - For ManaBox text, paste the export or use **Choose .txt file**. This path resolves set/collector-number printings rather than selecting a printing solely by name. Selecting ManaBox in the format menu sets Commander / EDH and a 100-card target; check those fields for your actual deck.
 4. Select **Create Deck**.
-5. Open the result and compare its names, quantities, printings, total, and commander against your original list.
+5. The saved deck opens automatically. Compare its names, quantities, printings, total, and commander against your original list.
 
-**Expected result:** a saved definition containing the resolved cards, not newly owned inventory. A Physical import can describe cards you do not yet own; Arena creation validates Arena ownership. Unavailable cards still need to be resolved before play. Save your source list until you have reviewed the result.
+**Expected result:** a saved definition containing the resolved cards, not newly owned inventory. Physical, Arena, and Graveyard creation can describe cards you do not own. Unavailable Physical copies must be resolved before checkout. Save your source list until you have reviewed the result.
 
 For a published precon instead:
 
 1. In **Create New Deck**, expand **Add a Precon Deck**.
 2. Enter at least two characters of a deck name, set code, or type and select **Search decks**.
-3. Use **More details** to review the list, then **Add deck** to choose it.
-4. Check the populated name, format, and target size. This chooser sets Commander / EDH and 100; adjust them when appropriate.
-5. Select the outer **Create Deck** button, then review the resulting deck and choose its commander if needed.
+3. Use **More details** to review the list, then **Choose deck** to select it. A confirmation beneath the picker reminds you to save the selection.
+4. Check the populated name, format, and target size. The published product type selects Commander / EDH (100), Brawl (60, or 100 for Historic Brawl), Pioneer (60), Modern (60), or Standard (60). Other products default to Casual (60). You can adjust these fields; historical product labels do not certify current format legality, and imported sideboards may increase the total.
+5. Select the outer **Create Deck** button. On success, the dialog closes and the saved deck opens; review its cards and choose its commander if needed.
 
 This deck-creation chooser creates a definition only. It does not buy or add owned cards, create a storage container, or check out the deck. Its precon list can contain source main-board, commander, and sideboard entries without representing separate deck zones, so verify the resulting total and intended format.
 
@@ -709,7 +713,7 @@ ChatGPT uses your Codex access and usage limits. Gemini's free-tier data-use ter
 
 #### Choose a deck type
 
-**Deck type** starts unselected and is required. Choose **Any** to let the AI select an archetype suited to your eligible cards and request, or choose a specific strategy. Its explanation and play style appear below the selector.
+**Deck type** defaults to **Any**, letting the AI select an archetype suited to your eligible cards and request. Choose a specific strategy if you prefer. Its explanation and play style appear below the selector.
 
 | Deck type | When to choose it |
 | --- | --- |

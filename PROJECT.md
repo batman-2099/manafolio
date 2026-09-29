@@ -220,7 +220,7 @@ Shared dispatch in `utils/cardApi.js` accepts Magic identities only. Removed int
 
 Deck definitions use one inventory; checked-out decks cannot switch inventory. `utils/deckRules.js` distinguishes inventory-constrained additions from availability-independent editor drafts while sharing copy-limit checks. Commander selection is a single existing card; the UI's commander workflow is not a promise of full tournament legality, partner commanders, or sideboards.
 
-Deck archiving changes only the definition's inventory, preserving list and metadata even without sufficient archived copies, and atomically clears physical source preferences. Restoring to Physical/Arena validates destination ownership. Graveyard additions/imports/search/availability/token ownership use archived copies only. Duplication and complete backups preserve Graveyard inventory; AI source-deck improvement rejects it.
+Deck archiving changes only the definition's inventory, preserving list and metadata even without sufficient archived copies, and atomically clears physical source preferences. Restoring to Physical/Arena validates destination ownership. Deck creation (including precon, decklist, and commander creation) permits unowned cards using draft validation. Graveyard card additions, search, availability, and token ownership remain scoped to archived copies. Duplication and complete backups preserve Graveyard inventory; AI source-deck improvement rejects it.
 
 Physical checkout reserves quantities by setting `decks.checked_out` and `checked_out_at`; it does **not** move collection entries. Availability subtracts copies reserved by other checked-out Physical decks. Arena and Graveyard decks cannot check out.
 

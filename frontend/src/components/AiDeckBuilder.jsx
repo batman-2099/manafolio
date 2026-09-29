@@ -51,7 +51,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   const [inventoryError, setInventoryError] = useState('');
   const [inventoryRevision, setInventoryRevision] = useState(0);
   const [format, setFormat] = useState(sourceDeck?.format || 'Commander / EDH');
-  const [deckType, setDeckType] = useState('');
+  const [deckType, setDeckType] = useState('any');
   const [powerLevel, setPowerLevel] = useState(2);
   const [targetSize, setTargetSize] = useState(sourceDeck?.target_size || 100);
   const [prompt, setPrompt] = useState('');
@@ -407,7 +407,6 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
             <div className="form-group" style={{ marginTop: '1rem' }}>
               <label htmlFor="ai-deck-type">{t('aiDeck.deckType')} ({t('aiDeck.deckTypeRequired')})</label>
               <select id="ai-deck-type" name="deck_type" form="ai-conversation-form" className="input-control" required value={deckType} aria-describedby={deckType ? 'ai-deck-type-description ai-deck-type-style' : undefined} onChange={event => { clearDraft(); setDeckType(event.target.value); }}>
-                <option value="" disabled>{t('aiDeck.chooseDeckType')}</option>
                 {DECK_TYPES.map(type => <option key={type.id} value={type.id}>{t(`aiDeckType.${type.id}.name`)}</option>)}
               </select>
               {deckType && <div style={{ marginTop: '0.75rem', overflowWrap: 'anywhere' }}>

@@ -158,7 +158,7 @@ Choose **Export view CSV** or **Export view TXT** in Collection. Export includes
 ### Create and import decks
 
 1. Open **Deck Builder → Create Deck** and choose **Physical**, **Arena**, or **Graveyard** inventory.
-2. Build from cards in that inventory or import a plain, ManaBox, or MTG Arena-style decklist, such as `4 Llanowar Elves (FDN) 227`. Graveyard decks use archived copies only.
+2. Build from cards in that inventory or import a plain, ManaBox, or MTG Arena-style decklist, such as `4 Llanowar Elves (FDN) 227`. Creation can include unowned cards in all three inventories; missing-copy counts still use only the matching inventory. No owned copies are created.
 3. Review your draft and choose **Save**, immediately before **Draw Simulator**. Card additions/removals, quantities, Pulled status, commander, and applied properties are committed together. Imports and edits remain local until saved; an unsaved marker and leave confirmation protect the draft, and failed saves retain it for retry.
 
 **Edit Properties → Deck Type → Graveyard → Apply Properties → Save** archives a deck definition without moving its cards. Its notes, list, and metadata remain; physical source preferences are cleared. Return checked-out decks first. Restoring to Physical or Arena requires the destination inventory to own every required copy. Graveyard decks cannot check out or use AI improvement. **Duplicate deck** retains inventory and metadata, not checkout state or wins/losses.

@@ -38,7 +38,7 @@ async function testCommanderCreation() {
   `);
   const inventory = await db.all('SELECT * FROM collection ORDER BY id');
   const body = { name: 'First', game: 'mtg', format: 'Commander / EDH', target_size: 100, commander_card_id: 'first' };
-  for (const [inventory_type, commander_card_id, name] of [['collection', 'first', 'First'], ['arena', 'second', 'Second']]) {
+  for (const [inventory_type, commander_card_id, name] of [['collection', 'first', 'First'], ['arena', 'second', 'Second'], ['graveyard', 'outside', 'Unowned archive'], ['arena', 'first', 'Unowned Arena'], ['collection', 'second', 'Unowned Physical']]) {
     const created = await request('post', '/', null, { ...body, inventory_type, commander_card_id, name });
     assert.strictEqual(created.statusCode, 201);
     const details = await request('get', '/:id', created.body.id);
@@ -62,10 +62,7 @@ async function testCommanderCreation() {
     { format: 'Standard' },
     { decklist_text: '2 First' },
     { precon_file: 'test-precon' },
-    { commander_card_id: 'unknown' },
-    { commander_card_id: 'outside' },
-    { inventory_type: 'arena' },
-    { commander_card_id: 'second', inventory_type: 'collection' }
+    { commander_card_id: 'unknown' }
   ]) {
     const rejected = await request('post', '/', null, { ...body, ...invalid });
     assert.strictEqual(rejected.statusCode, 400, JSON.stringify(invalid));

@@ -78,7 +78,7 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
         <BookOpen size={20} style={{ color: 'var(--accent-yellow)' }} />
         <h2 style={{ fontSize: '1.15rem', margin: 0, color: 'var(--text-strong)' }}>{t('mtgDeck.title')}</h2>
       </div>
-      <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5, marginBottom: '1rem' }}>{t('mtgDeck.hint')}</p>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5, marginBottom: '1rem' }}>{t(onChoose ? 'mtgDeck.chooseHint' : 'mtgDeck.hint')}</p>
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
         <input
           type="search"
@@ -114,7 +114,7 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
                       <List size={15} /> {detailsLoading === deck.fileName ? t('common.loading') : detail ? t('mtgDeck.hideDetails') : t('mtgDeck.details')}
                     </button>
                     <button type="button" className="btn btn-primary" disabled={adding === deck.fileName} onClick={() => onChoose ? onChoose(deck) : addDeck(deck)} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
-                      <Plus size={15} /> {adding === deck.fileName ? t('mtgDeck.adding') : t('mtgDeck.add')}
+                      <Plus size={15} /> {onChoose ? t('mtgDeck.choose') : adding === deck.fileName ? t('mtgDeck.adding') : t('mtgDeck.add')}
                     </button>
                   </div>
                 </div>

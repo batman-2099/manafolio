@@ -7,6 +7,9 @@ Release history starts with Manafolio 2.0.
 - Added Graveyard deck inventory: archive existing deck definitions without moving cards, create/edit/import decks using archived copies, or create a deck from a Graveyard container. Notes, metadata, duplication, and backups retain the inventory. Checked-out decks must be returned before archiving; Graveyard decks cannot reserve copies, check out, or use AI improvement. Restoring to Physical/Arena validates destination ownership.
 - Deck properties now show a direct Return-to-storage instruction when checkout makes Graveyard unavailable, with the explanation associated with the disabled option.
 - Increased existing 14px secondary labels, hints, and metadata to 15px across dashboard, collection, storage, inspector, scanning, settings, login, and help views, retaining primary text and control sizes.
+- Clarified precon selection in Deck Builder with a Choose deck action and save reminder. Successful deck creation now closes the creation dialog and opens the saved deck instead of leaving a reset form over the result.
+- Deck creation now displays failures inside the modal, preserves the draft for retry, and shows saving progress while preventing duplicate submission.
+- Physical, Arena, and Graveyard deck creation now permit unowned cards, including precon, decklist, and commander creation. Missing-copy reporting and Physical checkout requirements remain unchanged; creating a definition never adds owned inventory.
 
 ## 2.1.2
 

@@ -117,7 +117,7 @@ router.post('/', async (req, res) => {
         [name, description, deckGame, format, category, accent_color, targetSizeNum, inventoryType, req.user.id]
       );
       if (commander_card_id !== undefined) {
-        const check = await validateDeckAddition({ deckId: deck.lastID, userId: req.user.id, cardId: commander_card_id, newQty: 1 });
+        const check = await validateDeckAddition({ deckId: deck.lastID, userId: req.user.id, cardId: commander_card_id, newQty: 1, mode: 'draft' });
         if (!check.ok) throw Object.assign(new Error(check.error), { status: 400 });
         await db.run(`INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, 1)`, [deck.lastID, commander_card_id]);
         await db.run(`UPDATE decks SET commander_card_id = ? WHERE id = ? AND user_id = ?`, [commander_card_id, deck.lastID, req.user.id]);
@@ -128,7 +128,7 @@ router.post('/', async (req, res) => {
     const addDeckCard = async (cardId, quantity) => {
       if (inventoryType !== 'collection') {
         const current = await db.get(`SELECT quantity FROM deck_cards WHERE deck_id = ? AND card_id = ?`, [newDeckId, cardId]);
-        const check = await validateDeckAddition({ deckId: newDeckId, userId: req.user.id, cardId, newQty: (current?.quantity || 0) + quantity });
+        const check = await validateDeckAddition({ deckId: newDeckId, userId: req.user.id, cardId, newQty: (current?.quantity || 0) + quantity, mode: 'draft' });
         if (!check.ok) {
           const error = new Error(check.error);
           error.status = 400;
@@ -180,15 +180,12 @@ router.post('/', async (req, res) => {
           if (match) {
             const qty = parseInt(match[1], 10);
             const cardName = match[2].trim();
-            const card = await db.get(`SELECT id FROM card_cache WHERE LOWER(name) = LOWER(?) AND game = ?
-              AND (? != 'graveyard' OR EXISTS (
-                SELECT 1 FROM collection c WHERE c.card_id = card_cache.id AND c.user_id = ? AND c.list_type = 'graveyard' AND c.quantity > 0
-              )) LIMIT 1`, [cardName, deckGame, inventoryType, req.user.id]);
+            const card = await db.get(`SELECT id FROM card_cache WHERE LOWER(name) = LOWER(?) AND game = ? LIMIT 1`, [cardName, deckGame]);
             if (card) {
               await addDeckCard(card.id, qty);
             }
             else if (inventoryType === 'graveyard') {
-              throw Object.assign(new Error(`${cardName} is not available in Graveyard inventory`), { status: 400 });
+              throw Object.assign(new Error(`${cardName} was not found in the card catalog`), { status: 400 });
             }
           }
         }

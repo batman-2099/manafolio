@@ -9,6 +9,7 @@ import { arenaCardKey, buildDeckExport, parseDeckLine } from '../utils/deckText'
 import { deckContainers } from '../utils/deckContainers';
 import { defaultGame, isGameEnabled } from '../utils/games';
 import { MTG_FORMATS } from '../utils/cardOptions';
+import { preconFormat } from '../utils/preconFormat';
 import CardImage from './CardImage';
 import { useT } from '../utils/i18n';
 import MtgDeckImport from './MtgDeckImport';
@@ -121,6 +122,8 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   ];
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creatingDeck, setCreatingDeck] = useState(false);
+  const [createDeckError, setCreateDeckError] = useState(null);
   const [showAiBuilder, setShowAiBuilder] = useState(false);
   const [aiSourceDeck, setAiSourceDeck] = useState(null);
   const closeAiBuilder = () => { setShowAiBuilder(false); setAiSourceDeck(null); };
@@ -277,8 +280,25 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [hasUnsavedChanges, savingDeck]);
 
+  const closeCreateModal = () => {
+    setCreateDeckError(null);
+    setNewDeckName('');
+    setNewDeckDesc('');
+    setNewDeckFormat(NEW_DECK_DEFAULTS.format);
+    setNewDeckCategory('Competitive');
+    setNewDeckAccentColor('#eab308');
+    setNewDeckTargetSize(NEW_DECK_DEFAULTS.targetSize);
+    setNewDeckImportText('');
+    setNewDeckImportFormat('plain');
+    setNewDeckPreconFile('');
+    setNewDeckInventoryType('collection');
+    setShowPreconPicker(false);
+    setShowImportDecklistArea(false);
+    setShowCreateModal(false);
+  };
+
   useBackGuard(viewMode === 'detail' && !!activeDeck, leaveDeck);
-  useBackGuard(showCreateModal, () => setShowCreateModal(false));
+  useBackGuard(showCreateModal, () => creatingDeck ? false : closeCreateModal());
   useBackGuard(showSimulator, () => setShowSimulator(false));
   useBackGuard(!!deckDraft, () => refreshingInventory ? false : setDeckDraft(null));
   useBackGuard(showImportModal, () => setShowImportModal(false));
@@ -310,7 +330,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
   const handleCreateDeck = async (e) => {
     e.preventDefault();
-    if (!newDeckName.trim()) return;
+    if (creatingDeck || !newDeckName.trim()) return;
+    setCreatingDeck(true);
+    setCreateDeckError(null);
 
     try {
       const response = await fetch('/api/decks', {
@@ -334,25 +356,17 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       const data = await response.json();
       if (response.ok) {
         showToast(data.message || t('deck.created'), 'success');
-        setNewDeckName('');
-        setNewDeckDesc('');
-        setNewDeckFormat(NEW_DECK_DEFAULTS.format);
-        setNewDeckCategory('Competitive');
-        setNewDeckAccentColor('#eab308');
-        setNewDeckTargetSize(NEW_DECK_DEFAULTS.targetSize);
-        setNewDeckImportText('');
-        setNewDeckImportFormat('plain');
-        setNewDeckPreconFile('');
-        setNewDeckInventoryType('collection');
-        setShowPreconPicker(false);
-        setShowImportDecklistArea(false);
-        fetchDecks();
+        closeCreateModal();
+        await fetchDecks();
+        await loadDeckDetails(data.id);
       } else {
-        showToast(data.error || t('deck.errCreate'), 'error');
+        setCreateDeckError(data.error || t('deck.errCreate'));
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errCreateGeneric'), 'error');
+      setCreateDeckError(t('deck.errCreateGeneric'));
+    } finally {
+      setCreatingDeck(false);
     }
   };
 
@@ -2273,9 +2287,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
       {/* A. Create Deck Modal */}
       {showCreateModal && (
-        <Modal onClose={() => setShowCreateModal(false)} aria-labelledby="deck-create-title">
+        <Modal onClose={() => { if (!creatingDeck) closeCreateModal(); }} aria-labelledby="deck-create-title">
           <div className="glass-panel deck-create-panel">
-            <button className="btn btn-secondary btn-icon-only" aria-label={t('common.close')} onClick={() => setShowCreateModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', borderRadius: '50%' }}>
+            <button className="btn btn-secondary btn-icon-only" disabled={creatingDeck} aria-label={t('common.close')} onClick={closeCreateModal} style={{ position: 'absolute', top: '1rem', right: '1rem', borderRadius: '50%' }}>
               <X size={16} />
             </button>
 
@@ -2288,6 +2302,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             </p>
 
             <form onSubmit={handleCreateDeck} className="deck-create-form">
+              <fieldset disabled={creatingDeck} style={{ display: 'contents' }}>
               <div className="deck-create-body">
               
               <div className="form-group">
@@ -2347,6 +2362,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   value={newDeckName} 
                   onChange={(e) => setNewDeckName(e.target.value)}
                   required 
+                  pattern=".*\S.*"
                 />
               </div>
 
@@ -2443,8 +2459,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                       onChoose={(deck) => {
                         setNewDeckPreconFile(deck.fileName);
                         setNewDeckName(deck.name);
-                        setNewDeckFormat('Commander / EDH');
-                        setNewDeckTargetSize(100);
+                        const preset = preconFormat(deck.type);
+                        setNewDeckFormat(preset.format);
+                        setNewDeckTargetSize(preset.targetSize);
                         setNewDeckImportText('');
                         setShowImportDecklistArea(false);
                         setShowPreconPicker(false);
@@ -2452,6 +2469,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     />
                   </div>
                 )}
+                {newDeckPreconFile && <p role="status" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{t('mtgDeck.selectedHint')}</p>}
               </div>
 
               {/* Quick Decklist Importer Toggle */}
@@ -2514,10 +2532,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
               </div>
 
               </div>
+              {createDeckError && <p role="alert" className="deck-source-error" style={{ margin: '0.75rem 0' }}>{createDeckError}</p>}
               <div className="deck-create-footer">
-                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowCreateModal(false)}>{t('common.cancel')}</button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 2, fontWeight: 700 }}>{t('deck.createDeck')}</button>
+                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={closeCreateModal}>{t('common.cancel')}</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 2, fontWeight: 700 }}>{t(creatingDeck ? 'deck.saving' : 'deck.createDeck')}</button>
               </div>
+              </fieldset>
             </form>
           </div>
         </Modal>
