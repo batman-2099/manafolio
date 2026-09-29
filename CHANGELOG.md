@@ -4,6 +4,7 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Added **Price Check** immediately after Dashboard's **Add Cards** action: reuse the scanner to inspect a printing's estimated prices without adding inventory or changing Scan review drafts, then return with dashboard filters preserved.
 - Simplified history-period configuration and Magic-only statistics, shared set-family toggling between scanner and catalog selection, derived currency symbols from the existing registry, and removed unused mobile navigation CSS without changing supported workflows.
 - Shared deck cards now sort by card type in Deck Builder order, then alphabetically within each type.
 - Share deck keeps displaying the existing link and now offers **Generate new link**, with confirmation and atomic replacement that invalidates the old URL.

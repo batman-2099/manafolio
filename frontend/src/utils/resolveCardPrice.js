@@ -13,3 +13,10 @@ export function resolveCardPrice(card, printing) {
   if (printing === 'Normal' && card.price_normal > 0) return card.price_normal;
   return card.price_trend || 0;
 }
+
+// A finish quote must not borrow a generic trend or an owner's copy valuation.
+export function getPrintingPrice(card, printing) {
+  const raw = printing === 'Normal' ? card?.price_normal : printing === 'Holofoil' ? card?.price_holofoil : null;
+  const price = typeof raw === 'number' || typeof raw === 'string' ? Number(raw) : NaN;
+  return Number.isFinite(price) && price > 0 ? price : null;
+}

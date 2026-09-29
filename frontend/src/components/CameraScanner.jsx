@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react
 import { Camera, RefreshCw, AlertTriangle, X, Zap, ZapOff, Settings, ScanLine, ListFilter, Layers, Search } from 'lucide-react';
 import { getCardDisplayName } from '../utils/langHelper';
 import { priceText } from '../utils/formatPrice';
-import { resolveCardPrice } from '../utils/resolveCardPrice';
+import { resolveCardPrice, getPrintingPrice } from '../utils/resolveCardPrice';
 import { CONDITIONS, getPrintings } from '../utils/cardOptions';
 import CardEntryFields from './CardEntryFields';
 import Modal from './Modal';
@@ -69,7 +69,7 @@ const SCAN_PROFILES = [
 ];
 
 // A fallback is a reviewable candidate, not proof of the requested language.
-function LangFallbackNote({ card, style }) {
+function LangFallbackNote({ card, style, priceCheck = false }) {
   const { t } = useT();
   if (!card || !card.langFallback) return null;
   return (
@@ -79,13 +79,14 @@ function LangFallbackNote({ card, style }) {
       ...style,
     }}>
       <AlertTriangle size={11} style={{ flexShrink: 0 }} />
-      <span>{t('scan.langFallbackArt', { lang: card.langFallback, actual: card.language || 'English' })}</span>
+      <span>{t(priceCheck ? 'priceCheck.langFallback' : 'scan.langFallbackArt', { lang: card.langFallback, actual: card.language || 'English' })}</span>
     </div>
   );
 }
 
-function CameraScanner({ onAddSuccess, showToast }) {
+function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
   const { t } = useT();
+  const priceCheck = mode === 'price-check';
 
   const [stream, setStream] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -96,7 +97,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   
   // Drafts are account-owned review items, never collection entries.
   const [scanDrafts, setScanDrafts] = useState([]);
-  const [draftsLoading, setDraftsLoading] = useState(true);
+  const [draftsLoading, setDraftsLoading] = useState(!priceCheck);
   const [draftsError, setDraftsError] = useState(false);
   const [draftError, setDraftError] = useState('');
   const [draftBusy, setDraftBusy] = useState(false);
@@ -105,6 +106,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const draftActionRef = useRef(null);
 
   const loadDrafts = useCallback(async (signal) => {
+    if (priceCheck) return;
     setDraftsLoading(true);
     setDraftsError(false);
     try {
@@ -117,12 +119,13 @@ function CameraScanner({ onAddSuccess, showToast }) {
     } finally {
       if (!signal?.aborted) setDraftsLoading(false);
     }
-  }, []);
+  }, [priceCheck]);
   useEffect(() => {
+    if (priceCheck) return;
     const controller = new AbortController();
     loadDrafts(controller.signal);
     return () => controller.abort();
-  }, [loadDrafts]);
+  }, [loadDrafts, priceCheck]);
   const [scanFlash, setScanFlash] = useState(null); // 'capture', 'error', or null
   // What auto-scan is waiting for, shown as a small pill. Without the old
   // countdown ring there is otherwise no feedback at all when it declines to
@@ -223,7 +226,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   // language each added copy is recorded as. Remembered across sessions because
   // people scan a language at a time.
   const [scanLang, setScanLangState] = useState(() => localStorage.getItem('scanner_lang') || 'en');
-  const setScanLang = (code) => { setScanLangState(code); localStorage.setItem('scanner_lang', code); };
+  const setScanLang = (code) => { setScanLangState(code); if (!priceCheck) localStorage.setItem('scanner_lang', code); };
   const setsKey = (game, lang) => (lang === 'en' ? `scanner_set_${game}` : `scanner_set_${game}_${lang}`);
   // Set-scoped scanning across one or more sets, persisted per game and language.
   const [scanSetCodes, setScanSetCodesState] = useState(() => {
@@ -232,7 +235,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     const l = localStorage.getItem('scanner_lang') || 'en';
     return (localStorage.getItem(setsKey(g, l)) || '').split(',').map(s => s.trim()).filter(Boolean);
   });
-  const persistSets = (arr) => { setScanSetCodesState(arr); localStorage.setItem(setsKey(scanGame, scanLang), arr.join(',')); };
+  const persistSets = (arr) => { setScanSetCodesState(arr); if (!priceCheck) localStorage.setItem(setsKey(scanGame, scanLang), arr.join(',')); };
   const scanSetParam = scanSetCodes.join(',');
   const [setInput, setSetInput] = useState('');
   const [setList, setSetList] = useState([]);        // {id,name,children[],...} for the active game
@@ -278,6 +281,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const cameraRequestRef = useRef(0);
   const currentScanId = useRef(0);
   const scanAbortRef = useRef(null);
   const autoAddScanId = useRef(null);
@@ -444,7 +448,8 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const [dupConfirmCard, setDupConfirmCard] = useState(null);
   const [dupQty, setDupQty] = useState(1);
 
-  useBackGuard(scanMatches.length > 0, () => {
+  useBackGuard(scanMatches.length > 0 || (priceCheck && isDrawerOpen), () => {
+    if (priceCheck) { closeDrawer(); return; }
     if (draftBusyRef.current) return;
     setScanMatches([]);
     setDebugTimings([]);
@@ -478,6 +483,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   useEffect(() => {
     return () => {
       currentScanId.current += 1;
+      cameraRequestRef.current += 1;
       scanAbortRef.current?.abort();
       streamRef.current?.getTracks().forEach(track => track.stop());
       zoomTrackRef.current = null;
@@ -495,6 +501,12 @@ function CameraScanner({ onAddSuccess, showToast }) {
     setScanStatus('');
     setScanMatches([]);
     setLastMatches([]);
+    if (priceCheck) {
+      setSelectedCard(null);
+      setIsDrawerOpen(false);
+    }
+    setManualSearching(false);
+    setFindingPrintings(false);
     setScanName(null);
     lastScanImgRef.current = null;
     lastScanCroppedRef.current = false;
@@ -511,7 +523,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
     lastRawQuad.current = null;
     steadyFrames.current = 0;
     smoothed.current = null;
-  }, [scanGame, scanLang, scanSetParam, scanDetail, autoAdd, autoScan,
+  }, [scanGame, scanLang, scanSetParam, scanDetail, autoAdd, autoScan, priceCheck,
     guideOffset.x, guideOffset.y, guideAngle, guideScale, exposure, isTorchOn, zoom, zoomAdjusting, minFill, minSteady]);
 
   // On game switch: restore that game's remembered set filter and load its set
@@ -928,6 +940,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   };
 
   const startCamera = async () => {
+    const cameraRequest = ++cameraRequestRef.current;
     // Create/unlock the scan cue here: this call is inside a click handler, and a
     // context first created without a gesture starts suspended with no promise of
     // ever being allowed to resume. Every capture after this is gesture-less.
@@ -970,9 +983,15 @@ function CameraScanner({ onAddSuccess, showToast }) {
       };
       
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (cameraRequest !== cameraRequestRef.current) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      streamRef.current = mediaStream;
       setStream(mediaStream);
       setCameraActive(true);
     } catch (err) {
+      if (cameraRequest !== cameraRequestRef.current) return;
       console.error('Error opening camera:', err);
       setCameraErrorKey('scan.errCameraPermissions');
       showToast(t('scan.errCameraAccess'), 'error');
@@ -984,6 +1003,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   // above stops the tracks (which also kills the torch).
 
   const autoAddCard = async (card, qty = 1, overrides = null) => {
+    if (priceCheck) return;
     if (draftBusyRef.current || draftActionRef.current !== null || manualSearching || draftsLoading || draftsError) return;
     draftBusyRef.current = true;
     setDraftBusy(true);
@@ -1217,6 +1237,10 @@ function CameraScanner({ onAddSuccess, showToast }) {
     }
     setScanStatus('');
     if (matches.length === 1 && autoSingle) {
+      if (priceCheck) {
+        openQuickAdd(matches[0]);
+        return;
+      }
       // Recognition found the card either way. Auto-queue decides whether to
       // stage the draft immediately or open its fields first.
       if (autoAdd) {
@@ -1402,6 +1426,10 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const openQuickAdd = (card) => {
     setScanMatches([]);
     setSelectedCard(card);
+    if (priceCheck) {
+      setIsDrawerOpen(true);
+      return;
+    }
     setQuantity(1);
     setCondition('Near Mint');
     setPurchasePrice(0);
@@ -1437,6 +1465,10 @@ function CameraScanner({ onAddSuccess, showToast }) {
   const findOtherPrintings = async () => {
     if (!selectedCard || findingPrintings) return;
     setFindingPrintings(true);
+    const scanId = ++currentScanId.current;
+    scanAbortRef.current?.abort();
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
     try {
       const searchGame = selectedCard.game || scanGame;
       const searchLang = scanLang;
@@ -1451,6 +1483,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
       const res = hasImage
         ? await fetch('/api/search', {
             method: 'POST',
+            signal: controller.signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               game: searchGame,
@@ -1462,8 +1495,9 @@ function CameraScanner({ onAddSuccess, showToast }) {
               cropped: lastScanCroppedRef.current,
             }),
           })
-        : await fetch(`/api/search?${p.toString()}`);
+        : await fetch(`/api/search?${p.toString()}`, { signal: controller.signal });
       const raw = res.ok ? await res.json() : [];
+      if (scanId !== currentScanId.current) return;
       const found = [...raw].sort((a, b) => {
         const aScore = a.score !== undefined && a.score !== null ? a.score : -Infinity;
         const bScore = b.score !== undefined && b.score !== null ? b.score : -Infinity;
@@ -1479,9 +1513,12 @@ function CameraScanner({ onAddSuccess, showToast }) {
       setScanMatches(found);
       setShowAllMatches(true);
     } catch {
-      showToast(t('scan.noOtherPrintings'), 'status');
+      if (scanId === currentScanId.current) showToast(t('scan.noOtherPrintings'), 'status');
     } finally {
-      setFindingPrintings(false);
+      if (scanId === currentScanId.current) {
+        setFindingPrintings(false);
+        scanAbortRef.current = null;
+      }
     }
   };
 
@@ -1491,6 +1528,10 @@ function CameraScanner({ onAddSuccess, showToast }) {
     if (!q || manualSearching || draftBusyRef.current) return;
     if (loadingRef.current) handleCancelScan();
     setManualSearching(true);
+    const scanId = ++currentScanId.current;
+    scanAbortRef.current?.abort();
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
     try {
       const p = new URLSearchParams({
         game: scanGame,
@@ -1502,6 +1543,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
       const searchResponse = hasImage
         ? await fetch('/api/search', {
             method: 'POST',
+            signal: controller.signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               game: scanGame,
@@ -1512,9 +1554,11 @@ function CameraScanner({ onAddSuccess, showToast }) {
               cropped: lastScanCroppedRef.current,
             }),
           })
-        : await fetch(`/api/search?${p.toString()}`);
+        : await fetch(`/api/search?${p.toString()}`, { signal: controller.signal });
+      if (scanId !== currentScanId.current) return;
       if (searchResponse.ok) {
         const m = await searchResponse.json();
+        if (scanId !== currentScanId.current) return;
         if (m.length) {
           const sorted = [...m].sort((a, b) => {
             const aScore = a.score !== undefined && a.score !== null ? a.score : -Infinity;
@@ -1523,6 +1567,8 @@ function CameraScanner({ onAddSuccess, showToast }) {
             return (b.image_url ? 1 : 0) - (a.image_url ? 1 : 0);
           });
           setScanMatches(sorted);
+          setLastMatches(sorted);
+          setScanStatus('');
           setIsDrawerOpen(false);
           setShowAllMatches(true);
         } else {
@@ -1532,17 +1578,28 @@ function CameraScanner({ onAddSuccess, showToast }) {
         showToast(t('scan.errManualSearch'), 'error');
       }
     } catch {
-      showToast(t('scan.errManualSearch'), 'error');
+      if (scanId === currentScanId.current) showToast(t('scan.errManualSearch'), 'error');
     } finally {
-      setManualSearching(false);
+      if (scanId === currentScanId.current) {
+        setManualSearching(false);
+        scanAbortRef.current = null;
+      }
     }
   };
 
   const closeDrawer = () => {
-    if (draftBusyRef.current || languageChanging || findingPrintings || manualSearching) return;
+    if (!priceCheck && (draftBusyRef.current || languageChanging || findingPrintings || manualSearching)) return;
     setIsDrawerOpen(false);
     setSelectedCard(null);
     setScanMatches([]);
+    if (priceCheck) {
+      currentScanId.current += 1;
+      scanAbortRef.current?.abort();
+      setManualSearching(false);
+      setFindingPrintings(false);
+      setScanStatus('');
+      setDebugTimings([]);
+    }
     setQuantity(1);
     setCondition('Near Mint');
     setPrinting('Normal');
@@ -1554,6 +1611,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   };
 
   const toggleDraftFoil = async (draft) => {
+    if (priceCheck) return;
     if (draftBusyRef.current || draftActionRef.current !== null) return;
     const action = `foil-${draft.draft_id}`;
     draftActionRef.current = action;
@@ -1578,6 +1636,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   };
 
   const discardDraft = async (draft) => {
+    if (priceCheck) return;
     if (draftActionRef.current !== null || draftBusyRef.current) return;
     if (!window.confirm(t('scan.confirmDiscard', { name: getCardDisplayName(draft.name, draft.printed_name) }))) return;
     draftActionRef.current = draft.draft_id;
@@ -1599,6 +1658,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
   };
 
   const actOnDrafts = async (action) => {
+    if (priceCheck) return;
     if (draftActionRef.current !== null || draftBusyRef.current || draftsLoading || draftsError || !scanDrafts.length || isDrawerOpen) return;
     const draftIds = scanDrafts.map(draft => draft.draft_id);
     if (action === 'clear' && !window.confirm(t('scan.confirmClear'))) return;
@@ -1629,6 +1689,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (priceCheck) return;
     if (!selectedCard || draftBusyRef.current || draftActionRef.current !== null || languageChanging || draftsLoading || draftsError) return;
     draftBusyRef.current = true;
     setDraftBusy(true);
@@ -1866,7 +1927,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
               <input
                 type="checkbox"
                 checked={showDetectOutline}
-                onChange={(e) => { setShowDetectOutline(e.target.checked); localStorage.setItem('scan_outline', e.target.checked ? '1' : '0'); }}
+                onChange={(e) => { setShowDetectOutline(e.target.checked); if (!priceCheck) localStorage.setItem('scan_outline', e.target.checked ? '1' : '0'); }}
                 style={{ accentColor: 'var(--accent-green)' }}
               />
             </label>
@@ -1882,7 +1943,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
               <input
                 type="checkbox"
                 checked={showDebug}
-                onChange={(e) => { setShowDebug(e.target.checked); localStorage.setItem('scan_debug', e.target.checked ? '1' : '0'); }}
+                onChange={(e) => { setShowDebug(e.target.checked); if (!priceCheck) localStorage.setItem('scan_debug', e.target.checked ? '1' : '0'); }}
                 style={{ accentColor: 'var(--accent-green)', flexShrink: 0 }}
               />
             </label>
@@ -1911,7 +1972,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 </div>
                 <input
                   type="range" min="0.2" max="0.9" step="0.01" value={minFill}
-                  onChange={(e) => { const v = parseFloat(e.target.value); setMinFill(v); localStorage.setItem('scan_min_fill', String(v)); }}
+                  onChange={(e) => { const v = parseFloat(e.target.value); setMinFill(v); if (!priceCheck) localStorage.setItem('scan_min_fill', String(v)); }}
                   style={{ width: '100%', accentColor: 'var(--accent-red)' }}
                 />
 
@@ -1923,7 +1984,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 </div>
                 <input
                   type="range" min="1" max="10" step="1" value={minSteady}
-                  onChange={(e) => { const v = parseInt(e.target.value, 10); setMinSteady(v); localStorage.setItem('scan_min_steady', String(v)); }}
+                  onChange={(e) => { const v = parseInt(e.target.value, 10); setMinSteady(v); if (!priceCheck) localStorage.setItem('scan_min_steady', String(v)); }}
                   style={{ width: '100%', accentColor: 'var(--accent-red)' }}
                 />
 
@@ -1947,7 +2008,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 max={SCAN_PROFILES.length - 1}
                 step="1"
                 value={scanDetail}
-                onChange={(e) => { const v = parseInt(e.target.value, 10); setScanDetail(v); localStorage.setItem('scan_detail', String(v)); }}
+                onChange={(e) => { const v = parseInt(e.target.value, 10); setScanDetail(v); if (!priceCheck) localStorage.setItem('scan_detail', String(v)); }}
                 style={{ width: '100%', accentColor: 'var(--accent-red)' }}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-muted)' }}>
@@ -2129,7 +2190,19 @@ function CameraScanner({ onAddSuccess, showToast }) {
           </div>
         </div>
       )}
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+      {priceCheck && <form onSubmit={handleManualSearch} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
+        <label htmlFor="price-check-search">{t('scan.manualSearchLabel')}</label>
+        <input id="price-check-search" type="text" className="form-input"
+          value={manualSearchText} onChange={e => setManualSearchText(e.target.value)}
+          placeholder={t('scan.manualSearchPlaceholder')} disabled={manualSearching}
+          style={{ fontSize: '1rem', minHeight: 44 }} />
+        <button type="submit" className="btn btn-secondary" disabled={manualSearching || !manualSearchText.trim()}>
+          {manualSearching ? <RefreshCw size={16} className="spin" aria-hidden="true" /> : <Search size={16} aria-hidden="true" />}
+          {t(manualSearching ? 'common.loading' : 'search.submit')}
+        </button>
+        {scanStatus && !loading && <button type="button" className="btn btn-secondary" onClick={closeDrawer}>{t('scan.rescan')}</button>}
+      </form>}
+      {!priceCheck && <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
         <button
           type="button"
           role="switch"
@@ -2151,7 +2224,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
         <p id="scan-auto-queue-hint" style={{ fontSize: '0.9375rem', lineHeight: 1.5, color: 'var(--text-secondary)', margin: 0 }}>
           {t('scan.autoAddHint')}
         </p>
-      </div>
+      </div>}
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.4rem', '--set-name-font-size': '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                 <label htmlFor="scan-set-filter" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
@@ -2550,7 +2623,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
-                {t('scan.selectCorrect')}
+                {t(priceCheck ? 'priceCheck.selectCorrect' : 'scan.selectCorrect')}
               </p>
               {draftBusy && <p role="status">{t('common.loading')}…</p>}
               {draftError && <p role="alert">{draftError}</p>}
@@ -2622,7 +2695,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
                 identify, and the answer is usually near the top. */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.75rem', maxHeight: '350px', overflowY: 'auto', padding: '0.25rem' }}>
               {(showAllMatches ? scanMatches : scanMatches.slice(0, PICKER_PREVIEW)).map(card => (
-                <button type="button" key={card.id} className="tcg-card" disabled={draftBusy || manualSearching || draftsLoading || draftsError || draftAction !== null} onClick={() => autoAddCard(card)} style={{ cursor: 'pointer', background: 'none', border: 0, padding: 0, font: 'inherit' }}>
+                <button type="button" key={card.id} className="tcg-card" disabled={draftBusy || manualSearching || draftsLoading || draftsError || draftAction !== null} onClick={() => priceCheck ? openQuickAdd(card) : autoAddCard(card)} style={{ cursor: 'pointer', background: 'none', border: 0, padding: 0, font: 'inherit' }}>
                   <div className="tcg-card-inner" style={{ border: '1px solid var(--border-glass-hover)' }}>
                     <img src={card.image_url} alt={getCardDisplayName(card.name, card.printed_name)} className="tcg-card-image" />
                   </div>
@@ -2634,8 +2707,8 @@ function CameraScanner({ onAddSuccess, showToast }) {
                     <div className="tcg-card-name" style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-strong)', lineHeight: 1.2 }}>{getCardDisplayName(card.name, card.printed_name)}</div>
                     <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>#{card.number}</div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{card.set_name}</div>
-                    <LangFallbackNote card={card} />
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-yellow)', marginTop: '0.2rem' }}>{priceText(card.price_trend, card.price_currency)}</div>
+                    <LangFallbackNote card={card} priceCheck={priceCheck} />
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-yellow)', marginTop: '0.2rem' }}>{priceCheck && !(card.price_trend > 0) ? t('priceCheck.unavailable') : priceText(card.price_trend, card.price_currency)}</div>
                   </div>
                 </button>
               ))}
@@ -2678,7 +2751,7 @@ function CameraScanner({ onAddSuccess, showToast }) {
       )}
 
       </div>
-      <section className="glass-panel scan-review" aria-labelledby="scan-review-title">
+      {!priceCheck && <section className="glass-panel scan-review" aria-labelledby="scan-review-title">
         <div className="scan-review-header">
           <div>
             <h2 id="scan-review-title">{t('scan.reviewTitle')} ({scanDrafts.length})</h2>
@@ -2724,10 +2797,50 @@ function CameraScanner({ onAddSuccess, showToast }) {
             </li>
           ))}
         </ul>
-      </section>
+      </section>}
 
       {/* Drawer Overlay for Selected Card */}
-      {isDrawerOpen && <Modal onClose={closeDrawer} aria-labelledby="scan-drawer-title">
+      {priceCheck && isDrawerOpen && selectedCard && <Modal onClose={closeDrawer} aria-labelledby="price-check-result-title" style={{ padding: '1rem' }}>
+        <div className="glass-panel scan-confirm-modal" style={{ maxWidth: '420px', width: '100%', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
+            <div style={{ minWidth: 0 }}>
+              <h2 id="price-check-result-title" style={{ margin: 0, fontSize: '1.25rem', overflowWrap: 'anywhere' }}>{getCardDisplayName(selectedCard.name, selectedCard.printed_name)}</h2>
+              <p style={{ margin: '0.5rem 0 0', color: 'var(--text-secondary)' }}>{selectedCard.set_name} · #{selectedCard.number} · {selectedCard.language || langName(scanLang)}</p>
+            </div>
+            <button type="button" className="btn btn-secondary btn-icon-only" onClick={closeDrawer} aria-label={t('common.close')}><X size={18} /></button>
+          </div>
+          {selectedCard.image_url && <img src={selectedCard.image_url} alt={getCardDisplayName(selectedCard.name, selectedCard.printed_name)} style={{ width: '100%', maxWidth: 220, aspectRatio: '5 / 7', objectFit: 'contain', alignSelf: 'center', borderRadius: 'var(--radius-sm)' }} />}
+          <LangFallbackNote card={selectedCard} priceCheck style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }} />
+          <div aria-live="polite">
+            <p style={{ margin: '0 0 0.5rem', color: 'var(--text-secondary)' }}>{t('priceCheck.estimate')}</p>
+            <dl style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', margin: 0 }}>
+              {getPrintings().map(finish => {
+                const price = getPrintingPrice(selectedCard, finish.value);
+                return <div key={finish.value} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                  <dt>{t(finish.value === 'Normal' ? 'priceCheck.normal' : 'priceCheck.foil')}</dt>
+                  <dd style={{ margin: 0, fontWeight: 700, color: 'var(--accent-yellow)' }}>{price !== null ? priceText(price, selectedCard.price_currency) : t('priceCheck.unavailable')}</dd>
+                </div>;
+              })}
+            </dl>
+            {selectedCard.price_normal == null && selectedCard.price_holofoil == null && selectedCard.price_trend > 0 && <p>
+              {t('priceCheck.genericEstimate')}: {priceText(resolveCardPrice(selectedCard), selectedCard.price_currency)}
+            </p>}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {lastMatches.length > 1 && <button type="button" className="btn btn-secondary" disabled={findingPrintings} onClick={() => { setIsDrawerOpen(false); setScanMatches(lastMatches); setShowAllMatches(true); }}>
+              <ListFilter size={16} aria-hidden="true" />{t('scan.backToMatches', { n: lastMatches.length })}
+            </button>}
+            <button type="button" className="btn btn-secondary" onClick={findOtherPrintings} disabled={findingPrintings}>
+              {findingPrintings ? <RefreshCw size={16} className="spin" aria-hidden="true" /> : <Layers size={16} aria-hidden="true" />}{t(findingPrintings ? 'scan.fetchingCandidates' : 'scan.changePrinting')}
+            </button>
+            <button type="button" className="btn btn-secondary" disabled={findingPrintings} onClick={() => { setIsDrawerOpen(false); setScanMatches([selectedCard]); setShowAllMatches(true); }}>
+              <Search size={16} aria-hidden="true" />{t('scan.changeCard')}
+            </button>
+          </div>
+          <button type="button" className="btn btn-primary" onClick={closeDrawer}><RefreshCw size={16} aria-hidden="true" />{t('scan.rescan')}</button>
+        </div>
+      </Modal>}
+      {!priceCheck && isDrawerOpen && <Modal onClose={closeDrawer} aria-labelledby="scan-drawer-title">
       <div className="quick-add-drawer open">
         {selectedCard && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { getCardDisplayName } from '../utils/langHelper';
@@ -9,6 +9,8 @@ import { useT } from '../utils/i18n';
 import CardInspectorModal from './CardInspectorModal';
 import CardImage from './CardImage';
 import DashboardAnalytics, { ChartDataTable } from './DashboardAnalytics';
+
+const CameraScanner = lazy(() => import('./CameraScanner'));
 
 const COLORS = [
   '#60a5fa', '#4ade80', '#fbbf24', '#f87171', '#a78bfa',
@@ -33,6 +35,10 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
   const [statsState, setStatsState] = useState(null);
   const [statsRefresh, setStatsRefresh] = useState(0);
   const [timePeriod, setTimePeriod] = useState('30d');
+  const [priceCheckOpen, setPriceCheckOpen] = useState(false);
+  const priceCheckButtonRef = useRef(null);
+  const backButtonRef = useRef(null);
+  const wasPriceCheckOpen = useRef(false);
   const gameFilter = defaultGameFilter();
   const [inventoryFilter, setInventoryFilter] = useState('all');
   const isArchive = inventoryFilter === 'graveyard';
@@ -52,6 +58,12 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
 
   // Clickable Card Inspector State
   const [inspectorCard, setInspectorCard] = useState(null);
+
+  useEffect(() => {
+    if (priceCheckOpen) backButtonRef.current?.focus();
+    else if (wasPriceCheckOpen.current) priceCheckButtonRef.current?.focus();
+    wasPriceCheckOpen.current = priceCheckOpen;
+  }, [priceCheckOpen]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -99,6 +111,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
         <div className="dashboard-actions">
           <button type="button" className="btn btn-secondary" onClick={() => onNavigate('collection')}>{t('nav.collection')}</button>
           <button type="button" className="btn btn-primary" onClick={() => onNavigate('add-cards')}>{t('nav.addCards')}</button>
+          <button ref={priceCheckButtonRef} type="button" className="btn btn-secondary" onClick={() => setPriceCheckOpen(true)}>{t('priceCheck.title')}</button>
         </div>
       </header>
       <div className="view-toolbar">
@@ -126,6 +139,21 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
       <p>{t(stats ? 'common.refreshing' : 'dash.loading')}</p>
     </div>
   ) : null;
+
+  if (priceCheckOpen) {
+    return (
+      <div className="dashboard-page">
+        <header className="page-heading">
+          <h1 className="page-title">{t('priceCheck.title')}</h1>
+          <button ref={backButtonRef} type="button" className="btn btn-secondary" onClick={() => setPriceCheckOpen(false)}>{t('priceCheck.backToDashboard')}</button>
+        </header>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>{t('priceCheck.hint')}</p>
+        <Suspense fallback={<div className="read-state read-state-initial" role="status"><div className="spinner" aria-hidden="true" /><p>{t('common.loading')}</p></div>}>
+          <CameraScanner mode="price-check" showToast={showToast} />
+        </Suspense>
+      </div>
+    );
+  }
 
   if (loading && !stats) {
     return <div className="dashboard-page">{renderFilters()}{statsStatus}</div>;

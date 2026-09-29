@@ -48,7 +48,7 @@ The guide text is currently English. Tables scroll horizontally on narrow screen
 
 | Area | Use it for |
 | --- | --- |
-| Dashboard | Quantities, valuation, growth, and deck-result summaries. |
+| Dashboard | Quantities, valuation, growth, deck-result summaries, and scan-only Price Check. |
 | Add Cards | Search, rapid entry, collection imports, preconstructed decks, and camera scanning. |
 | Collection | Find and inspect owned, planned, or archived cards; filter and export results. |
 | Storage | Physical and archived containers, positions, covers, filing, and moving copies. |
@@ -93,7 +93,15 @@ On narrow screens, use **More** for navigation items that are not shown in the b
 - Graveyard figures describe archived records separately. Original addition dates are not archive dates, and history is not a reconstruction of past archive membership.
 - Prices depend on printing and provider data. A graded copy's per-copy value can replace its raw market value. Manafolio does not convert currencies; mixed-currency totals must not be read as a converted single-currency sum.
 
+### Check a card's price without adding it
 
+1. On **Dashboard**, choose **Price Check**, immediately after **Add Cards**.
+2. Activate the camera and scan the card using the usual scanner controls. A known set filter helps narrow the matches.
+3. Compare the artwork, set, collector number, and language with your physical card. If recognition is uncertain, choose the correct candidate or printing before relying on its price.
+4. Read the available normal and foil prices in your selected currency. Cached and provider prices are estimates, not offers or guaranteed sale prices; an unavailable price does not mean zero.
+5. Scan another card, or choose **Back to Dashboard** to return to your previous inventory filter and history range.
+
+**Price Check does not add owned inventory or create, edit, clear, or commit Scan review drafts.** To record a card you own, leave Price Check and use **Add Cards**. Camera permissions, HTTPS requirements, and scanner catalog setup are the same as ordinary scanning; the static demo cannot perform live recognition or provider lookups.
 
 ## Add Cards: build an accurate inventory
 

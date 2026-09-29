@@ -30,6 +30,7 @@ Manafolio was originally forked from [Bindarr](https://github.com/thenotoriousJe
 - **Your own server.** Multi-user accounts, roles, invite-only registration by default, read-only API keys, optional public shares, account themes, and translated interfaces. Access the same server from desktop and phone browsers.
 - **Mana-inspired themes.** Arcane Blue and Jenny remain available alongside Plains, Island, Swamp, Mountain, Forest, and Wastes palettes. Each retains layered surfaces, metallic branding, and desktop/mobile navigation. Choose your account theme in Settings; removed Light, Magic, and LCARS selections fall back to Arcane Blue.
 - **Camera scanning.** Identify artwork candidates with local models and title/footer OCR, then save them to an account-scoped Scan review queue. Toggle foil or discard drafts before explicitly adding them to your collection; scanning needs additional server assets and HTTPS on phones.
+- **Price Check.** Scan from the Dashboard to inspect a printing's estimated normal and foil prices without adding inventory or changing Scan review drafts. Cached/provider prices use the selected currency and are not guaranteed sale prices.
 
 ## At a glance
 
