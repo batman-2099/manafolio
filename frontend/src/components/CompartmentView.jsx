@@ -21,7 +21,8 @@ function pocketColumns(capacity) {
 // counts occupancy on a stacking container (card, printing and language; not
 // condition). The first copy holds the slot and the rest ride along in its
 // quantity, so the page lays out from stacks rather than from rows.
-function stackPocketCards(cards) {
+function stackPocketCards(cards, highlightSet, pulledSet) {
+  const priority = card => highlightSet?.has(card.entry_id) ? 2 : pulledSet?.has(card.entry_id) ? 1 : 0;
   const stacks = new Map();
   for (const card of cards) {
     const key = `${card.card_id}|${card.printing || 'Normal'}|${card.language || 'English'}`;
@@ -31,6 +32,12 @@ function stackPocketCards(cards) {
       continue;
     }
     held.quantity += card.quantity || 1;
+    // In pull mode represent an actionable physical copy, not an unrelated
+    // first row. Keep the shared pocket's position and combined quantity.
+    if (priority(card) > priority(held)) {
+      const { quantity, position } = held;
+      Object.assign(held, card, { quantity, position });
+    }
     // Whichever copy is actually filed decides where the stack sits; an unplaced
     // one joining it must not drag the pocket back to "no position".
     if (!(held.position > 0) && card.position > 0) held.position = card.position;
@@ -242,7 +249,7 @@ export function FocusedCardInfo({ card, slotNumber, moveSelect = null }) {
             {card.quantity > 1 && <span style={{ ...infoChipStyle, color: 'var(--text-strong)' }}>x{card.quantity}</span>}
             {card.price_trend > 0 && (
               <span style={{ ...infoChipStyle, color: 'var(--accent-yellow)', marginLeft: 'auto' }}>
-                {t('compartment.value', { price: priceText(card.price_trend) })}
+                {t('compartment.value', { price: priceText(card.price_trend, card.price_currency) })}
               </span>
             )}
             {card.purchase_price > 0 && <span style={infoChipStyle}>{t('compartment.paid', { price: priceText(card.purchase_price) })}</span>}
@@ -470,7 +477,7 @@ export default function CompartmentView({
 
   if (isBinder) {
     const cols = pocketColumns(compartment.capacity);
-    const pocketCards = allowStacking ? stackPocketCards(cards) : cards;
+    const pocketCards = allowStacking ? stackPocketCards(cards, pullMode ? highlightSet : null, pullMode ? pulledSet : null) : cards;
     let maxSlotFromCards = compartment.capacity || 1;
     pocketCards.forEach(c => {
       if (c && c.position > 0) {

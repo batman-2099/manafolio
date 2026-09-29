@@ -106,8 +106,28 @@ async function main() {
       assert.strictEqual((await request('PUT', { scryfall_bulk_download_time: bad, scan_exclude_tokens: !before.scan_exclude_tokens })).status, 400);
       assert.deepStrictEqual(await (await request('GET')).json(), before, 'invalid time rejects the whole update before mutation');
     }
+    const beforeRow = await db.get('SELECT * FROM app_settings WHERE id = 1');
+    const combined = {
+      price_refresh_days: '7', scryfall_bulk_download_time: '12:34',
+      scan_exclude_tokens: true, scan_exclude_art_cards: true,
+      scan_exclude_jumpstart: true, scan_exclude_promos: true, setup_complete: true,
+    };
+    for (const public_base_url of ['ftp://example.test', null, 123, {}]) {
+      assert.strictEqual((await request('PUT', { ...combined, public_base_url })).status, 400);
+      assert.deepStrictEqual(await db.get('SELECT * FROM app_settings WHERE id = 1'), beforeRow,
+        'an invalid URL must leave every other submitted setting unchanged');
+    }
+    await db.run(`CREATE TRIGGER reject_settings BEFORE UPDATE OF public_base_url ON app_settings
+      BEGIN SELECT RAISE(ABORT, 'settings storage failure fixture'); END`);
+    assert.strictEqual((await request('PUT', { ...combined, public_base_url: 'https://example.test' })).status, 500);
+    assert.deepStrictEqual(await db.get('SELECT * FROM app_settings WHERE id = 1'), beforeRow,
+      'storage failure must reject the entire settings update');
+    await db.run('DROP TRIGGER reject_settings');
     assert.strictEqual((await request('PUT', { scryfall_bulk_download_time: '12:00' }, 'member')).status, 403);
     assert.deepStrictEqual(await (await request('GET')).json(), before);
+    const saved = await request('PUT', { ...combined, public_base_url: ' https://example.test/base/// ' });
+    assert.strictEqual(saved.status, 200);
+    assert.deepStrictEqual(await saved.json(), { ...combined, price_refresh_days: 7, public_base_url: 'https://example.test/base' });
     let downloadCalls = 0;
     bulk.refresh = async () => { downloadCalls++; throw new Error('private-server-path fixture'); };
     assert.strictEqual((await request('POST', {}, 'member', '/scryfall-bulk/download')).status, 403);

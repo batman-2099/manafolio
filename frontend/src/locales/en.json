@@ -318,6 +318,7 @@
   "collection.exportViewCsv": "Export view CSV",
   "collection.exportViewTxt": "Export view TXT",
   "common.loading": "Loading",
+  "common.mixedCurrencies": "Mixed currencies — totals are not converted.",
   "common.delete": "Delete",
   "common.cancel": "Cancel",
   "common.save": "Save",

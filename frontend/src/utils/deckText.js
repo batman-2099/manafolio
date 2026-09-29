@@ -54,3 +54,23 @@ export function parseDeckLine(line) {
 export function arenaCardKey(name, setId, number) {
   return `${String(name).trim().toLowerCase()}\0${String(setId).replace(/^mtg-/i, '').toLowerCase()}\0${String(number).toLowerCase()}`;
 }
+
+export function ownedImportIndex(cards) {
+  const byName = new Map();
+  const byPrinting = new Map();
+  for (const card of cards) {
+    for (const name of [card.name, card.printed_name].filter(Boolean)) {
+      const key = name.trim().toLowerCase();
+      const existing = byName.get(key);
+      if (!existing || existing.owned_qty < card.owned_qty) byName.set(key, card);
+      if (card.set_id && card.number) byPrinting.set(arenaCardKey(name, card.set_id, card.number), card);
+    }
+  }
+  return { byName, byPrinting };
+}
+
+export function findOwnedImportCard(parsed, index) {
+  return (parsed.setCode && parsed.number
+    ? index.byPrinting.get(arenaCardKey(parsed.name, parsed.setCode, parsed.number))
+    : index.byName.get(parsed.name.trim().toLowerCase())) || null;
+}

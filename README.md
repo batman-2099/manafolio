@@ -30,7 +30,7 @@ Manafolio was originally forked from [Bindarr](https://github.com/thenotoriousJe
 - **Your own server.** Multi-user accounts, roles, invite-only registration by default, read-only API keys, optional public shares, account themes, and translated interfaces. Access the same server from desktop and phone browsers.
 - **Mana-inspired themes.** Arcane Blue and Jenny remain available alongside Plains, Island, Swamp, Mountain, Forest, and Wastes palettes. Each retains layered surfaces, metallic branding, and desktop/mobile navigation. Choose your account theme in Settings; removed Light, Magic, and LCARS selections fall back to Arcane Blue.
 - **Camera scanning.** Identify artwork candidates with local models and title/footer OCR, then save them to an account-scoped Scan review queue. Toggle foil or discard drafts before explicitly adding them to your collection; scanning needs additional server assets and HTTPS on phones.
-- **Price Check.** Scan from the Dashboard to inspect a printing's estimated normal and foil prices without adding inventory or changing Scan review drafts. Cached/provider prices use the selected currency and are not guaranteed sale prices.
+- **Price Check.** Scan from the Dashboard to inspect a printing's estimated normal and foil prices without adding inventory or changing Scan review drafts, then return with dashboard filters preserved. Quotes retain their reported currency; the browser preference is only a fallback, not exchange-rate conversion or a guaranteed sale price.
 
 ## At a glance
 
@@ -164,11 +164,13 @@ Archive individual cards or a selection to **Graveyard** to retain their metadat
 
 In **Add Cards**, upload a ManaBox `.txt` export or a CSV, including Manafolio-style and MTG Arena collection exports. Choose the destination inventory before importing. TXT previews quantities, foil entries, and distinct printings; CSV review shows detected rows, validation errors, and editable column mappings before saving. Printings resolve through the local Scryfall catalog with API fallback.
 
+Imported quantities must be whole numbers from 1 to 2,147,483,647; an omitted quantity defaults to one. Malformed, fractional, zero, and negative quantities are reported as row errors rather than silently changed.
+
 The **Import activity** log reports lookups, rate-limit waits, preparation, and saving; completion summaries include failures and downloadable retry lists. Preparation is not a committed save. Leaving the page disconnects the log but does not roll back the import—check the destination before retrying after a lost connection.
 
 ### Export the current collection view
 
-Choose **Export view CSV** or **Export view TXT** in Collection. Export includes all matching results, not just the current page, respecting the inventory tab, search, filters, sorting, and duplicate stacking. It excludes hidden cards and other tabs. CSV includes printing, condition, language, and purchase price; TXT uses quantity, name, set, and collector number. Use a complete backup for the whole account.
+Choose **Export view CSV** or **Export view TXT** in Collection. Export includes all matching results across pages, respecting the inventory tab, search, filters, and sorting. It excludes hidden cards and other tabs. CSV preserves each underlying entry's printing, condition, language, and purchase price even when duplicate stacking is enabled. TXT combines matching name/set/collector-number entries into quantities. Use a complete backup for the whole account.
 
 ### Create and import decks
 
@@ -267,6 +269,8 @@ Saving rechecks ownership, quantities, copy limits, and cached rules atomically;
 
 Connect only to a trusted Manafolio server. The official [Codex app-server](https://developers.openai.com/codex/app-server/) integration requires a Unix server, including Docker, and disables model access to host files, commands, and external tools. Credentials are separated per user under `<database-directory>/codex/<user-id>/`, but administrators can access them. **Disconnect** removes that user's local Codex data. Collection JSON backups exclude credentials; whole-volume backups include them and must be protected. AI endpoints require browser sessions rather than API keys.
 
+Deleting an account also stops its local Codex work and removes its credential directory without contacting OpenAI or revoking provider-side authorization. A cleanup failure leaves the account undeleted and reports an error; retry deletion after correcting the filesystem problem. Existing backups are not erased.
+
 Gemini and OpenRouter keys are stored separately per user and provider in the server database, not returned to the browser. **Remove API key** deletes that provider's stored key without affecting other providers; revoke it at the provider to invalidate it externally. Administrators and database/volume backups can access these keys; account JSON exports exclude them. Gemini receives requests at Google's API, while OpenRouter forwards them to the selected model's upstream provider. Review both the gateway's and upstream provider's policies before sending data. Adding providers does not change existing saved provider choices.
 
 **Ollama deployment security.** Requests originate from the server, not the browser. Signed-in users can contact server-accessible HTTP(S) addresses, including localhost and private/LAN services. Invite only trusted users and enforce outbound network restrictions with your firewall; URL validation is not an access allowlist. Manafolio does not add Ollama authentication. Do not expose its port publicly.
@@ -294,7 +298,7 @@ For server recovery, preserve the persistent volume and keep protected backups o
    ```
 
    From source, run `node scripts/fetch-models.mjs` in `backend/`.
-2. Build the relevant language catalog under **Admin → Catalogs**. Downloading data and fingerprinting artwork can take hours; stopped builds retain completed work for resuming.
+2. Build the relevant language catalog under **Admin → Catalogs**. Downloading data and fingerprinting artwork can take hours. Stopped or failed builds keep the working catalog and cached card data; uncommitted embeddings are discarded. The next build reuses unchanged vectors from the last successful publication.
 3. Source installations need Tesseract at `/usr/bin/tesseract`, the path used by the scanner, with `eng` trained data (`/usr/bin/tesseract --list-langs`). On Debian/Ubuntu, install `tesseract-ocr tesseract-ocr-eng`. Source-built Docker images include both.
 
 Hold the card still until verification finishes. Auto-queue, including Turbo, requires two fresh photos to agree on the printing and pass safety checks. Settings changes, pausing, or leaving cancel pending verification. Native camera zoom is available only when supported by the browser/device; no simulated digital crop is applied.
@@ -324,7 +328,7 @@ Collection, deck, precon, and container imports consult a persistent Scryfall bu
 
 The separate `<DB_PATH>.scryfall-bulk.sqlite` file is rebuildable card data, not a collection backup. Allow space for it and a temporary replacement; failed updates retain the previous catalog. Imported prices initially reflect the snapshot, while scheduled price sweeps and stale-cache refreshes use the live API.
 
-Prices come from the printing's provider, primarily Scryfall, TCGplayer, and Cardmarket. Manafolio does not convert currencies; mixed-currency totals are identified as mixed. A graded copy's per-copy value replaces its raw market price in totals and exports.
+Prices come from the printing's provider, primarily Scryfall, TCGplayer, and Cardmarket. Known quote currencies take precedence over the browser's currency preference; Manafolio does not convert amounts. Collection totals show separate currency subtotals, and dashboard/public mixed totals are explicitly marked rather than presented as converted money. A graded copy's per-copy value replaces its raw market price in totals and exports.
 
 ## API access
 

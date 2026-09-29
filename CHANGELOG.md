@@ -4,6 +4,15 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Closed cross-account/wrong-parent compartment mutations, bound OIDC login state to the initiating browser with single-use consumption, and made account deletion dispose local Codex work and credentials.
+- Preserved quantity-row identities and metadata at startup; corrected quantity-aware purchase-cost splitting and cent allocation; made swaps, settings updates, and admin updates atomic.
+- Made local catalog publication use one atomic metadata commit with immutable binary generations. Failed/canceled builds retain working coverage; cache errors propagate, truncated NPY payloads are rejected, and experimental multi-view output is isolated from production.
+- Restored Brawl/Historic Brawl backup roundtrips, validated ordinary import quantities, and preserved underlying per-entry CSV metadata even when collection display stacks are enabled.
+- Fixed printing-lookup races, inspector draft cancellation, repeated Quick Add submissions, stale storage responses, submitted-search pagination, exact physical-deck printing resolution, and stacked-pocket checkout identity.
+- Kept source currencies on quotes and identified mixed totals, refreshed replaced artwork URLs, added scoped price-history failure/retry states, and restored progress polling after transient failures.
+- Preserved editable copy metadata when opening the inspector from Dashboard, and initialized drafts correctly when opening a previously closed inspector rather than leaving quantity/cost defaults.
+- Reused accessible native dialogs for public collection previews and synchronized list tabs with browser history. Removed unused Search location fetching and obsolete startup splitting/SQL-shaped test fakes.
+- Scoped test cleanup to each run's own temporary directory, added behavior regressions and frontend publication gates, revalidated stable model/ORT URLs, refreshed same-size ORT assets, and corrected bootstrap/binary deployment guidance.
 - Removed the unlinked web manifest and its unused icon files; the active SVG favicon and web application are unchanged.
 - Added 256 Ultra PRO Magic sleeve designs to the card-back picker, including all ten Guilds of Ravnica variants. Official images are cropped on selection, with sideways sleeves rotated without clipping; existing Save/Cancel and failed-download recovery are preserved.
 - Added 67 Ultimate Guard sleeve-back previews alongside Dragon Shield in the existing card-back picker, grouped by supplier and plain/art designs. Cropped previews are bundled to avoid the shop's cross-origin download restrictions; saved backs and explicit Save/Cancel behavior are unchanged.

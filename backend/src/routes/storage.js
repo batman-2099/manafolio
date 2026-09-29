@@ -377,6 +377,8 @@ router.put('/locations/:id/compartments/:comp_id', async (req, res) => {
   try {
     const loc = await db.get(`SELECT id FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
     if (!loc) return res.status(404).json({ error: 'Location not found' });
+    const comp = await getOwnedCompartment(comp_id, req.user.id);
+    if (!comp || comp.loc_id !== Number(id)) return res.status(404).json({ error: 'Compartment not found' });
 
     let ruleConfigJson;
     if (rule_config !== undefined) {
@@ -387,26 +389,10 @@ router.put('/locations/:id/compartments/:comp_id', async (req, res) => {
       }
     }
 
-    const updates = [];
-    const params = [];
-    if (label !== undefined) { updates.push('label = ?'); params.push(label || null); }
-    if (capacity !== undefined) { updates.push('capacity = ?'); params.push(Math.max(1, parseInt(capacity, 10) || 1)); }
-    if (rule_config !== undefined) { updates.push('rule_config = ?'); params.push(ruleConfigJson); }
-    if (locked !== undefined) { updates.push('locked = ?'); params.push(locked ? 1 : 0); }
-
-    if (updates.length > 0) {
-      params.push(comp_id, id);
-      await db.run(`UPDATE compartments SET ${updates.join(', ')} WHERE id = ? AND location_id = ?`, params);
-    }
-
-    if (Array.isArray(assignedFilters)) {
-      await db.run(`DELETE FROM compartment_assignments WHERE compartment_id = ?`, [comp_id]);
-      for (const filterVal of assignedFilters) {
-        if (filterVal) {
-          await db.run(`INSERT OR IGNORE INTO compartment_assignments (compartment_id, filter_value) VALUES (?, ?)`, [comp_id, filterVal]);
-        }
-      }
-    }
+    await db.withTransaction(async () => {
+      await updateCompartment(comp, { label, capacity, rule_config: ruleConfigJson, locked });
+      if (Array.isArray(assignedFilters)) await replaceCompartmentFilters(comp_id, assignedFilters);
+    });
 
     res.json({ message: 'Compartment updated successfully' });
   } catch (error) {
@@ -415,26 +401,32 @@ router.put('/locations/:id/compartments/:comp_id', async (req, res) => {
   }
 });
 
-router.delete('/locations/:id/compartments/:comp_id', async (req, res) => {
-  const { id, comp_id } = req.params;
+async function deleteCompartment(req, res) {
+  const nested = req.params.comp_id !== undefined;
+  const id = nested ? req.params.comp_id : req.params.id;
   try {
-    const loc = await db.get(`SELECT id FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
-    if (!loc) return res.status(404).json({ error: 'Location not found' });
-
-    const totalComps = await db.get(`SELECT COUNT(*) as count FROM compartments WHERE location_id = ?`, [id]);
-    if (totalComps.count <= 1) {
-      return res.status(400).json({ error: 'Cannot delete the last compartment of a location' });
-    }
-
-    await db.run(`UPDATE collection SET location_id = NULL, compartment_id = NULL, position = 0 WHERE compartment_id = ? AND user_id = ?`, [comp_id, req.user.id]);
-    await db.run(`DELETE FROM compartments WHERE id = ? AND location_id = ?`, [comp_id, id]);
-
-    res.json({ message: 'Compartment deleted successfully (cards inside moved to Unsorted)' });
+    const result = await db.withTransaction(async () => {
+      if (nested) {
+        const loc = await db.get(`SELECT id FROM locations WHERE id = ? AND user_id = ?`, [req.params.id, req.user.id]);
+        if (!loc) return { status: 404, error: 'Location not found' };
+      }
+      const comp = await getOwnedCompartment(id, req.user.id);
+      if (!comp || (nested && comp.loc_id !== Number(req.params.id))) return { status: 404, error: 'Compartment not found' };
+      const total = await db.get(`SELECT COUNT(*) AS count FROM compartments WHERE location_id = ?`, [comp.loc_id]);
+      if (total.count <= 1) return { status: 400, error: 'Cannot delete the last compartment of a location' };
+      await db.run(`UPDATE collection SET location_id = NULL, compartment_id = NULL, position = 0 WHERE compartment_id = ? AND user_id = ?`, [id, req.user.id]);
+      await db.run(`DELETE FROM compartments WHERE id = ? AND location_id = ?`, [id, comp.loc_id]);
+      return { message: `Compartment deleted${nested ? ' successfully' : ''} (cards inside moved to Unsorted)` };
+    });
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    res.json(result);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to delete compartment' });
   }
-});
+}
+
+router.delete('/locations/:id/compartments/:comp_id', deleteCompartment);
 
 // Flat compartment routes (compartment id is globally unique). The storage UI
 // edits rows/pages by bare compartment id; resolve the owning location for auth.
@@ -443,6 +435,24 @@ async function getOwnedCompartment(compId, userId) {
     SELECT cp.*, l.id AS loc_id, l.type AS loc_type, l.sort_order, l.foil_sorting, l.inventory_type
     FROM compartments cp JOIN locations l ON cp.location_id = l.id
     WHERE cp.id = ? AND l.user_id = ?`, [compId, userId]);
+}
+
+async function updateCompartment(comp, { label, capacity, rule_config, locked }, updateAll = false) {
+  if (capacity !== undefined) {
+    const cap = Math.max(1, parseInt(capacity, 10) || 1);
+    if (updateAll) await db.run(`UPDATE compartments SET capacity = ? WHERE location_id = ?`, [cap, comp.loc_id]);
+    else await db.run(`UPDATE compartments SET capacity = ? WHERE id = ?`, [cap, comp.id]);
+  }
+  if (label !== undefined) await db.run(`UPDATE compartments SET label = ? WHERE id = ?`, [label || null, comp.id]);
+  if (locked !== undefined) await db.run(`UPDATE compartments SET locked = ? WHERE id = ?`, [locked ? 1 : 0, comp.id]);
+  if (rule_config !== undefined) await db.run(`UPDATE compartments SET rule_config = ? WHERE id = ?`, [rule_config, comp.id]);
+}
+
+async function replaceCompartmentFilters(id, filters) {
+  await db.run(`DELETE FROM compartment_assignments WHERE compartment_id = ?`, [id]);
+  for (const filterVal of filters) {
+    if (filterVal) await db.run(`INSERT OR IGNORE INTO compartment_assignments (compartment_id, filter_value) VALUES (?, ?)`, [id, filterVal]);
+  }
 }
 
 router.patch('/compartments/:id', async (req, res) => {
@@ -459,14 +469,7 @@ router.patch('/compartments/:id', async (req, res) => {
       catch { return res.status(400).json({ error: 'rule_config must be valid JSON' }); }
     }
 
-    if (capacity !== undefined) {
-      const cap = Math.max(1, parseInt(capacity, 10) || 1);
-      if (updateAll) await db.run(`UPDATE compartments SET capacity = ? WHERE location_id = ?`, [cap, comp.loc_id]);
-      else await db.run(`UPDATE compartments SET capacity = ? WHERE id = ?`, [cap, id]);
-    }
-    if (label !== undefined) await db.run(`UPDATE compartments SET label = ? WHERE id = ?`, [label || null, id]);
-    if (locked !== undefined) await db.run(`UPDATE compartments SET locked = ? WHERE id = ?`, [locked ? 1 : 0, id]);
-    if (rule_config !== undefined) await db.run(`UPDATE compartments SET rule_config = ? WHERE id = ?`, [ruleConfigJson, id]);
+    await updateCompartment(comp, { label, capacity, rule_config: ruleConfigJson, locked }, updateAll);
 
     // Evict cards this row/page no longer accepts after a rule change.
     let evicted = 0;
@@ -494,21 +497,7 @@ router.patch('/compartments/:id', async (req, res) => {
   }
 });
 
-router.delete('/compartments/:id', async (req, res) => {
-  const { id } = req.params;
-  try {
-    const comp = await getOwnedCompartment(id, req.user.id);
-    if (!comp) return res.status(404).json({ error: 'Compartment not found' });
-    const total = await db.get(`SELECT COUNT(*) AS count FROM compartments WHERE location_id = ?`, [comp.loc_id]);
-    if (total.count <= 1) return res.status(400).json({ error: 'Cannot delete the last compartment of a location' });
-    await db.run(`UPDATE collection SET location_id = NULL, compartment_id = NULL, position = 0 WHERE compartment_id = ? AND user_id = ?`, [id, req.user.id]);
-    await db.run(`DELETE FROM compartments WHERE id = ?`, [id]);
-    res.json({ message: 'Compartment deleted (cards inside moved to Unsorted)' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to delete compartment' });
-  }
-});
+router.delete('/compartments/:id', deleteCompartment);
 
 router.put('/compartments/:id/filters', async (req, res) => {
   const { id } = req.params;
@@ -516,10 +505,7 @@ router.put('/compartments/:id/filters', async (req, res) => {
   try {
     const comp = await getOwnedCompartment(id, req.user.id);
     if (!comp) return res.status(404).json({ error: 'Compartment not found' });
-    await db.run(`DELETE FROM compartment_assignments WHERE compartment_id = ?`, [id]);
-    for (const filterVal of (Array.isArray(filters) ? filters : [])) {
-      if (filterVal) await db.run(`INSERT OR IGNORE INTO compartment_assignments (compartment_id, filter_value) VALUES (?, ?)`, [id, filterVal]);
-    }
+    await db.withTransaction(() => replaceCompartmentFilters(id, Array.isArray(filters) ? filters : []));
     res.json({ message: 'Filters updated' });
   } catch (error) {
     console.error(error);

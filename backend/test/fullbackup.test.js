@@ -192,6 +192,19 @@ async function testFullBackup() {
     assert.strictEqual(restoreRes.statusCode, 200);
     assert.strictEqual((await db.get('SELECT notes FROM decks WHERE user_id = 1 ORDER BY id')).notes, '',
       'nullable backup notes normalize to an empty string');
+
+    for (const format of ['Brawl', 'Historic Brawl']) {
+      await db.run(`UPDATE decks SET format = ?, commander_card_id = 'backup-card', notes = 'Brawl plans', wins = 8, losses = 2 WHERE name = 'Backup Deck'`, [format]);
+      const before = await db.get(`SELECT * FROM decks WHERE name = 'Backup Deck'`);
+      await exportBackup({ query: { format: 'backup' }, user: { id: 1 } }, res);
+      await importBackup({ body: { format: 'backup', data: res.body }, user: { id: 1 } }, restoreRes);
+      assert.strictEqual(restoreRes.statusCode, 200, `${format} commander backups must restore`);
+      const after = await db.get(`SELECT * FROM decks WHERE name = 'Backup Deck'`);
+      assert.notStrictEqual(after.id, before.id);
+      assert.deepStrictEqual({ ...after, id: before.id }, before, 'Brawl metadata must survive the backup roundtrip unchanged');
+      assert.deepStrictEqual(await db.all('SELECT card_id, quantity, checked_out FROM deck_cards WHERE deck_id = ?', [after.id]),
+        [{ card_id: 'backup-card', quantity: 2, checked_out: 1 }], 'Brawl card references remap to the restored deck');
+    }
   } finally {
     try { db.dbConnection.close(); } catch { /* already closed */ }
     for (const suffix of ['', '-wal', '-shm']) {

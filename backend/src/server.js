@@ -225,12 +225,6 @@ db.initDb()
 
     scryfallBulkSchedule.start().catch(err => console.error('Scryfall bulk scheduler failed:', err.message));
 
-    // Un-stack legacy multi-quantity entries so every copy is its own row (one
-    // physical card = one storage slot). No-op once migrated.
-    const { splitStackedEntries } = require('./utils/collectionHelpers');
-    const splitCount = await splitStackedEntries(db);
-    if (splitCount > 0) console.log(`Split ${splitCount} stacked collection copies into individual rows.`);
-
     // Magic set data comes from Scryfall.
     await scryfallApi.fetchAndCacheSets();
 
@@ -373,12 +367,12 @@ app.use('/api/settings', settingsRoutes);
 // what the user aims with and what the server matches cannot disagree. That
 // means the browser has to be able to fetch the model — unauthenticated, because
 // the outline runs before login is relevant and the file is public weights.
-// Immutable: the filename changes when the model does.
+// The URL is stable across model upgrades, so clients must revalidate it.
 // Only the corner model. Serving the whole directory would also expose the
 // 56 MB embedding catalog, which the browser never needs and which nobody
 // should be able to pull off an install by guessing a filename.
 app.get('/models/cornelius.onnx', (req, res) => {
-  res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+  res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
   // MODEL_DIR, not a hardcoded backend/data: the container keeps the models on
   // the persisted volume (CV_MODEL_DIR=/app/database/models). Hardcoded, this
   // 404'd in every Docker install, the worker fell back to the pure-JS contour
@@ -389,13 +383,9 @@ app.get('/models/cornelius.onnx', (req, res) => {
 });
 
 const frontendBuildPath = path.join(__dirname, '../../frontend/dist');
-// A year, immutable. Vite content-hashes every asset filename, so a changed file
-// is a changed URL and a stale cache cannot happen. Without this the browser
-// revalidated the entire bundle on every reload — the megabyte-scale wasm
-// included — which on a phone is the difference between an instant open and a
-// wait. index.html is served by the catch-all below and stays uncached, so a
-// deploy is still picked up immediately.
-app.use(express.static(frontendBuildPath, { maxAge: '1y', immutable: true, index: false }));
+// Only Vite's hashed build assets are immutable. Public/ORT filenames are stable.
+app.use('/assets', express.static(path.join(frontendBuildPath, 'assets'), { maxAge: '1y', immutable: true }));
+app.use(express.static(frontendBuildPath, { maxAge: 0, index: false }));
 
 // Catch-all route to serve Index.html in production
 app.get('*', (req, res, next) => {

@@ -6,13 +6,19 @@ const CONDITION_MAP = {
   'damaged': 'Damaged', 'dmg': 'Damaged', 'poor': 'Damaged'
 };
 
+function csvQuantity(value) {
+  if (value === undefined || value === '') return 1;
+  const quantity = Number(value);
+  return Number.isFinite(quantity) ? quantity : value;
+}
+
 // ponytail: only the collector-number precedence differs between these formats.
 function marketplaceCsvRow(row, collector_number) {
   return {
     name: row['Card Name'] || row['Name'],
     set_code: row['Set Code'] || row['Set'],
     collector_number,
-    quantity: parseInt(row['Quantity'], 10) || 1,
+    quantity: csvQuantity(row['Quantity']),
     condition: CONDITION_MAP[(row['Condition'] || '').toLowerCase()] || 'Near Mint',
     printing: (row['Printing'] === 'Foil' || row['Printing'] === 'Holofoil') ? 'Holofoil' : 'Normal',
     game: 'mtg'
@@ -26,7 +32,7 @@ const STRATEGIES = {
     set_name: row['Set Name'] || row['set_name'],
     collector_number: row['Card Number'] || row['card_number'] || row['number'],
     card_id: row['Card ID'] || row['card_id'],
-    quantity: parseInt(row['Quantity'] || row['quantity'], 10) || 1,
+    quantity: csvQuantity(row['Quantity'] === '' ? row['quantity'] : row['Quantity'] ?? row['quantity']),
     condition: CONDITION_MAP[(row['Condition'] || '').toLowerCase()] || 'Near Mint',
     printing: row['Printing'] || 'Normal',
     language: row['Language'] || 'English',
@@ -37,7 +43,7 @@ const STRATEGIES = {
     name: row['Name'],
     set_code: row['Edition'],
     collector_number: row['Collector Number'],
-    quantity: parseInt(row['Count'], 10) || 1,
+    quantity: csvQuantity(row['Count']),
     condition: CONDITION_MAP[(row['Condition'] || '').toLowerCase()] || 'Near Mint',
     printing: (row['Foil'] === 'true' || row['Foil'] === '1') ? 'Holofoil' : 'Normal',
     language: row['Language'] || 'English',
@@ -49,7 +55,7 @@ const STRATEGIES = {
     name: row['Name'] || row['Card Name'],
     set_code: row['Set code'] || row['Set Code'] || row['Set'],
     collector_number: row['Card number'] || row['Number'],
-    quantity: parseInt(row['Quantity'], 10) || 1,
+    quantity: csvQuantity(row['Quantity']),
     condition: CONDITION_MAP[(row['Condition'] || '').toLowerCase()] || 'Near Mint',
     printing: (row['Foil'] === 'true' || row['Foil'] === '1' || row['Foil'] === true) ? 'Holofoil' : 'Normal',
     game: 'mtg'
@@ -63,7 +69,7 @@ function mappedCsvRow(row, mapping) {
     set_code: value('set_code'),
     collector_number: value('collector_number'),
     card_id: value('card_id'),
-    quantity: parseInt(value('quantity'), 10) || 1,
+    quantity: csvQuantity(value('quantity')),
     condition: CONDITION_MAP[value('condition').toLowerCase()] || 'Near Mint',
     printing: /^(true|1|foil|holofoil)$/i.test(printing) ? 'Holofoil' : printing || 'Normal',
     language: value('language') || 'English',

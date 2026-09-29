@@ -14,14 +14,14 @@ export const SYMBOLS = Object.fromEntries(CURRENCIES.map(({ code, symbol }) => [
 export const getCurrency = () => {
   try {
     const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('manafolio_currency') : null;
-    return (stored && SYMBOLS[stored]) ? stored : DEFAULT_CURRENCY;
+    return Object.hasOwn(SYMBOLS, stored) ? stored : DEFAULT_CURRENCY;
   } catch {
     return DEFAULT_CURRENCY;
   }
 };
 
 export const setCurrency = (code) => {
-  const next = SYMBOLS[code] ? code : DEFAULT_CURRENCY;
+  const next = Object.hasOwn(SYMBOLS, code) ? code : DEFAULT_CURRENCY;
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem('manafolio_currency', next);
   }
@@ -31,7 +31,7 @@ export const setCurrency = (code) => {
 };
 
 export const currencySymbol = (currency) => {
-  const code = (currency && SYMBOLS[currency]) ? currency : getCurrency();
+  const code = Object.hasOwn(SYMBOLS, currency) ? currency : getCurrency();
   return SYMBOLS[code] || '$';
 };
 
@@ -39,6 +39,5 @@ export const activeCurrencySymbol = () => SYMBOLS[getCurrency()] || '$';
 
 export const formatPrice = (p) => (parseFloat(p) || 0).toFixed(2);
 
-// Formats a price using the app's single active currency setting.
-// Enforces one uniform currency across the entire application.
-export const priceText = (p) => `${activeCurrencySymbol()}${formatPrice(p)}`;
+// An explicit source currency labels the original amount; this performs no FX.
+export const priceText = (p, currency) => `${currencySymbol(currency)}${formatPrice(p)}`;

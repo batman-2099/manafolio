@@ -1,9 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CURRENCIES,
   DEFAULT_CURRENCY,
-  SYMBOLS,
   getCurrency,
   setCurrency,
   currencySymbol,
@@ -41,8 +39,6 @@ test('currency configuration and defaults', () => {
   assert.equal(currencySymbol(), '$');
   assert.equal(activeCurrencySymbol(), '$');
   assert.equal(priceText(5), '$5.00');
-  // Even if an old row had EUR currency, priceText uses the active currency (USD)
-  assert.equal(priceText(5, 'EUR'), '$5.00');
 });
 
 test('currency selection and priceText formatting', () => {
@@ -54,7 +50,6 @@ test('currency selection and priceText formatting', () => {
   assert.equal(currencySymbol(), '€');
   assert.equal(activeCurrencySymbol(), '€');
   assert.equal(priceText(19.99), '€19.99');
-  assert.equal(priceText(19.99, 'USD'), '€19.99'); // Enforces single active currency
 
   // Test GBP
   setCurrency('GBP');
@@ -89,12 +84,16 @@ test('currency selection and priceText formatting', () => {
   localStorage.clear();
 });
 
-test('CURRENCIES list has valid codes and labels', () => {
-  assert.ok(CURRENCIES.length >= 6);
-  for (const c of CURRENCIES) {
-    assert.ok(c.code && typeof c.code === 'string');
-    assert.ok(c.symbol && typeof c.symbol === 'string');
-    assert.ok(c.label && typeof c.label === 'string');
-    assert.equal(SYMBOLS[c.code], c.symbol);
-  }
+test('source currency takes precedence without converting the amount', () => {
+  localStorage.clear();
+  setCurrency('GBP');
+  assert.equal(priceText(19.99, 'USD'), '$19.99');
+  assert.equal(priceText('19.99', 'EUR'), '€19.99');
+  assert.equal(priceText(0, 'JPY'), '¥0.00');
+  assert.equal(priceText(-2.5, 'CAD'), 'C$-2.50');
+  assert.equal(priceText(19.99), '£19.99');
+  assert.equal(priceText(19.99, null), '£19.99');
+  assert.equal(priceText(19.99, 'INVALID'), '£19.99');
+  assert.equal(priceText(19.99, 'toString'), '£19.99');
+  localStorage.clear();
 });

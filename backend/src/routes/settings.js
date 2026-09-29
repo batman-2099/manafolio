@@ -112,6 +112,8 @@ router.put('/', requireAdmin, async (req, res) => {
     setup_complete,
   } = req.body;
 
+  const updates = {};
+
   if (scryfall_bulk_download_time !== undefined &&
       (typeof scryfall_bulk_download_time !== 'string' || scryfall_bulk_download_time.length !== 5 || !/^([01]\d|2[0-3]):[0-5]\d$/.test(scryfall_bulk_download_time))) {
     return res.status(400).json({ error: 'Scryfall bulk download time must be HH:mm in UTC (00:00–23:59).' });
@@ -125,37 +127,35 @@ router.put('/', requireAdmin, async (req, res) => {
     if (!Number.isInteger(n) || n < 0 || n > 30) {
       return res.status(400).json({ error: 'Price refresh interval must be a whole number of days from 0 (off) to 30.' });
     }
-    await db.run(`UPDATE app_settings SET price_refresh_days = ? WHERE id = 1`, [n]);
+    updates.price_refresh_days = n;
   }
-  if (scan_exclude_tokens !== undefined) {
-    await db.run(`UPDATE app_settings SET scan_exclude_tokens = ? WHERE id = 1`, [scan_exclude_tokens ? 1 : 0]);
-  }
-  if (scan_exclude_art_cards !== undefined) {
-    await db.run(`UPDATE app_settings SET scan_exclude_art_cards = ? WHERE id = 1`, [scan_exclude_art_cards ? 1 : 0]);
-  }
-  if (scan_exclude_jumpstart !== undefined) {
-    await db.run(`UPDATE app_settings SET scan_exclude_jumpstart = ? WHERE id = 1`, [scan_exclude_jumpstart ? 1 : 0]);
-  }
-  if (scan_exclude_promos !== undefined) {
-    await db.run(`UPDATE app_settings SET scan_exclude_promos = ? WHERE id = 1`, [scan_exclude_promos ? 1 : 0]);
-  }
-
-  if (setup_complete !== undefined) {
-    await db.run(`UPDATE app_settings SET setup_complete = ? WHERE id = 1`, [setup_complete ? 1 : 0]);
+  for (const [key, value] of Object.entries({
+    scan_exclude_tokens, scan_exclude_art_cards, scan_exclude_jumpstart,
+    scan_exclude_promos, setup_complete,
+  })) {
+    if (value !== undefined) updates[key] = value ? 1 : 0;
   }
 
   if (public_base_url !== undefined) {
+    if (typeof public_base_url !== 'string') {
+      return res.status(400).json({ error: 'Public base URL must be a string' });
+    }
     const trimmed = public_base_url.trim();
     if (trimmed && !/^https?:\/\//i.test(trimmed)) {
       return res.status(400).json({ error: 'Public base URL must start with http:// or https://' });
     }
-    const cleaned = trimmed.replace(/\/+$/, '');
-    await db.run(`UPDATE app_settings SET public_base_url = ? WHERE id = 1`, [cleaned]);
+    updates.public_base_url = trimmed.replace(/\/+$/, '');
   }
 
   try {
     if (scryfall_bulk_download_time !== undefined) {
-      await db.run('UPDATE app_settings SET scryfall_bulk_download_time = ? WHERE id = 1', [scryfall_bulk_download_time]);
+      updates.scryfall_bulk_download_time = scryfall_bulk_download_time;
+    }
+    const fields = Object.keys(updates);
+    if (fields.length) {
+      await db.run(`UPDATE app_settings SET ${fields.map(key => `${key} = ?`).join(', ')} WHERE id = 1`, Object.values(updates));
+    }
+    if (scryfall_bulk_download_time !== undefined) {
       scryfallBulkSchedule.reschedule(scryfall_bulk_download_time);
     }
     res.json(await getEffectiveSettings());

@@ -325,6 +325,7 @@
   "common.edit": "편집",
   "common.errBackend": "백엔드 연결에 실패했습니다.",
   "common.loading": "불러오는 중",
+  "common.mixedCurrencies": "여러 통화가 포함되어 있습니다. 합계는 환산되지 않습니다.",
   "common.logoAlt": "Manafolio 로고",
   "dash.analytics": "통계",
   "common.next": "다음",

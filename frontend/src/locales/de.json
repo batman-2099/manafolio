@@ -495,6 +495,7 @@
   "common.edit": "Bearbeiten",
   "common.errBackend": "Fehler bei der Verbindung zum Backend.",
   "common.loading": "Wird geladen",
+  "common.mixedCurrencies": "Gemischte Währungen — Summen werden nicht umgerechnet.",
   "common.logoAlt": "Manafolio-Logo",
   "common.next": "Weiter",
   "common.rename": "Umbenennen",

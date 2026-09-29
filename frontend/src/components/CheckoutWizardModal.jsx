@@ -119,7 +119,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
           const sortOrder = loc.sort_order || 'custom';
           if (sortOrder === 'custom') cards.sort((a, b) => (a.position || 0) - (b.position || 0));
           else sortCardsByOrder(cards, sortOrder, loc.foil_sorting, setsList);
-          next[pg.key] = { compartment: comp, cards, locationType: loc.type || 'Binder', sortOrder };
+          next[pg.key] = { compartment: comp, cards, locationType: loc.type || 'Binder', sortOrder, allowStacking: !!loc.allow_stacking };
         } catch (err) {
           console.error('Failed to load compartment layout', err);
         }
@@ -216,6 +216,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
           compartment={grid.compartment}
           cards={grid.cards}
           locationType={grid.locationType}
+          allowStacking={grid.allowStacking}
           sortOrder={grid.sortOrder}
           setsList={setsList}
           highlightEntryIds={undoneIds}

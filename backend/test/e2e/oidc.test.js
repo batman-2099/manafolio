@@ -125,11 +125,22 @@ async function runTests() {
     currentNonce = authUrl.searchParams.get('nonce');
     assert(currentNonce, 'the authorization request must carry a nonce');
     assert(state, 'state parameter must be present');
+    const cookie = loginRes.headers.get('set-cookie');
+    assert.match(cookie, /HttpOnly/i);
+    assert.match(cookie, /SameSite=Lax/i);
+    for (const headers of [{}, { Cookie: 'manafolio_oidc=unrelated-browser' }]) {
+      const rejected = await fetch(`${base}/api/auth/oidc/callback?code=stolen&state=${encodeURIComponent(state)}`, {
+        redirect: 'manual', headers,
+      });
+      const params = new URL(rejected.headers.get('location'), base).searchParams;
+      assert.strictEqual(params.get('oidc_token'), null);
+      assert.match(params.get('oidc_error'), /cookie/i);
+    }
     console.log('PASS: F7-TC2');
 
     // F7-TC3: GET /api/auth/oidc/callback handles code exchange and returns token
     const callbackRes = await fetch(`${base}/api/auth/oidc/callback?code=valid-auth-code&state=${encodeURIComponent(state)}`, {
-      redirect: 'manual'
+      redirect: 'manual', headers: { Cookie: loginRes.headers.get('set-cookie').split(';')[0] }
     });
     assert.strictEqual(callbackRes.status, 302, 'callback must redirect to frontend');
     const callbackRedirect = callbackRes.headers.get('location');
@@ -138,6 +149,13 @@ async function runTests() {
     const callbackUrl = new URL(callbackRedirect, base);
     const issuedToken = callbackUrl.searchParams.get('oidc_token');
     assert(issuedToken, 'issued token must be non-empty');
+    assert.match(callbackRes.headers.get('set-cookie'), /Expires=Thu, 01 Jan 1970/i);
+    const reused = await fetch(`${base}/api/auth/oidc/callback?code=reused&state=${encodeURIComponent(state)}`, {
+      redirect: 'manual', headers: { Cookie: cookie.split(';')[0] },
+    });
+    const reusedParams = new URL(reused.headers.get('location'), base).searchParams;
+    assert.strictEqual(reusedParams.get('oidc_token'), null);
+    assert.match(reusedParams.get('oidc_error'), /reused/i);
     console.log('PASS: F7-TC3');
 
     // F7-TC4: First OIDC user on fresh instance is bootstrapped as instance owner admin
@@ -162,7 +180,7 @@ async function runTests() {
     const state2 = authUrl2.searchParams.get('state');
     currentNonce = authUrl2.searchParams.get('nonce');
     const callbackRes2 = await fetch(`${base}/api/auth/oidc/callback?code=valid-auth-code-2&state=${encodeURIComponent(state2)}`, {
-      redirect: 'manual'
+      redirect: 'manual', headers: { Cookie: loginRes2.headers.get('set-cookie').split(';')[0] }
     });
     const token2 = new URL(callbackRes2.headers.get('location'), base).searchParams.get('oidc_token');
     const meRes2 = await fetch(`${base}/api/auth/me`, {
@@ -181,7 +199,7 @@ async function runTests() {
     const state3 = authUrl3.searchParams.get('state');
     currentNonce = authUrl3.searchParams.get('nonce');
     const callbackRes3 = await fetch(`${base}/api/auth/oidc/callback?code=valid-auth-code-3&state=${encodeURIComponent(state3)}`, {
-      redirect: 'manual'
+      redirect: 'manual', headers: { Cookie: loginRes3.headers.get('set-cookie').split(';')[0] }
     });
     const token3 = new URL(callbackRes3.headers.get('location'), base).searchParams.get('oidc_token');
     const meRes3 = await fetch(`${base}/api/auth/me`, {
@@ -218,7 +236,7 @@ async function runTests() {
     const state4 = authUrl4.searchParams.get('state');
     currentNonce = authUrl4.searchParams.get('nonce');
     const callbackRes4 = await fetch(`${base}/api/auth/oidc/callback?code=valid-auth-code-4&state=${encodeURIComponent(state4)}`, {
-      redirect: 'manual'
+      redirect: 'manual', headers: { Cookie: loginRes4.headers.get('set-cookie').split(';')[0] }
     });
     const takeoverRedirect = new URL(callbackRes4.headers.get('location'), base);
     assert.strictEqual(takeoverRedirect.searchParams.get('oidc_token'), null,
@@ -238,7 +256,7 @@ async function runTests() {
     const state5 = authUrl5.searchParams.get('state');
     currentNonce = authUrl5.searchParams.get('nonce');
     const callbackRes5 = await fetch(`${base}/api/auth/oidc/callback?code=valid-auth-code-5&state=${encodeURIComponent(state5)}`, {
-      redirect: 'manual'
+      redirect: 'manual', headers: { Cookie: loginRes5.headers.get('set-cookie').split(';')[0] }
     });
     const ownerToken = new URL(callbackRes5.headers.get('location'), base).searchParams.get('oidc_token');
     assert(ownerToken, 'the identity that bootstrapped the owner must still log in');
@@ -268,7 +286,7 @@ async function runTests() {
     // The IdP answers with the nonce from some other login, not this one.
     currentNonce = 'a-nonce-from-a-different-login';
     const callbackRes6 = await fetch(`${base}/api/auth/oidc/callback?code=valid-auth-code-6&state=${encodeURIComponent(state6)}`, {
-      redirect: 'manual'
+      redirect: 'manual', headers: { Cookie: loginRes6.headers.get('set-cookie').split(';')[0] }
     });
     const replay = new URL(callbackRes6.headers.get('location'), base).searchParams;
     assert.strictEqual(replay.get('oidc_token'), null, 'a mismatched nonce must not issue a session');
@@ -370,7 +388,7 @@ async function runUsernameLinkTests() {
     const state = authUrl.searchParams.get('state');
     currentNonce = authUrl.searchParams.get('nonce');
     const res = await fetch(`${base}/api/auth/oidc/callback?code=${code}&state=${encodeURIComponent(state)}`, {
-      redirect: 'manual'
+      redirect: 'manual', headers: { Cookie: loginRes.headers.get('set-cookie').split(';')[0] }
     });
     return new URL(res.headers.get('location'), base).searchParams;
   };

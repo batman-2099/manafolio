@@ -1,11 +1,14 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { spawn } = require('child_process');
 
 const TEST_DIR = __dirname;
 const files = fs.readdirSync(TEST_DIR)
   .filter(f => f.endsWith('.test.js') && f !== 'run.js')
   .sort();
+
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'manafolio-e2e-'));
 
 let totalPassed = 0;
 let totalFailed = 0;
@@ -22,7 +25,11 @@ async function runTestFile(file) {
     // account when a password is pinned — a real fresh install gets its owner
     // from the setup wizard instead, and a headless test has no browser.
     const child = spawn('node', [path.join(TEST_DIR, file)], {
-      env: { ...process.env, DEFAULT_ADMIN_PASSWORD: 'test-admin-password' },
+      env: {
+        ...process.env, DEFAULT_ADMIN_PASSWORD: 'test-admin-password',
+        TMPDIR: tempDir, TMP: tempDir, TEMP: tempDir,
+        DB_PATH: path.join(tempDir, `${file}.db`),
+      },
     });
     
     let filePassed = 0;
@@ -70,6 +77,7 @@ async function runTestFile(file) {
 
 async function main() {
   console.log(`Discovered ${files.length} E2E test files under ${TEST_DIR}.`);
+  if (!files.length) throw new Error('No E2E test files found');
   for (const file of files) {
     await runTestFile(file);
   }
@@ -83,10 +91,12 @@ async function main() {
   console.log(`  Total test cases:  ${totalPassed + totalFailed}`);
   console.log(`=========================================`);
   
-  process.exit(failedSuites > 0 ? 1 : 0);
+  process.exitCode = failedSuites > 0 ? 1 : 0;
 }
 
 main().catch(err => {
   console.error('Unhandled runner error:', err);
-  process.exit(1);
+  process.exitCode = 1;
+}).finally(() => {
+  fs.rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });

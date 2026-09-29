@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay, MouseSensor, useSensor, useSensors, useDraggable, useDroppable, pointerWithin } from '@dnd-kit/core';
 import { Plus, Minus, Trash2, X, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, Edit3, Download, Search, SlidersHorizontal, Layers } from 'lucide-react';
 import { sortCardsByOrder } from '../utils/cardSort';
+import { priceText } from '../utils/formatPrice';
 import { getFoilOverlayClass, getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
 import { getCardRarityBorder, getRarityBadgeStyle, getRarityBadgeLabel } from '../utils/cardRarity';
 import CardInspectorModal from './CardInspectorModal';
@@ -176,7 +177,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const locationsLoading = locationStatus.inventoryType !== inventoryType || locationStatus.loading;
   const locationsError = locationStatus.inventoryType === inventoryType && locationStatus.error;
   const [activeLocationId, setActiveLocationId] = useState(null);
-  const [compartments, setCompartments] = useState([]);
+  const [compartmentData, setCompartmentData] = useState({ locationId: null, inventoryType, items: [] });
+  const compartmentsRequest = useRef(0);
+  const activeLocationRef = useRef(activeLocationId);
+  activeLocationRef.current = activeLocationId;
+  const compartments = useMemo(() => compartmentData.locationId === activeLocationId && compartmentData.inventoryType === inventoryType ? compartmentData.items : [], [compartmentData, activeLocationId, inventoryType]);
   const [allCards, setAllCards] = useState([]);
   const [loadedCardsKey, setLoadedCardsKey] = useState(null);
   const [cardsError, setCardsError] = useState(false);
@@ -491,13 +496,22 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     }
   }, [inventoryType, cardsKey]);
 
-  const fetchCompartments = async (locId) => {
-    if (!locId) { setCompartments([]); return; }
+  const fetchCompartments = useCallback(async (locId) => {
+    if (activeLocationRef.current !== locId || inventoryRef.current !== inventoryType) return;
+    const request = ++compartmentsRequest.current;
+    if (!locId) {
+      setCompartmentData({ locationId: locId, inventoryType, items: [] });
+      return;
+    }
     try {
       const res = await fetch(`/api/locations/${locId}/compartments`);
-      if (res.ok) setCompartments(await res.json());
+      if (!res.ok) throw new Error('Failed to load compartments');
+      const items = await res.json();
+      if (request === compartmentsRequest.current && activeLocationRef.current === locId && inventoryRef.current === inventoryType) {
+        setCompartmentData({ locationId: locId, inventoryType, items });
+      }
     } catch (err) { console.error(err); }
-  };
+  }, [inventoryType]);
 
   // The gallery uses summary covers; workspace rules and filing need the full
   // inventory, including the unassigned queue (the API only scopes compartments).
@@ -524,8 +538,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   }, [needsCards, cardsReady, fetchAllCards]);
 
   useEffect(() => {
+    const requests = compartmentsRequest;
     fetchCompartments(activeLocationId);
-  }, [activeLocationId, statsTrigger]);
+    return () => { requests.current++; };
+  }, [activeLocationId, statsTrigger, fetchCompartments]);
 
   useEffect(() => {
     if (selectedLocationId) {
@@ -2771,7 +2787,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         </div>
                         <div style={{ fontSize: '0.62rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.set_name || ''}</span>
-                          {card.price_trend > 0 && <span style={{ color: 'var(--accent-yellow)', fontWeight: 600, flexShrink: 0 }}>${card.price_trend.toFixed(2)}</span>}
+                          {card.price_trend > 0 && <span style={{ color: 'var(--accent-yellow)', fontWeight: 600, flexShrink: 0 }}>{priceText(card.price_trend, card.price_currency)}</span>}
                         </div>
                       </div>
                         </>
@@ -2810,7 +2826,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
                       {card.price_trend > 0 && (
                         <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--accent-yellow)', flexShrink: 0 }}>
-                          ${card.price_trend.toFixed(2)}
+                          {priceText(card.price_trend, card.price_currency)}
                         </span>
                       )}
                         </>

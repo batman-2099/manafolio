@@ -5,13 +5,17 @@ import { useSyncExternalStore } from 'react';
 // whatever has been contributed back and committed to the repo); see
 // backend/src/cardArt.js.
 
-export const artUrl = (cardId) => `/api/card-art/${encodeURIComponent(cardId)}.png`;
+export const artUrl = (cardId) => {
+  const revision = revisions.get(cardId);
+  return `/api/card-art/${encodeURIComponent(cardId)}.png${revision ? `?v=${revision}` : ''}`;
+};
 
 // Which cards have art, fetched once per page load. Without this, the only way to
 // find out would be to request the art and see if it 404s — which for a grid of a
 // few hundred artless cards means a few hundred pointless requests, every scroll.
 let ids = new Set();
 let started = false;
+const revisions = new Map();
 const listeners = new Set();
 
 // useSyncExternalStore compares snapshots by identity, so the Set object must be
@@ -45,6 +49,7 @@ export function useCardArtIndex() {
 // Fold a just-uploaded (or just-deleted) card into the index so the change shows
 // up everywhere immediately instead of after a reload.
 export function noteArtChanged(cardId, present) {
+  revisions.set(cardId, Math.max(Date.now(), (revisions.get(cardId) || 0) + 1));
   const next = new Set(ids);
   if (present) next.add(cardId); else next.delete(cardId);
   emit(next);

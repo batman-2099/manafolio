@@ -43,10 +43,11 @@ async function getScryfallSets() {
   const scryfallApi = require('./scryfallApi');
   try {
     const r = await scryfallApi.scryGetRetried('https://api.scryfall.com/sets');
-    scryfallSetsCache = r.data.data || [];
+    if (!Array.isArray(r.data.data) || !r.data.data.length) throw new Error('Scryfall returned no sets');
+    scryfallSetsCache = r.data.data;
     scryfallSetsCacheAt = Date.now();
-  } catch {
-    if (!scryfallSetsCache) scryfallSetsCache = [];
+  } catch (e) {
+    if (!scryfallSetsCache) throw e;
   }
   return scryfallSetsCache;
 }
@@ -118,18 +119,13 @@ async function mtgSetFamilyQuery(set, lang, { excludeChildCodes = [] } = {}) {
   const code = norm(set);
   const codes = new Set([code]);
   const exclusions = await getScanExclusions();
-  try {
-    const data = await getScryfallSets();
-    for (const s of data) {
-      // norm() on both sides, matching getMtgChildSets — the UI lists the family
-      // from that function and the build queries it from this one, so a
-      // difference here means indexing something other than what was shown.
-      if (s.parent_set_code && norm(s.parent_set_code) === code && !s.digital
-          && childAllowed(s, exclusions, excludeChildCodes)) {
-        codes.add(s.code);
-      }
+  const data = await getScryfallSets();
+  for (const s of data) {
+    if (s.parent_set_code && norm(s.parent_set_code) === code && !s.digital
+        && childAllowed(s, exclusions, excludeChildCodes)) {
+      codes.add(s.code);
     }
-  } catch { /* /sets unreachable: fall back to the main set only */ }
+  }
   const sets = [...codes].map(c => `set:${c}`).join(' or ');
   // Language is a search keyword (and needs include_multilingual on the request,
   // added by mtgSearchUrl below) — Scryfall has no lang parameter.
@@ -199,12 +195,10 @@ async function cacheSetCards(game, set, lang, { excludeChildCodes = [] } = {}) {
 // Cache full card data so the post-match /api/search is an instant local
 // card_cache hit instead of a live (throttled) provider fetch per scan.
 async function cacheFetchedCards(cards, code) {
-  try {
-    const scryfallApi = require('./scryfallApi');
-    const seen = new Set();
-    const rows = cards.filter(c => c.id && (seen.has(c.id) ? false : seen.add(c.id)));
-    await scryfallApi.cacheCards(rows.map(c => scryfallApi.normalizeCard(c, code)));
-  } catch (e) { console.warn(`cardSets: caching cards failed: ${e.message}`); }
+  const scryfallApi = require('./scryfallApi');
+  const seen = new Set();
+  const rows = cards.filter(c => c.id && (seen.has(c.id) ? false : seen.add(c.id)));
+  await scryfallApi.cacheCards(rows.map(c => scryfallApi.normalizeCard(c, code)));
 }
 
 module.exports = {

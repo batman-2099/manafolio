@@ -1285,67 +1285,65 @@ router.post('/collection/:id/place', async (req, res) => {
   const { id } = req.params;
   const { compartment_id, slot, swap_with } = req.body;
   try {
-    const entry = await db.get(`SELECT * FROM collection WHERE id = ? AND user_id = ?`, [id, req.user.id]);
-    if (!entry) return res.status(404).json({ error: 'Collection entry not found' });
+    const result = await db.withTransaction(async () => {
+      const entry = await db.get(`SELECT * FROM collection WHERE id = ? AND user_id = ?`, [id, req.user.id]);
+      if (!entry) throw new AddCardError(404, 'Collection entry not found');
 
-    const comp = await db.get(`
-      SELECT c.id, c.capacity, l.id AS loc_id, l.type AS loc_type, l.sort_order, l.allow_stacking, l.inventory_type
-      FROM compartments c JOIN locations l ON c.location_id = l.id
-      WHERE c.id = ? AND l.user_id = ?`, [compartment_id, req.user.id]);
-    if (!comp) return res.status(400).json({ error: 'Invalid compartment' });
-    assertStorageInventory(comp, entry.list_type);
-    if (comp.sort_order !== 'custom') return res.status(400).json({ error: 'Manual placement is only available in Custom order' });
+      const comp = await db.get(`
+        SELECT c.id, c.capacity, l.id AS loc_id, l.type AS loc_type, l.sort_order, l.allow_stacking, l.inventory_type
+        FROM compartments c JOIN locations l ON c.location_id = l.id
+        WHERE c.id = ? AND l.user_id = ?`, [compartment_id, req.user.id]);
+      if (!comp) throw new AddCardError(400, 'Invalid compartment');
+      assertStorageInventory(comp, entry.list_type);
+      if (comp.sort_order !== 'custom') throw new AddCardError(400, 'Manual placement is only available in Custom order');
 
-    const isBinder = isBinderType(comp.loc_type);
+      const isBinder = isBinderType(comp.loc_type);
 
-    if (swap_with) {
-      const other = await db.get(`SELECT * FROM collection WHERE id = ? AND user_id = ?`, [swap_with, req.user.id]);
-      if (!other) return res.status(400).json({ error: 'Swap target not found' });
-      assertStorageInventory(comp, other.list_type);
-      if (other.compartment_id !== Number(compartment_id)) return res.status(400).json({ error: 'Swap target must belong to the destination compartment' });
-      if (entry.location_id) {
-        const source = await db.get('SELECT inventory_type FROM locations WHERE id = ? AND user_id = ?', [entry.location_id, req.user.id]);
-        if (!source) return res.status(400).json({ error: 'Invalid source container' });
-        assertStorageInventory(source, other.list_type);
-      }
-      // Stacking container: dropping a copy onto its own twin joins that pocket
-      // rather than trading places with it — trading two identical cards is a
-      // no-op the user can see no result from.
-      if (comp.allow_stacking && stackKey(entry) === stackKey(other)) {
+      if (swap_with) {
+        const other = await db.get(`SELECT * FROM collection WHERE id = ? AND user_id = ?`, [swap_with, req.user.id]);
+        if (!other) throw new AddCardError(400, 'Swap target not found');
+        assertStorageInventory(comp, other.list_type);
+        if (other.compartment_id !== Number(compartment_id)) throw new AddCardError(400, 'Swap target must belong to the destination compartment');
+        if (entry.location_id) {
+          const source = await db.get('SELECT inventory_type FROM locations WHERE id = ? AND user_id = ?', [entry.location_id, req.user.id]);
+          if (!source) throw new AddCardError(400, 'Invalid source container');
+          assertStorageInventory(source, other.list_type);
+        }
+        // Identical copies join a stacking pocket rather than trading places.
+        if (comp.allow_stacking && stackKey(entry) === stackKey(other)) {
+          await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
+            [other.compartment_id, other.location_id, other.position, id, req.user.id]);
+          return { message: 'Card stacked', placement: await describePlacement(db, id, req.user.id) };
+        }
         await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
           [other.compartment_id, other.location_id, other.position, id, req.user.id]);
-        const stackedPlacement = await describePlacement(db, id, req.user.id);
-        return res.json({ message: 'Card stacked', placement: stackedPlacement });
+        await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
+          [entry.compartment_id, entry.location_id, entry.position, swap_with, req.user.id]);
+        return { message: 'Cards swapped', placement: await describePlacement(db, id, req.user.id) };
       }
-      await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
-        [other.compartment_id, other.location_id, other.position, id, req.user.id]);
-      await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
-        [entry.compartment_id, entry.location_id, entry.position, swap_with, req.user.id]);
-      const placement = await describePlacement(db, id, req.user.id);
-      return res.json({ message: 'Cards swapped', placement });
-    }
 
-    if (!Number.isInteger(slot) || slot < 1) return res.status(400).json({ error: 'Invalid slot' });
+      if (!Number.isInteger(slot) || slot < 1) throw new AddCardError(400, 'Invalid slot');
 
-    const sourceComp = entry.compartment_id;
-    if (isBinder) {
-      await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
-        [compartment_id, comp.loc_id, slot * 1000, id, req.user.id]);
-    } else {
-      await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
-        [compartment_id, comp.loc_id, slot * 1000 - 500, id, req.user.id]);
-      await rebalanceCompartmentByScheme(db, compartment_id, 'custom');
-    }
-
-    if (sourceComp && sourceComp !== compartment_id) {
-      const src = await db.get(`SELECT l.type AS loc_type FROM compartments c JOIN locations l ON c.location_id = l.id WHERE c.id = ?`, [sourceComp]);
-      if (src && !isBinderType(src.loc_type)) {
-        await rebalanceCompartmentByScheme(db, sourceComp, 'custom');
+      const sourceComp = entry.compartment_id;
+      if (isBinder) {
+        await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
+          [compartment_id, comp.loc_id, slot * 1000, id, req.user.id]);
+      } else {
+        await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
+          [compartment_id, comp.loc_id, slot * 1000 - 500, id, req.user.id]);
+        await rebalanceCompartmentByScheme(db, compartment_id, 'custom');
       }
-    }
 
-    const placement = await describePlacement(db, id, req.user.id);
-    res.json({ message: 'Card placed', placement });
+      if (sourceComp && sourceComp !== compartment_id) {
+        const src = await db.get(`SELECT l.type AS loc_type FROM compartments c JOIN locations l ON c.location_id = l.id WHERE c.id = ?`, [sourceComp]);
+        if (src && !isBinderType(src.loc_type)) {
+          await rebalanceCompartmentByScheme(db, sourceComp, 'custom');
+        }
+      }
+
+      return { message: 'Card placed', placement: await describePlacement(db, id, req.user.id) };
+    });
+    res.json(result);
   } catch (error) {
     if (error.status) return res.status(error.status).json({ error: error.message });
     console.error(error);
@@ -1465,21 +1463,29 @@ router.post('/collection/bulk', async (req, res) => {
     if (action === 'purchase_split') {
       const total = parseFloat(value && value.total);
       const method = value && value.method === 'equal' ? 'equal' : 'weighted';
-      if (!(total >= 0)) return res.status(400).json({ error: 'total must be a non-negative number' });
-      const rows = await db.all(
-        `SELECT c.id, COALESCE(cc.price_trend, 0) AS price FROM collection c
-         LEFT JOIN card_cache cc ON cc.id = c.card_id
-         WHERE c.id IN (${placeholders}) AND c.user_id = ?`,
-        [...ids, req.user.id]
-      );
-      if (rows.length === 0) return res.status(400).json({ error: 'No valid entries' });
-      const sum = rows.reduce((s, r) => s + (r.price || 0), 0);
-      const weighted = method === 'weighted' && sum > 0;
-      const shares = splitPrice(rows.map(r => r.price || 0), total, method);
-      for (let i = 0; i < rows.length; i++) {
-        await db.run(`UPDATE collection SET purchase_price = ? WHERE id = ? AND user_id = ?`, [shares[i], rows[i].id, req.user.id]);
+      if (!Number.isFinite(total) || total < 0 || !Number.isSafeInteger(Math.round(total * 100))) {
+        return res.status(400).json({ error: 'total must be a finite non-negative cent amount' });
       }
-      return res.json({ message: `Split $${total.toFixed(2)} across ${rows.length} card(s) (${weighted ? 'by value' : 'evenly'})`, affected: rows.length });
+      const result = await db.withTransaction(async () => {
+        const rows = await db.all(
+          `SELECT c.id, c.quantity, COALESCE(cc.price_trend, 0) AS price FROM collection c
+           LEFT JOIN card_cache cc ON cc.id = c.card_id
+           WHERE c.id IN (${placeholders}) AND c.user_id = ? ORDER BY c.id`,
+          [...ids, req.user.id]
+        );
+        if (rows.length === 0) throw new AddCardError(400, 'No valid entries');
+        const weighted = method === 'weighted' && rows.some(r => Number.isFinite(r.price) && r.price > 0);
+        const weights = rows.map(r => r.quantity * (weighted ? (Number.isFinite(r.price) && r.price > 0 ? r.price : 0) : 1));
+        const shares = splitPrice(weights, total, 'weighted');
+        // Allocate cents per entry, retaining fractional-cent per-copy costs:
+        // rounding each copy would lose money or require splitting reserved rows.
+        for (let i = 0; i < rows.length; i++) {
+          await db.run(`UPDATE collection SET purchase_price = ? WHERE id = ? AND user_id = ?`,
+            [shares[i] / rows[i].quantity, rows[i].id, req.user.id]);
+        }
+        return { message: `Split $${total.toFixed(2)} across ${rows.reduce((n, r) => n + r.quantity, 0)} card(s) (${weighted ? 'by value' : 'evenly'})`, affected: rows.length };
+      });
+      return res.json(result);
     }
 
     const locationId = value ? parseInt(value, 10) : null;

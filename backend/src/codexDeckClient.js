@@ -12,7 +12,8 @@ const MAX_SESSIONS = 8;
 const MAX_PROMPT_BYTES = 512 * 1024;
 const MAX_MESSAGE_BYTES = 2 * 1024 * 1024;
 const sessions = new Map();
-const operations = new Set();
+const operations = new Map();
+const disposedUsers = new Set();
 
 // Security-sensitive: reviewed against rust-v0.155.1, not the moving CLI defaults.
 // thread/start + turn/start environments:[] removes shell/apply_patch/view_image
@@ -68,6 +69,10 @@ function userKey(userId) {
   return String(value);
 }
 
+function userHome(key) {
+  return path.resolve(path.dirname(require('./db').dbPath), 'codex', key);
+}
+
 async function privateDirectory(directory) {
   await fs.mkdir(directory, { recursive: true, mode: 0o700 });
   const stat = await fs.lstat(directory);
@@ -83,16 +88,16 @@ async function createSession(key) {
   const pkg = require(pkgPath);
   if (pkg.version !== VERSION) throw failure(503, 'The installed Codex version needs a security review.');
   const executable = path.resolve(path.dirname(pkgPath), pkg.bin.codex);
-  const root = path.resolve(path.dirname(require('./db').dbPath), 'codex');
-  const home = path.join(root, key);
+  const home = userHome(key);
+  const root = path.dirname(home);
   await privateDirectory(root);
   await privateDirectory(home);
   // A fresh runtime lives outside the application tree: no repository config or
   // AGENTS.md is discovered, and HOME never points at the server operator's home.
   const runtime = await fs.mkdtemp(path.join(os.tmpdir(), 'manafolio-codex-'));
-  await fs.chmod(runtime, 0o700);
   let child;
   try {
+    await fs.chmod(runtime, 0o700);
     for (const name of ['home', 'work', 'tmp']) await privateDirectory(path.join(runtime, name));
     child = childProcess.spawn(process.execPath, [
       executable, 'app-server', '--listen', 'stdio://', '--strict-config',
@@ -126,14 +131,18 @@ async function createSession(key) {
   let loginCompletion;
   const pending = new Map();
   const session = { home, runtime, login: null, ready: null, close, request, touch, runTurn };
-  let resolveClosed;
-  const closed = new Promise(resolve => { resolveClosed = resolve; });
+  let resolveClosed, rejectClosed;
+  const closed = new Promise((resolve, reject) => { resolveClosed = resolve; rejectClosed = reject; });
+  closed.catch(error => console.error('Codex runtime cleanup failed:', error.message));
   let cleanupStarted = false;
 
   function cleanup() {
     if (cleanupStarted) return;
     cleanupStarted = true;
-    fs.rm(runtime, { recursive: true, force: true }).then(resolveClosed, resolveClosed);
+    fs.rm(runtime, { recursive: true, force: true }).then(() => {
+      if (sessions.get(key) === session) sessions.delete(key);
+      resolveClosed();
+    }, rejectClosed);
   }
 
   function close(error = failure(503, 'The AI connection closed. Please try again.')) {
@@ -142,7 +151,6 @@ async function createSession(key) {
     clearTimeout(idleTimer);
     clearTimeout(loginTimer);
     session.login = null;
-    if (sessions.get(key) === session) sessions.delete(key);
     for (const item of pending.values()) {
       clearTimeout(item.timer);
       item.reject(error);
@@ -388,11 +396,14 @@ async function getSession(key) {
 
 async function withOperation(userId, action) {
   const key = userKey(userId);
+  if (disposedUsers.has(key)) throw failure(410, 'This AI account has been deleted.');
   if (operations.has(key)) throw failure(409, 'Another AI action is in progress. Please wait.');
-  operations.add(key);
+  let finish;
+  operations.set(key, new Promise(resolve => { finish = resolve; }));
   let session;
   try {
     session = await getSession(key);
+    if (disposedUsers.has(key)) throw failure(410, 'This AI account has been deleted.');
     return await action(session);
   } catch (error) {
     if (session && error.status !== 409) await session.close(error);
@@ -400,6 +411,7 @@ async function withOperation(userId, action) {
     throw failure(503, 'The isolated AI connection is unavailable.');
   } finally {
     operations.delete(key);
+    finish();
     session?.touch();
   }
 }
@@ -427,6 +439,22 @@ async function logout(userId) {
     // Remove persisted auth and any account-scoped cache without ever reading tokens.
     await fs.rm(session.home, { recursive: true, force: true });
   });
+}
+
+// Administrative deletion is local-only, even if Codex is unavailable or offline.
+async function disposeUser(userId) {
+  const key = userKey(userId);
+  disposedUsers.add(key);
+  const operation = operations.get(key);
+  const entry = sessions.get(key);
+  if (entry) {
+    const session = await entry;
+    await session.close(failure(410, 'This AI account has been deleted.'));
+  }
+  // Creation and an already-running operation must finish before removing auth:
+  // neither may recreate directories after this function returns.
+  if (operation) await operation;
+  await fs.rm(userHome(key), { recursive: true, force: true });
 }
 
 // rust-v0.155.1 ModelListResponse uses data/nextCursor; Model.model is the
@@ -523,4 +551,4 @@ async function shutdown() {
   await Promise.allSettled([...sessions.values()].map(async entry => (await entry).close()));
 }
 
-module.exports = { account, login, logout, models, suggest, shutdown };
+module.exports = { account, login, logout, models, suggest, disposeUser, shutdown };

@@ -28,27 +28,29 @@ const MTG_COLOR_FG = {
 // Self-contained: owns its edit form (PUT) and delete (DELETE) so every screen
 // gets the same rich view + edit without duplicating the form. onUpdate() lets
 // the parent refetch after a change. onViewStorage is optional (hidden if absent).
-function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onViewStorage, startInEdit = false }) {
+function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, onViewStorage, startInEdit = false }) {
   const { t } = useT();
-  const [mode, setMode] = useState('view');
+  const [mode, setMode] = useState(startInEdit ? 'edit' : 'view');
   const [locations, setLocations] = useState([]);
-  const [q, setQ] = useState(1);
-  const [condition, setCondition] = useState('Near Mint');
-  const [printing, setPrinting] = useState('Normal');
-  const [language, setLanguage] = useState('English');
-  const [purchasePrice, setPurchasePrice] = useState(0);
-  const [locationId, setLocationId] = useState('');
-  const [isTrade, setIsTrade] = useState(0);
-  const [favorite, setFavorite] = useState(0);
-  const [listType, setListType] = useState('collection');
-  const [missing, setMissing] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [grader, setGrader] = useState('Raw');
-  const [grade, setGrade] = useState('');
-  const [certNumber, setCertNumber] = useState('');
-  const [marketValue, setMarketValue] = useState('');
+  const [q, setQ] = useState(card.quantity ?? 1);
+  const [condition, setCondition] = useState(card.condition || 'Near Mint');
+  const [printing, setPrinting] = useState(card.printing || 'Normal');
+  const [language, setLanguage] = useState(card.language || 'English');
+  const [purchasePrice, setPurchasePrice] = useState(card.purchase_price || 0);
+  const [locationId, setLocationId] = useState(card.location_id || '');
+  const [isTrade, setIsTrade] = useState(card.is_trade ? 1 : 0);
+  const [favorite, setFavorite] = useState(card.favorite ? 1 : 0);
+  const [listType, setListType] = useState(card.list_type || 'collection');
+  const [missing, setMissing] = useState(!!card.missing);
+  const [notes, setNotes] = useState(card.notes || '');
+  const grader = card.grader || 'Raw';
+  const grade = card.grade == null ? '' : String(card.grade);
+  const certNumber = card.cert_number || '';
+  const [marketValue, setMarketValue] = useState(card.market_value == null ? '' : String(card.market_value));
   const [localizedCard, setLocalizedCard] = useState(null);
-  const [prevTargetId, setPrevTargetId] = useState(card?.entry_id || card?.id || null);
+  const printingRequest = useRef(0);
+  const printingPending = useRef(false);
+  const [localizing, setLocalizing] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [creatingCommanderDeck, setCreatingCommanderDeck] = useState(false);
   const [deckListVersion, setDeckListVersion] = useState(0);
@@ -74,13 +76,11 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
   useBackGuard(isFullScreen, () => setIsFullScreen(false));
 
   const targetEntryId = card?.entry_id || card?.id;
-  if (targetEntryId !== prevTargetId) {
-    setPrevTargetId(targetEntryId);
-    if (localizedCard) setLocalizedCard(null);
-    if (isFullScreen) setIsFullScreen(false);
-  }
+  const targetRef = useRef(targetEntryId);
+  targetRef.current = targetEntryId;
+  useEffect(() => () => { printingRequest.current++; }, []);
 
-  const activeCard = card ? (localizedCard || card) : null;
+  const activeCard = card && localizedCard?.targetId === targetEntryId ? localizedCard.card : card;
 
   useEffect(() => {
     if (!targetEntryId) return;
@@ -93,56 +93,39 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
     return () => { cancelled = true; };
   }, [targetEntryId, listType]);
 
-  useEffect(() => {
-    if (!card) return;
-    setLocalizedCard(null);
-    hasToggledRef.current = false;
-    setMode(startInEdit ? 'edit' : 'view');
-    setQ(card.quantity ?? 1);
-    setCondition(card.condition || 'Near Mint');
-    setPrinting(card.printing || 'Normal');
-    setLanguage(card.language || 'English');
-    setPurchasePrice(card.purchase_price || 0);
-    setLocationId(card.location_id || '');
-    setIsTrade(card.is_trade ? 1 : 0);
-    setFavorite(card.favorite ? 1 : 0);
-    setListType(card.list_type || 'collection');
-    setNotes(card.notes || '');
-    setGrader(card.grader || 'Raw');
-    setGrade(card.grade == null ? '' : String(card.grade));
-    setCertNumber(card.cert_number || '');
-    setMissing(!!card.missing);
-    setMarketValue(card.market_value == null ? '' : String(card.market_value));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset form only when the entry changes, not on every card mutation
-  }, [targetEntryId, startInEdit]);
-
   const handleLanguageChange = async (newLang) => {
     setLanguage(newLang);
     if (!activeCard) return;
+    const request = ++printingRequest.current;
+    const target = targetEntryId;
+    const isCurrent = () => request === printingRequest.current && target === targetRef.current;
+    printingPending.current = true;
+    setLocalizing(true);
     try {
       const cardId = activeCard.card_id || activeCard.id;
       const resp = await fetch(`/api/cards/${encodeURIComponent(cardId)}/printing?lang=${encodeURIComponent(newLang)}&game=${activeCard.game || activeCard.supertype || ''}`);
       if (resp.ok) {
         const localized = await resp.json();
-        if (localized && localized.id) {
-          const updated = {
-            ...(card || {}),
-            ...localized,
-            card_id: localized.id,
-            language: newLang,
-          };
-          if (card) {
-            Object.assign(card, updated);
-          }
-          setLocalizedCard(updated);
+        if (isCurrent() && localized?.id) {
+          setLocalizedCard({ targetId: target, card: { ...card, ...localized, entry_id: card.entry_id, card_id: localized.id, language: newLang } });
+          return;
         }
       }
+      if (isCurrent()) setLanguage(activeCard.language || 'English');
     } catch (e) {
+      if (isCurrent()) setLanguage(activeCard.language || 'English');
       console.warn('Could not switch to localized printing:', e);
+    } finally {
+      if (isCurrent()) {
+        printingPending.current = false;
+        setLocalizing(false);
+      }
     }
   };
 
   const handleClose = () => {
+    printingRequest.current++;
+    setLocalizedCard(null);
     if (hasToggledRef.current && onUpdate) {
       onUpdate();
     }
@@ -155,7 +138,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!targetEntryId) return;
+    if (!targetEntryId || printingPending.current) return;
     const qNum = Math.max(1, parseInt(q, 10) || 1);
     try {
       const res = await fetch(`/api/collection/${targetEntryId}`, {
@@ -190,24 +173,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
         })
       });
       if (res.ok) {
-        card.quantity = qNum;
-        card.condition = condition;
-        card.printing = printing;
-        card.language = language;
-        card.purchase_price = parseFloat(purchasePrice) || 0;
-        card.location_id = locationId ? parseInt(locationId, 10) : null;
-        card.list_type = listType;
-        card.is_trade = isTrade ? 1 : 0;
-        card.favorite = favorite ? 1 : 0;
-        card.missing = missing ? 1 : 0;
-        card.notes = notes;
-        card.grader = grader;
-        card.grade = grade === '' ? null : parseFloat(grade);
-        card.cert_number = certNumber.trim() || null;
-        card.market_value = marketValue === '' ? null : parseFloat(marketValue);
-        // The server resolves this per printing on the next fetch; mirror it here so
-        // a screen still holding this object does not show the old printing's price.
-        card.price_trend = resolveCardPrice(card, printing);
+        // Parent state is refreshed only after persistence, never while drafting.
         showToast && showToast(t('inspector.entryUpdated'), 'success');
         onUpdate && onUpdate();
         onClose();
@@ -607,8 +573,8 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setMode('view')} style={{ flex: 1 }}>{t('common.cancel')}</button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 2 }}>{t('inspector.saveChanges')}</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { printingRequest.current++; printingPending.current = false; setLocalizing(false); setLocalizedCard(null); setLanguage(card.language || 'English'); setMode('view'); }} style={{ flex: 1 }}>{t('common.cancel')}</button>
+                <button type="submit" className="btn btn-primary" disabled={localizing} aria-busy={localizing} style={{ flex: 2 }}>{t('inspector.saveChanges')}</button>
               </div>
             </form>
           ) : (
@@ -758,8 +724,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
                   <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent-yellow)', marginTop: '0.15rem' }}>
                     {priceText(displayPrice, activeCard.price_currency)}
                   </div>
-                  {/* Say where a non-English price came from and in what currency —
-                      it is Cardmarket's EUR figure rendered with the app's $. */}
+                  {/* Provider prices retain their reported currency. */}
                   {priceSource(activeCard) && (
                     <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
                       {t('inspector.priceVia', { source: priceSource(activeCard).name, currency: priceSource(activeCard).currency })}
@@ -859,4 +824,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
   );
 }
 
-export default CardInspectorModal;
+export default function CardInspectorModal(props) {
+  // A keyed draft is initialized before controls render, never by a later effect.
+  return props.card ? <CardInspectorContent key={props.card.entry_id || props.card.id} {...props} /> : null;
+}

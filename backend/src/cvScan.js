@@ -19,6 +19,7 @@ const sharp = require('sharp');
 const ort = require('onnxruntime-node');
 const { loadNpz } = require('./utils/npz');
 const languages = require('./utils/languages');
+const { binaryPath, readCatalog } = require('./utils/localCatalog');
 
 const MODEL_DIR = process.env.CV_MODEL_DIR || path.join(__dirname, '..', 'data', 'models');
 const CORN_SIZE = 384;     // cornelius input
@@ -75,7 +76,6 @@ const catalogs = {};   // catalog key -> { cat, ids, n, dim } (or an in-flight p
 
 // Preserve the bare English filename; other languages have their own catalogs.
 const suffix = (lang) => (!lang || lang === 'en' || lang === 'English' ? '' : `-${String(lang).toLowerCase()}`);
-const localBin = (game, lang) => path.join(MODEL_DIR, `milo-${game}${suffix(lang)}-local.bin`);
 const localMeta = (game, lang) => path.join(MODEL_DIR, `milo-${game}${suffix(lang)}-local.json`);
 
 function catalogPath(game) {
@@ -84,7 +84,11 @@ function catalogPath(game) {
 
 // Prefer local catalogs, whose IDs resolve directly in card_cache.
 function hasLocal(game, lang) {
-  return fs.existsSync(localBin(game, lang)) && fs.existsSync(localMeta(game, lang));
+  try {
+    const file = localMeta(game, lang);
+    const meta = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return fs.existsSync(binaryPath(file, meta));
+  } catch { return false; }
 }
 
 function isBuilt(game = 'mtg', lang) {
@@ -145,13 +149,9 @@ async function load(game = 'mtg', lang) {
       const t0 = Date.now();
       const m = await loadModels();
       if (hasLocal(game, useLang)) {
-        const meta = JSON.parse(fs.readFileSync(localMeta(game, useLang), 'utf8'));
-        const buf = fs.readFileSync(localBin(game, useLang));
+        const { meta, bin: buf } = readCatalog(localMeta(game, useLang));
         const dim = meta.dim;
         const n = meta.ids.length;
-        if (buf.length !== n * dim * 4) {
-          throw new Error(`local ${game} catalog is ${buf.length} bytes, expected ${n * dim * 4}`);
-        }
         const cat = new Float32Array(buf.buffer, buf.byteOffset, n * dim);
         console.log(`cvScan: ${key} LOCAL catalog ${n} x ${dim}d loaded in ${Date.now() - t0} ms`);
         return { ...m, cat, ids: meta.ids, n, dim, local: true, lang: useLang || "English" };

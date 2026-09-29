@@ -58,19 +58,39 @@ const DTYPES = {
 };
 
 function parseNpy(b) {
-  if (b.toString('latin1', 0, 6) !== '\x93NUMPY') throw new Error('not npy');
+  if (b.length < 10 || b.toString('latin1', 0, 6) !== '\x93NUMPY') throw new Error('not npy');
   const major = b[6];
-  const hlen = major === 1 ? b.readUInt16LE(8) : b.readUInt32LE(8);
+  if (![1, 2, 3].includes(major)) throw new Error('unsupported npy version');
   const hstart = major === 1 ? 10 : 12;
-  const header = b.toString('latin1', hstart, hstart + hlen);
-  const descr = /'descr':\s*'([^']+)'/.exec(header)[1];
-  const fortran = /'fortran_order':\s*(True|False)/.exec(header)[1] === 'True';
-  const shape = (/'shape':\s*\(([^)]*)\)/.exec(header)[1].match(/\d+/g) || []).map(Number);
+  if (b.length < hstart) throw new Error('truncated npy header');
+  const hlen = major === 1 ? b.readUInt16LE(8) : b.readUInt32LE(8);
+  if (hlen > b.length - hstart) throw new Error('truncated npy header');
+  const header = b.toString(major === 3 ? 'utf8' : 'latin1', hstart, hstart + hlen);
+  const dtype = /'descr':\s*'([^']+)'/.exec(header);
+  const order = /'fortran_order':\s*(True|False)/.exec(header);
+  const dimensions = /'shape':\s*\(([^)]*)\)/.exec(header);
+  if (!dtype || !order || !dimensions) throw new Error('invalid npy header');
+  const descr = dtype[1], fortran = order[1] === 'True';
+  const parts = dimensions[1].trim().replace(/,\s*$/, '').trim();
+  const shape = parts ? parts.split(',').map(s => {
+    if (!/^\s*\d+\s*$/.test(s)) throw new Error('invalid npy dimension');
+    const n = Number(s);
+    if (!Number.isSafeInteger(n)) throw new Error('unsafe npy dimension');
+    return n;
+  }) : [];
+  const n = shape.reduce((a, c) => {
+    const count = a * c;
+    if (!Number.isSafeInteger(count)) throw new Error('unsafe npy dimensions');
+    return count;
+  }, 1);
   const body = b.subarray(hstart + hlen);
+  const stringType = /^(<U|\|S)(\d+)$/.exec(descr);
+  const w = stringType ? Number(stringType[2]) : null;
+  const bytes = stringType ? w * (stringType[1] === '<U' ? 4 : 1) : DTYPES[descr]?.BYTES_PER_ELEMENT;
+  if (!Number.isSafeInteger(bytes) || bytes <= 0) throw new Error(`unsupported dtype ${descr}`);
+  if (!Number.isSafeInteger(n * bytes) || n * bytes > body.length) throw new Error('truncated or unsafe npy payload');
 
   if (descr.startsWith('<U')) {           // fixed-width UTF-32 strings
-    const w = parseInt(descr.slice(2), 10);
-    const n = shape.reduce((a, c) => a * c, 1);
     const arr = new Array(n);
     for (let i = 0; i < n; i++) {
       let s = '';
@@ -84,8 +104,6 @@ function parseNpy(b) {
     return { shape, data: arr, descr, fortran };
   }
   if (descr.startsWith('|S')) {           // fixed-width bytes
-    const w = parseInt(descr.slice(2), 10);
-    const n = shape.reduce((a, c) => a * c, 1);
     const arr = new Array(n);
     for (let i = 0; i < n; i++) {
       const s = body.subarray(i * w, (i + 1) * w);
@@ -98,7 +116,6 @@ function parseNpy(b) {
 
   const T = DTYPES[descr];
   if (!T) throw new Error(`unsupported dtype ${descr}`);
-  const n = shape.reduce((a, c) => a * c, 1);
   // Copy: the zip payload is not guaranteed to be aligned to the element size,
   // and a TypedArray view over a misaligned offset throws.
   const copy = Buffer.allocUnsafe(n * T.BYTES_PER_ELEMENT);

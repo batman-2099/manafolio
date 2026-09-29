@@ -77,6 +77,8 @@ The builder's conversation is session-only in the interface, not a saved Manafol
 
 ChatGPT credentials are stored separately for each user under `<database-directory>/codex/<user-id>/`. Server administrators can access those files. **Disconnect** removes that user's local Codex data; it does not erase provider-side records or older backups. Account JSON exports exclude these credentials, while whole-volume backups include them.
 
+Account deletion stops that user's local Codex processes and removes the credential directory without contacting OpenAI. It does not revoke provider-side authorization or erase older backups. If local cleanup fails, deletion reports an error and retains the database account.
+
 Gemini and OpenRouter API keys are stored per user/provider in the server database. They are never returned in account or preferences responses and are excluded from account JSON exports, but database snapshots and whole-volume backups include them. Administrators can access them. Removing a key deletes the current stored copy, not older backups or provider records; revoke the key at its provider when necessary.
 
 See the [AI workflow and deployment guidance](README.md#get-an-ai-deck-recommendation) before enabling a provider.

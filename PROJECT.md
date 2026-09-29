@@ -122,6 +122,7 @@ Public routes are mounted deliberately **before** the single `app.use('/api', au
 - A token matching `users.api_key` instead is GET-only. `requireAdmin` rejects API keys even for administrator accounts, and `/auth/me` removes provider credentials from API-key responses.
 - AI account/model/preferences and suggestion operations require a browser session. The read-only AI inventory endpoint remains accessible with an API key.
 - Local auth/bootstrap and optional OIDC live in `routes/auth.js` and `utils/oidc.js`. Registration is closed unless `ALLOW_REGISTRATION=true`.
+- OIDC state is HMAC-signed, browser-bound with an HttpOnly SameSite=Lax cookie, and single-use. Pending attempts expire after ten minutes and are process-local; a backend restart requires a new login. HTTPS callbacks use Secure cookies.
 - On an empty installation, `DEFAULT_ADMIN_PASSWORD` seeds `admin`; otherwise `/api/auth/bootstrap` creates that account through first-run setup. Protect access until setup is complete. Passwords must not be logged.
 
 `GET /api/health` is public, checks database readiness and a query, and returns `{"status":"ok"}` when healthy or HTTP 503 while unavailable. It is the Docker healthcheck target.
@@ -147,6 +148,7 @@ File names in this table are under `backend/src/routes/`. The table groups actua
 | `/api/settings` | `settings.js` | Effective settings/version, administrator changes and Scryfall bulk download |
 
 The built frontend is served from `frontend/dist`. Non-API paths fall back to the SPA. `/models/cornelius.onnx` exposes only the public corner-model weights, not the entire model/catalog directory.
+Vite's hashed `/assets/` files are immutable; stable public/ORT filenames and `/models/cornelius.onnx` revalidate so upgrades do not leave old runtime/model bytes cached for a year.
 
 ### Deployment security
 
@@ -163,13 +165,15 @@ The main SQLite connection enables foreign keys, WAL, and a five-second busy tim
 
 Use this helper for a multi-statement invariant rather than issuing ad hoc `BEGIN`/`COMMIT` calls. Without the queue boundary, another request's statements can enter the same connection's transaction. Keep domain validation and writes that must agree inside the transaction. Checkout validates availability, records exact allocations, and updates its reservation state transactionally.
 
-Current transactional workflows include complete deck editor saves, AI deck saves/replacements, precon import, collection import, account restore, container import/move, and Physical/Graveyard whole-container transfer. Their details differ: a transaction does not imply every unresolved row is fatal. In particular, ordinary collection import can report individual failures while saving valid entries; precon import with deck creation rejects unresolved cards rather than saving a partial deck.
+Current transactional workflows include complete deck editor saves, AI deck saves/replacements, precon import, collection import, account restore, container import/move, Physical/Graveyard whole-container transfer, manual card swaps, and bulk purchase-cost allocation. Settings and admin account updates validate the entire request before a single SQL update. Ordinary collection imports can report individual failures while saving valid entries; precon import with deck creation rejects unresolved cards rather than saving a partial deck.
 
 ### Migration and backup cautions
 
 Use [the offline migration procedure](README.md#migrate-an-existing-installation) before changing an existing deployment. Preserve the entire stopped data directory, mount identity, ownership, and matching WAL/SHM sidecars; a WAL can contain committed data not yet in the main file. Never treat an unexpected setup screen as permission to initialize a replacement database.
 
 Startup does not rename previous database files; complete the offline procedure before restarting. **Very old schemas containing `collection.sub_location_1` trigger a destructive collection/location reset in `initDb`.** Back up and inspect such databases before starting this version; automatic initialization is not a lossless upgrade for that schema.
+
+Startup preserves quantity-bearing collection entries rather than expanding them into metadata-losing copies. Bulk purchase splitting weights shares by quantity, allocates entry totals in integer cents, and divides each share by its quantity. Fractional-cent per-copy costs preserve the rounded purchase total and existing entry/reservation identities.
 
 Server snapshots are handled by `backup.js`. For an offline whole-volume copy, stop all writers and retain the database and any sidecars together. Snapshots stored only in the same volume do not protect against loss of that volume.
 
@@ -240,7 +244,8 @@ Return clears the deck-level reservation state. Checkout/check-in use the same s
 `routes/importExport.js` handles CSV/TXT review, collection import, account backup/restore, and ManaBox container workflows. Mapping and export helpers live under `backend/src/utils/`.
 
 - Import preview is validation and mapping, not a committed save. Progress distinguishes lookup/preparation from saving; losing the progress connection does not roll back an in-flight import. Check the destination before retrying.
-- Collection-view CSV/TXT export represents the matching view across pages, including its inventory, filters, ordering, and stacking. It is not a whole-account backup.
+- Ordinary CSV/JSON imports require integer quantities in `1..2147483647`; missing quantities default to one. Invalid rows retain their original quantity in error reporting rather than being truncated or coerced.
+- Collection-view export represents matching entries across pages, including inventory, filters, and ordering. CSV uses underlying entries regardless of display stacking; TXT aggregates matching name/set/collector-number quantities. Neither replaces a whole-account backup.
 - Complete account backup uses the `manafolio-backup` format. Restore replaces the signed-in user's collection, storage, and decks in a transaction rather than merging. Preserve the original export before any explicit format-marker conversion; see [account backup instructions](README.md#back-up-or-move-an-account).
 - Account JSON contains collection/storage/deck data and cached card metadata, not login/provider credentials or the entire server. Whole-volume backups have a different scope and can contain Codex credentials and TLS private keys.
 - Precon import is handled in `collection.js`: Scryfall resolves MTGJSON entries, optional storage is sized for the cards, and optional deck creation checks out the imported Physical deck. With deck creation requested, unresolved entries fail the operation rather than producing a partial deck.
@@ -285,12 +290,14 @@ These checks are heuristics, not guaranteed printing accuracy. The title crop ta
 
 `CV_MODEL_DIR` holds models and catalogs: source default `backend/data/models`, Docker `/app/database/models`. Keep the Docker directory on the persistent volume. Models alone do not identify cards. A missing usable catalog returns HTTP 503 with `notBuilt`, not a misleading empty match list.
 
-`catalog.js` builds a `(game, language)` catalog in two resumable phases:
+`catalog.js` builds a `(game, language)` catalog in two phases:
 
 1. Cache the provider's sets/cards with `cardSets.cacheSetCards`.
-2. Embed available artwork and write `milo-<game>[-<language>]-local.bin` plus JSON IDs/dimensions/source URLs.
+2. Embed available artwork and publish `milo-<game>[-<language>]-local.json`, whose `binary` field names an immutable generation `.bin`.
 
-Completed vectors with unchanged embedded source URLs are reused; stopped builds retain partial work. Scoped set builds merge into the existing local catalog. Local catalogs use `card_cache.id` and take precedence over published NPZ catalogs. Coverage denominators distinguish a completed build from complete provider coverage. The active Admin catalog language picker requests Magic; retained catalog tooling can still contain other games.
+`utils/localCatalog.js` writes the generation first and atomically renames JSON as the sole commit point. Readers validate the binary basename, dimensions, and byte length; installed legacy JSON/fixed-bin pairs remain readable. Failed or canceled builds leave the committed pair unchanged. Cached cards and unchanged vectors from the last successful build are reusable; uncommitted embeddings are discarded. Scoped set builds retain existing coverage. Local catalogs use `card_cache.id` and take precedence over published NPZ catalogs. Coverage denominators distinguish a successful build from complete provider coverage.
+
+Use `scripts/build-catalog.mjs` for production builds. The experimental multi-view `scripts/build-cv-catalog.mjs` requires an explicit `--output <file.json>` outside `CV_MODEL_DIR`; its game/language/limit/views/concurrency options remain available without overwriting production catalogs. Caught failures clean their staging files; process termination can leave unreferenced files. Atomic publication is not an fsync/power-loss durability guarantee.
 
 For a catalog-backed diagnostic, run from `backend/`:
 
@@ -307,6 +314,8 @@ The harness samples catalog rows, degrades reference art, compares genuine match
 Inventory is scoped to the signed-in user and selected Physical/Arena destination, with optional color/set/container filters. Missing physical copies are excluded. Including checked-out cards permits planning with them, not sharing their reservations. Improving a saved deck can retain eligible source-deck copies despite its own reservation/filters; other decks' reservations still matter. Create/replace revalidates ownership, quantities, and cached rules transactionally. Replacing a checked-out deck is rejected; saving never moves cards or checks out a deck.
 
 ChatGPT integration uses the pinned official Codex app-server package and device login, with per-user data under `<database-directory>/codex/<user-id>/`. The client disables model host-file, command, and external-tool access, rejects unsupported app-server actions, and requires a Unix server. Administrators can still read persisted credentials. Disconnect removes the user's local Codex data; account JSON backups exclude it, but volume backups include it.
+
+Admin account deletion disposes Codex locally before deleting database records: it blocks stale/new operations, drains in-flight startup/use, kills the existing process, and removes credentials/runtime files without spawning a process or calling provider logout. Cleanup failure retains the database user; Codex stays blocked for that account until deletion succeeds or the backend restarts.
 
 Ollama uses the selected HTTP(S) address or `OLLAMA_BASE_URL`, defaults to server loopback, requires an installed structured-output model, and does not silently fall back to ChatGPT. Requests originate from the **server**. URL syntax validation is not a destination allowlist: signed-in users can reach server-accessible private/LAN services. Use trusted accounts and outbound firewall controls, and do not expose an unauthenticated Ollama port publicly.
 
@@ -365,5 +374,7 @@ The Vite frontend uses `https://localhost:5173`; the API uses `http://localhost:
 | `npm run check:locales --prefix frontend` | Translation key/placeholder checks |
 | `npm run build:frontend` | Production frontend build |
 | `npm start` | Backend serving API and an existing `frontend/dist` build |
+
+Test runners give each invocation its own temporary directory and database defaults, then delete only that directory. Both Docker publication and server-binary builds depend on backend tests plus frontend lint, utility tests, and locale validation.
 
 When changing a workflow, exercise the actual user path as well as relevant tests: inventory boundaries, ownership checks, rollback behavior, lost progress connections, deck draft saves, and physical placement are consumer-visible contracts. Scanner validation needs actual models/catalogs and camera conditions; AI verification needs the selected provider. Do not claim these optional integrations were exercised by an unrelated unit suite.

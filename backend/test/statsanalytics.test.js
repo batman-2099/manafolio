@@ -58,6 +58,7 @@ async function main() {
       await db.run('UPDATE card_cache SET price_trend = ?, set_id = ?, set_name = ?, rarity = ? WHERE id = ?',
         [price, archive ? 'archive' : 'shared', archive ? 'Archive Set' : 'Shared Set', archive ? 'Rare' : 'Common', card]);
     }
+    await db.run("UPDATE card_cache SET price_currency = 'EUR' WHERE id = 'multi'");
     for (const [card, quantity, inventory, added, user = owner] of [
       ['multi', 2, 'collection', '2025-09-30T23:30:00-01:00'],
       ['multi', 3, 'collection', '2026-09-01T00:30:00+01:00'],
@@ -110,6 +111,10 @@ async function main() {
       assert.strictEqual(response.summary.totalCards, (physical ? 21 : 0) + (arena ? 7 : 0));
       assert.strictEqual(response.summary.unsortedCount, physical ? 21 : 0);
       assert.strictEqual(response.summary.totalValue, (physical ? 77 : 0) + (arena ? 49 : 0));
+      assert.deepStrictEqual(response.summary.currencies, physical ? ['EUR', 'USD'] : ['USD']);
+      for (const card of [...response.topValuable, ...response.recentAdditions]) {
+        assert.strictEqual(card.price_currency, card.card_id === 'multi' ? 'EUR' : 'USD');
+      }
       assert.strictEqual(response.summary.totalSpent, response.summary.totalCards);
       assert.deepStrictEqual(response.setProgress, [{
         setId: 'shared', setName: 'Shared Set', ownedUnique: inventory === 'all' ? 5 : physical ? 4 : 1,

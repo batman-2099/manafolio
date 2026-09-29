@@ -40,6 +40,10 @@ jobs:
         run: npm run lint
         working-directory: frontend
 
+      - name: Frontend tests and locales
+        run: npm test
+        working-directory: frontend
+
   # One leg per architecture, each on a runner of that architecture. QEMU
   # emulation was the alternative and it is far slower here: the image compiles
   # sqlite3 from source (see Dockerfile), which under emulation dominates the

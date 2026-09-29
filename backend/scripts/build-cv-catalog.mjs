@@ -3,16 +3,13 @@
 // Local catalogs use card_cache IDs, so every match resolves to a known printing.
 // Unlike published snapshots, they can incorporate newly cached cards.
 //
-// Output, beside the models:
-//   milo-mtg-local.bin    Float32 embeddings, n * dim, row-major
-//   milo-mtg-local.json   { dim, ids: [...], builtAt, model, views }
-//
-// Resumable: re-running keeps every embedding already computed and only fetches
-// cards that are new or whose image_url changed. A full MTG build takes hours.
+// Experimental multi-view builder. Production builds use build-catalog.mjs.
+// An explicit JSON output outside CV_MODEL_DIR keeps limited experiments from
+// replacing the scanner's working catalog. Only complete runs are published.
 //
 // Usage, from backend/:
-//   node scripts/build-cv-catalog.mjs --game mtg --limit 2000
-//   node scripts/build-cv-catalog.mjs --game mtg --views 3   # augmented mean
+//   node scripts/build-cv-catalog.mjs --game mtg --limit 2000 --output /tmp/milo-test/catalog.json
+//   node scripts/build-cv-catalog.mjs --game mtg --views 3 --output /tmp/milo-test/catalog.json
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,30 +21,36 @@ const sharp = require('sharp');
 const ort = require('onnxruntime-node');
 const db = require('../src/db');
 const { toTensor } = require('../src/cvScan');
+const { readCatalog, publishCatalog } = require('../src/utils/localCatalog');
+const languages = require('../src/utils/languages');
 
 const arg = (f, d) => { const i = process.argv.indexOf(f); return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
 const game = arg('--game', 'mtg');
 if (game !== 'mtg') throw new Error('Unsupported game');
-const lang = arg('--lang', 'English');
-const limit = parseInt(arg('--limit', '0'), 10);
-const views = Math.max(1, parseInt(arg('--views', '1'), 10));
-const concurrency = Math.max(1, parseInt(arg('--concurrency', '8'), 10));
+const lang = languages.toName(arg('--lang', 'English'));
+const limit = Number(arg('--limit', '0'));
+const views = Number(arg('--views', '1'));
+const concurrency = Number(arg('--concurrency', '8'));
+if (!Number.isSafeInteger(limit) || limit < 0 || !Number.isSafeInteger(views) || views < 1 || views > 25
+    || !Number.isSafeInteger(concurrency) || concurrency < 1) throw new Error('Invalid limit, views (1–25), or concurrency');
 
 const MODEL_DIR = process.env.CV_MODEL_DIR || path.join(__dirname, '..', 'data', 'models');
 const SIZE = 448;
-// MUST match cvScan's naming, including the English special case: English keeps
-// the bare filename so existing builds stay valid, every other language gets its
-// own file. Without the suffix a `--lang Japanese` build silently OVERWRITES the
-// English catalog with 3k Japanese cards, which looks like a working build and
-// is a total loss of the English one.
-const langSuffix = (l) => (!l || l === 'en' || l === 'English' ? '' : `-${String(l).toLowerCase()}`);
-const binPath = path.join(MODEL_DIR, `milo-${game}${langSuffix(lang)}-local.bin`);
-const metaPath = path.join(MODEL_DIR, `milo-${game}${langSuffix(lang)}-local.json`);
+const output = arg('--output', '');
+if (!output || !output.endsWith('.json')) throw new Error('--output must name an experimental .json catalog outside CV_MODEL_DIR; use build-catalog.mjs for production');
+const metaPath = path.resolve(output);
+fs.mkdirSync(MODEL_DIR, { recursive: true });
+fs.mkdirSync(path.dirname(metaPath), { recursive: true });
+const relative = path.relative(fs.realpathSync(MODEL_DIR), fs.realpathSync(path.dirname(metaPath)));
+if (!relative || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))) {
+  throw new Error('--output must be outside CV_MODEL_DIR');
+}
+let cancelled = false;
+process.on('SIGINT', () => { cancelled = true; });
+process.on('SIGTERM', () => { cancelled = true; });
 
 // The reference image is already a flat, square-on card render — there is nothing
-// to dewarp. `--views` insets the crop instead, which moves the reference a little
-// way toward what a photographed card looks like after an imperfect dewarp. It is
-// the catalog-side half of the test-time averaging the scanner does.
+// to dewarp. `--views` insets the crop to test robustness to imperfect dewarping.
 async function embedCard(session, buf) {
   const vecs = [];
   for (let v = 0; v < views; v++) {
@@ -74,10 +77,10 @@ async function embedCard(session, buf) {
 }
 
 function loadExisting() {
-  if (!fs.existsSync(metaPath) || !fs.existsSync(binPath)) return null;
+  if (!fs.existsSync(metaPath)) return null;
   try {
-    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-    const buf = fs.readFileSync(binPath);
+    const { meta, bin: buf } = readCatalog(metaPath);
+    if (meta.model !== 'milo1' || (meta.views || 1) !== views || meta.game !== game || meta.lang !== lang) return null;
     const vecs = new Map();
     const dim = meta.dim;
     for (let i = 0; i < meta.ids.length; i++) {
@@ -117,12 +120,15 @@ async function main() {
   const queue = rows.slice();
   const inflight = new Map();
   const fetchOne = async (row) => {
-    const res = await fetch(row.image_url, { signal: AbortSignal.timeout(30000) });
+    const res = await fetch(row.image_url, {
+      signal: AbortSignal.timeout(30000),
+      headers: { 'User-Agent': `Manafolio/${require('../package.json').version}`, Accept: 'image/*' },
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return Buffer.from(await res.arrayBuffer());
   };
   const pump = () => {
-    while (inflight.size < concurrency && queue.length) {
+    while (inflight.size < concurrency && queue.length && !cancelled) {
       const row = queue.shift();
       if (prev && prev.vecs.has(row.id) && prev.srcs.get(row.id) === row.image_url) {
         ids.push(row.id); out.push(prev.vecs.get(row.id)); srcs[row.id] = row.image_url;
@@ -154,22 +160,16 @@ async function main() {
     pump();
   }
 
-  if (!out.length) { console.error('nothing embedded; refusing to write an empty catalog'); process.exit(1); }
+  if (cancelled) throw new Error('Build cancelled; catalog unchanged');
+  if (failed) throw new Error(`${failed} card(s) failed to embed; catalog unchanged`);
+  if (!out.length) throw new Error('nothing embedded; refusing to write an empty catalog');
   const dim = out[0].length;
-  const bin = Buffer.allocUnsafe(out.length * dim * 4);
-  out.forEach((v, i) => Buffer.from(v.buffer, v.byteOffset, dim * 4).copy(bin, i * dim * 4));
-
-  // Write beside the target and rename, so an interrupted run never leaves a
-  // half-written catalog that loads as garbage.
-  fs.writeFileSync(binPath + '.tmp', bin);
-  fs.writeFileSync(metaPath + '.tmp', JSON.stringify({
+  publishCatalog(metaPath, {
     dim, ids, srcs, views, game, lang,
     model: 'milo1', builtAt: new Date().toISOString(),
-  }));
-  fs.renameSync(binPath + '.tmp', binPath);
-  fs.renameSync(metaPath + '.tmp', metaPath);
+  }, out);
 
-  console.log(`\nwrote ${ids.length} x ${dim} to ${path.basename(binPath)} (${(bin.length / 1e6).toFixed(1)} MB)`);
+  console.log(`\nwrote ${ids.length} x ${dim} to ${metaPath}`);
   console.log(`built ${built}, reused ${reused}, failed ${failed}`);
   process.exit(0);
 }

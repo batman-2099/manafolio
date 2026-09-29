@@ -5,10 +5,10 @@ name: Build Server Binaries
 # build only, uploaded as workflow artifacts (test). Each binary is a Node
 # Single Executable App (stdlib, no third-party packager) whose blob is just
 # backend/launch.js; the real server ships beside it under app/ (backend src +
-# node_modules + frontend build). Scan indexes (backend/data) and .env are
-# gitignored, so they are NOT bundled: the server runs, and code-free card-image
-# matching stays inert until the operator builds the indexes and drops a .env in
-# app/backend.
+# node_modules + frontend build). Scan models/catalogs and .env are NOT bundled.
+# Install scan assets through Admin -> Catalogs and configure app/backend/.env.
+# Scanning also needs native Tesseract with English data; without a usable
+# catalog the scanner returns HTTP 503, including set-scoped requests.
 on:
   push:
     tags: [ "v*" ]
@@ -18,7 +18,22 @@ permissions:
   contents: write
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm ci --prefix backend && npm ci --prefix frontend
+      - name: Test backend
+        run: npm test --prefix backend
+      - name: Check frontend
+        run: npm run lint --prefix frontend && npm test --prefix frontend
+
   server:
+    needs: verify
     strategy:
       fail-fast: false
       matrix:
@@ -138,9 +153,14 @@ jobs:
           $RUN
           Then open http://localhost:3001
           Config: copy app/backend/.env.example to app/backend/.env and edit.
-          Code-free card-image scan matching needs the whole-game indexes in
-          app/backend/data (built from Admin -> Global Scan Indexes); without
-          them, set-scoped scanning still works and code-free returns nothing.
+          With no DEFAULT_ADMIN_PASSWORD, the first browser visit creates the
+          owner account. Protect access until setup is complete.
+          Scanning needs models and a usable catalog installed through
+          Admin -> Catalogs, plus /usr/bin/tesseract with English trained data.
+          The binary archive does not bundle those assets or native OCR.
+          Without a usable catalog, scan requests return HTTP 503.
+          Native scanning and ChatGPT/Codex require the supported Unix runtime;
+          use Docker for these features on Windows.
           EOF
 
       # Archive the tree contents at the root (no wrapping folder), matching the

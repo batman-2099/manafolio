@@ -214,8 +214,21 @@ async function testMockOidcFlow() {
   oidc._resetDiscoveryCache();
 
   try {
-    // 1. Test buildAuthorizationUrl
-    const authUrl = await oidc.buildAuthorizationUrl();
+    const begin = async () => {
+      const req = { protocol: 'https', headers: {}, get: () => 'manafolio.example.test' };
+      const authUrl = await oidc.buildAuthorizationUrl(req, {
+        cookie(name, value, options) {
+          assert.strictEqual(options.httpOnly, true);
+          assert.strictEqual(options.sameSite, 'lax');
+          assert.strictEqual(options.secure, true);
+          assert.strictEqual(options.path, '/api/auth/oidc');
+          req.headers.cookie = `${name}=${value}`;
+        },
+      });
+      return { req, authUrl, stateToken: new URL(authUrl).searchParams.get('state') };
+    };
+    const first = await begin();
+    const { authUrl } = first;
     const parsedAuth = new URL(authUrl);
     assert.strictEqual(parsedAuth.pathname, '/auth');
     assert.strictEqual(parsedAuth.searchParams.get('client_id'), 'manafolio-test-client');
@@ -227,19 +240,37 @@ async function testMockOidcFlow() {
     currentNonce = parsedAuth.searchParams.get('nonce');
     assert(currentNonce, 'nonce param must be set');
 
-    // 2. Test exchangeCode
-    const exchangeResult = await oidc.exchangeCode({
-      code: 'test-auth-code-xyz',
-      stateToken,
-      req: null
+    const otherBrowser = await begin();
+    for (const req of [null, { headers: {} }, otherBrowser.req]) {
+      await assert.rejects(oidc.exchangeCode({ code: 'stolen-code', stateToken, req }), /cookie/i);
+      assert.strictEqual(authCodeReceived, null, 'an unrelated browser must be rejected before contacting the provider');
+    }
+    const exchanging = oidc.exchangeCode({
+      code: 'test-auth-code-xyz', stateToken, req: first.req,
     });
+    await assert.rejects(oidc.exchangeCode({ code: 'replayed-code', stateToken, req: first.req }), /reused/i);
+    const exchangeResult = await exchanging;
 
     assert.strictEqual(authCodeReceived, 'test-auth-code-xyz', 'token endpoint must receive authorization code');
     assert(codeVerifierReceived, 'token endpoint must receive PKCE code_verifier');
+    assert.strictEqual(crypto.createHash('sha256').update(codeVerifierReceived).digest('base64url'),
+      parsedAuth.searchParams.get('code_challenge'), 'the original PKCE challenge must still be enforced');
     assert.strictEqual(exchangeResult.extracted.sub, 'auth-user-999');
     assert.strictEqual(exchangeResult.extracted.username, 'draftchampion');
 
-    console.log('PASS: Mock OIDC authorization URL and code exchange');
+    await assert.rejects(oidc.exchangeCode({ code: 'replayed-code', stateToken, req: first.req }), /reused/i);
+    const realNow = Date.now;
+    let expired;
+    try {
+      const now = realNow();
+      Date.now = () => now + 10 * 60 * 1000;
+      expired = oidc.exchangeCode({ code: 'expired-code', stateToken: otherBrowser.stateToken, req: otherBrowser.req });
+    } finally {
+      Date.now = realNow;
+    }
+    await assert.rejects(expired, /expired/i);
+    assert.strictEqual(authCodeReceived, 'test-auth-code-xyz', 'reused and expired callbacks never exchange their code');
+    console.log('PASS: Browser-bound, one-use OIDC exchange with PKCE and expiry');
   } finally {
     if (typeof server.closeAllConnections === 'function') {
       server.closeAllConnections();

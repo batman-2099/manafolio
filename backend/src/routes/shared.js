@@ -70,7 +70,7 @@ router.get('/:share_token/containers/:id', async (req, res) => {
              c.printing, c.language, c.favorite, c.is_trade, c.market_value,
              cc.name, cc.printed_name, cc.supertype, cc.subtypes, cc.types, cc.rarity,
              cc.set_id, cc.set_name, cc.number, cc.image_url, cc.game, cc.cmc, cc.color_identity,
-             cc.price_trend, cc.price_normal, cc.price_holofoil
+             cc.price_trend, cc.price_normal, cc.price_holofoil, cc.price_currency
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
       WHERE c.location_id = ? AND c.user_id = ? AND c.list_type = 'collection' AND cc.game = 'mtg'
@@ -146,6 +146,7 @@ router.get('/:share_token', async (req, res) => {
         cc.price_trend,
         cc.price_normal,
         cc.price_holofoil,
+        cc.price_currency,
         l.name AS location_name
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id

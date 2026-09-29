@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
+const codex = require('../codexDeckClient');
 const scryfallApi = require('../scryfallApi');
 const catalog = require('../catalog');
 const { parseCardRow } = require('../utils/priceHelpers');
@@ -219,12 +220,8 @@ router.put('/users/:id', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (password !== undefined) {
-      if (password.length < 8) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters' });
-      }
-      const newHash = db.hashPassword(password);
-      await db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [newHash, id]);
+    if (password !== undefined && (typeof password !== 'string' || password.length < 8)) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
     if (role !== undefined) {
@@ -235,7 +232,14 @@ router.put('/users/:id', async (req, res) => {
       if (parseInt(id, 10) === req.user.id && role !== 'admin') {
         return res.status(400).json({ error: 'You cannot demote yourself from Administrator role.' });
       }
-      await db.run(`UPDATE users SET role = ? WHERE id = ?`, [role, id]);
+    }
+
+    const updates = {};
+    if (password !== undefined) updates.password_hash = db.hashPassword(password);
+    if (role !== undefined) updates.role = role;
+    const fields = Object.keys(updates);
+    if (fields.length) {
+      await db.run(`UPDATE users SET ${fields.map(key => `${key} = ?`).join(', ')} WHERE id = ?`, [...Object.values(updates), id]);
     }
 
     res.json({ message: 'User updated successfully' });
@@ -259,10 +263,13 @@ router.delete('/users/:id', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    await db.run(`DELETE FROM sessions WHERE user_id = ?`, [id]);
-    await db.run(`DELETE FROM collection WHERE user_id = ?`, [id]);
-    await db.run(`DELETE FROM locations WHERE user_id = ?`, [id]);
-    await db.run(`DELETE FROM users WHERE id = ?`, [id]);
+    await codex.disposeUser(targetUser.id);
+    await db.withTransaction(async () => {
+      await db.run(`DELETE FROM sessions WHERE user_id = ?`, [id]);
+      await db.run(`DELETE FROM collection WHERE user_id = ?`, [id]);
+      await db.run(`DELETE FROM locations WHERE user_id = ?`, [id]);
+      await db.run(`DELETE FROM users WHERE id = ?`, [id]);
+    });
 
     res.json({ message: `User "${targetUser.username}" and all their card collections/locations have been permanently deleted.` });
   } catch (error) {

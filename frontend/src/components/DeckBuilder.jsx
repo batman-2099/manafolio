@@ -5,7 +5,7 @@ import { shuffleArray } from '../utils/shuffle';
 import { displayName } from '../utils/languages';
 import CheckoutWizardModal from './CheckoutWizardModal';
 import { useBackGuard } from '../utils/useBackGuard';
-import { arenaCardKey, buildDeckExport, parseDeckLine } from '../utils/deckText';
+import { ownedImportIndex, findOwnedImportCard, buildDeckExport, parseDeckLine } from '../utils/deckText';
 import { deckContainers } from '../utils/deckContainers';
 import { defaultGame, isGameEnabled } from '../utils/games';
 import { MTG_FORMATS } from '../utils/cardOptions';
@@ -884,30 +884,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   };
 
   const loadOwnedImportCards = async () => {
-    const cards = await loadInventoryCards(activeDeck.game, activeDeck.inventory_type);
-    const byName = new Map();
-    const byPrinting = new Map();
-    for (const card of cards) {
-      const names = [card.name, card.printed_name].filter(Boolean);
-      for (const name of names) {
-        const existing = byName.get(name.toLowerCase());
-        if (!existing || existing.owned_qty < card.owned_qty) byName.set(name.toLowerCase(), card);
-        if (card.set_id && card.number) byPrinting.set(arenaCardKey(name, card.set_id, card.number), card);
-      }
-    }
-    return { byName, byPrinting };
-  };
-
-  const findImportCard = async (parsed, arenaCards) => {
-    if (arenaCards) {
-      if (parsed.setCode && parsed.number) {
-        return arenaCards.byPrinting.get(arenaCardKey(parsed.name, parsed.setCode, parsed.number)) || null;
-      }
-      return arenaCards.byName.get(parsed.name.toLowerCase()) || null;
-    }
-    const res = await fetch(`/api/search?name=${encodeURIComponent(parsed.name)}&scope=collection&game=${activeDeck.game}`);
-    if (!res.ok) return null;
-    return (await res.json())[0] || null;
+    const cards = await loadInventoryCards(activeDeck.game, activeDeck.inventory_type || 'collection');
+    return ownedImportIndex(cards);
   };
 
   const handleCompareImport = async () => {
@@ -915,9 +893,9 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     setComparingImport(true);
     const lines = importText.split('\n').map(l => l.trim()).filter(Boolean);
     const results = [];
-    let arenaCards = null;
+    let ownedCards;
     try {
-      if (activeDeck.inventory_type !== 'collection') arenaCards = await loadOwnedImportCards();
+      ownedCards = await loadOwnedImportCards();
     } catch (err) {
       console.error(err);
       setComparingImport(false);
@@ -932,7 +910,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
       const displayName = setCode && number ? `${rawName} (${setCode.toUpperCase()}) ${number}` : rawName;
 
       try {
-        const card = await findImportCard(parsed, arenaCards);
+        const card = findOwnedImportCard(parsed, ownedCards);
         if (card) {
           const owned = card.owned_qty || 0;
           const inDeck = activeDeck.cards.find(c => c.id === card.id)?.quantity || 0;

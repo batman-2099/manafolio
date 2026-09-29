@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Database, Play, Square, RefreshCw, Check, AlertTriangle, Cpu, Download, ListFilter, Zap } from 'lucide-react';
 import SetTree from './SetTree';
 import { useT } from '../utils/i18n';
@@ -285,65 +285,73 @@ export default function CatalogPanel({ showToast }) {
   const [last, setLast] = useState(null);
   const [loading, setLoading] = useState(true);
   const [engine, setEngine] = useState(null);
-  const timer = useRef(null);
 
-  const load = async () => {
+  const load = async (signal) => {
     try {
-      const r = await fetch('/api/admin/catalogs');
+      const r = await fetch('/api/admin/catalogs', { signal });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
+      // Engine state is optional; a failed read must not discard running progress.
+      let models;
+      try {
+        const e = await fetch('/api/admin/models', { signal });
+        if (e.ok) models = await e.json();
+      } catch { /* the panel still lists catalogs without it */ }
+      if (signal.aborted) return;
       setCatalogs(j.catalogs || []);
       setProgress(j.progress || null);
       setLast(j.last || null);
-      // Engine state is a separate read: it is filesystem + byte sizes, nothing to
-      // do with the database counts above.
-      try {
-        const e = await fetch('/api/admin/models');
-        if (e.ok) setEngine(await e.json());
-      } catch { /* the panel still lists catalogs without it */ }
+      if (models) setEngine(models);
     } catch (e) {
-      showToast?.(t('catalog.errLoadCatalogs', { message: e.message }), 'error');
+      if (!signal.aborted) showToast?.(t('catalog.errLoadCatalogs', { message: e.message }), 'error');
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   };
 
-  // Poll only while something is running. A build is minutes-to-hours of work, so
-  // the panel is usually idle and a permanent 1s poll would be pure noise.
+  // Poll only while something is running.
   useEffect(() => {
-    load();
-    return () => clearTimeout(timer.current);
+    const controller = new AbortController();
+    load(controller.signal);
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // One timer for both jobs. A build and a download are never both running (each
   // refuses while the other holds its slot), so a single poll covers whichever is.
   useEffect(() => {
-    clearTimeout(timer.current);
     if (!progress && !engine?.progress) return;
-    timer.current = setTimeout(async () => {
+    const controller = new AbortController();
+    const { signal } = controller;
+    let timer;
+    const poll = async () => {
       try {
         if (progress) {
-          const r = await fetch('/api/admin/catalogs/progress');
+          const r = await fetch('/api/admin/catalogs/progress', { signal });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const j = await r.json();
+          if (signal.aborted) return;
+          // Refresh installed counts before committing the terminal progress.
+          if (!j.progress) await load(signal);
+          if (signal.aborted) return;
           setProgress(j.progress || null);
           setLast(j.last || null);
-          // A build that just finished changes the row counts, so refresh the list.
-          if (!j.progress) load();
         }
         if (engine?.progress) {
-          const e = await fetch('/api/admin/models');
-          if (e.ok) {
-            const ej = await e.json();
-            setEngine(ej);
-            // A finished download changes what is installed, and a downloaded
-            // catalog changes what the list reports as published.
-            if (!ej.progress) load();
-          }
+          const e = await fetch('/api/admin/models', { signal });
+          if (!e.ok) throw new Error(`HTTP ${e.status}`);
+          const ej = await e.json();
+          if (signal.aborted) return;
+          if (!ej.progress) await load(signal);
+          if (!signal.aborted) setEngine(ej);
         }
-      } catch { /* a dropped poll is not worth surfacing; the next one retries */ }
-    }, POLL_MS);
-    return () => clearTimeout(timer.current);
+      } catch { /* a dropped poll retries without discarding the last progress */ }
+      finally {
+        if (!signal.aborted) timer = setTimeout(poll, POLL_MS);
+      }
+    };
+    timer = setTimeout(poll, POLL_MS);
+    return () => { controller.abort(); clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progress, engine?.progress]);
 

@@ -341,6 +341,7 @@
   "common.edit": "Modifier",
   "common.errBackend": "Erreur de connexion au backend.",
   "common.loading": "Chargement",
+  "common.mixedCurrencies": "Devises multiples : les totaux ne sont pas convertis.",
   "common.logoAlt": "Logo de Manafolio",
   "dash.analytics": "Statistiques",
   "common.next": "Suivant",

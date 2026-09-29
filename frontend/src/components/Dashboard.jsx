@@ -225,7 +225,11 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
   const setTitle = t(isArchive ? 'dash.archiveValueBySet' : 'dash.valueBySet');
   const typeTitle = t(gameFilter === 'mtg' ? 'dash.colorDistribution' : 'dash.typeDistribution');
   const rarityTitle = t('dash.rarityDistribution');
-  const formatMoney = value => `${currencySymbol()}${money(value)}`;
+  const currencies = summary.currencies || [];
+  const mixedCurrencies = currencies.length > 1;
+  const quoteCurrency = currencies.length === 1 ? currencies[0] : undefined;
+  const quoteSymbol = mixedCurrencies ? '' : currencySymbol(quoteCurrency);
+  const formatMoney = value => `${quoteSymbol}${money(value)}`;
   const formatDate = value => new Date(`${value}T00:00:00Z`).toLocaleDateString(locale, { timeZone: 'UTC' });
 
   return (
@@ -243,8 +247,8 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
           </div>
           <div>
             <dt>{t(isArchive ? 'dash.archivedValue' : 'dash.netWorth')}</dt>
-            <dd className="dashboard-summary-value">{currencySymbol()}{money(summary.totalValue)}</dd>
-            <dd className="dashboard-summary-note">{t('dash.avgPerCard', { price: priceText(summary.avgCardValue) })}</dd>
+            <dd className="dashboard-summary-value">{formatMoney(summary.totalValue)}</dd>
+            <dd className="dashboard-summary-note">{mixedCurrencies ? t('common.mixedCurrencies') : t('dash.avgPerCard', { price: priceText(summary.avgCardValue, quoteCurrency) })}</dd>
           </div>
         </dl>
       </div>
@@ -266,7 +270,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
           {!change?.available ? (!historyError && !loadingHistory && <span>{t('dash.noPriceHistory')}</span>) : (
             <span className={change.abs >= 0 ? 'positive' : 'negative'}>
               <TrendingUp aria-hidden="true" size={14} style={{ transform: change.abs >= 0 ? 'none' : 'rotate(180deg)' }} />
-              {change.abs >= 0 ? '+' : ''}{currencySymbol()}{money(change.abs)} ({change.abs >= 0 ? '+' : ''}{change.pct}%)
+              {change.abs >= 0 ? '+' : ''}{priceText(change.abs, 'EUR')} ({change.abs >= 0 ? '+' : ''}{change.pct}%)
             </span>
           )}
         </div>
@@ -295,7 +299,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="date" tickFormatter={formatDate} stroke="var(--text-secondary)" style={{ fontSize: '0.7rem' }} />
-                <YAxis stroke="var(--text-secondary)" style={{ fontSize: '0.7rem' }} tickFormatter={(v) => `${currencySymbol()}${v}`} />
+                <YAxis stroke="var(--text-secondary)" style={{ fontSize: '0.7rem' }} tickFormatter={(v) => `${quoteSymbol}${v}`} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }}
                   labelStyle={{ color: 'var(--text-primary)' }}
@@ -344,7 +348,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                       </div>
                     </div>
                     <div className="dashboard-card-price">
-                      <div className="dashboard-card-amount">{priceText(card.price_trend)}<span> {t('dash.each')}</span></div>
+                      <div className="dashboard-card-amount">{priceText(card.price_trend, card.price_currency)}<span> {t('dash.each')}</span></div>
                       <div className="dashboard-card-meta">{card.quantity > 1 ? t('dash.qty', { qty: card.quantity }) : (card.added_at ? new Date(card.added_at).toLocaleDateString(locale) : '')}</div>
                     </div>
                   </button>
@@ -379,9 +383,9 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                     </div>
                   </div>
                   <div className="dashboard-card-price">
-                    <div className="dashboard-card-amount">{priceText(card.price_trend)}<span> {t('dash.each')}</span></div>
+                    <div className="dashboard-card-amount">{priceText(card.price_trend, card.price_currency)}<span> {t('dash.each')}</span></div>
                     <div className="dashboard-card-meta">
-                      {card.quantity > 1 ? t('dash.qtyTotal', { qty: card.quantity, price: priceText(card.price_trend * card.quantity) }) : t('dash.qty', { qty: 1 })}
+                      {card.quantity > 1 ? t('dash.qtyTotal', { qty: card.quantity, price: priceText(card.price_trend * card.quantity, card.price_currency) }) : t('dash.qty', { qty: 1 })}
                     </div>
                   </div>
                 </button>
@@ -424,7 +428,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
               <div className="dashboard-set-chart-inner" style={{ width: '100%', height: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={sets} role="img" aria-labelledby="dashboard-set-title" layout="vertical" margin={{ left: 10, right: 30, top: 10, bottom: 10 }}>
-                  <XAxis type="number" stroke="var(--text-secondary)" tickFormatter={(v) => `${currencySymbol()}${v}`} />
+                  <XAxis type="number" stroke="var(--text-secondary)" tickFormatter={(v) => `${quoteSymbol}${v}`} />
                   <YAxis dataKey="name" type="category" width={120} stroke="var(--text-secondary)" tickLine={false} axisLine={false} style={{ fontSize: '0.8rem' }} />
                   <Tooltip 
                     contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }}

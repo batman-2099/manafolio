@@ -98,7 +98,7 @@ On narrow screens, use **More** for navigation items that are not shown in the b
 1. On **Dashboard**, choose **Price Check**, immediately after **Add Cards**.
 2. Activate the camera and scan the card using the usual scanner controls. A known set filter helps narrow the matches.
 3. Compare the artwork, set, collector number, and language with your physical card. If recognition is uncertain, choose the correct candidate or printing before relying on its price.
-4. Read the available normal and foil prices in your selected currency. Cached and provider prices are estimates, not offers or guaranteed sale prices; an unavailable price does not mean zero.
+4. Read the available normal and foil prices in their reported currency. The browser currency preference is used only when a quote has no recognized currency; it never converts amounts. Cached and provider prices are estimates, not offers or guaranteed sale prices; an unavailable price does not mean zero.
 5. Scan another card, or choose **Back to Dashboard** to return to your previous inventory filter and history range.
 
 **Price Check does not add owned inventory or create, edit, clear, or commit Scan review drafts.** To record a card you own, leave Price Check and use **Add Cards**. Camera permissions, HTTPS requirements, and scanner catalog setup are the same as ordinary scanning; the static demo cannot perform live recognition or provider lookups.
@@ -172,6 +172,8 @@ Use this workflow when you want to **add inventory**. It is different from **Sto
 6. Review **Import Complete**, including **Cards added** and **Cards not added**. Download the failed-card list where offered, correct those entries, and retry only the unresolved work.
 
 **Expected result:** successfully resolved cards are added to the destination inventory. Reading a file and reviewing its preview do not save inventory by themselves.
+
+Quantities must be whole numbers from 1 to 2,147,483,647. Missing quantities default to one; malformed, fractional, zero, or negative values are reported as errors rather than silently changed.
 
 **Important import warning:** lookup/preparation is not the same as saving. Leaving the page disconnects the activity log but does not roll back a server import already in progress. There are no automatic import retries. After a lost connection, inspect the destination before submitting the same file again; repeating a successful import can add unwanted copies.
 
@@ -293,7 +295,7 @@ A trade flag is not another inventory: **For Trade Only** filters flagged entrie
 
 **Filters → Stack Duplicates** combines duplicate printings into a display card with a summed quantity. **Split by Condition** and **Split by Holo/Printing** determine whether those differences remain separate in the display.
 
-This does not move cards into one storage pocket or merge their real-world locations. For copy-specific editing or a detailed export, turn stacking off first. **Select** mode automatically shows individual entries so actions target real records, not an ambiguous display stack.
+This does not move cards into one storage pocket or merge their real-world locations. For copy-specific editing, turn stacking off first. CSV exports preserve the underlying entry details regardless of display stacking. **Select** mode automatically shows individual entries so actions target real records, not an ambiguous display stack.
 
 ### Use the card inspector
 
@@ -328,16 +330,18 @@ Useful inspector actions include:
 
 For a purchase containing several cards, the price splitter offers **Total paid**, **By value** or **Evenly**, and **Split across …**. Apply it only to the entries belonging to that purchase.
 
+Both methods account for the number of copies in each entry. Entry shares are allocated in cents, then divided by their quantities; a per-copy cost can retain fractions of a cent so the full purchase total stays correct without splitting entries or changing reservations.
+
 **Warning:** bulk changes affect all selected entries. **Delete** is permanent and asks for confirmation. Inventory-transfer buttons change ownership classification; they do not duplicate cards. Return checked-out copies before archiving them.
 
 ### Export exactly the current view
 
 1. Choose the inventory you want to export.
-2. Set search, filters, sorting, and stacking. For separate copy-level details, turn **Stack Duplicates** off; leave selection mode if you want the normal stacked view.
+2. Set search, filters, and sorting. Display stacking does not discard underlying CSV entry details.
 3. Open **Export**.
 4. Choose **Export view CSV** or **Export view TXT** and save the downloaded file.
 
-**Expected result:** all matching results across pages are exported in the current order. CSV carries fields such as printing, condition, language, and purchase price; TXT is a compact quantity/name/set/collector-number list.
+**Expected result:** all matching entries across pages are exported in the current order. CSV preserves each entry's printing, condition, language, and purchase price even when duplicates are visually stacked. TXT is a compact quantity/name/set/collector-number list, combining matching printings.
 
 **Important:** this is the matching view, not only checked selections or the current page. Cards hidden by filters or in another inventory are not included. It is not a complete backup of storage, notes, and other application records. Treat downloaded inventory and purchase-price files as private data; exporting does not publish a link, but anyone you send the file to can read it.
 
@@ -634,6 +638,8 @@ This deck-creation chooser creates a definition only. It does not buy or add own
 
 **Expected result:** the deck is **Checked out**, and its quantities are reserved against other Physical decks. The reservation is made before the guide opens. Checkout does not erase or change the recorded storage slots; those slots remain the return addresses.
 
+In a binder with stacking enabled, the highlighted shared pocket acts on a requested physical entry, not an unrelated first copy in that pocket. Use the individual checklist rows when gathering multiple requested entries from the same pocket.
+
 If you use the guide's **Cancel**/X, click outside it, or use its back action, Manafolio attempts to undo the checkout. Do not treat closing it as completion. After a network or undo error, inspect the deck's current status before trying again.
 
 Arena and Graveyard decks cannot be checked out, even if a checkout control is visible. Wishlist and Graveyard do not supply Physical checkout. If copies are missing or another deck needs the same quantities, resolve that situation rather than assuming a deck definition proves the cards are ready.
@@ -800,7 +806,7 @@ Open **Settings** and use its section links to jump to the relevant panel.
 1. Open **Preferences**.
 2. Use **Language** to choose the interface language. This changes app text, not the language recorded for a printed card.
 3. Choose **Theme**: **Arcane Blue**, **Jenny**, **Plains**, **Island**, **Swamp**, **Mountain**, **Forest**, or **Wastes**. Theme changes save to your account automatically and apply on other devices when you sign in. Obsolete Light/Magic/LCARS preferences fall back to Arcane Blue.
-4. Set **Currency** to USD, EUR, GBP, CAD, AUD, or JPY. **This is a display preference, not exchange-rate conversion.** Do not interpret relabeled values as converted money; provider currencies and mixed-currency totals still require care.
+4. Set **Currency** to USD, EUR, GBP, CAD, AUD, or JPY. Known provider quote currencies take precedence; this preference is only a fallback for amounts without a recognized currency. **It does not perform exchange-rate conversion.** Collection totals separate currencies; other mixed totals are marked explicitly.
 5. Set **Default Views** for the available screens, including **Deck Builder cards → Table view / Grid view**.
 6. Set **Default Card Zoom** from 60% through 250% for card grids.
 
@@ -870,6 +876,8 @@ Duplicated decks and decks restored from an account JSON backup start without sh
 
 **Expected result:** a `manafolio-backup` JSON export containing this account's inventory entries (including Physical, Arena, Wishlist, and Graveyard), associated cached card metadata, storage layouts/placements, decks and their private notes, commander selections, Pulled state, checkout data, and wins/losses. It includes private card metadata such as purchase prices and card notes, so treat it as private even though login/provider credentials are excluded.
 
+Commander selections round-trip for Commander/EDH, Brawl, and Historic Brawl decks.
+
 **Export CSV** and **Export JSON** in this panel are card-data exports, not substitutes for **Complete Backup**. The complete account file does not include the server installation, login credentials, API/provider keys, sessions, account/browser preferences, standalone Notes records, price-history tables, or uploaded artwork files. It is an account data transfer/recovery file, not a whole-server backup.
 
 ### Restore a backup into the signed-in account
@@ -920,6 +928,8 @@ If you do not see **Admin**, ask the person who operates your server. Do not cha
 
 Account deletion is destructive. Back up required data first and read the confirmation. **Generate Test Cards** adds sample cards; do not use it on a real collection merely to test whether the server works.
 
+Deletion also stops the account's local ChatGPT/Codex work and removes its credential directory. It does not contact OpenAI, revoke provider authorization, or erase backups. If credential cleanup fails, the account remains and an error is shown; correct the filesystem problem and retry deletion.
+
 ### Configure the server's public address
 
 Under **Admin → Instance Settings**, configure **Public Base URL** when share links would otherwise point to an internal address. Use the externally reachable HTTPS address and choose **Save Settings**. Check a generated link from a separate browser/device. Changing the URL does not itself configure DNS, TLS, firewall rules, or a reverse proxy.
@@ -928,7 +938,7 @@ Under **Admin → Instance Settings**, configure **Public Base URL** when share 
 
 The price-refresh schedule controls refreshing card prices. **Settings → Scryfall bulk data** controls the persistent card-data snapshot used by lookups/imports. **Admin → Catalogs** manages artwork-matching catalogs for scanning. These are different resources; refreshing prices does not install scan models or build a scan catalog.
 
-A failed bulk update retains the previous catalog. Allow disk space for both the current catalog and its replacement. Large artwork builds can take hours; review progress and resume supported interrupted builds instead of repeatedly starting new ones.
+A failed bulk update retains the previous catalog. Allow disk space for both the current catalog and its replacement. Stopped or failed artwork builds retain the working catalog and downloaded card data, but discard uncommitted embeddings. The next build reuses unchanged vectors from the last successful publication. Catalog/setup progress polling resumes after transient connection failures.
 
 ### Take a server backup
 

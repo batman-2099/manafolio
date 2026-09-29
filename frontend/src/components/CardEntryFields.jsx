@@ -49,7 +49,7 @@ export default function CardEntryFields({
   const Price = (
     <div className="form-group" style={groupStyle}>
       <label htmlFor={`${fieldId}-price`}>{t('card.purchasePrice')}</label>
-      <input id={`${fieldId}-price`} type="number" step="0.01" min="0" className="input-control" value={purchasePrice} onChange={(e) => onPurchasePrice(e.target.value)} placeholder="0.00" />
+      <input id={`${fieldId}-price`} type="number" step="any" min="0" className="input-control" value={purchasePrice} onChange={(e) => onPurchasePrice(e.target.value)} placeholder="0.00" />
     </div>
   );
   const Condition = (

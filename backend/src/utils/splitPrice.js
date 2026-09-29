@@ -1,20 +1,23 @@
-// Split a total price paid across cards into per-card purchase prices.
-// prices: array of each card's market value (0 if unknown).
-// method 'weighted' allocates proportional to market value; 'equal' splits
-// evenly. Weighted falls back to equal when every price is 0. All arithmetic is
-// in integer cents; any rounding remainder lands on the last card so the parts
-// sum back to exactly `total`.
+// Split a total into cent-denominated entry shares. Cumulative boundaries keep
+// every share nonnegative and the rounded total exact, including tiny totals.
+// Weighted falls back to equal when no positive finite market values exist.
 function splitPrice(prices, total, method = 'weighted') {
-  const n = prices.length;
-  if (n === 0) return [];
+  if (!Number.isFinite(total) || total < 0 || !Number.isSafeInteger(Math.round(total * 100))) {
+    throw new RangeError('total must be a finite non-negative cent amount');
+  }
+  if (prices.length === 0) return [];
   const cents = Math.round(total * 100);
-  const sum = prices.reduce((s, p) => s + (p || 0), 0);
-  const weighted = method === 'weighted' && sum > 0;
+  const values = prices.map(p => Number.isFinite(p) && p > 0 ? p : 0);
+  const max = Math.max(...values);
+  const weights = values.map(p => method === 'weighted' && max > 0 ? p / max : 1);
+  const sum = weights.reduce((s, p) => s + p, 0);
+  let cumulative = 0;
   let allocated = 0;
-  return prices.map((p, i) => {
-    if (i === n - 1) return (cents - allocated) / 100;
-    const share = weighted ? Math.round(cents * (p || 0) / sum) : Math.round(cents / n);
-    allocated += share;
+  return weights.map((weight, i) => {
+    cumulative += weight;
+    const boundary = i === weights.length - 1 ? cents : Math.min(cents, Math.floor(cents * (cumulative / sum)));
+    const share = boundary - allocated;
+    allocated = boundary;
     return share / 100;
   });
 }
@@ -40,6 +43,14 @@ if (require.main === module) {
   assert.ok(sums(splitPrice([0, 0], 9, 'weighted'), 9), 'weighted fallback sums to total');
   // Single card gets the whole total.
   assert.deepStrictEqual(splitPrice([5], 12.5, 'weighted'), [12.5]);
+  for (const method of ['equal', 'weighted']) {
+    const tiny = splitPrice([1, 1, 1, 1], 0.02, method);
+    assert.ok(tiny.every(n => n >= 0), 'small totals never create negative costs');
+    assert.ok(sums(tiny, 0.02), 'small totals retain every cent');
+  }
+  for (const invalid of [Infinity, NaN, -1]) {
+    assert.throws(() => splitPrice([1], invalid), RangeError);
+  }
 
   console.log('splitPrice self-check passed');
 }

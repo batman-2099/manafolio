@@ -22,7 +22,7 @@ router.get('/stats', async (req, res) => {
       SELECT
         c.quantity, c.purchase_price, c.added_at, c.printing, c.condition, c.card_id, c.market_value, c.list_type,
         cc.types, cc.subtypes, cc.supertype, cc.game, cc.rarity, cc.set_name, cc.set_id, cc.price_trend, cc.price_normal, cc.price_holofoil,
-        cc.price_avg1, cc.price_avg7, cc.price_avg30, cc.name, cc.color_identity, cc.cmc,
+        cc.price_avg1, cc.price_avg7, cc.price_avg30, cc.price_currency, cc.name, cc.color_identity, cc.cmc,
         l.name as location_name
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
@@ -40,6 +40,7 @@ router.get('/stats', async (req, res) => {
     let physicalCards = 0;
     let digitalCards = 0;
     let archivedCards = 0;
+    const currencies = new Set();
 
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
@@ -103,6 +104,7 @@ router.get('/stats', async (req, res) => {
       else if (row.list_type === 'collection') physicalCards += qty;
       else if (row.list_type === 'graveyard') archivedCards += qty;
       totalValue += qty * price;
+      if (qty * price > 0) currencies.add(row.price_currency || 'USD');
       totalSpent += qty * (row.purchase_price || 0);
       if (row.list_type === 'collection' && !row.location_name) unsortedCount += qty;
 
@@ -196,10 +198,10 @@ router.get('/stats', async (req, res) => {
         c.id AS entry_id, c.location_id, (SELECT name FROM locations WHERE id = c.location_id) AS location_name,
         (SELECT type FROM locations WHERE id = c.location_id) AS location_type,
         c.quantity, c.condition, c.printing, c.language, c.purchase_price, c.is_trade, c.favorite, c.list_type,
-        c.grader, c.grade, c.market_value,
+        c.grader, c.grade, c.cert_number, c.market_value, c.missing, c.notes,
         cc.id as card_id, cc.name, cc.printed_name, cc.rarity, cc.set_name, cc.set_id, cc.number, cc.image_url,
         cc.game, cc.supertype, cc.subtypes, cc.types, cc.cmc, cc.color_identity, cc.price_trend,
-        cc.price_normal, cc.price_holofoil
+        cc.price_normal, cc.price_holofoil, cc.price_currency
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
       WHERE c.user_id = ?${listFilter}${gameFilter}
@@ -267,11 +269,11 @@ router.get('/stats', async (req, res) => {
     const recentRows = await db.all(`
       SELECT c.id AS entry_id, c.location_id, (SELECT name FROM locations WHERE id = c.location_id) AS location_name,
              (SELECT type FROM locations WHERE id = c.location_id) AS location_type,
-             c.quantity, c.condition, c.printing, c.language, c.added_at, c.is_trade, c.favorite, c.list_type,
-             c.grader, c.grade, c.market_value,
+             c.quantity, c.condition, c.printing, c.language, c.purchase_price, c.added_at, c.is_trade, c.favorite, c.list_type,
+             c.grader, c.grade, c.cert_number, c.market_value, c.missing, c.notes,
              cc.id as card_id, cc.name, cc.printed_name, cc.rarity, cc.set_name, cc.set_id, cc.number, cc.image_url,
              cc.game, cc.supertype, cc.subtypes, cc.types, cc.cmc, cc.color_identity,
-             cc.price_trend, cc.price_normal, cc.price_holofoil
+             cc.price_trend, cc.price_normal, cc.price_holofoil, cc.price_currency
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
       WHERE c.user_id = ?${listFilter}${gameFilter}
@@ -295,6 +297,7 @@ router.get('/stats', async (req, res) => {
         archivedCards,
         uniqueCards,
         totalValue: parseFloat(totalValue.toFixed(2)),
+        currencies: [...currencies].sort(),
         totalSpent: parseFloat(totalSpent.toFixed(2)),
         roi,
         avgCardValue,

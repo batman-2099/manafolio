@@ -41,10 +41,6 @@ for (const f of KEEP) {
   // contour detector with nothing in the log to say why.
   if (!statSync(from).isFile()) throw new Error(`onnxruntime-web is missing ${f} — check the KEEP list against node_modules/onnxruntime-web/dist`);
   const to = path.join(dst, f);
-  // Skip unchanged files: this runs before every dev start and the .wasm is 13 MB.
-  try {
-    if (statSync(to).size === statSync(from).size) continue;
-  } catch { /* not there yet */ }
   copyFileSync(from, to);
   n++;
 }

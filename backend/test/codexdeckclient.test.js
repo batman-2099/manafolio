@@ -106,10 +106,12 @@ async function main() {
   const originalKey = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = 'synthetic-parent-secret';
   const children = [];
+  const runtimes = [];
   childProcess.spawn = (executable, args, options) => {
     assert.strictEqual(executable, process.execPath);
     const child = spawn(process.execPath, ['-e', `(${fakeServer.toString()})();`], options);
     children.push(child);
+    runtimes.push(path.dirname(options.cwd));
     return child;
   };
   const client = require('../src/codexDeckClient');
@@ -206,8 +208,64 @@ async function main() {
     assert.ok(!timedOutProgress.some(event => event.stage === 'response_received'));
     assert.strictEqual(activeIntervals.size, 0, 'timed-out generation clears its waiting heartbeat');
     global.setTimeout = originalTimeout;
+
+    // Deleting dormant credentials must not spawn Codex or contact its logout RPC.
+    const dormantHome = path.join(dir, 'codex', '5');
+    await fs.mkdir(dormantHome, { recursive: true });
+    await fs.writeFile(path.join(dormantHome, 'auth.json'), '{"fixture":"not-a-real-token"}');
+    const beforeDisposal = children.length;
+    await client.disposeUser(5);
+    assert.strictEqual(children.length, beforeDisposal);
+    await assert.rejects(fs.stat(dormantHome), error => error.code === 'ENOENT');
+    await assert.rejects(client.login(5), error => error.status === 410);
+
+    const mkdir = fs.mkdir;
+    let entered, release;
+    const creating = new Promise(resolve => { entered = resolve; });
+    const released = new Promise(resolve => { release = resolve; });
+    fs.mkdir = async (directory, options) => {
+      if (directory === path.join(dir, 'codex', '4')) {
+        entered();
+        await released;
+      }
+      return mkdir(directory, options);
+    };
+    try {
+      const pending = client.account(4);
+      pending.catch(() => {});
+      await creating;
+      const disposal = client.disposeUser(4);
+      const rejected = assert.rejects(client.account(4), error => error.status === 410);
+      release();
+      await rejected;
+      await disposal;
+      await assert.rejects(pending, error => [410, 503].includes(error.status));
+      await assert.rejects(fs.stat(path.join(dir, 'codex', '4')), error => error.code === 'ENOENT',
+        'an in-flight creation cannot recreate deleted account storage');
+    } finally {
+      release();
+      fs.mkdir = mkdir;
+    }
+
+    let generating;
+    const generated = new Promise(resolve => { generating = resolve; });
+    const active = client.suggest(2, 'hold', schema, {}, event => {
+      if (event.stage === 'generating') generating();
+    });
+    active.catch(() => {});
+    await generated;
+    await client.disposeUser(2);
+    await assert.rejects(active, error => [410, 503].includes(error.status));
+    await assert.rejects(fs.stat(path.join(dir, 'codex', '2')), error => error.code === 'ENOENT');
+    await assert.rejects(client.account(2), error => error.status === 410);
+    assert.strictEqual(activeIntervals.size, 0, 'deletion must cancel active recommendation work');
+    await client.disposeUser(3);
+    await assert.rejects(fs.stat(path.join(dir, 'codex', '3')), error => error.code === 'ENOENT');
     await client.shutdown();
     assert.ok(children.every(child => child.exitCode !== null || child.signalCode !== null), 'closed sessions must not leave child processes alive');
+    for (const runtime of runtimes) {
+      await assert.rejects(fs.stat(runtime), error => error.code === 'ENOENT', 'deleted or closed sessions must remove runtime files');
+    }
     console.log('Codex client isolation, lifecycle, bounded generation, and refusal checks passed.');
   } finally {
     global.setTimeout = originalTimeout;

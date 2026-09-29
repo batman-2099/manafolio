@@ -89,6 +89,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(false);
   const searchPending = useRef(false);
+  const submittedSearch = useRef(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
 
@@ -152,7 +153,16 @@ function CardSearch({ onAddSuccess, showToast }) {
   const [selectedCard, setSelectedCard] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [, setLocations] = useState([]);
+  const drawerGeneration = useRef(0);
+  const printingRequest = useRef(0);
+  const printingPending = useRef(false);
+  const [localizing, setLocalizing] = useState(false);
+  const addPending = useRef(false);
+  const [adding, setAdding] = useState(false);
+  useEffect(() => () => {
+    drawerGeneration.current++;
+    printingRequest.current++;
+  }, []);
   
   // Form states
   const [quantity, setQuantity] = useState(1);
@@ -163,12 +173,6 @@ function CardSearch({ onAddSuccess, showToast }) {
   const [grader, setGrader] = useState('Raw');
   const [grade, setGrade] = useState('');
   const [certNumber, setCertNumber] = useState('');
-  const [, setLocationId] = useState('');
-
-  // Fetch physical locations on mount for the form dropdown
-  useEffect(() => {
-    fetchLocations();
-  }, []);
 
   // Set codes for autocomplete; search expects codes without the game prefix.
   useEffect(() => {
@@ -189,27 +193,15 @@ function CardSearch({ onAddSuccess, showToast }) {
     return () => { cancelled = true; };
   }, [game, searchLang]);
 
-  const fetchLocations = async () => {
-    try {
-      const response = await fetch('/api/locations');
-      if (response.ok) {
-        const data = await response.json();
-        setLocations(data);
-        if (data.length > 0) {
-          // Default to Unassigned Pile
-          setLocationId('');
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching locations:', err);
-    }
-  };
 
   // pageNum > 1 appends to the existing results instead of replacing them.
-  const runSearch = async (pageNum, size = pageSize) => {
+  const runSearch = async (pageNum, size = pageSize, criteria = null) => {
     if (searchPending.current) return;
     searchPending.current = true;
     const append = pageNum > 1;
+    const submitted = criteria || (append ? submittedSearch.current : { query, numberQuery, setCodeQuery, game, searchLang });
+    if (!submitted) { searchPending.current = false; return; }
+    if (!append) submittedSearch.current = submitted;
     if (append) setLoadingMore(true); else setLoading(true);
     setSearchError(null);
     if (!append) {
@@ -222,12 +214,12 @@ function CardSearch({ onAddSuccess, showToast }) {
     }
     try {
       const params = new URLSearchParams();
-      if (query) params.append('name', query);
-      if (numberQuery) params.append('number', numberQuery);
-      if (setCodeQuery) params.append('set', setCodeQuery);
+      if (submitted.query) params.append('name', submitted.query);
+      if (submitted.numberQuery) params.append('number', submitted.numberQuery);
+      if (submitted.setCodeQuery) params.append('set', submitted.setCodeQuery);
       params.append('scope', 'internet');
-      params.append('game', game);
-      params.append('lang', searchLang);
+      params.append('game', submitted.game);
+      params.append('lang', submitted.searchLang);
       params.append('page', pageNum);
       params.append('limit', size);
 
@@ -276,7 +268,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   const changePageSize = (size) => {
     setPageSize(size);
     localStorage.setItem('search_page_size', String(size));
-    if (searching) runSearch(1, size);
+    if (searching) runSearch(1, size, submittedSearch.current);
   };
 
   // Dynamically compute filters from search results
@@ -480,25 +472,42 @@ function CardSearch({ onAddSuccess, showToast }) {
   };
 
   const handleLanguageChange = async (newLang) => {
+    if (!selectedCard || addPending.current) return;
     setLanguage(newLang);
-    if (!selectedCard) return;
+    const request = ++printingRequest.current;
+    const generation = drawerGeneration.current;
+    printingPending.current = true;
+    setLocalizing(true);
+    const isCurrent = () => request === printingRequest.current && generation === drawerGeneration.current;
     try {
       const targetGame = selectedCard.game || game;
       const resp = await fetch(`/api/cards/${encodeURIComponent(selectedCard.id)}/printing?lang=${encodeURIComponent(newLang)}&game=${encodeURIComponent(targetGame)}`);
       if (resp.ok) {
         const localized = await resp.json();
-        if (localized && localized.id) {
-          setSelectedCard(prev => (prev ? { ...prev, ...localized, language: newLang } : { ...localized, language: newLang }));
+        if (isCurrent() && localized?.id) {
+          setSelectedCard({ ...selectedCard, ...localized, language: newLang });
           return;
         }
       }
+      if (isCurrent()) setLanguage(selectedCard.language || langName(searchLang));
     } catch (e) {
+      if (isCurrent()) setLanguage(selectedCard.language || langName(searchLang));
       console.warn('Could not switch to localized printing:', e);
+    } finally {
+      if (isCurrent()) {
+        printingPending.current = false;
+        setLocalizing(false);
+      }
     }
-    setSelectedCard(prev => (prev ? { ...prev, language: newLang } : prev));
   };
 
   const openQuickAdd = (card) => {
+    drawerGeneration.current++;
+    printingRequest.current++;
+    printingPending.current = false;
+    setLocalizing(false);
+    addPending.current = false;
+    setAdding(false);
     setSelectedCard(card);
     setPurchasePrice(0); // Default to 0 purchase spend
     // The card itself knows which printing it is, so the copy is recorded in that
@@ -511,6 +520,12 @@ function CardSearch({ onAddSuccess, showToast }) {
   };
 
   const closeDrawer = () => {
+    drawerGeneration.current++;
+    printingRequest.current++;
+    printingPending.current = false;
+    setLocalizing(false);
+    addPending.current = false;
+    setAdding(false);
     setIsDrawerOpen(false);
     setIsFullScreen(false);
     setSelectedCard(null);
@@ -528,7 +543,10 @@ function CardSearch({ onAddSuccess, showToast }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedCard) return;
+    if (!selectedCard || addPending.current || printingPending.current) return;
+    addPending.current = true;
+    setAdding(true);
+    const generation = drawerGeneration.current;
     const action = e.nativeEvent.submitter?.value || 'collection';
     const listType = addToArena && action === 'collection' ? 'arena' : action;
 
@@ -550,6 +568,10 @@ function CardSearch({ onAddSuccess, showToast }) {
           cert_number: certNumber.trim() || null
         })
       });
+      if (generation !== drawerGeneration.current) {
+        if (response.ok) onAddSuccess();
+        return;
+      }
 
       if (response.ok) {
         showToast(t('search.addedToCollection', { name: displayName(selectedCard) }), 'success');
@@ -571,11 +593,16 @@ function CardSearch({ onAddSuccess, showToast }) {
         // A rejected cert number (already in the collection) explains itself; the
         // generic message would send the user back to re-type a correct number.
         const body = await response.json().catch(() => null);
-        showToast(body?.error || t('search.errAddDb'), 'error');
+        if (generation === drawerGeneration.current) showToast(body?.error || t('search.errAddDb'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('search.errSave'), 'error');
+      if (generation === drawerGeneration.current) showToast(t('search.errSave'), 'error');
+    } finally {
+      if (generation === drawerGeneration.current) {
+        addPending.current = false;
+        setAdding(false);
+      }
     }
   };
 
@@ -1222,8 +1249,8 @@ function CardSearch({ onAddSuccess, showToast }) {
               <div className="quick-add-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem' }}>
                 <div className="quick-add-footer-actions">
                   <button type="button" className="btn btn-secondary" onClick={closeDrawer}>{t('common.cancel')}</button>
-                  <button type="submit" value="wishlist" className="btn btn-secondary">{t('search.addToWishlist')}</button>
-                  <button type="submit" value="collection" className="btn btn-primary">{t(addToArena ? 'search.addToArena' : 'search.addToCollection')}</button>
+                  <button type="submit" value="wishlist" className="btn btn-secondary" disabled={adding || localizing} aria-busy={adding || localizing}>{t('search.addToWishlist')}</button>
+                  <button type="submit" value="collection" className="btn btn-primary" disabled={adding || localizing} aria-busy={adding || localizing}>{t(addToArena ? 'search.addToArena' : 'search.addToCollection')}</button>
                 </div>
               </div>
             </form>

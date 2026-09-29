@@ -21,42 +21,32 @@ export default function PriceHistoryChart({
 }) {
   const { t, locale } = useT();
   const [range, setRange] = useState(defaultRange);
-  const [data, setData] = useState([]);
-  const [insufficientHistory, setInsufficientHistory] = useState(false);
-  const [coverage, setCoverage] = useState({ spanDays: 0, windowDays: null, marketCount: 0, recordedCount: 0 });
-  const [loading, setLoading] = useState(false);
+  const [historyState, setHistoryState] = useState(null);
+  const [refresh, setRefresh] = useState(0);
+  const scope = JSON.stringify([cardId, range, currency]);
+  const result = historyState?.scope === scope ? historyState.data : null;
+  const data = result?.data;
+  const insufficientHistory = !!result?.insufficientHistory;
+  const coverage = result || {};
+  const loading = historyState?.scope !== scope || historyState.loading;
+  const error = historyState?.scope === scope && historyState.error;
 
   useEffect(() => {
-    if (!cardId) {
-      setData([]);
-      return;
-    }
-    let cancelled = false;
+    if (!cardId) return;
+    const controller = new AbortController();
+    setHistoryState(previous => ({ scope, data: previous?.scope === scope ? previous.data : null, loading: true, error: false }));
     (async () => {
       try {
-        setLoading(true);
-        const response = await fetch(`/api/cards/${cardId}/price-history?range=${range}`);
-        if (response.ok) {
-          const json = await response.json();
-          if (!cancelled) {
-            setData(json.data ?? []);
-            setInsufficientHistory(!!json.insufficientHistory);
-            setCoverage({
-              spanDays: json.spanDays ?? 0,
-              windowDays: json.windowDays ?? null,
-              marketCount: json.marketCount ?? 0,
-              recordedCount: json.recordedCount ?? 0,
-            });
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching price history:', err);
-      } finally {
-        if (!cancelled) setLoading(false);
+        const response = await fetch(`/api/cards/${encodeURIComponent(cardId)}/price-history?range=${range}`, { signal: controller.signal });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (!controller.signal.aborted) setHistoryState({ scope, data, loading: false, error: false });
+      } catch {
+        if (!controller.signal.aborted) setHistoryState(previous => ({ ...previous, loading: false, error: true }));
       }
     })();
-    return () => { cancelled = true; };
-  }, [cardId, range]);
+    return () => controller.abort();
+  }, [cardId, range, scope, refresh]);
 
   const chartData = useMemo(
     () => (data || []).map(d => ({ ...d, ts: new Date(d.recorded_at).getTime() })),
@@ -101,6 +91,7 @@ export default function PriceHistoryChart({
       <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
         {RANGE_KEYS.map(key => (
           <button
+            type="button"
             key={key}
             onClick={() => setRange(key)}
             aria-pressed={range === key}
@@ -122,6 +113,18 @@ export default function PriceHistoryChart({
         ))}
       </div>
 
+      {error ? (
+        <div className="read-state">
+          <p role="alert">{t('dash.errHistory')}{result && <> {t('common.staleData')}</>}</p>
+          <button type="button" className="btn btn-secondary" onClick={() => setRefresh(value => value + 1)}>{t('dash.retry')}</button>
+        </div>
+      ) : loading && (
+        <div className="read-state" role="status">
+          <div className="spinner" aria-hidden="true" />
+          <p>{t(result ? 'common.refreshing' : 'common.loading')}</p>
+        </div>
+      )}
+
       {/* Say where the line came from. Cardmarket's rolling averages are real
           market data pulled per request; everything else is what Manafolio has
           watched happen since it was installed. */}
@@ -136,10 +139,8 @@ export default function PriceHistoryChart({
         </div>
       )}
 
-      <div style={{ width: '100%', height: `${height}px` }}>
-        {loading ? (
-          <div className="spinner" style={{ height: '30px', margin: `${Math.max(0, height / 2 - 15)}px auto` }} />
-        ) : insufficientHistory ? (
+      <div style={{ width: '100%', height: `${height}px` }} aria-busy={loading}>
+        {!result ? null : insufficientHistory ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
             {t('priceHistory.insufficient')}
           </div>

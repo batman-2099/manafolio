@@ -325,6 +325,7 @@
   "common.edit": "編集",
   "common.errBackend": "バックエンドへの接続でエラーが発生しました。",
   "common.loading": "読み込み中",
+  "common.mixedCurrencies": "複数の通貨が含まれています。合計額の通貨換算は行われません。",
   "common.logoAlt": "Manafolio のロゴ",
   "dash.analytics": "統計",
   "common.next": "次へ",

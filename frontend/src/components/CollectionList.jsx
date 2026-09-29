@@ -327,15 +327,19 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   }, [displayCards, subTab, tradeOnly]);
 
   const exportView = (format) => {
-    downloadBlob(new Blob([buildCollectionExport(displayCards, format)], {
+    downloadBlob(new Blob([buildCollectionExport(filteredCollection, format)], {
       type: format === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
     }), `manafolio-${subTab}-view.${format}`);
   };
 
-  const totalValue = useMemo(
-    () => displayCards.reduce((sum, item) => sum + (item.price_trend || 0) * (item.quantity || 1), 0),
-    [displayCards]
-  );
+  const totalValues = useMemo(() => {
+    const totals = new Map();
+    for (const item of filteredCollection) {
+      const currency = item.price_currency || '';
+      totals.set(currency, (totals.get(currency) || 0) + (item.price_trend || 0) * (item.quantity || 1));
+    }
+    return [...totals].map(([currency, value]) => priceText(value, currency)).join(' + ');
+  }, [filteredCollection]);
 
   const paginationControls = hasCollection && pageCount > 1 && (
     <nav aria-label={t('collection.pagination')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '0.75rem', margin: '1rem 0' }}>
@@ -688,7 +692,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       {hasCollection && !selectMode && (
         <div role="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', fontSize: '0.9375rem', color: 'var(--text-secondary)', flexWrap: 'wrap', gap: '0.5rem' }}>
           <span><strong style={{ color: 'var(--text-strong)' }}>{displayCards.length}</strong> {t('collection.cardUnit', { count: displayCards.length })}</span>
-          <span>{t('collection.totalValue')} <strong style={{ color: 'var(--text-strong)' }}>{priceText(totalValue)}</strong></span>
+          <span>{t('collection.totalValue')} <strong style={{ color: 'var(--text-strong)' }}>{totalValues}</strong></span>
         </div>
       )}
 

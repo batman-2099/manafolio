@@ -63,31 +63,52 @@ export default function SetupWizard({ user, onClose, showToast }) {
   // being glued into a sentence: "9.6 MB" is "9,6 MB" in half of Europe.
   const mb = (n) => t('setup.scan.megabytes', { size: Number((n / 1024 / 1024).toFixed(1)) });
 
-  const load = async () => {
+  const load = async (signal) => {
     try {
       const [e, c] = await Promise.all([
-        fetch('/api/admin/models').then(r => r.ok ? r.json() : null),
-        fetch('/api/admin/catalogs').then(r => r.ok ? r.json() : null),
+        fetch('/api/admin/models', { signal }).then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        }),
+        fetch('/api/admin/catalogs', { signal }).then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        }),
       ]);
+      if (signal.aborted) return;
       setEngine(e);
       setCatalogs(c?.catalogs || []);
-    } catch { /* the wizard is not worth an error toast on a transient blip */ }
+    } catch { /* retain progress and retry on a transient blip */ }
   };
 
-  const loadLocations = () => fetch('/api/locations')
+  const loadLocations = (signal) => fetch('/api/locations', { signal })
     .then(r => r.ok ? r.json() : [])
-    .then(rows => setLocations(Array.isArray(rows) ? rows : []))
+    .then(rows => { if (!signal?.aborted) setLocations(Array.isArray(rows) ? rows : []); })
     .catch(() => { /* the storage step degrades to its create form */ });
 
-  useEffect(() => { load(); loadLocations(); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    load(controller.signal);
+    loadLocations(controller.signal);
+    return () => controller.abort();
+  }, []);
 
   // Poll while a download runs, from whatever step the user is on: these are tens
   // of megabytes, and a bar that stops moving is the only way to tell a stalled
   // download from a slow one.
   useEffect(() => {
     if (!engine?.progress) return;
-    const timer = setTimeout(load, 1000);
-    return () => clearTimeout(timer);
+    const controller = new AbortController();
+    let timer;
+    const poll = async () => {
+      try {
+        await load(controller.signal);
+      } finally {
+        if (!controller.signal.aborted) timer = setTimeout(poll, 1000);
+      }
+    };
+    timer = setTimeout(poll, 1000);
+    return () => { controller.abort(); clearTimeout(timer); };
   }, [engine?.progress]);
 
   const dl = engine?.progress;

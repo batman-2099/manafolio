@@ -19,6 +19,7 @@ const db = require('./db');
 const cardSets = require('./cardSets');
 const languages = require('./utils/languages');
 const cvScan = require('./cvScan');
+const { binaryPath, readCatalog, publishCatalog } = require('./utils/localCatalog');
 
 const MODEL_DIR = process.env.CV_MODEL_DIR || path.join(__dirname, '..', 'data', 'models');
 const SIZE = 448;
@@ -27,7 +28,13 @@ const GAMES = ['mtg'];
 const suffix = (lang) => (!lang || lang === 'en' || lang === 'English' ? '' : `-${String(lang).toLowerCase()}`);
 const binPath = (game, lang) => {
   if (game !== 'mtg') throw new Error('Unsupported game');
-  return path.join(MODEL_DIR, `milo-mtg${suffix(lang)}-local.bin`);
+  const file = metaPath(game, lang);
+  try {
+    return binaryPath(file, JSON.parse(fs.readFileSync(file, 'utf8')));
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+    return file.replace(/\.json$/, '.bin');
+  }
 };
 const metaPath = (game, lang) => {
   if (game !== 'mtg') throw new Error('Unsupported game');
@@ -129,7 +136,7 @@ async function list() {
           built = {
             rows: meta.ids.length,
             builtAt: meta.builtAt,
-            bytes: fs.statSync(binPath(game, lang)).size,
+            bytes: fs.statSync(binaryPath(metaPath(game, lang), meta)).size,
           };
         }
       } catch { built = null; }
@@ -295,15 +302,18 @@ async function embedPhase(job) {
   let prev = null;
   try {
     if (fs.existsSync(metaPath(job.game, job.lang))) {
-      const meta = JSON.parse(fs.readFileSync(metaPath(job.game, job.lang), 'utf8'));
-      const buf = fs.readFileSync(binPath(job.game, job.lang));
+      const { meta, bin: buf } = readCatalog(metaPath(job.game, job.lang));
+      if ((meta.model && meta.model !== 'milo1') || (meta.views || 1) !== 1) throw new Error('Different embedding configuration; run a full rebuild');
       const vecs = new Map();
       for (let i = 0; i < meta.ids.length; i++) {
         vecs.set(meta.ids[i], new Float32Array(buf.buffer, buf.byteOffset + i * meta.dim * 4, meta.dim));
       }
       prev = { vecs, srcs: new Map(Object.entries(meta.srcs || {})) };
     }
-  } catch { prev = null; }
+  } catch (e) {
+    if (scoped) throw e;
+    prev = null;
+  }
 
   const session = await ort.InferenceSession.create(path.join(MODEL_DIR, 'milo.onnx'), {
     intraOpNumThreads: 1, interOpNumThreads: 1, executionMode: 'sequential',
@@ -373,22 +383,16 @@ async function embedPhase(job) {
     }
   }
 
-  // A cancelled build still writes what it has: the partial catalog is valid and
-  // resuming later reuses all of it. Refusing to write would throw away the work.
+  // Only complete builds replace the working catalog. Cached card data survives
+  // cancellation; uncommitted embeddings are deliberately discarded.
+  if (job.cancelled) return { built, reused, failed, wrote: false };
+  if (failed) throw new Error(`${failed} card(s) failed to embed; catalog unchanged`);
   if (!vecs.length) return { built, reused, failed, wrote: false };
   const dim = vecs[0].length;
-  const bin = Buffer.allocUnsafe(vecs.length * dim * 4);
-  vecs.forEach((v, i) => Buffer.from(v.buffer, v.byteOffset, dim * 4).copy(bin, i * dim * 4));
-  fs.mkdirSync(MODEL_DIR, { recursive: true });
-  // Write-then-rename: an interrupted write must not leave a truncated catalog
-  // that loads as garbage.
-  fs.writeFileSync(binPath(job.game, job.lang) + '.tmp', bin);
-  fs.writeFileSync(metaPath(job.game, job.lang) + '.tmp', JSON.stringify({
+  publishCatalog(metaPath(job.game, job.lang), {
     dim, ids, srcs, game: job.game, lang: job.lang,
-    model: 'milo1', builtAt: new Date().toISOString(),
-  }));
-  fs.renameSync(binPath(job.game, job.lang) + '.tmp', binPath(job.game, job.lang));
-  fs.renameSync(metaPath(job.game, job.lang) + '.tmp', metaPath(job.game, job.lang));
+    model: 'milo1', views: 1, builtAt: new Date().toISOString(),
+  }, vecs);
   cvScan.reload(job.game, job.lang);
   return { built, reused, failed, wrote: true, rows: ids.length };
 }
@@ -409,12 +413,13 @@ function start(game, lang = 'English', opts = {}) {
   (async () => {
     try {
       const cached = opts.skipCache ? { cards: 0, failed: 0 } : await cachePhase(job);
-      const embedded = job.cancelled && !opts.keepGoing ? null : await embedPhase(job);
+      if (cached.failed) throw new Error(`${cached.failed} set(s) failed to cache; catalog unchanged`);
+      const embedded = job.cancelled ? null : await embedPhase(job);
       job.phase = job.cancelled ? 'cancelled' : 'done';
       // Say what was skipped and why, or a build that could not touch 46 listed sets
       // reports success and leaves the user wondering why the coverage did not move.
       const skipped = cached.gaps ? `, ${cached.gaps} set(s) skipped — no card data upstream` : '';
-      job.message = embedded
+      job.message = job.cancelled ? `build cancelled; catalog unchanged, cached ${cached.cards} cards${skipped}` : embedded
         ? `${embedded.rows || 0} cards embedded (${embedded.built} new, ${embedded.reused} reused, ${embedded.failed} failed)${skipped}`
         : `cached ${cached.cards} cards${skipped}`;
       console.log(`catalog: ${job.game}/${job.lang} ${job.phase} — ${job.message}`);

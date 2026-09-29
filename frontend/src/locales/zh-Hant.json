@@ -325,6 +325,7 @@
   "common.edit": "編輯",
   "common.errBackend": "連線後端時發生錯誤。",
   "common.loading": "載入中",
+  "common.mixedCurrencies": "包含多種貨幣，合計金額未經匯率換算。",
   "common.logoAlt": "Manafolio 標誌",
   "dash.analytics": "統計",
   "common.next": "下一步",

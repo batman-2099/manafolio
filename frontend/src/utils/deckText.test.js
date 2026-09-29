@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { arenaCardKey, buildDeckExport, parseDeckLine } from './deckText.js';
+import { arenaCardKey, buildDeckExport, parseDeckLine, ownedImportIndex, findOwnedImportCard } from './deckText.js';
 
 const cards = [
   { quantity: 4, name: 'Lightning Bolt', set_id: '2x2', number: '117', supertype: 'MTG' },
@@ -78,6 +78,17 @@ const arenaForests = new Map(parsedArenaLines
   .map(card => [arenaCardKey(card.name, card.setCode, card.number), card.number]));
 assert.strictEqual(arenaForests.get(arenaCardKey('Forest', 'AFR', '278')), '278');
 assert.strictEqual(arenaForests.get(arenaCardKey('Forest', 'AFR', '279')), '279');
+
+const owned = [
+  { id: 'first', name: 'Forest', set_id: 'mtg-afr', number: '278', owned_qty: 5 },
+  { id: 'second', name: 'Forest', printed_name: 'Wald', set_id: 'mtg-afr', number: '279', owned_qty: 1 },
+];
+const index = ownedImportIndex(owned);
+assert.strictEqual(findOwnedImportCard(parseDeckLine('1 Forest (AFR) 279'), index), owned[1]);
+assert.strictEqual(findOwnedImportCard(parseDeckLine('1 Wald (AFR) 279'), index), owned[1]);
+assert.strictEqual(findOwnedImportCard(parseDeckLine('1 Forest'), index), owned[0]);
+assert.strictEqual(findOwnedImportCard(parseDeckLine('1 Forest (AFR) 280'), index), null);
+assert.strictEqual(findOwnedImportCard(parseDeckLine('1 Forest (FDN) 279'), index), null);
 
 console.log('deckText self-check passed');
 

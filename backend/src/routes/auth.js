@@ -39,7 +39,7 @@ router.get('/oidc/login', authLimiter, async (req, res) => {
   }
 
   try {
-    const authUrl = await oidc.buildAuthorizationUrl(req);
+    const authUrl = await oidc.buildAuthorizationUrl(req, res);
     res.redirect(302, authUrl);
   } catch (error) {
     console.error('OIDC login initiation failed:', error.message);
@@ -56,6 +56,7 @@ router.get('/oidc/callback', authLimiter, async (req, res) => {
   const { code, state, error, error_description } = req.query;
 
   const frontendRedirect = (params) => {
+    oidc.clearLoginCookie(req, res);
     const baseUrl = process.env.PUBLIC_BASE_URL ? process.env.PUBLIC_BASE_URL.replace(/\/+$/, '') : '';
     const qs = new URLSearchParams(params).toString();
     res.redirect(302, `${baseUrl}/?${qs}`);

@@ -15,4 +15,12 @@ for (const [format, number] of [['tcgplayer', '161'], ['dragonshield', '162']]) 
   assert.strictEqual(parseThirdPartyCSV([fallback], format)[0].collector_number,
     format === 'tcgplayer' ? '247' : '246', 'an empty preferred column falls back to the other');
 }
+for (const format of ['internal', 'arena', 'tcgplayer', 'dragonshield', 'manabox', 'custom']) {
+  const mapping = format === 'custom' ? { name: 'Name', quantity: 'Count' } : undefined;
+  for (const [raw, expected] of [['0', 0], ['-2', -2], ['1.5', 1.5], ['2junk', '2junk'], ['Infinity', 'Infinity'], ['NaN', 'NaN'], ['3', 3], ['', 1], [undefined, 1]]) {
+    const item = parseThirdPartyCSV([{ Name: 'Bolt', Quantity: raw, Count: raw }], format, mapping)[0];
+    assert.strictEqual(item.quantity, expected, `${format} must preserve malformed quantities for validation, not truncate or default them`);
+  }
+}
+assert.strictEqual(parseThirdPartyCSV([{ Quantity: '', quantity: '4' }], 'internal')[0].quantity, 4);
 console.log('csvmappers.test.js: conflicting and empty collector-number columns passed');

@@ -349,6 +349,7 @@
   "common.edit": "Изменить",
   "common.errBackend": "Ошибка подключения к бэкенду.",
   "common.loading": "Загрузка",
+  "common.mixedCurrencies": "Разные валюты — итоговые суммы не конвертируются.",
   "common.logoAlt": "Логотип Manafolio",
   "dash.analytics": "Статистика",
   "common.next": "Далее",

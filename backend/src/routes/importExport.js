@@ -8,6 +8,7 @@ const { resolveCardPrice } = require('../utils/priceHelpers');
 const { isBinderType } = require('../utils/compartmentSort');
 const { assertStorageInventory, checkedOutSources, moveContainerCopies } = require('../utils/collectionHelpers');
 const { normalizeCardBack } = require('../utils/cardBack');
+const validImportQuantity = quantity => Number.isSafeInteger(quantity) && quantity > 0 && quantity <= 2147483647;
 
 function parseCsvRows(data) {
   const lines = typeof data === 'string' ? data.split(/\r?\n/).map(line => line.trim()).filter(Boolean) : [];
@@ -109,7 +110,7 @@ async function parseCompleteBackup(data) {
     || backup.decks.some(deck => deck.commander_card_id != null && (
       typeof deck.commander_card_id !== 'string'
       || deck.game !== 'mtg'
-      || !/commander|edh/i.test(deck.format)
+      || !/commander|edh|brawl/i.test(deck.format)
       || !backup.deck_cards.some(card => card.deck_id === deck.id && card.card_id === deck.commander_card_id && card.quantity > 0)
     ))
   ) {
@@ -388,12 +389,15 @@ router.post('/import/preview', (req, res) => {
     const items = parseThirdPartyCSV(rows, csvFormat(headers, format), mapping);
     const errors = items.flatMap((item, index) => {
       const row = index + 2;
-      return item.name ? [] : [`Row ${row}: Name is required.`];
+      return [
+        ...(!item.name ? [`Row ${row}: Name is required.`] : []),
+        ...(!validImportQuantity(item.quantity) ? [`Row ${row}: Quantity must be an integer from 1 to 2147483647.`] : [])
+      ];
     });
     return res.json({
       headers,
       cards: items.length,
-      quantity: items.reduce((total, item) => total + item.quantity, 0),
+      quantity: items.reduce((total, item) => total + (validImportQuantity(item.quantity) ? item.quantity : 0), 0),
       errors
     });
   } catch (error) {
@@ -498,12 +502,22 @@ router.post('/import', async (req, res) => {
     // cards instead of real normalized printings.
     const failedItem = item => ({
       name: item.name || item.card_id || 'Unknown card',
-      quantity: item.quantity || 1,
+      quantity: item.quantity,
       set_code: item.set_code || item.set_id || '',
       collector_number: item.collector_number || item.number || ''
     });
     let failedItems = [];
-    const magicItems = manaBoxItems || (formatKey !== 'json' && rawItems.filter(item => item.game === 'mtg'));
+    rawItems = rawItems.filter(item => {
+      const quantity = item.quantity === undefined ? 1
+        : typeof item.quantity === 'string' && item.quantity.trim() !== '' ? Number(item.quantity) : item.quantity;
+      if (!validImportQuantity(quantity)) {
+        failedItems.push({ ...failedItem(item), error: 'Quantity must be an integer from 1 to 2147483647' });
+        return false;
+      }
+      item.quantity = quantity;
+      return true;
+    });
+    const magicItems = manaBoxItems ? rawItems : (formatKey !== 'json' && rawItems.filter(item => item.game === 'mtg'));
     if (magicItems?.length) {
       const { cards, pairs, unmatchedRows = [] } = await scryfallApi.bulkFetchByIdentifier(magicItems.map(item => ({
         ...item,
@@ -514,10 +528,13 @@ router.post('/import', async (req, res) => {
       await scryfallApi.cacheCards(cards);
 
       unmatchedCount = magicItems.length - pairs.length;
-      failedItems = unmatchedRows.map(failedItem);
+      failedItems.push(...unmatchedRows.map(failedItem));
       rawItems = pairs.map(({ row, card }) => ({ ...row, card_id: card.id }));
       if (rawItems.length === 0) {
-        return respond(400, { error: 'No Magic cards matched Scryfall' });
+        return respond(400, { error: 'No Magic cards matched Scryfall', summary: {
+          added: { cards: 0, copies: 0, items: [] },
+          failed: { cards: failedItems.length, copies: failedItems.reduce((total, item) => total + (validImportQuantity(item.quantity) ? item.quantity : 0), 0), items: failedItems }
+        } });
       }
     } else {
       onProgress?.({ stage: 'resolved', matched: rawItems.length, unmatched: 0 });
@@ -567,7 +584,7 @@ router.post('/import', async (req, res) => {
           [
             cardId,
             req.user.id,
-            item.quantity || 1,
+            item.quantity,
             item.condition || 'Near Mint',
             item.printing || 'Normal',
             item.language || 'English',
@@ -577,7 +594,7 @@ router.post('/import', async (req, res) => {
           ]
         );
         importedCount++;
-        addedItems.push({ name: item.name || cardId, quantity: item.quantity || 1 });
+        addedItems.push({ name: item.name || cardId, quantity: item.quantity });
         if (importedCount % 100 === 0) {
           onProgress?.({ stage: 'saving', current: importedCount, total: rawItems.length });
         }
@@ -589,7 +606,7 @@ router.post('/import', async (req, res) => {
     onProgress?.({ stage: 'saved', current: importedCount, total: importedCount });
 
     const unmatched = unmatchedCount ? ` ${unmatchedCount} unmatched Magic printings were skipped.` : '';
-    const copies = items => items.reduce((total, item) => total + (Number(item.quantity) || 1), 0);
+    const copies = items => items.reduce((total, item) => total + (validImportQuantity(item.quantity) ? item.quantity : 0), 0);
     return respond(200, {
       success: true,
       count: importedCount,

@@ -19,6 +19,8 @@ const game = arg('--game', 'mtg');
 if (game !== 'mtg') throw new Error('Unsupported game');
 const lang = arg('--lang', 'English');
 const skipCache = process.argv.includes('--skip-cache');
+process.on('SIGINT', () => catalog.stop());
+process.on('SIGTERM', () => catalog.stop());
 
 async function main() {
   await db.initDb();
@@ -36,7 +38,7 @@ async function main() {
   }
   const done = catalog.lastResult();
   console.log(`\n${done ? `${done.phase}: ${done.message}` : 'finished'}`);
-  process.exit(done && done.phase === 'error' ? 1 : 0);
+  process.exit(done && done.phase === 'done' ? 0 : 1);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
