@@ -4,7 +4,7 @@ const os = require('os');
 const path = require('path');
 const sharp = require('sharp');
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bindarr-scansafety-'));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'manafolio-scansafety-'));
 process.env.DB_PATH = path.join(dir, 'scan.db');
 process.env.CV_MODEL_DIR = dir;
 
@@ -30,6 +30,13 @@ process.env.CV_MODEL_DIR = dir;
   fs.writeFileSync(path.join(dir, 'milo-mtg-local.json'), JSON.stringify({ dim: 2, ids: cards.map(card => card.id) }));
   fs.writeFileSync(path.join(dir, 'milo-mtg-local.bin'), Buffer.from(new Float32Array([0.94, 0, 0.88, 0, 0.1, 0]).buffer));
   const cvScan = require('../src/cvScan');
+  assert.throws(() => cvScan.isBuilt('unsupported'), /Unsupported game/);
+  assert.throws(() => cvScan.builtLangs('unsupported'), /Unsupported game/);
+  assert.throws(() => cvScan.reload('unsupported'), /Unsupported game/);
+  await assert.rejects(cvScan.load('unsupported'), /Unsupported game/);
+  await assert.rejects(cvScan.loadAll('unsupported'), /Unsupported game/);
+  await assert.rejects(cvScan.match(null, 'unsupported'), /Unsupported game/);
+  await assert.rejects(cvScan.scoreCards(null, 'unsupported', []), /Unsupported game/);
   const rgb = Buffer.alloc(448 * 448 * 3);
   for (let y = 0; y < 448; y++) {
     for (let x = 0; x < 448; x++) {
@@ -54,7 +61,7 @@ process.env.CV_MODEL_DIR = dir;
 
   const scanOcr = require('../src/utils/scanOcr');
   let evidence = { status: 'unreadable' };
-  scanOcr.readPrinting = async () => {
+  scanOcr.readCardText = async () => {
     if (evidence instanceof Error) throw evidence;
     return { ...evidence };
   };
@@ -78,6 +85,21 @@ process.env.CV_MODEL_DIR = dir;
 
   match = clean([candidate(0, 0.94), candidate(2, 0.3)]);
   assert.strictEqual((await scan()).safety.autoAddSafe, true, 'unreadable legacy footer alone must not reject an unambiguous card');
+  const nameTsv = text => text.split(' ').map((word, i) =>
+    ['5', '1', '1', '1', '1', i + 1, i * 40, '0', '35', '20', '95', word].join('\t')).join('\n');
+  evidence = { status: 'unreadable', nameTsv: nameTsv('Different Card') };
+  const titled = await scan();
+  assert.strictEqual(titled.safety.autoAddSafe, true, 'title OCR cannot veto unambiguous artwork');
+  assert.deepStrictEqual(titled.safety.name, { status: 'read', text: 'Different Card', confidence: 0.95 });
+  assert.strictEqual(titled.candidates[0].card.id, cards[0].id, 'title OCR cannot promote artwork matches');
+  evidence = { status: 'read', setCode: 'neo', number: '7a', nameTsv: nameTsv('Different Card') };
+  assert.strictEqual((await scan()).safety.autoAddSafe, true, 'title OCR cannot veto matching artwork and footer');
+  match = clean([candidate(0, 0.94), candidate(1, 0.92)]);
+  evidence = { status: 'unreadable', nameTsv: nameTsv('Lightning Bolt') };
+  const reprints = await scan();
+  assert.strictEqual(reprints.safety.autoAddSafe, false);
+  assert.ok(reprints.safety.reasons.includes('ambiguous_printing'), 'title OCR does not resolve reprints');
+  evidence = { status: 'unreadable' };
   match = clean([candidate(0, 0.94), candidate(0, 0.93), candidate(2, 0.92)]);
   assert.ok((await scan()).safety.reasons.includes('ambiguous_printing'), 'distinct third candidate must block even with a different name');
   match = clean([candidate(0, 0.94), candidate(1, 0.92)]);
@@ -126,6 +148,44 @@ process.env.CV_MODEL_DIR = dir;
   evidence = new Error('OCR process failed');
   assert.ok((await scan()).safety.reasons.includes('ocr_error'));
 
+  // Both scans start OCR while hydration is blocked. A fast rejection belongs
+  // only to its own request; successful TSV waits for the newly hydrated set.
+  const scryfall = require('../src/scryfallApi');
+  const getCardById = scryfall.getCardById;
+  const readCardText = scanOcr.readCardText;
+  const pendingMetadata = new Map();
+  let allHydrating;
+  const hydrating = new Promise(resolve => { allHydrating = resolve; });
+  scryfall.getCardById = id => new Promise(resolve => {
+    pendingMetadata.set(id, resolve);
+    if (pendingMetadata.size === 2) allHydrating();
+  });
+  let ocrCalls = 0;
+  scanOcr.readCardText = async () => {
+    if (++ocrCalls === 2) throw new Error('Early OCR failure');
+    const lines = [['007a', 'R'], ['NEW', 'EN']];
+    return { tsv: lines.flatMap((words, line) => words.map((word, column) =>
+      ['5', '1', '1', '1', line + 1, column + 1, '0', '0', '30', '20', '95', word].join('\t'))).join('\n') };
+  };
+  match = clean([candidate(0, 0.94)]);
+  const successfulScan = scan();
+  match = clean([candidate(2, 0.94)]);
+  const failedOcrScan = scan();
+  await hydrating;
+  assert.strictEqual(ocrCalls, 2, 'recognition must not wait for pending metadata');
+  await new Promise(resolve => setImmediate(resolve));
+  pendingMetadata.get(cards[2].id)(cards[2]);
+  const failedOcrAnswer = await failedOcrScan;
+  assert.deepStrictEqual(failedOcrAnswer.safety.reasons, ['ocr_error']);
+  pendingMetadata.get(cards[0].id)({ ...cards[0], set_id: 'new' });
+  const successfulAnswer = await successfulScan;
+  assert.strictEqual(successfulAnswer.safety.ocr.status, 'matched', 'parse against late candidate set knowledge');
+  assert.strictEqual(successfulAnswer.safety.autoAddSafe, true);
+  assert.strictEqual(successfulAnswer.candidates[0].card.id, cards[0].id);
+  scryfall.getCardById = getCardById;
+  scanOcr.readCardText = readCardText;
+  match = clean([candidate(0, 0.94)]);
+
   // A cached same-art printing need not appear in the model's top K to be a tie.
   const sqlite3 = require('sqlite3');
   const bulk = new sqlite3.Database(`${process.env.DB_PATH}.scryfall-bulk.sqlite`);
@@ -147,6 +207,22 @@ process.env.CV_MODEL_DIR = dir;
   assert.strictEqual((await scan()).safety.autoAddSafe, true, 'exact OCR resolves cached same-art reprints');
   evidence = { status: 'unreadable' };
   assert.strictEqual((await scan({ set: 'neo' })).safety.autoAddSafe, true, 'explicit set can exclude other-set cached reprints');
+
+  // The existing bulk snapshot can hydrate a cold candidate while offline;
+  // subsequent reads use card_cache rather than needing either provider.
+  await db.run('DELETE FROM card_cache WHERE id = ?', [cards[0].id]);
+  const clientGet = scryfall.client.get;
+  scryfall.client.get = async () => { throw new Error('Provider unavailable'); };
+  const coldCard = await scryfall.getCardById(cards[0].id);
+  assert.strictEqual(coldCard?.id, cards[0].id);
+  assert.strictEqual(coldCard.set_id, cards[0].set_id);
+  assert.strictEqual(coldCard.language, 'English');
+  const scryfallBulk = require('../src/scryfallBulk');
+  const storedMetadata = scryfallBulk.storedMetadata;
+  scryfallBulk.storedMetadata = async () => { throw new Error('Bulk unavailable'); };
+  assert.strictEqual((await scryfall.getCardById(cards[0].id))?.id, cards[0].id);
+  scryfallBulk.storedMetadata = storedMetadata;
+  scryfall.client.get = clientGet;
 
   cvScan.isBuilt = () => false;
   let unavailable;

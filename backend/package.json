@@ -1,7 +1,7 @@
 {
-  "name": "bindarr-backend",
-  "version": "1.8.5",
-  "description": "Backend API for Bindarr",
+  "name": "manafolio-backend",
+  "version": "2.1.2",
+  "description": "Backend API for Manafolio",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

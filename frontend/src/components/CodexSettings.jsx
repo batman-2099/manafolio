@@ -7,6 +7,10 @@ const EFFORT_KEYS = {
   none: 'aiDeck.effortNone', minimal: 'aiDeck.effortMinimal', low: 'aiDeck.effortLow',
   medium: 'aiDeck.effortMedium', high: 'aiDeck.effortHigh', xhigh: 'aiDeck.effortXhigh',
 };
+const HOSTED_PROVIDERS = {
+  gemini: { name: 'Gemini', keyUrl: 'https://aistudio.google.com/apikey' },
+  openrouter: { name: 'OpenRouter', keyUrl: 'https://openrouter.ai/settings/keys' },
+};
 
 async function request(path, options, fallback) {
   const response = await fetch(`/api/ai-decks${path}`, options);
@@ -22,6 +26,7 @@ export default function CodexSettings() {
   const [accountError, setAccountError] = useState('');
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountLoading, setAccountLoading] = useState(false);
+  const [apiKey, setApiKey] = useState('');
   const [models, setModels] = useState([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState('');
@@ -37,6 +42,8 @@ export default function CodexSettings() {
   const providerSession = useRef(null);
   const provider = preferences?.provider;
   const isOllama = provider === 'ollama';
+  const hosted = HOSTED_PROVIDERS[provider];
+  const isChatGPT = provider === 'chatgpt';
 
   useEffect(() => {
     const controller = new AbortController();
@@ -151,9 +158,34 @@ export default function CodexSettings() {
     }
   };
 
+  const saveCredential = async (remove = false) => {
+    if (!hosted || accountBusy || accountLoading || saving || (!remove && !apiKey.trim())) return;
+    const signal = providerSession.current.signal;
+    setAccountBusy(true);
+    setAccountError('');
+    const key = apiKey.trim();
+    setApiKey('');
+    try {
+      await request(remove ? `/credentials?${new URLSearchParams({ provider })}` : '/credentials', {
+        method: remove ? 'DELETE' : 'PUT', signal,
+        ...(!remove && { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, api_key: key }) }),
+      }, t('codexSettings.errCredential'));
+      if (signal.aborted) return;
+      setAccount(null);
+      setModels([]);
+      setSaved(false);
+      setConnectionRevision(value => value + 1);
+    } catch (err) {
+      if (!signal.aborted) setAccountError(err.message);
+    } finally {
+      if (!signal.aborted) setAccountBusy(false);
+    }
+  };
+
   const changeProvider = event => {
     providerSession.current?.abort();
     setLogin(null);
+    setApiKey('');
     setAccount(null);
     setAccountError('');
     setAccountBusy(false);
@@ -187,9 +219,9 @@ export default function CodexSettings() {
   };
 
   const providerDefault = models.find(model => model.isDefault) || models[0];
-  const selectedModel = preferences?.model ? models.find(model => model.id === preferences.model) : isOllama ? null : providerDefault;
+  const selectedModel = preferences?.model ? models.find(model => model.id === preferences.model) : isChatGPT ? providerDefault : null;
   const staleModel = models.length > 0 && !!preferences?.model && !selectedModel;
-  const staleEffort = !!selectedModel && !!preferences?.reasoning_effort && !selectedModel.reasoningEfforts.includes(preferences.reasoning_effort);
+  const staleEffort = isChatGPT && !!selectedModel && !!preferences?.reasoning_effort && !selectedModel.reasoningEfforts.includes(preferences.reasoning_effort);
   const defaultEffort = selectedModel?.reasoningEfforts.includes(selectedModel.defaultReasoningEffort)
     ? selectedModel.defaultReasoningEffort : selectedModel?.reasoningEfforts[0];
   const effortLabel = effort => EFFORT_KEYS[effort] ? t(EFFORT_KEYS[effort]) : effort;
@@ -205,7 +237,7 @@ export default function CodexSettings() {
     try {
       const data = await request('/preferences', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, signal,
-        body: JSON.stringify(preferences),
+        body: JSON.stringify({ ...preferences, reasoning_effort: isChatGPT ? preferences.reasoning_effort : null }),
       }, t('codexSettings.errSave'));
       if (signal.aborted) return;
       setPreferences(data);
@@ -218,10 +250,10 @@ export default function CodexSettings() {
   };
 
   return (
-    <section className="glass-panel" aria-labelledby="codex-settings-title" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', minWidth: 0 }}>
+    <section className="glass-panel ai-settings" aria-labelledby="codex-settings-title">
       <div style={{ ...rowStyle, borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
         <Sparkles size={20} style={{ color: 'var(--accent-yellow)' }} aria-hidden="true" />
-        <h3 id="codex-settings-title" style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('codexSettings.title')}</h3>
+        <h3 id="codex-settings-title" tabIndex={-1} style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('codexSettings.title')}</h3>
       </div>
       <div className="form-group">
         <label htmlFor="ai-provider">{t('codexSettings.provider')}</label>
@@ -229,10 +261,11 @@ export default function CodexSettings() {
           {!provider && <option value="">{t('common.loading')}</option>}
           <option value="chatgpt">ChatGPT</option>
           <option value="ollama">Ollama</option>
+          {Object.entries(HOSTED_PROVIDERS).map(([id, entry]) => <option key={id} value={id}>{entry.name}</option>)}
         </select>
       </div>
-      {provider && <>
-      <p style={{ color: 'var(--text-secondary)', margin: 0 }}>{t(isOllama ? 'codexSettings.ollamaHint' : 'aiDeck.accountHint')}</p>
+      {provider && <div className="ai-connection">
+      <h4>{hosted ? hosted.name : isOllama ? 'Ollama' : t('aiDeck.accountTitle')}</h4>
       {isOllama && (
         <div className="form-group">
           <label htmlFor="ai-ollama-url">{t('codexSettings.ollamaUrl')}</label>
@@ -240,13 +273,11 @@ export default function CodexSettings() {
           <p id="ai-ollama-url-hint" style={{ color: 'var(--text-secondary)', margin: 0 }}>{t('codexSettings.ollamaUrlHint')}</p>
         </div>
       )}
-      <h4>{isOllama ? 'Ollama' : t('aiDeck.accountTitle')}</h4>
-      <p style={{ color: 'var(--text-secondary)', margin: 0 }}>{t(isOllama ? 'codexSettings.ollamaPrivacy' : 'aiDeck.privacy')}</p>
       <div style={rowStyle}>
-        <span role="status">{account?.connected ? t('aiDeck.connected') : isOllama && checkedOllamaUrl === null ? t('codexSettings.checkRequired') : account === null && !accountError ? t('common.loading') : t('aiDeck.disconnected')}{!isOllama && account?.connected && account.email ? ` · ${account.email}` : ''}</span>
-        {isOllama ? (
-          <button type="button" className="btn btn-secondary" disabled={accountLoading || modelsLoading || saving} onClick={checkConnection}>
-            {t(accountLoading ? 'common.loading' : accountError ? 'aiDeck.retry' : 'codexSettings.checkConnection')}
+        <span role="status">{account?.connected ? t('aiDeck.connected') : isOllama && checkedOllamaUrl === null ? t('codexSettings.checkRequired') : account === null && !accountError ? t('common.loading') : t('aiDeck.disconnected')}{isChatGPT && account?.connected && account.email ? ` · ${account.email}` : ''}</span>
+        {isOllama || hosted ? (
+          !accountError && <button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || modelsLoading || saving} onClick={checkConnection}>
+            {t(accountLoading ? 'common.loading' : 'codexSettings.checkConnection')}
           </button>
         ) : (
           <button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || saving || !!login} onClick={() => handleAccount(!!account?.connected)}>
@@ -254,7 +285,21 @@ export default function CodexSettings() {
           </button>
         )}
       </div>
-      {!isOllama && login && (
+      {hosted && (
+        <form onSubmit={event => { event.preventDefault(); saveCredential(); }}>
+          <div className="form-group">
+            <label htmlFor="ai-api-key">{t('codexSettings.apiKey', { provider: hosted.name })}</label>
+            <input id="ai-api-key" name="ai-api-key" type="password" className="input-control" value={apiKey} autoComplete="new-password" spellCheck={false} required disabled={accountBusy || accountLoading || saving} onChange={event => setApiKey(event.target.value)} aria-describedby="ai-api-key-hint" />
+            <p id="ai-api-key-hint" style={{ color: 'var(--text-secondary)', margin: 0 }}>{t(import.meta.env.VITE_DEMO ? 'codexSettings.demoKeyHint' : 'codexSettings.apiKeyHint')}</p>
+            <a className="ai-provider-key-link" href={hosted.keyUrl} target="_blank" rel="noopener noreferrer">{t('codexSettings.getApiKey', { provider: hosted.name })}</a>
+          </div>
+          <div style={rowStyle}>
+            <button type="submit" className="btn btn-secondary" disabled={accountBusy || accountLoading || saving || !apiKey.trim()}>{t(accountBusy ? 'common.loading' : account?.connected ? 'codexSettings.replaceApiKey' : 'codexSettings.saveApiKey')}</button>
+            {account?.connected && <button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || saving} onClick={() => saveCredential(true)}>{t('codexSettings.removeApiKey')}</button>}
+          </div>
+        </form>
+      )}
+      {isChatGPT && login && (
         <div style={{ overflowWrap: 'anywhere' }}>
           <p>{t('aiDeck.loginInstructions')}</p>
           <a href={/^https:\/\//i.test(login.verificationUrl) ? login.verificationUrl : undefined} target="_blank" rel="noopener noreferrer">{login.verificationUrl}</a>
@@ -263,8 +308,19 @@ export default function CodexSettings() {
           <button type="button" className="btn btn-secondary" disabled={accountBusy} onClick={() => handleAccount(true)}>{t('common.cancel')}</button>
         </div>
       )}
-      {accountError && <p role="alert" style={{ color: 'var(--status-error)' }}>{accountError}</p>}
-      </>}
+      {accountError && <div className="ai-connection-error" role="alert">
+        <p>{accountError}</p>
+        <button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || modelsLoading || saving} onClick={checkConnection}>{t('aiDeck.retry')}</button>
+      </div>}
+      <div className="ai-privacy">
+        <p>{t('codexSettings.privacySummary')}</p>
+        <details key={provider}>
+          <summary>{t('codexSettings.privacyDetails')}</summary>
+          <p>{t(hosted ? `codexSettings.${provider}Hint` : isOllama ? 'codexSettings.ollamaHint' : 'aiDeck.accountHint')}</p>
+          <p>{t(hosted ? `codexSettings.${provider}Privacy` : isOllama ? 'codexSettings.ollamaPrivacy' : 'aiDeck.privacy')}</p>
+        </details>
+      </div>
+      </div>}
       <p style={{ color: 'var(--text-secondary)', margin: 0 }}>{t('codexSettings.hint')}</p>
       {!preferences && !preferencesError && <p role="status">{t('common.loading')}</p>}
       {preferencesError && <p role="alert" style={{ color: 'var(--status-error)' }}>{preferencesError} <button type="button" className="btn btn-secondary" onClick={() => setPreferencesRevision(value => value + 1)}>{t('aiDeck.retry')}</button></p>}
@@ -279,12 +335,12 @@ export default function CodexSettings() {
                   setSaved(false);
                   setSaveError('');
                 }}>
-                  <option value="">{isOllama ? t('codexSettings.chooseModel') : `${t('codexSettings.providerDefault')}${providerDefault ? ` · ${providerDefault.name}` : ''}`}</option>
+                  <option value="">{isChatGPT ? `${t('codexSettings.providerDefault')}${providerDefault ? ` · ${providerDefault.name}` : ''}` : t(hosted ? 'codexSettings.chooseHostedModel' : 'codexSettings.chooseModel')}</option>
                   {preferences.model && !models.some(model => model.id === preferences.model) && <option value={preferences.model}>{preferences.model}</option>}
                   {models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
                 </select>
               </div>
-              {!isOllama && <div className="form-group" style={{ flex: '1 1 180px', minWidth: 0 }}>
+              {isChatGPT && <div className="form-group" style={{ flex: '1 1 180px', minWidth: 0 }}>
                 <label htmlFor="ai-effort">{t('aiDeck.thinkingLevel')}</label>
                 <select id="ai-effort" className="input-control" value={preferences.reasoning_effort || ''} disabled={!preferences.model || !selectedModel || (!selectedModel.reasoningEfforts.length && !staleEffort)} onChange={event => {
                   setPreferences(current => ({ ...current, reasoning_effort: event.target.value || null }));
@@ -304,7 +360,7 @@ export default function CodexSettings() {
         </form>
       )}
       {modelsLoading && <p role="status">{t('aiDeck.loadingModels')}</p>}
-      {modelsError && <p role="alert" style={{ color: 'var(--status-error)' }}>{modelsError} <button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || saving} onClick={checkConnection}>{t('aiDeck.retry')}</button></p>}
+      {modelsError && (!isOllama || modelsError !== accountError) && <div className="ai-connection-error" role="alert"><p>{modelsError}</p><button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || modelsLoading || saving} onClick={checkConnection}>{t('aiDeck.retry')}</button></div>}
       {saveError && <p role="alert" style={{ color: 'var(--status-error)' }}>{saveError}</p>}
       {saved && <p role="status">{t('codexSettings.saved')}</p>}
     </section>

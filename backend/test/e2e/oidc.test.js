@@ -5,8 +5,8 @@ const http = require('http');
 const assert = require('assert');
 const { spawn } = require('child_process');
 
-const tmpDb = path.join(os.tmpdir(), `bindarr-oidc-test-${process.pid}.db`);
-const linkDb = path.join(os.tmpdir(), `bindarr-oidc-link-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-oidc-test-${process.pid}.db`);
+const linkDb = path.join(os.tmpdir(), `manafolio-oidc-link-${process.pid}.db`);
 const projectRoot = path.join(__dirname, '../../../');
 
 async function waitForServer(url) {
@@ -24,8 +24,8 @@ async function runTests() {
   // 1. Start mock OIDC IdP
   let mockUserClaims = {
     sub: 'idp-sub-777',
-    preferred_username: 'PalletTownTrainer',
-    email: 'trainer@pallet.org'
+    preferred_username: 'CardCollector',
+    email: 'collector@example.org'
   };
   // Echoed into the ID token, as a real IdP does with the nonce it was sent.
   let currentNonce = null;
@@ -50,7 +50,7 @@ async function runTests() {
       req.on('end', () => {
         const payloadB64 = Buffer.from(JSON.stringify({
           iss: `http://${req.headers.host}`,
-          aud: 'bindarr-test-id',
+          aud: 'manafolio-test-id',
           exp: Math.floor(Date.now() / 1000) + 3600,
           nonce: currentNonce,
           ...mockUserClaims
@@ -81,22 +81,22 @@ async function runTests() {
   const idpPort = idpServer.address().port;
   const idpIssuer = `http://127.0.0.1:${idpPort}`;
 
-  // 2. Start Bindarr backend server with OIDC configuration
-  const bindarrPort = '3019';
-  const base = `http://localhost:${bindarrPort}`;
+  // 2. Start Manafolio backend server with OIDC configuration
+  const manafolioPort = '3019';
+  const base = `http://localhost:${manafolioPort}`;
 
   const server = spawn('node', [path.join(projectRoot, 'backend/src/server.js')], {
     env: {
       ...process.env,
       DEFAULT_ADMIN_PASSWORD: '',
-      PORT: bindarrPort,
+      PORT: manafolioPort,
       DB_PATH: tmpDb,
       HTTPS_PORT: '',
       OIDC_ENABLED: 'true',
       OIDC_PROVIDER_NAME: 'TestIdP',
       OIDC_ISSUER_URL: idpIssuer,
-      OIDC_CLIENT_ID: 'bindarr-test-id',
-      OIDC_CLIENT_SECRET: 'bindarr-test-secret',
+      OIDC_CLIENT_ID: 'manafolio-test-id',
+      OIDC_CLIENT_SECRET: 'manafolio-test-secret',
       OIDC_AUTO_PROVISION: 'true'
     }
   });
@@ -120,7 +120,7 @@ async function runTests() {
 
     const authUrl = new URL(redirectLocation);
     assert.strictEqual(authUrl.pathname, '/authorize');
-    assert.strictEqual(authUrl.searchParams.get('client_id'), 'bindarr-test-id');
+    assert.strictEqual(authUrl.searchParams.get('client_id'), 'manafolio-test-id');
     const state = authUrl.searchParams.get('state');
     currentNonce = authUrl.searchParams.get('nonce');
     assert(currentNonce, 'the authorization request must carry a nonce');
@@ -154,8 +154,8 @@ async function runTests() {
     // F7-TC5: Second OIDC user is auto-provisioned as a member account
     mockUserClaims = {
       sub: 'idp-sub-888',
-      preferred_username: 'PalletTownTrainer',
-      email: 'trainer@pallet.org'
+      preferred_username: 'CardCollector',
+      email: 'collector@example.org'
     };
     const loginRes2 = await fetch(`${base}/api/auth/oidc/login`, { redirect: 'manual' });
     const authUrl2 = new URL(loginRes2.headers.get('location'));
@@ -169,7 +169,7 @@ async function runTests() {
       headers: { 'Authorization': `Bearer ${token2}` }
     });
     const meData2 = await meRes2.json();
-    assert.strictEqual(meData2.user.username, 'pallettowntrainer');
+    assert.strictEqual(meData2.user.username, 'cardcollector');
     assert.strictEqual(meData2.user.role, 'member');
     assert.strictEqual(meData2.user.oidc_sub, 'idp-sub-888');
     assert.notStrictEqual(meData2.user.id, meData.user.id, 'must be separate user account');
@@ -231,7 +231,7 @@ async function runTests() {
     mockUserClaims = {
       sub: 'idp-sub-777',
       preferred_username: 'admin',
-      email: 'owner@pallet.org'
+      email: 'owner@example.org'
     };
     const loginRes5 = await fetch(`${base}/api/auth/oidc/login`, { redirect: 'manual' });
     const authUrl5 = new URL(loginRes5.headers.get('location'));
@@ -260,7 +260,7 @@ async function runTests() {
     mockUserClaims = {
       sub: 'idp-sub-777',
       preferred_username: 'admin',
-      email: 'owner@pallet.org'
+      email: 'owner@example.org'
     };
     const loginRes6 = await fetch(`${base}/api/auth/oidc/login`, { redirect: 'manual' });
     const authUrl6 = new URL(loginRes6.headers.get('location'));
@@ -296,7 +296,7 @@ async function runUsernameLinkTests() {
   let mockUserClaims = {
     sub: 'idp-sub-link',
     preferred_username: 'admin',
-    email: 'owner@pallet.org'
+    email: 'owner@example.org'
   };
   let currentNonce = null;
 
@@ -317,7 +317,7 @@ async function runUsernameLinkTests() {
       req.on('end', () => {
         const payloadB64 = Buffer.from(JSON.stringify({
           iss: `http://${req.headers.host}`,
-          aud: 'bindarr-test-id',
+          aud: 'manafolio-test-id',
           exp: Math.floor(Date.now() / 1000) + 3600,
           nonce: currentNonce,
           ...mockUserClaims
@@ -357,8 +357,8 @@ async function runUsernameLinkTests() {
       OIDC_ENABLED: 'true',
       OIDC_PROVIDER_NAME: 'TestIdP',
       OIDC_ISSUER_URL: idpIssuer,
-      OIDC_CLIENT_ID: 'bindarr-test-id',
-      OIDC_CLIENT_SECRET: 'bindarr-test-secret',
+      OIDC_CLIENT_ID: 'manafolio-test-id',
+      OIDC_CLIENT_SECRET: 'manafolio-test-secret',
       OIDC_AUTO_PROVISION: 'true',
       OIDC_ALLOW_USERNAME_LINK: 'true'
     }
@@ -407,7 +407,7 @@ async function runUsernameLinkTests() {
     mockUserClaims = {
       sub: 'idp-sub-link',
       preferred_username: 'admin',
-      email: 'owner@pallet.org'
+      email: 'owner@example.org'
     };
     const again = await callback('link-code-3');
     const againMe = await (await fetch(`${base}/api/auth/me`, {

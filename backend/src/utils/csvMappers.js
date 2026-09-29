@@ -6,6 +6,19 @@ const CONDITION_MAP = {
   'damaged': 'Damaged', 'dmg': 'Damaged', 'poor': 'Damaged'
 };
 
+// ponytail: only the collector-number precedence differs between these formats.
+function marketplaceCsvRow(row, collector_number) {
+  return {
+    name: row['Card Name'] || row['Name'],
+    set_code: row['Set Code'] || row['Set'],
+    collector_number,
+    quantity: parseInt(row['Quantity'], 10) || 1,
+    condition: CONDITION_MAP[(row['Condition'] || '').toLowerCase()] || 'Near Mint',
+    printing: (row['Printing'] === 'Foil' || row['Printing'] === 'Holofoil') ? 'Holofoil' : 'Normal',
+    game: 'mtg'
+  };
+}
+
 const STRATEGIES = {
   internal: (row) => ({
     name: row['Name'] || row['card_name'] || row['Name'],
@@ -30,24 +43,8 @@ const STRATEGIES = {
     language: row['Language'] || 'English',
     game: 'mtg'
   }),
-  tcgplayer: (row) => ({
-    name: row['Card Name'] || row['Name'],
-    set_code: row['Set Code'] || row['Set'],
-    collector_number: row['Number'] || row['Card Number'],
-    quantity: parseInt(row['Quantity'], 10) || 1,
-    condition: CONDITION_MAP[(row['Condition'] || '').toLowerCase()] || 'Near Mint',
-    printing: (row['Printing'] === 'Foil' || row['Printing'] === 'Holofoil') ? 'Holofoil' : 'Normal',
-    game: 'pokemon'
-  }),
-  dragonshield: (row) => ({
-    name: row['Card Name'] || row['Name'],
-    set_code: row['Set Code'] || row['Set'],
-    collector_number: row['Card Number'] || row['Number'],
-    quantity: parseInt(row['Quantity'], 10) || 1,
-    condition: CONDITION_MAP[(row['Condition'] || '').toLowerCase()] || 'Near Mint',
-    printing: (row['Printing'] === 'Foil' || row['Printing'] === 'Holofoil') ? 'Holofoil' : 'Normal',
-    game: 'pokemon'
-  }),
+  tcgplayer: (row) => marketplaceCsvRow(row, row['Number'] || row['Card Number']),
+  dragonshield: (row) => marketplaceCsvRow(row, row['Card Number'] || row['Number']),
   manabox: (row) => ({
     name: row['Name'] || row['Card Name'],
     set_code: row['Set code'] || row['Set Code'] || row['Set'],

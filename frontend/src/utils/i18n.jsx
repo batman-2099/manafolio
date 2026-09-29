@@ -39,7 +39,7 @@ const Ctx = createContext(null);
 
 export function I18nProvider({ children }) {
   const [locale, setLocale] = useState(() => (
-    localStorage.getItem('bindarr_ui_lang')
+    localStorage.getItem('manafolio_ui_lang')
     || pickLocale(LOCALES, navigator.languages?.length ? navigator.languages : [navigator.language || 'en'])
   ));
   const [dict, setDict] = useState(() => (locale === 'en' ? en : null));
@@ -60,7 +60,7 @@ export function I18nProvider({ children }) {
   const value = useMemo(() => ({
     locale,
     setLocale: (next) => {
-      localStorage.setItem('bindarr_ui_lang', next);
+      localStorage.setItem('manafolio_ui_lang', next);
       setLocale(next);
     },
     // t('key') / t('key', { name: 'Ash' }) / t('cards.count', { count: 3 })

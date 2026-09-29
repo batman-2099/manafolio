@@ -1,142 +1,74 @@
-// The card_cache query builders that pokemontcg.io, Scryfall and TCGdex all share.
-//
-// They were three separate copies that had already drifted apart, so what is
-// pinned here is mostly the resolution of that drift — plus one latent bug the
-// merge exposed.
-// No framework — plain node + assert. Run: `node test/cardsearchsql.test.js`
+// Run: node test/cardsearchsql.test.js
 const assert = require('assert');
 const os = require('os');
 const path = require('path');
 
-process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-searchsql-${process.pid}.db`);
-const { collectionQuery, localCacheQuery, numberClause, nameClause } = require('../src/utils/cardSearchSql');
+process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-searchsql-${process.pid}.db`);
+const db = require('../src/db');
+const { collectionQuery, localCacheQuery } = require('../src/utils/cardSearchSql');
+const { normalizeSearchParams } = require('../src/routes/collection');
 
-const squash = (s) => s.replace(/\s+/g, ' ').trim();
-
-function testNumberMatching() {
-  // Written either way round: "004" must find a stored "4" and vice versa. Only
-  // pokemontcg.io did this before; it is a pure OR, so it can only find more.
-  const padded = numberClause('number', '004');
-  assert.ok(padded.clause.includes('number = ?'), 'exact form is matched');
-  // as typed, zero-stripped, then the numeric CAST comparison
-  assert.deepStrictEqual(padded.params, ['004', '4', '004']);
-
-  // A number with no leading zeros needs no stripped variant.
-  const plain = numberClause('number', '4');
-  assert.strictEqual(plain.params.filter(p => p === '4').length, 2, 'exact + CAST, no redundant stripped term');
-
-  // THE LATENT BUG. SQLite casts any non-numeric string to 0, so
-  // CAST('TG12') = CAST('SV49') = 0 — the CAST branch matched every card whose
-  // number starts with a letter. It is now only emitted for numeric input.
-  const promo = numberClause('number', 'TG12');
-  assert.ok(!promo.clause.includes('CAST'), 'no CAST for a non-numeric collector number');
-  assert.deepStrictEqual(promo.params, ['TG12'], 'exact match only');
-
-  const numeric = numberClause('number', '25');
-  assert.ok(numeric.clause.includes('CAST'), 'CAST still applies where it means something');
-
-  // Fractions (e.g. 5/64) and hash prefixes (#5) extract the clean collector number
-  const frac = numberClause('number', '5/64');
-  assert.ok(frac.clause.includes('CAST'), 'CAST applies for extracted numeric part of fraction');
-  assert.deepStrictEqual(frac.params, ['5/64', '5', '5']);
-
-  const hashNum = numberClause('number', '#5');
-  assert.deepStrictEqual(hashNum.params, ['#5', '5', '5']);
-
-  // Column name is honoured, so the aliased collection query and the bare local
-  // one cannot diverge.
-  assert.ok(numberClause('cc.number', '7').clause.includes('cc.number'));
-
-  for (const empty of ['', null, undefined, '   ']) {
-    assert.strictEqual(numberClause('number', empty), null, `no clause for ${JSON.stringify(empty)}`);
+async function main() {
+  await db.initDb();
+  const user = (await db.run("INSERT INTO users (username, password_hash, share_token) VALUES ('search-owner', 'x', 'search-owner')")).lastID;
+  const other = (await db.run("INSERT INTO users (username, password_hash, share_token) VALUES ('search-other', 'x', 'search-other')")).lastID;
+  for (const [id, name, printed, number, game, language] of [
+    ['mtg-en', 'Lightning Bolt', null, '4', 'mtg', 'English'],
+    ['mtg-ja', 'Lightning Bolt', '稲妻', '004', 'mtg', 'Japanese'],
+    ['mtg-promo', 'Promo One', null, 'A12', 'mtg', 'English'],
+    ['mtg-other-promo', 'Promo Two', null, 'B49', 'mtg', 'English'],
+    ['unsupported-card', 'Legacy Card', null, '4', 'unsupported', 'English'],
+    ['mtg-private', 'Private Card', null, '8', 'mtg', 'English'],
+    ['mtg-wishlist', 'Wishlist Card', null, '9', 'mtg', 'English'],
+  ]) {
+    await db.run('INSERT INTO card_cache (id, name, printed_name, number, game, language, set_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, name, printed, number, game, language, 'test']);
   }
-}
-
-function testNameMatching() {
-  // Both columns: `name` is the searchable one, `printed_name` the localized one.
-  // pokemontcg.io's local query checked only `name` before.
-  const n = nameClause('', 'Celebi');
-  assert.ok(n.clause.includes('name LIKE ?') && n.clause.includes('printed_name LIKE ?'));
-  assert.deepStrictEqual(n.params, ['%Celebi%', '%Celebi%']);
-  assert.ok(nameClause('cc.', 'x').clause.includes('cc.printed_name'), 'prefix is applied to both columns');
-  for (const empty of ['', null, undefined, '  ']) {
-    assert.strictEqual(nameClause('', empty), null, `no clause for ${JSON.stringify(empty)}`);
+  for (const [card, owner, qty, list] of [
+    ['mtg-en', user, 2, 'collection'], ['mtg-en', user, 3, 'collection'],
+    ['mtg-ja', user, 1, 'collection'], ['unsupported-card', user, 1, 'collection'],
+    ['mtg-private', other, 5, 'collection'], ['mtg-wishlist', user, 7, 'wishlist'],
+  ]) {
+    await db.run('INSERT INTO collection (card_id, user_id, quantity, list_type) VALUES (?, ?, ?, ?)', [card, owner, qty, list]);
   }
-}
+  const query = ({ sql, params }) => db.all(sql, params);
+  const owned = await query(collectionQuery('mtg', { userId: user, limit: 60, offset: 0 }));
+  assert.deepStrictEqual(owned.map(row => [row.id, row.owned_qty]).sort(), [['mtg-en', 5], ['mtg-ja', 1]],
+    'collection search includes owned languages, aggregates copies, and excludes other games, users and lists');
+  assert.deepStrictEqual(await query(collectionQuery("mtg' OR 1=1 --", { userId: user, limit: 60, offset: 0 })), [],
+    'the game parameter cannot widen collection access');
 
-function testCollectionScopeIgnoresLanguage() {
-  // The resolved disagreement: collection scope answers "what do I own", and you
-  // own the card whatever language you own it in. TCGdex used to filter here, so
-  // the same search returned different rows depending on the UI language.
-  const { sql, params } = collectionQuery('pokemon', {
-    userId: 7, name: 'Celebi', number: '004', setList: [], limit: 60, offset: 0,
-  });
-  assert.ok(!/language/i.test(sql), 'collection scope must NOT filter by language');
-  assert.ok(squash(sql).includes('JOIN card_cache cc ON c.card_id = cc.id'));
-  assert.ok(squash(sql).includes("c.list_type = 'collection'"));
-  assert.ok(squash(sql).includes('GROUP BY cc.id LIMIT ? OFFSET ?'), 'grouped, so one row per card');
+  const local = (options = {}) => query(localCacheQuery('mtg', { language: 'English', limit: 60, offset: 0, ...options }));
+  for (const number of ['004', '4', '#4', '4/100']) {
+    assert.deepStrictEqual((await local({ number })).map(row => row.id), ['mtg-en']);
+    assert.deepStrictEqual((await local({ number, language: 'Japanese' })).map(row => row.id), ['mtg-ja']);
+  }
+  assert.deepStrictEqual((await local({ number: 'A12' })).map(row => row.id), ['mtg-promo'],
+    'nonnumeric collector numbers must not all compare as zero');
+  for (const name of ['Lightning Bolt', '稲妻']) {
+    assert.deepStrictEqual((await local({ name, language: 'Japanese' })).map(row => row.id), ['mtg-ja'],
+      'localized cards are searchable by either name');
+  }
+  assert.deepStrictEqual((await local({ name: 'Bolt', number: '004', setList: ['test'] })).map(row => row.id), ['mtg-en']);
+  assert.deepStrictEqual(await local({ name: 'Bolt', number: '004', setList: ['other'] }), []);
+  assert.deepStrictEqual(await local({ name: 'Bolt', limit: 1, offset: 1 }), [], 'pagination excludes the preceding result');
 
-  // game is BOUND, never interpolated.
-  assert.ok(!sql.includes("'pokemon'"), 'game is a bound parameter, not inlined');
-  assert.strictEqual(params[0], 7, 'userId first');
-  assert.strictEqual(params[1], 'pokemon', 'then game');
-  assert.strictEqual(params[params.length - 2], 60, 'limit');
-  assert.strictEqual(params[params.length - 1], 0, 'offset');
-
-  // Same shape for MTG — the only difference is the bound game.
-  const mtg = collectionQuery('mtg', { userId: 7, limit: 10, offset: 0 });
-  assert.strictEqual(mtg.params[1], 'mtg');
-  assert.strictEqual(squash(mtg.sql), squash(collectionQuery('pokemon', { userId: 7, limit: 10, offset: 0 }).sql),
-    'both games build identical SQL; only the bound game differs');
-}
-
-function testLocalCacheKeepsLanguage() {
-  // The opposite call, and deliberately so: in the cache, language is part of a
-  // printing's identity, so a Japanese search must not be answered with the
-  // English row sitting next to it.
-  const { sql, params } = localCacheQuery('pokemon', {
-    language: 'Japanese', name: '', number: '', setList: [], limit: 60, offset: 0,
-  });
-  assert.ok(/language = \?/.test(sql), 'local cache MUST filter by language');
-  assert.ok(!sql.includes('JOIN'), 'no collection join — this is the plain cache');
-  assert.deepStrictEqual(params, ['pokemon', 'Japanese', 60, 0]);
-}
-
-function testParamOrderMatchesClauseOrder() {
-  // The failure this catches is silent and total: parameters binding to the wrong
-  // placeholders returns confident nonsense rather than an error.
-  const { sql, params } = localCacheQuery('mtg', {
-    language: 'English', name: 'Bolt', number: '007', limit: 5, offset: 10,
-  });
-  const placeholders = (sql.match(/\?/g) || []).length;
-  assert.strictEqual(placeholders, params.length, `${placeholders} placeholders vs ${params.length} params`);
-  assert.deepStrictEqual(params, ['mtg', 'English', '%Bolt%', '%Bolt%', '007', '7', '007', 5, 10]);
-}
-
-function testNormalizeSearchParams() {
-  const { normalizeSearchParams } = require('../src/routes/collection');
-  assert.deepStrictEqual(normalizeSearchParams({ name: 'Kangaskhan 5/64' }), { name: 'Kangaskhan', number: '5', set: '' });
-  assert.deepStrictEqual(normalizeSearchParams({ name: 'Kangaskhan', number: '5/64' }), { name: 'Kangaskhan', number: '5', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ name: 'Lightning Bolt 5/64' }), { name: 'Lightning Bolt', number: '5', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ name: 'Lightning Bolt', number: '5/64' }), { name: 'Lightning Bolt', number: '5', set: '' });
   assert.deepStrictEqual(normalizeSearchParams({ name: '5/64' }), { name: '', number: '5', set: '' });
   assert.deepStrictEqual(normalizeSearchParams({ name: '#5' }), { name: '', number: '5', set: '' });
-  assert.deepStrictEqual(normalizeSearchParams({ name: 'Kangaskhan #5' }), { name: 'Kangaskhan', number: '5', set: '' });
-  assert.deepStrictEqual(normalizeSearchParams({ name: 'Kangaskhan 5' }), { name: 'Kangaskhan', number: '5', set: '' });
-  assert.deepStrictEqual(normalizeSearchParams({ name: 'Kangaskhan' }), { name: 'Kangaskhan', number: '', set: '' });
-  assert.deepStrictEqual(normalizeSearchParams({ q: 'Kangaskhan 5/64' }), { name: 'Kangaskhan', number: '5', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ name: 'Lightning Bolt #5' }), { name: 'Lightning Bolt', number: '5', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ name: 'Lightning Bolt 5' }), { name: 'Lightning Bolt', number: '5', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ name: 'Lightning Bolt' }), { name: 'Lightning Bolt', number: '', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ q: '  Lightning Bolt  ' }), { name: 'Lightning Bolt', number: '', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ q: '稲妻' }), { name: '稲妻', number: '', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ q: 'Lightning Bolt', name: 'Island' }), { name: 'Island', number: '', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ q: 'Lightning Bolt', set: 'lea', number: '5' }), { name: '', number: '5', set: 'lea' });
+  assert.deepStrictEqual(normalizeSearchParams({ q: 'Lightning Bolt 5/64' }), { name: 'Lightning Bolt', number: '5', set: '' });
   assert.deepStrictEqual(normalizeSearchParams({ q: '5/64' }), { name: '', number: '5', set: '' });
-  assert.deepStrictEqual(normalizeSearchParams({ name: 'Charizard VMAX SV107/SV122' }), { name: 'Charizard VMAX', number: 'SV107', set: '' });
-  assert.deepStrictEqual(normalizeSearchParams({ set: 'base2', number: '5/64' }), { name: '', number: '5', set: 'base2' });
-}
-
-function main() {
-  testNumberMatching();
-  testNameMatching();
-  testCollectionScopeIgnoresLanguage();
-  testLocalCacheKeepsLanguage();
-  testParamOrderMatchesClauseOrder();
-  testNormalizeSearchParams();
+  assert.deepStrictEqual(normalizeSearchParams({ name: 'Promo Card A107/A122' }), { name: 'Promo Card', number: 'A107', set: '' });
+  assert.deepStrictEqual(normalizeSearchParams({ set: 'lea', number: '5/64' }), { name: '', number: '5', set: 'lea' });
   console.log('cardsearchsql.test.js: all assertions passed');
 }
 
-try { main(); process.exit(0); }
-catch (err) { console.error(err); process.exit(1); }
+main().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });

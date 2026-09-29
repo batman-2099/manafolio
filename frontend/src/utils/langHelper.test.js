@@ -1,60 +1,20 @@
-// Self-check for card display name localization and Japanese translation fallback.
+// Self-check for provider names and supported languages.
 // Run: `node src/utils/langHelper.test.js`
 import assert from 'node:assert';
-import { getCardDisplayName, translateJapaneseName } from './langHelper.js';
+import { getCardDisplayName } from './langHelper.js';
 
 // 1. When printed_name exists, it always wins regardless of language.
-assert.strictEqual(getCardDisplayName('Ancestral Katana', 'Japanese', '祖先の刀'), '祖先の刀');
-assert.strictEqual(getCardDisplayName('Lightning Bolt', 'French', 'Foudre'), 'Foudre');
-assert.strictEqual(getCardDisplayName('Charizard', 'German', 'Glurak'), 'Glurak');
+assert.strictEqual(getCardDisplayName('Ancestral Katana', '祖先の刀'), '祖先の刀');
+assert.strictEqual(getCardDisplayName('Lightning Bolt', 'Foudre'), 'Foudre');
+assert.strictEqual(getCardDisplayName('Lightning Bolt'), 'Lightning Bolt');
+assert.strictEqual(getCardDisplayName(null), '');
 
-// 2. When printed_name is absent and language is Japanese, map known species.
-assert.strictEqual(getCardDisplayName('Charizard', 'Japanese'), 'リザードン');
-assert.strictEqual(getCardDisplayName('Pikachu', 'Japanese'), 'ピカチュウ');
-assert.strictEqual(getCardDisplayName('Charizard', 'ja'), 'リザードン');
-assert.strictEqual(getCardDisplayName('Charizard', 'JAPANESE'), 'リザードン');
-
-// 3. Owner/variant prefixes map correctly with base species.
-assert.strictEqual(getCardDisplayName('Dark Charizard', 'Japanese'), 'わるいリザードン');
-assert.strictEqual(getCardDisplayName('Light Dragonite', 'Japanese'), 'やさしいカイリュー');
-assert.strictEqual(getCardDisplayName('Shining Mew', 'Japanese'), 'ひかるミュウ');
-assert.strictEqual(getCardDisplayName("Giovanni's Machamp", 'Japanese'), 'サカキのカイリキー');
-
-// 4. Multilingual Pokémon species translation (FR, DE, IT, ES, JA, etc.)
-assert.strictEqual(getCardDisplayName('Charizard', 'French'), 'Dracaufeu');
-assert.strictEqual(getCardDisplayName('Charizard ex', 'French'), 'Dracaufeu ex');
-assert.strictEqual(getCardDisplayName('Charizard', 'German'), 'Glurak');
-assert.strictEqual(getCardDisplayName('Charizard VMAX', 'German'), 'Glurak VMAX');
-assert.strictEqual(getCardDisplayName('Meowscarada ex', 'French'), 'Miascarade ex');
-assert.strictEqual(getCardDisplayName('Charizard ex', 'Japanese'), 'リザードン ex');
-assert.strictEqual(getCardDisplayName('Charizard', 'English'), 'Charizard');
-assert.strictEqual(getCardDisplayName('Charizard', 'en'), 'Charizard');
-assert.strictEqual(getCardDisplayName('Lightning Bolt', 'German'), 'Lightning Bolt');
-assert.strictEqual(getCardDisplayName('Lightning Bolt', 'de'), 'Lightning Bolt');
-
-// 5. Unmapped species name in Japanese returns English name.
-assert.strictEqual(getCardDisplayName('SomeUnmappedPokemon', 'Japanese'), 'SomeUnmappedPokemon');
-
-// 6. translateJapaneseName maps Japanese search queries back to English.
-assert.strictEqual(translateJapaneseName('リザードン'), 'Charizard');
-assert.strictEqual(translateJapaneseName('わるいリザードン'), 'Dark Charizard');
-assert.strictEqual(translateJapaneseName('サカキのカイリキー'), "Giovanni's Machamp");
-
-// 7. Game-scoped language filtering in frontend.
-import { getLanguagesForGame, getLanguageNamesForGame, isLanguageSupported } from './languages.js';
-assert.strictEqual(getLanguagesForGame('lorcana').length, 6);
-assert.ok(isLanguageSupported('lorcana', 'French'));
-assert.ok(isLanguageSupported('lorcana', 'fr'));
-assert.ok(!isLanguageSupported('lorcana', 'es'));
-assert.ok(!isLanguageSupported('lorcana', 'Spanish'));
-assert.strictEqual(getLanguageNamesForGame('lorcana').length, 6);
-assert.strictEqual(getLanguagesForGame('mtg').length, 11);
-// 8. Disney Lorcana card translations
-assert.strictEqual(getCardDisplayName('Tyler Nguyen-Baker - 4*Town Fan', 'French'), 'Tyler Nguyen-Baker - Fan des 4*Town');
-assert.strictEqual(getCardDisplayName('Tyler Nguyen-Baker - 4*Town Fan', 'German'), 'Tyler Nguyen-Baker - 4*Town-Fan');
-assert.strictEqual(getCardDisplayName('Tyler Nguyen-Baker - 4*Town Fan', 'Italian'), 'Tyler Nguyen-Baker - Fan dei 4*Town');
-assert.strictEqual(getCardDisplayName('Elsa - Snow Queen', 'French'), 'Elsa - Reine des neiges');
-assert.strictEqual(getCardDisplayName('Mickey Mouse - Brave Little Tailor', 'German'), 'Micky Maus - Tapferes Schneiderlein');
-assert.strictEqual(getCardDisplayName('Beast - Tragic Hero', 'it'), 'La Bestia - Eroe tragico');
+// Game-scoped language filtering in frontend.
+import { getLanguagesForGame, isLanguageSupported } from './languages.js';
+assert.ok(isLanguageSupported('mtg', 'French'));
+assert.ok(isLanguageSupported('mtg', 'fr'));
+assert.ok(isLanguageSupported('mtg', 'Spanish'));
+assert.deepStrictEqual(getLanguagesForGame('unsupported'), []);
+assert.ok(!isLanguageSupported('unsupported', 'en'));
 
 console.log('langHelper.test.js OK');

@@ -12,10 +12,9 @@ const assert = require('assert');
 const os = require('os');
 const path = require('path');
 
-process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-languages-${process.pid}.db`);
+process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-languages-${process.pid}.db`);
 const languages = require('../src/utils/languages');
 const scryfallApi = require('../src/scryfallApi');
-const tcgdexApi = require('../src/tcgdexApi');
 
 // --- 1. Language registry resolves every form callers use ---------------------
 assert.strictEqual(languages.toCode('Japanese'), 'ja', 'display name -> code');
@@ -29,20 +28,6 @@ for (const name of ['English', 'Japanese', 'German', 'French', 'Spanish', 'Itali
   assert.strictEqual(languages.toName(name), name, `${name} must survive a round trip`);
 }
 assert.strictEqual(languages.toCode('klingon'), 'en', 'unknown input degrades to English');
-assert.ok(languages.isEnglish(''), 'no language means English');
-assert.ok(languages.isEnglish('English') && languages.isEnglish('en'));
-assert.ok(!languages.isEnglish('ja'));
-
-// --- 1b. Game-scoped language filtering ---------------------------------------
-assert.strictEqual(languages.getLanguagesForGame('lorcana').length, 6, 'Lorcana supports 6 languages');
-assert.ok(languages.isLanguageSupported('lorcana', 'fr'), 'Lorcana supports French');
-assert.ok(languages.isLanguageSupported('lorcana', 'de'), 'Lorcana supports German');
-assert.ok(languages.isLanguageSupported('lorcana', 'French'), 'Lorcana supports French by name');
-assert.ok(!languages.isLanguageSupported('lorcana', 'es'), 'Lorcana does not support Spanish');
-assert.ok(!languages.isLanguageSupported('lorcana', 'pt'), 'Lorcana does not support Portuguese');
-assert.ok(!languages.isLanguageSupported('lorcana', 'ko'), 'Lorcana does not support Korean');
-assert.strictEqual(languages.getLanguagesForGame('mtg').length, 11, 'MTG supports 11 languages');
-assert.strictEqual(languages.getLanguagesForGame('pokemon').length, 11, 'Pokemon supports 11 languages');
 
 // --- 2. Scryfall query construction -----------------------------------------
 // Capture the URLs fetchWindow actually requests.
@@ -131,58 +116,9 @@ function normalizeChecks() {
   assert.strictEqual(none.price_trend, 0);
 }
 
-// --- 4. TCGdex ids round-trip ------------------------------------------------
-function tcgdexChecks() {
-  // The trap: TCGdex set ids contain dashes and can themselves be two lowercase
-  // letters ("lc-3"), so a [a-z]{2} pattern reads "tcgdex-en-lc-3" as language
-  // "en-lc" and card "3", and the card then 404s on every lookup.
-  const cases = [
-    ['tcgdex-ja-SV2a-004', 'ja', 'SV2a-004'],
-    ['tcgdex-en-lc-3', 'en', 'lc-3'],
-    ['tcgdex-zh-tw-SV2a-001', 'zh-tw', 'SV2a-001'],
-    ['mtg-abc', null, 'mtg-abc'],
-  ];
-  for (const [id, lang, provider] of cases) {
-    assert.strictEqual(tcgdexApi.idLanguage(id), lang, `language of ${id}`);
-    assert.strictEqual(tcgdexApi.providerId(id), provider, `provider id of ${id}`);
-  }
-
-  // A full TCGdex card maps onto the card_cache shape, with Cardmarket's rolling
-  // averages landing in the same columns the price charts already read.
-  const card = tcgdexApi.normalizeCard({
-    id: 'SV2a-004', localId: '004', name: 'ヒトカゲ', category: 'Pokemon', stage: 'Basic',
-    rarity: 'Common', types: ['Fire'], image: 'https://assets.tcgdex.net/ja/SV/SV2a/004',
-    set: { id: 'SV2a', name: 'ポケモンカード151' },
-    pricing: { cardmarket: { avg: 0.07, trend: 0.04, avg1: 0.04, avg7: 0.05, avg30: 0.07 }, tcgplayer: null },
-  }, 'ja');
-  assert.strictEqual(card.id, 'tcgdex-ja-SV2a-004', 'id carries the language');
-  assert.strictEqual(card.game, 'pokemon');
-  assert.strictEqual(card.language, 'Japanese');
-  assert.strictEqual(card.number, '004');
-  assert.strictEqual(card.set_name, 'ポケモンカード151');
-  // A Japan-exclusive card has no English name anywhere, so the localized name is
-  // both `name` and `printed_name`.
-  assert.strictEqual(card.name, 'ヒトカゲ');
-  assert.strictEqual(card.printed_name, 'ヒトカゲ');
-  assert.strictEqual(card.supertype, 'Pokémon', "must match pokemontcg.io's accented spelling so filters don't split");
-  assert.strictEqual(card.price_normal, 0.07);
-  assert.strictEqual(card.price_avg7, 0.05);
-  assert.strictEqual(card.image_url, 'https://assets.tcgdex.net/ja/SV/SV2a/004/low.png');
-
-  // TCGplayer's market price wins over Cardmarket when both exist (same
-  // precedence tcgApi has always used for English cards).
-  const withTp = tcgdexApi.normalizeCard({
-    id: 'sv03-125', localId: '125', name: 'Charizard ex', category: 'Pokemon',
-    set: { id: 'sv03', name: 'Obsidian Flames' },
-    pricing: { cardmarket: { 'avg-holo': 7.36 }, tcgplayer: { holofoil: { marketPrice: 4.97 } } },
-  }, 'en');
-  assert.strictEqual(withTp.price_holofoil, 4.97);
-}
-
 async function main() {
   await scryfallChecks();
   normalizeChecks();
-  tcgdexChecks();
   console.log('languages.test.js: all assertions passed');
 }
 

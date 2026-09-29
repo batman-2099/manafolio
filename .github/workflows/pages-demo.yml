@@ -1,13 +1,13 @@
 name: Deploy Demo to GitHub Pages
 
 # Builds the frontend in demo mode (fixture-backed, no backend) and publishes it
-# to GitHub Pages. Manual dispatch, plus any push to main that touches the
-# frontend. Enable Pages -> Source: GitHub Actions in repo settings once.
+# to GitHub Pages. Manual dispatch, plus main updates to the frontend or guide.
+# Enable Pages -> Source: GitHub Actions in repo settings once.
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
-    paths: [ 'frontend/**' ]
+    paths: [ 'frontend/**', 'docs/USER_GUIDE.md' ]
 
 permissions:
   contents: read
@@ -27,14 +27,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/configure-pages@v5
+        id: pages
       - name: Build demo bundle
         working-directory: frontend
         env:
           VITE_DEMO: '1'
+          VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
         run: |
           npm ci
           npm run build
-      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: frontend/dist

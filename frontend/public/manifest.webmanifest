@@ -1,4 +1,7 @@
 {
+  "name": "Manafolio",
+  "short_name": "Manafolio",
+  "description": "Your collection. Every card accounted for.",
   "background_color": "#0a0f1d",
   "icons": [
     {

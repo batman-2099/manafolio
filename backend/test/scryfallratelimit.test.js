@@ -8,7 +8,7 @@ const assert = require('assert');
 const os = require('os');
 const path = require('path');
 
-process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-ratelimit-${process.pid}.db`);
+process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-ratelimit-${process.pid}.db`);
 const scryfallApi = require('../src/scryfallApi');
 
 const hits = [];

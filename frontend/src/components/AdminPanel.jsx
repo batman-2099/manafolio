@@ -5,6 +5,9 @@ import CatalogPanel from './CatalogPanel';
 import SetupWizard from './SetupWizard';
 import { currencySymbol } from '../utils/formatPrice';
 import { useT } from '../utils/i18n';
+import { downloadBlob } from '../utils/downloadBlob';
+import Modal from './Modal';
+import './AdminPanel.css';
 
 const formatBytes = (n) => {
   if (!n) return '0 B';
@@ -28,13 +31,13 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
   // Change Password Modal States
   const [targetUser, setTargetUser] = useState(null);
-  useBackGuard(!!targetUser, () => setTargetUser(null));
+  const closePassword = () => { setTargetUser(null); setUpdatePassword(''); };
+  useBackGuard(!!targetUser, closePassword);
   const [updatePassword, setUpdatePassword] = useState('');
   const [pwdLoading, setPwdLoading] = useState(false);
 
   // Instance Settings States
   const [publicBaseUrl, setPublicBaseUrl] = useState('');
-  const [pokemonProvider, setPokemonProvider] = useState('pokemontcg');
   const [priceRefreshDays, setPriceRefreshDays] = useState(1);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const mountedRef = useRef(true);
@@ -76,14 +79,14 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       const res = await fetch('/api/admin/seed-cards', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
-        showToast(data.message);
+        showToast(data.message, 'success');
         fetchUsers(); // Refresh stats
       } else {
-        showToast(t('admin.errSeed'));
+        showToast(t('admin.errSeed'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errSeedGeneric'));
+      showToast(t('admin.errSeedGeneric'), 'error');
     }
   };
 
@@ -103,19 +106,12 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   const handleDownloadBackup = async (file) => {
     try {
       const res = await fetch(`/api/admin/backups/${encodeURIComponent(file)}/download`);
-      if (!res.ok) { showToast(t('admin.errDownload')); return; }
+      if (!res.ok) { showToast(t('admin.errDownload'), 'error'); return; }
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, file);
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errDownloadGeneric'));
+      showToast(t('admin.errDownloadGeneric'), 'error');
     }
   };
 
@@ -125,14 +121,14 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       const res = await fetch('/api/admin/backups', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        showToast(t('admin.backupCreated', { file: data.file, size: formatBytes(data.size) }));
+        showToast(t('admin.backupCreated', { file: data.file, size: formatBytes(data.size) }), 'success');
         fetchBackups();
       } else {
-        showToast(data.error || t('admin.errBackup'));
+        showToast(data.error || t('admin.errBackup'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errBackupGeneric'));
+      showToast(t('admin.errBackupGeneric'), 'error');
     } finally {
       setBackupLoading(false);
     }
@@ -147,11 +143,11 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
         if (!mountedRef.current) return;
         setUsers(data);
       } else {
-        showToast(t('admin.errUserList'));
+        showToast(t('admin.errUserList'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('common.errBackend'));
+      showToast(t('common.errBackend'), 'error');
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -164,7 +160,6 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
         const data = await response.json();
         if (!mountedRef.current) return;
         setPublicBaseUrl(data.public_base_url || '');
-        setPokemonProvider(data.pokemon_provider || 'pokemontcg');
         setPriceRefreshDays(data.price_refresh_days ?? 1);
       }
     } catch (err) {
@@ -181,7 +176,6 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           public_base_url: publicBaseUrl,
-          pokemon_provider: pokemonProvider,
           price_refresh_days: Number(priceRefreshDays),
         })
       });
@@ -189,16 +183,15 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       if (response.ok) {
         const data = await response.json();
         setPublicBaseUrl(data.public_base_url || '');
-        setPokemonProvider(data.pokemon_provider || 'pokemontcg');
         setPriceRefreshDays(data.price_refresh_days ?? 1);
-        showToast(t('admin.settingsUpdated'));
+        showToast(t('admin.settingsUpdated'), 'success');
       } else {
         const data = await response.json();
-        showToast(data.error || t('admin.errSettings'));
+        showToast(data.error || t('admin.errSettings'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errSettingsGeneric'));
+      showToast(t('admin.errSettingsGeneric'), 'error');
     } finally {
       setSettingsLoading(false);
     }
@@ -207,11 +200,11 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   const handleAddUser = async (e) => {
     e.preventDefault();
     if (newUsername.length < 3) {
-      showToast(t('admin.errUsernameShort', { count: 3 }));
+      showToast(t('admin.errUsernameShort', { count: 3 }), 'error');
       return;
     }
     if (newPassword.length < 8) {
-      showToast(t('login.errPasswordShort', { count: 8 }));
+      showToast(t('login.errPasswordShort', { count: 8 }), 'error');
       return;
     }
 
@@ -224,18 +217,18 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       });
 
       if (response.ok) {
-        showToast(t('admin.userCreated', { name: newUsername }));
+        showToast(t('admin.userCreated', { name: newUsername }), 'success');
         setNewUsername('');
         setNewPassword('');
         setNewRole('member');
         fetchUsers();
       } else {
         const data = await response.json();
-        showToast(data.error || t('admin.errCreateUser'));
+        showToast(data.error || t('admin.errCreateUser'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errCreateUserGeneric'));
+      showToast(t('admin.errCreateUserGeneric'), 'error');
     } finally {
       setAddLoading(false);
     }
@@ -244,7 +237,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   const handleToggleRole = async (user) => {
     const nextRole = user.role === 'admin' ? 'member' : 'admin';
     if (user.username === 'admin') {
-      showToast(t('admin.errDemoteRoot'));
+      showToast(t('admin.errDemoteRoot'), 'error');
       return;
     }
 
@@ -260,15 +253,15 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       });
 
       if (response.ok) {
-        showToast(t('admin.roleUpdated', { role: nextRole, name: user.username }));
+        showToast(t('admin.roleUpdated', { role: nextRole, name: user.username }), 'success');
         fetchUsers();
       } else {
         const data = await response.json();
-        showToast(data.error || t('admin.errRoleChange'));
+        showToast(data.error || t('admin.errRoleChange'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errRoleChangeGeneric'));
+      showToast(t('admin.errRoleChangeGeneric'), 'error');
     }
   };
 
@@ -276,7 +269,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
     e.preventDefault();
     if (!targetUser) return;
     if (updatePassword.length < 8) {
-      showToast(t('login.errPasswordShort', { count: 8 }));
+      showToast(t('login.errPasswordShort', { count: 8 }), 'error');
       return;
     }
 
@@ -289,16 +282,16 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       });
 
       if (response.ok) {
-        showToast(t('admin.passwordUpdated', { name: targetUser.username }));
+        showToast(t('admin.passwordUpdated', { name: targetUser.username }), 'success');
         setUpdatePassword('');
         setTargetUser(null);
       } else {
         const data = await response.json();
-        showToast(data.error || t('settings.errPasswordUpdate'));
+        showToast(data.error || t('settings.errPasswordUpdate'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('settings.errPasswordUpdateGeneric'));
+      showToast(t('settings.errPasswordUpdateGeneric'), 'error');
     } finally {
       setPwdLoading(false);
     }
@@ -306,7 +299,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
   const handleDeleteUser = async (user) => {
     if (user.username === 'admin') {
-      showToast(t('admin.errDeleteRoot'));
+      showToast(t('admin.errDeleteRoot'), 'error');
       return;
     }
 
@@ -320,15 +313,15 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       });
 
       if (response.ok) {
-        showToast(t('admin.userDeleted', { name: user.username }));
+        showToast(t('admin.userDeleted', { name: user.username }), 'success');
         fetchUsers();
       } else {
         const data = await response.json();
-        showToast(data.error || t('admin.errDeleteUser'));
+        showToast(data.error || t('admin.errDeleteUser'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errDeleteUserGeneric'));
+      showToast(t('admin.errDeleteUserGeneric'), 'error');
     }
   };
 
@@ -375,7 +368,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', height: '34px' }}>
             <Users size={16} style={{ color: 'var(--accent-red)' }} />
-            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('admin.totalTrainers', { count: users.length })}</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('admin.totalUsers', { count: users.length })}</span>
           </div>
         </div>
       </div>
@@ -455,13 +448,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                 disabled={settingsLoading}
               />
             </div>
-            {/* How often prices are refreshed automatically.
-                Every provider here is free except one: the optional
-                pokemontcgapi.com provider charges credits per card refreshed, so
-                a daily sweep of a large collection is a recurring bill rather
-                than a recurring courtesy. Daily stays the default — that is what
-                every install did before this existed — but someone who checks
-                their collection value monthly can now say so. */}
+            {/* How often prices are refreshed automatically. */}
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label htmlFor="admin-price-refresh">{t('admin.priceRefresh')}</label>
               <select
@@ -511,7 +498,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
             </button>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, lineHeight: 1.4 }}>
-            {t('admin.backupHint', { keep: 10, dbFile: 'bindarr.db' })}
+            {t('admin.backupHint', { keep: 10, dbFile: 'manafolio.db' })}
           </p>
 
           {backups.length === 0 ? (
@@ -564,8 +551,8 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
               <input
                 type="text"
                 className="input-control"
-                placeholder={t('admin.filterTrainers')}
-                aria-label={t('admin.filterTrainers')}
+                placeholder={t('admin.filterUsers')}
+                aria-label={t('admin.filterUsers')}
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
                 style={{ width: '100%', paddingLeft: '2rem', paddingVertical: '0.35rem', fontSize: '0.85rem' }}
@@ -578,11 +565,11 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
             <div className="spinner"></div>
           ) : filteredUsers.length === 0 ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              {t('admin.noTrainerMatch')}
+              {t('admin.noUserMatch')}
             </div>
           ) : (
             <div className="collection-table-wrapper" style={{ overflowX: 'auto' }}>
-              <table className="collection-table">
+              <table className="collection-table admin-user-table">
                 <thead>
                   <tr>
                     <th>{t('login.username')}</th>
@@ -616,34 +603,40 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                       <td className="hide-mobile" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                         {new Date(user.created_at).toLocaleDateString(locale)}
                       </td>
-                      <td style={{ fontWeight: 600 }}>{t('admin.userCards', { count: user.total_cards })}</td>
-                      <td style={{ fontWeight: 700, color: 'var(--accent-yellow)' }}>
+                      <td data-label={t('sets.colCards')} style={{ fontWeight: 600 }}>{t('admin.userCards', { count: user.total_cards })}</td>
+                      <td data-label={t('admin.colPortfolio')} style={{ fontWeight: 700, color: 'var(--accent-yellow)' }}>
                         {currencySymbol()}{(user.total_value || 0).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <td className="admin-user-actions-cell">
+                        <div className="admin-user-actions">
                           <button 
                             className="btn btn-secondary btn-icon-only" 
                             title={t('admin.toggleRole')}
+                            aria-label={t('admin.toggleRole')}
                             onClick={() => handleToggleRole(user)}
                             disabled={user.username === 'admin'}
                           >
                             {user.role === 'admin' ? <ToggleRight size={14} style={{ color: 'var(--accent-red)' }} /> : <ToggleLeft size={14} />}
+                            <span className="admin-user-action-label">{t('admin.toggleRole')}</span>
                           </button>
                           <button 
                             className="btn btn-secondary btn-icon-only" 
                             title={t('admin.resetPassword')}
+                            aria-label={t('admin.resetPassword')}
                             onClick={() => setTargetUser(user)}
                           >
                             <Key size={14} style={{ color: 'var(--accent-yellow)' }} />
+                            <span className="admin-user-action-label">{t('admin.resetPassword')}</span>
                           </button>
                           <button 
                             className="btn btn-danger btn-icon-only" 
                             title={t('admin.deleteAccount')}
+                            aria-label={t('admin.deleteAccount')}
                             onClick={() => handleDeleteUser(user)}
                             disabled={user.username === 'admin'}
                           >
                             <Trash2 size={14} />
+                            <span className="admin-user-action-label">{t('admin.deleteAccount')}</span>
                           </button>
                         </div>
                       </td>
@@ -658,7 +651,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
       {/* Change Password Dialog Overlay */}
       {targetUser && (
-        <div className="modal-overlay" style={{
+        <Modal onClose={closePassword} aria-labelledby="admin-reset-title" style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.6)',
@@ -666,11 +659,11 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 999
+          zIndex: 999, padding: '1rem'
         }}>
           <div className="glass-panel" style={{ maxWidth: '380px', width: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div>
-              <h3 style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('admin.resetPassword')}</h3>
+              <h3 id="admin-reset-title" style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('admin.resetPassword')}</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{t('admin.resetPasswordFor')} <strong>{targetUser.username}</strong></p>
             </div>
             <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -686,12 +679,11 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                   value={updatePassword}
                   onChange={(e) => setUpdatePassword(e.target.value)}
                   required
-                  autoFocus
                   disabled={pwdLoading}
                 />
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => { setTargetUser(null); setUpdatePassword(''); }} disabled={pwdLoading}>
+                <button type="button" className="btn btn-secondary" onClick={closePassword} disabled={pwdLoading}>
                   {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={pwdLoading}>
@@ -700,7 +692,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
     </div>

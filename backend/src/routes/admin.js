@@ -3,7 +3,6 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
-const tcgApi = require('../tcgApi');
 const scryfallApi = require('../scryfallApi');
 const catalog = require('../catalog');
 const { parseCardRow } = require('../utils/priceHelpers');
@@ -35,16 +34,7 @@ router.post('/seed-cards', async (req, res) => {
       box = { id: result.lastID };
     }
 
-    const SEED_SETS = ['base1', 'sv1', 'swsh1'];
     const MOCK_POOL = [];
-    for (const setId of SEED_SETS) {
-      try {
-        MOCK_POOL.push(...await tcgApi.getCardsBySet(setId, req.user.tcg_api_key));
-        await new Promise(r => setTimeout(r, 500)); // Be gentle on the rate limits
-      } catch (err) {
-        console.error(`Seed: skipping Pokémon set ${setId}:`, err.message);
-      }
-    }
     const MTG_SEED_SETS = ['lea', 'mh3'];
     for (const setCode of MTG_SEED_SETS) {
       try {
@@ -56,7 +46,7 @@ router.post('/seed-cards', async (req, res) => {
     }
     if (MOCK_POOL.length === 0) {
       // Fallback: If APIs are completely down/rate-limited, try to use whatever is already in the cache
-      const cached = await db.all(`SELECT * FROM card_cache LIMIT 500`);
+      const cached = await db.all(`SELECT * FROM card_cache WHERE game = 'mtg' LIMIT 500`);
       if (cached.length > 0) {
         console.log(`Seed: APIs failed, falling back to ${cached.length} locally cached cards.`);
         for (const r of cached) {
@@ -83,7 +73,6 @@ router.post('/seed-cards', async (req, res) => {
       const options = [];
       if (card.price_normal > 0) options.push('Normal');
       if (card.price_holofoil > 0) options.push('Holofoil');
-      if (card.price_reverse_holofoil > 0) options.push('Reverse Holofoil');
       return options.length > 0 ? options : ['Normal'];
     };
 
@@ -157,9 +146,7 @@ router.get('/users', async (req, res) => {
         SELECT COUNT(c.id) as unique_cards, SUM(c.quantity) as total_cards,
           SUM(c.quantity * CASE
             WHEN c.printing = 'Holofoil' AND cc.price_holofoil IS NOT NULL AND cc.price_holofoil > 0 THEN cc.price_holofoil
-            WHEN c.printing = 'Reverse Holofoil' AND cc.price_reverse_holofoil IS NOT NULL AND cc.price_reverse_holofoil > 0 THEN cc.price_reverse_holofoil
             WHEN c.printing = 'Normal' AND cc.price_normal IS NOT NULL AND cc.price_normal > 0 THEN cc.price_normal
-            WHEN c.printing = '1st Edition' AND cc.price_1st_edition IS NOT NULL AND cc.price_1st_edition > 0 THEN cc.price_1st_edition
             ELSE cc.price_trend
           END) as total_value
         FROM collection c
@@ -311,28 +298,16 @@ router.get('/catalogs', async (req, res) => {
   }
 });
 
-// The non-English catalogs that can be built at all, with per-language counts.
-//
-// Separate from /catalogs because it costs a provider set list per language and
-// /catalogs is polled every second during a build. The panel asks for this once,
-// when the user opens the language section.
-router.get('/catalogs/languages', async (req, res) => {
-  try {
-    res.json({ languages: await catalog.listLanguages('mtg') });
-  } catch (e) {
-    console.error('listLanguages failed:', e.message);
-    res.status(500).json({ error: 'Could not list languages' });
-  }
-});
 
 router.post('/catalogs/build', (req, res) => {
   // `sets` scopes the build to the sets the user actually has in front of them,
   // which is minutes instead of hours. Omit it for the whole game. A scoped build
   // MERGES into the existing catalog (catalog.js embedPhase), so building one set
   // never discards the sets built before it.
-  const { lang, skipCache, sets } = req.body || {};
+  const { game = 'mtg', lang, skipCache, sets } = req.body || {};
+  if (!isGame(game)) return res.status(400).json({ error: 'Unsupported game' });
   try {
-    res.json({ progress: catalog.start('mtg', lang, { skipCache: !!skipCache, sets: Array.isArray(sets) ? sets : [] }) });
+    res.json({ progress: catalog.start(game, lang, { skipCache: !!skipCache, sets: Array.isArray(sets) ? sets : [] }) });
   } catch (e) {
     // "already running" is a conflict, not a server fault — the UI shows the
     // running build rather than an error.
@@ -344,29 +319,10 @@ router.post('/catalogs/build', (req, res) => {
 // and the licence the models carry. See utils/modelAssets for why the models are
 // a deliberate download rather than part of the image.
 router.get('/models', async (req, res) => {
-  // The product map ships with the ready-made Pokémon catalog's state because it is
-  // that catalog's other half: product ids with nothing to look them up in name no
-  // cards at all.
-  res.json({
-    ...require('../utils/modelAssets').status(),
-    productMap: await require('../tcgplayerCatalog').summary(),
-  });
+  res.json(require('../utils/modelAssets').status());
 });
 
-// Build (or refresh) the TCGplayer product map. A download of the ready-made
-// Pokémon catalog starts this on its own — this is the button for refreshing it
-// after a set release, or recovering from a run that failed halfway.
-router.post('/models/product-map', (req, res) => {
-  const productMap = require('../tcgplayerCatalog');
-  try {
-    if (req.body && req.body.stop) return res.json({ stopped: productMap.stop() });
-    res.json({ progress: productMap.start() });
-  } catch (e) {
-    res.status(409).json({ error: e.message, progress: productMap.state() });
-  }
-});
-
-// `what`: 'models' or 'catalog:mtg' / 'catalog:pokemon'. Downloading is the
+// `what`: 'models' or a supported 'catalog:<game>'. Downloading is the
 // operator's own act on their own install — which is precisely why it is a button
 // they press rather than something that happens on startup.
 router.post('/models/download', (req, res) => {

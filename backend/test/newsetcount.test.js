@@ -20,9 +20,12 @@ const assert = require('assert');
 const os = require('os');
 const path = require('path');
 
-process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-newsetcount-${process.pid}.db`);
+process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-newsetcount-${process.pid}.db`);
+process.env.CV_MODEL_DIR = `${process.env.DB_PATH}.models`;
 const db = require('../src/db');
-const { newSetCount } = require('../src/catalog');
+const catalog = require('../src/catalog');
+const { newSetCount } = catalog;
+const cardSets = require('../src/cardSets');
 
 // Big enough that a per-set scan of card_cache is unmistakably slower than one
 // pass, small enough to seed in a second. The real install is 1,047 x 104k.
@@ -60,7 +63,7 @@ async function main() {
     for (let i = 0; i < 2000; i++) {
       await db.run(
         `INSERT INTO card_cache (id, name, set_id, number, game, language) VALUES (?, ?, ?, ?, ?, ?)`,
-        [`tcgdex-c${i}`, `Card ${i}`, `A${i % 50}`, String(i), 'pokemon', 'English']
+        [`unsupported-c${i}`, `Card ${i}`, `A${i % 50}`, String(i), 'unsupported', 'English']
       );
     }
     for (const c of codes.slice(NSETS - UNCACHED)) {
@@ -104,10 +107,18 @@ async function main() {
   assert.strictEqual(await newSetCount('mtg', 'English'), UNCACHED - GAPPED,
     'a set with no upstream data must not be reported as missing');
 
-  // 5. A game with nothing in either table has nothing missing, not everything.
-  assert.strictEqual(await newSetCount('lorcana', 'English'), 0);
+  // Unsupported stored identities remain untouched, but cannot become catalogs.
+  await assert.rejects(newSetCount('unsupported', 'English'), /Unsupported game/);
+  await assert.rejects(catalog.setCounts('unsupported'), /Unsupported game/);
+  assert.throws(() => catalog.start('unsupported'), /Unsupported game/);
+  assert.throws(() => catalog.binPath('unsupported'), /Unsupported game/);
+  assert.throws(() => catalog.metaPath('unsupported'), /Unsupported game/);
+  await assert.rejects(cardSets.listAllSets('unsupported'), /Unsupported game/);
+  await assert.rejects(cardSets.cacheSetCards('unsupported', 's1'), /Unsupported game/);
+  assert.ok((await catalog.list()).every(row => row.game === 'mtg'));
+  assert.strictEqual((await db.get("SELECT COUNT(*) n FROM card_cache WHERE game = 'unsupported'")).n, 2000);
 
-  console.log(`newsetcount.test.js: all 5 assertions passed (count took ${ms}ms)`);
+  console.log(`newsetcount.test.js: catalog counting and unsupported-game boundaries passed (count took ${ms}ms)`);
 }
 
 main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });

@@ -1,40 +1,14 @@
 // The two card_cache queries every provider runs, built in one place.
-//
-// pokemontcg.io, Scryfall and TCGdex each carried their own copy of both — the
-// same JOIN, the same name/number/set filter assembly, ~35 lines apiece. They had
-// already drifted in three ways by the time they were merged, and the drift is
-// the point: nobody chose it, and two of the three variants were wrong.
-//
-// Where they disagreed, and why this file resolves it the way it does:
-//
-//  1. LANGUAGE IN COLLECTION SCOPE. tcgdexApi filtered `cc.language`; the other
-//     two deliberately did not, both carrying a comment explaining that filtering
-//     would hide a user's Japanese copies from a deck search. Not filtering wins:
-//     collection scope answers "what do I own", and you own the card whatever
-//     language you own it in. The old behaviour also made results depend on the
-//     UI language for no reason a user could see — the same collection search
-//     returned different rows in English and Japanese.
-//
-//  2. LEADING ZEROS. tcgApi matched a zero-stripped form of the number as well
-//     ("004" also matching a stored "4"); the other two did not. Matching wins:
-//     it is a pure OR, so it can only ever find more, and collector numbers are
-//     written both ways depending on where they were typed.
-//
-//  3. LOCALIZED NAMES IN THE LOCAL CACHE. tcgApi searched `name` only; the others
-//     searched `printed_name` too. Searching both wins, and costs nothing where
-//     printed_name is NULL (a NULL LIKE is not true, so the OR just falls through).
-//
-// Language IS filtered in the local-cache query, in all three, and that stays:
-// there it is part of a cached printing's identity, and answering a Japanese
-// search with the English row sitting next to it would return the wrong card.
+// Collection queries include all owned languages; cache queries select the
+// requested printing language. Both match localized names and numeric variants.
 const { setSqlFilter } = require('./setQuery');
 
 // Match a collector number written either way round.
 //
 // The CAST is what lets "4" find a stored "004", but on its own it over-matches
-// badly: SQLite casts any non-numeric string to 0, so CAST('TG12') = CAST('SV49')
-// = 0 and a search for one promo number matched every card whose number starts
-// with a letter. It is therefore only applied when the query IS numeric, where it
+// badly: SQLite casts any non-numeric string to 0, so distinct letter-prefixed
+// collector numbers would match one another.
+// The cast is therefore only applied when the query IS numeric, where it
 // means what it looks like. Non-numeric numbers fall back to exact matching,
 // which is what they needed all along.
 function numberClause(column, number) {
@@ -73,14 +47,14 @@ function nameClause(prefix, name) {
 
 // What the user OWNS, across every language they own it in. `game` is bound, not
 // interpolated, so a caller cannot widen the query by passing something odd.
-function collectionQuery(game, { userId, name, number, setList = [], limit, offset }) {
+function collectionQuery(game, { userId, name, number, setList = [], limit, offset, listType = 'collection' }) {
   let sql = `
     SELECT cc.*, SUM(c.quantity) AS owned_qty
     FROM collection c
     JOIN card_cache cc ON c.card_id = cc.id
-    WHERE c.user_id = ? AND c.list_type = 'collection' AND cc.game = ?
+    WHERE c.user_id = ? AND c.list_type = ? AND cc.game = ?
   `;
-  const params = [userId, game];
+  const params = [userId, listType, game];
   for (const part of [nameClause('cc.', name), numberClause('cc.number', number), setSqlFilter(setList, 'cc')]) {
     if (!part) continue;
     sql += ` AND ${part.clause}`;

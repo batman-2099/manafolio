@@ -12,6 +12,7 @@ const router = express.Router();
 // Gated on share_locations, not just share_enabled: where a card is stored is
 // exactly what this exposes, and that is the setting the owner opts into.
 router.get('/:share_token/containers/:id', async (req, res) => {
+  if (req.query?.game !== undefined && req.query.game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
   const { share_token, id } = req.params;
   try {
     const owner = await db.get(`SELECT id, username, share_enabled, share_locations FROM users WHERE share_token = ?`, [share_token]);
@@ -40,7 +41,7 @@ router.get('/:share_token/containers/:id', async (req, res) => {
              c.printing, c.language, c.favorite, c.is_trade, c.market_value,
              cc.name, cc.printed_name, cc.supertype, cc.subtypes, cc.types, cc.rarity,
              cc.set_id, cc.set_name, cc.number, cc.image_url, cc.game, cc.cmc, cc.color_identity,
-             cc.price_trend, cc.price_normal, cc.price_holofoil, cc.price_reverse_holofoil, cc.price_1st_edition
+             cc.price_trend, cc.price_normal, cc.price_holofoil
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
       WHERE c.location_id = ? AND c.user_id = ? AND c.list_type = 'collection' AND cc.game = 'mtg'
@@ -63,6 +64,7 @@ router.get('/:share_token/containers/:id', async (req, res) => {
 
 // Retrieve a shared collection by share token
 router.get('/:share_token', async (req, res) => {
+  if (req.query?.game !== undefined && req.query.game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
   const { share_token } = req.params;
   const listType = req.query.list || 'collection';
 
@@ -115,8 +117,6 @@ router.get('/:share_token', async (req, res) => {
         cc.price_trend,
         cc.price_normal,
         cc.price_holofoil,
-        cc.price_reverse_holofoil,
-        cc.price_1st_edition,
         l.name AS location_name
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id

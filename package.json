@@ -1,7 +1,7 @@
 {
-  "name": "bindarr-monorepo",
+  "name": "manafolio-monorepo",
   "private": true,
-  "description": "Monorepo for Bindarr Pokémon Card Collection Manager",
+  "description": "Monorepo for Manafolio Magic: The Gathering collection, storage, and deck manager",
   "scripts": {
     "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
@@ -13,5 +13,6 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
-  }
+  },
+  "version": "2.1.2"
 }

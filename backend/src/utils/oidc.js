@@ -22,12 +22,12 @@ function isAutoProvisionEnabled() {
   return true;
 }
 
-// Whether an IdP identity may attach itself to a Bindarr account that already
+// Whether an IdP identity may attach itself to a Manafolio account that already
 // exists, purely because the two share a username.
 //
 // Off unless the operator turns it on, and that is the whole point. The username
 // comes from a claim the IdP sends (OIDC_USER_CLAIM, preferred_username by
-// default) and extractUserIdentity lower-cases it, while the Bindarr owner
+// default) and extractUserIdentity lower-cases it, while the Manafolio owner
 // account is always created as "admin". So on any IdP where a person can choose
 // or edit their own username — self-registration, or a profile page that lets
 // them — setting it to "admin" and signing in once used to bind their identity

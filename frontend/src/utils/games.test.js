@@ -1,25 +1,13 @@
 import assert from 'node:assert';
 
-const store = new Map();
-globalThis.localStorage = {
-  getItem: key => store.get(key) || null,
-  setItem: (key, value) => store.set(key, String(value)),
-  removeItem: key => store.delete(key),
-};
+import { isGameEnabled, defaultGame, defaultGameFilter, gameLabel } from './games.js';
 
-const {
-  enabledGames, isGameEnabled,
-  setGameEnabled, defaultGame, defaultGameFilter, gameLabel,
-} = await import('./games.js');
-
-assert.deepStrictEqual(enabledGames(), ['mtg']);
 assert.ok(isGameEnabled('mtg'));
-assert.ok(!isGameEnabled('pokemon'));
-assert.ok(!isGameEnabled('lorcana'));
+assert.ok(!isGameEnabled('unknown'));
 assert.strictEqual(defaultGame(), 'mtg');
 assert.strictEqual(defaultGameFilter(), 'mtg');
-assert.strictEqual(gameLabel('pokemon'), 'Magic: The Gathering');
+assert.strictEqual(gameLabel('unknown'), 'unknown');
+assert.notStrictEqual(gameLabel(undefined), gameLabel('mtg'));
 assert.strictEqual(gameLabel('mtg', true), 'MTG');
-assert.strictEqual(setGameEnabled('mtg', false), false);
 
 console.log('Magic-only game configuration self-check passed');

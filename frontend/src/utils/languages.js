@@ -2,7 +2,7 @@
 // backend (shared/languages.json) rather than mirrored here — the display names are
 // what get stored in collection.language, so the two lists drifting apart would
 // mean the UI offering a language the server does not recognise. Each row also
-// carries the provider-specific spellings (Scryfall's zht, TCGdex's zh-tw); the UI
+// carries provider-specific spellings (such as Scryfall's zht); the UI
 // ignores them and only ever speaks the canonical code.
 import LANGUAGE_TABLE from '../../../shared/languages.json' with { type: 'json' };
 
@@ -52,20 +52,17 @@ import { getCardDisplayName } from './langHelper.js';
 
 // The card name to show: providers give us the localized name (printed_name) for
 // a non-English printing and the English one is still there for searching, so
-// prefer whatever the card itself was printed with, falling back to translation dictionaries.
+// prefer whatever the card itself was printed with, falling back to the original name.
 export const displayName = (card) => {
   if (!card) return '';
-  return getCardDisplayName(card.name, card.language, card.printed_name, card.game || card.supertype);
+  return getCardDisplayName(card.name, card.printed_name);
 };
 
 // The English name to show ALONGSIDE the localized one, or null when there isn't a
 // distinct one to show.
 //
 // This is free for Magic: Scryfall gives every printing an English `name` plus the
-// localized `printed_name`, so a Japanese card already carries both. It is null for
-// non-English Pokémon, where TCGdex has only the localized name — a Japan-only card
-// has no English name anywhere, and the dexId that could give a species name is
-// blank on exactly the ex/special cards, absent on Trainers and Energy.
+// localized `printed_name`, so a Japanese card already carries both.
 export function translatedName(card) {
   if (!card) return null;
   const shown = displayName(card);
@@ -75,9 +72,6 @@ export function translatedName(card) {
 
 // The set's code. Unlike its name this reads the same in every language, so it is
 // what you can actually search for or quote. MTG set ids are stored prefixed.
-//
-// Casing is left exactly as the provider gives it: TCGdex codes are mixed-case
-// ("SV8a", "sv03") and upper-casing them produces a code that does not resolve.
 export function setCode(card) {
   const code = String(card?.set_id || '').replace(/^mtg-/, '');
   return code || null;

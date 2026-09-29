@@ -3,26 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>Bindarr</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Manafolio</title>
     <!-- Cache only: the authenticated account's theme replaces this after session refresh. -->
     <script>
       (function () {
         const isShare = /^\/share\/[a-zA-Z0-9_-]+$/.test(window.location.pathname);
-        const urlTheme = isShare && new URLSearchParams(window.location.search).get('theme');
+        const urlTheme = new URLSearchParams(window.location.search).get('theme');
         let cachedTheme = 'dark';
         try {
-          if (localStorage.getItem('bindarr_token')) cachedTheme = localStorage.getItem('theme') || 'dark';
+          if (localStorage.getItem('manafolio_token')) cachedTheme = localStorage.getItem('theme') || 'dark';
         } catch (e) { /* private mode / storage blocked: stay on dark */ }
-        const theme = urlTheme || cachedTheme;
+        const theme = isShare ? urlTheme : cachedTheme;
         document.documentElement.setAttribute('data-theme',
-          ['dark', 'light', 'jenny', 'mtg', 'lcars', 'pokemon', 'lorcana'].includes(theme) ? theme : 'dark');
+          __THEME_KEYS__.includes(theme) ? theme : 'dark');
       })();
     </script>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@500;600;700;800;900&family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700;800&family=Philosopher:ital,wght@0,400;0,700;1,400;1,700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Righteous&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>

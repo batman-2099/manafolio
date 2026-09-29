@@ -6,7 +6,7 @@ const { Readable } = require('stream');
 const { gzipSync } = require('zlib');
 
 async function main() {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bindarr-scryfall-catalog-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'manafolio-scryfall-catalog-'));
   process.env.DB_PATH = path.join(dir, 'user.db');
   const catalogPath = `${process.env.DB_PATH}.scryfall-bulk.sqlite`;
   const modulePath = require.resolve('../src/scryfallBulk');

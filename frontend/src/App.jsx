@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
-import { LayoutDashboard, Database, MapPin, Sparkles, Settings as SettingsIcon, LogOut, ShieldAlert, Plus, Swords, StickyNote } from 'lucide-react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import { LayoutDashboard, Database, MapPin, Settings as SettingsIcon, LogOut, ShieldAlert, Plus, Swords, BookOpen, MoreHorizontal, X } from 'lucide-react';
 import Login from './components/Login';
 import Logo from './components/Logo';
 import { pushBackGuard } from './utils/useBackGuard';
 import { useT } from './utils/i18n';
+import themes from '../../shared/themes.json';
 
 // View components are code-split so heavy deps (recharts in the chart views)
 // load on demand instead of in the initial bundle.
@@ -17,7 +18,7 @@ const SetupWizard = lazy(() => import('./components/SetupWizard'));
 const SharedCollection = lazy(() => import('./components/SharedCollection'));
 const SharedContainer = lazy(() => import('./components/SharedContainer'));
 const DeckBuilder = lazy(() => import('./components/DeckBuilder'));
-const Notes = lazy(() => import('./components/Notes'));
+const HowTo = lazy(() => import('./components/HowTo'));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -64,7 +65,7 @@ window.fetch = function (input, options = {}) {
   const url = typeof input === 'string' ? input : (input && input.url) || '';
   const isPublicOrAuthRoute = url.includes('/api/shared/') || url.includes('/api/auth/login') || url.includes('/api/auth/register') || url.includes('/api/auth/bootstrap');
 
-  const token = localStorage.getItem('bindarr_token');
+  const token = localStorage.getItem('manafolio_token');
   const finalOptions = { ...options };
   if (token && url.startsWith('/api/') && !isPublicOrAuthRoute) {
     finalOptions.headers = {
@@ -73,9 +74,9 @@ window.fetch = function (input, options = {}) {
     };
   }
   return originalFetch(input, finalOptions).then(response => {
-    if (response.status === 401 && !isPublicOrAuthRoute && token === localStorage.getItem('bindarr_token')) {
+    if (response.status === 401 && url.startsWith('/api/') && !isPublicOrAuthRoute && token === localStorage.getItem('manafolio_token')) {
       // Dispatch custom event to trigger logout without page refresh
-      window.dispatchEvent(new Event('bindarr_logout'));
+      window.dispatchEvent(new Event('manafolio_logout'));
     }
     return response;
   });
@@ -83,11 +84,12 @@ window.fetch = function (input, options = {}) {
 
 function App() {
   const { t } = useT();
-  const [token, setToken] = useState(localStorage.getItem('bindarr_token'));
+  const [token, setToken] = useState(localStorage.getItem('manafolio_token'));
   const [user, setUser] = useState(() => {
     try {
-      const u = localStorage.getItem('bindarr_user');
-      return u ? JSON.parse(u) : null;
+      const u = JSON.parse(localStorage.getItem('manafolio_user') || 'null');
+      if (u) u.theme = themes.includes(u.theme) ? u.theme : 'dark';
+      return u;
     } catch {
       return null;
     }
@@ -96,6 +98,10 @@ function App() {
   const sessionRevision = useRef(0);
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [settingsSection, setSettingsSection] = useState(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const navRef = useRef(null);
+  const moreTriggerRef = useRef(null);
   // First-run scanning setup. Asked once per session, only for an admin, and only
   // while it is genuinely incomplete — setupNeeded() reads the same endpoints the
   // wizard does so there is one definition of 'set up'.
@@ -107,6 +113,8 @@ function App() {
   const [deckViewKey, setDeckViewKey] = useState(0);
   const [selectedCardFilter, setSelectedCardFilter] = useState('');
   const [toast, setToast] = useState(null);
+  const toastIdRef = useRef(0);
+  const toastRef = useRef(null);
   const [statsTrigger, setStatsTrigger] = useState(0);
 
   const tabGuardRef = useRef(null);
@@ -120,12 +128,16 @@ function App() {
   // the browser past the app origin into about:blank.
   const goTab = (tab, inventoryType = 'collection') => {
     if (tab !== activeTab && navigationGuardRef.current?.() === false) return false;
+    if (moreOpen) moreTriggerRef.current?.focus();
+    setMoreOpen(false);
+    setSettingsSection(null);
     if (tab === 'storage') setStorageInventoryType(inventoryType);
     if (tab === activeTab) return true;
     const prev = activeTab;
     const prevStorageInventoryType = storageInventoryType;
     tabGuardRef.current = pushBackGuard(() => {
       if (navigationGuardRef.current?.() === false) return false;
+      setMoreOpen(false);
       tabGuardRef.current = null;
       setActiveTab(prev);
       setStorageInventoryType(prevStorageInventoryType);
@@ -147,10 +159,14 @@ function App() {
 
   // The browser value is only a first-paint cache; the account owns the theme.
   useLayoutEffect(() => {
-    if (shareToken) return;
-    const theme = token && ['dark', 'light', 'jenny', 'mtg', 'lcars'].includes(user?.theme) ? user.theme : 'dark';
+    const selected = shareToken
+      ? new URLSearchParams(window.location.search).get('theme')
+      : token && user?.theme;
+    const theme = themes.includes(selected) ? selected : 'dark';
     document.documentElement.setAttribute('data-theme', theme);
-    try { localStorage.setItem('theme', theme); } catch { /* storage may be blocked */ }
+    if (!shareToken) {
+      try { localStorage.setItem('theme', theme); } catch { /* storage may be blocked */ }
+    }
   }, [token, user?.theme, shareToken]);
 
   // Reload the account on session restoration, including changes made on another device.
@@ -161,17 +177,17 @@ function App() {
     fetch('/api/auth/me')
       .then(res => res.ok ? res.json() : Promise.reject(new Error('Failed to fetch profile')))
       .then(data => {
-        if (cancelled || revision !== sessionRevision.current || token !== localStorage.getItem('bindarr_token')) return;
+        if (cancelled || revision !== sessionRevision.current || token !== localStorage.getItem('manafolio_token')) return;
         setUser(data.user);
-        localStorage.setItem('bindarr_user', JSON.stringify(data.user));
+        localStorage.setItem('manafolio_user', JSON.stringify(data.user));
       })
       .catch(err => { if (!cancelled) console.error('Session refresh failed:', err); });
     return () => { cancelled = true; };
   }, [token, shareToken]);
 
-  const showToast = (message) => {
-    setToast(message);
-  };
+  const showToast = useCallback((message, kind = 'status') => {
+    setToast({ id: ++toastIdRef.current, message, kind });
+  }, []);
 
   // Handle OIDC / SSO token in URL redirect
   useEffect(() => {
@@ -190,32 +206,85 @@ function App() {
         })
           .then(res => res.ok ? res.json() : Promise.reject(new Error('Failed to fetch profile')))
           .then(data => {
-            if (data.user && revision === sessionRevision.current && !localStorage.getItem('bindarr_token')) {
+            if (data.user && revision === sessionRevision.current && !localStorage.getItem('manafolio_token')) {
               sessionRevision.current += 1;
               setToken(oidcToken);
               setUser(data.user);
-              localStorage.setItem('bindarr_token', oidcToken);
-              localStorage.setItem('bindarr_user', JSON.stringify(data.user));
-              showToast(t('toast.welcomeBack', { name: data.user.username }));
+              localStorage.setItem('manafolio_token', oidcToken);
+              localStorage.setItem('manafolio_user', JSON.stringify(data.user));
+              showToast(t('toast.welcomeBack', { name: data.user.username }), 'success');
               setActiveTab('dashboard');
             }
           })
           .catch(err => {
             console.error('OIDC token verification failed:', err);
-            showToast(t('login.errOidcFailed'));
+            showToast(t('login.errOidcFailed'), 'error');
           });
       }
     } catch { /* ignore URL parse error */ }
-  }, [t, token]);
+  }, [t, token, showToast]);
 
   useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => {
-        setToast(null);
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
+    if (!toast) return;
+    let remaining = Math.max(6000, Math.min(15000, (toast.message?.length || 0) * 60));
+    let startedAt;
+    let timer;
+    let hovered = false;
+    let focused = false;
+    const updateTimer = () => {
+      if (timer) {
+        clearTimeout(timer);
+        remaining -= performance.now() - startedAt;
+        timer = null;
+      }
+      if (document.hidden || hovered || focused) return;
+      startedAt = performance.now();
+      timer = setTimeout(() => setToast(current => current?.id === toast.id ? null : current), remaining);
+    };
+    const onEnter = (event) => { if (event.pointerType === 'mouse') { hovered = true; updateTimer(); } };
+    const onLeave = () => { hovered = false; updateTimer(); };
+    const onFocus = () => { focused = true; updateTimer(); };
+    const onBlur = (event) => {
+      if (!element?.contains(event.relatedTarget)) { focused = false; updateTimer(); }
+    };
+    const element = toastRef.current;
+    element?.addEventListener('pointerenter', onEnter);
+    element?.addEventListener('pointerleave', onLeave);
+    element?.addEventListener('focusin', onFocus);
+    element?.addEventListener('focusout', onBlur);
+    document.addEventListener('visibilitychange', updateTimer);
+    updateTimer();
+    return () => {
+      clearTimeout(timer);
+      element?.removeEventListener('pointerenter', onEnter);
+      element?.removeEventListener('pointerleave', onLeave);
+      element?.removeEventListener('focusin', onFocus);
+      element?.removeEventListener('focusout', onBlur);
+      document.removeEventListener('visibilitychange', updateTimer);
+    };
   }, [toast]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onOutside = (event) => {
+      if (!navRef.current?.contains(event.target)) setMoreOpen(false);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMoreOpen(false);
+        moreTriggerRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', onOutside);
+    document.addEventListener('focusin', onOutside);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onOutside);
+      document.removeEventListener('focusin', onOutside);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [moreOpen]);
 
   // Offer first-run setup to an admin until it is finished or skipped. The flag
   // lives on the server, so closing the wizard halfway resumes it at the next
@@ -238,45 +307,22 @@ function App() {
       sessionRevision.current += 1;
       setToken(null);
       setUser(null);
-      localStorage.removeItem('bindarr_token');
-      localStorage.removeItem('bindarr_user');
-      showToast(t('toast.sessionExpired'));
+      localStorage.removeItem('manafolio_token');
+      localStorage.removeItem('manafolio_user');
+      showToast(t('toast.sessionExpired'), 'error');
     };
-    window.addEventListener('bindarr_logout', handleAutoLogout);
-    return () => window.removeEventListener('bindarr_logout', handleAutoLogout);
-  }, [t]);
+    window.addEventListener('manafolio_logout', handleAutoLogout);
+    return () => window.removeEventListener('manafolio_logout', handleAutoLogout);
+  }, [t, showToast]);
 
-  // Pointer-reactive foil: one delegated listener drives --px/--py (0-100%) on
-  // whichever card the pointer is over, so the holo/reverse-holo rainbow tracks
-  // the cursor (MTG-style). CSS custom props inherit down to the overlay div.
-  useEffect(() => {
-    const onMove = (e) => {
-      const card = e.target.closest && e.target.closest('.tilt-card-wrapper');
-      if (!card) return;
-      const r = card.getBoundingClientRect();
-      card.style.setProperty('--px', `${((e.clientX - r.left) / r.width) * 100}%`);
-      card.style.setProperty('--py', `${((e.clientY - r.top) / r.height) * 100}%`);
-      card.classList.add('foil-active');
-    };
-    const onLeave = (e) => {
-      const card = e.target.closest && e.target.closest('.tilt-card-wrapper');
-      if (card) card.classList.remove('foil-active');
-    };
-    document.addEventListener('pointermove', onMove, { passive: true });
-    document.addEventListener('pointerout', onLeave, { passive: true });
-    return () => {
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerout', onLeave);
-    };
-  }, []);
 
   const handleLoginSuccess = (newToken, newUser) => {
     sessionRevision.current += 1;
     setToken(newToken);
     setUser(newUser);
-    localStorage.setItem('bindarr_token', newToken);
-    localStorage.setItem('bindarr_user', JSON.stringify(newUser));
-    showToast(t('toast.welcomeBack', { name: newUser.username }));
+    localStorage.setItem('manafolio_token', newToken);
+    localStorage.setItem('manafolio_user', JSON.stringify(newUser));
+    showToast(t('toast.welcomeBack', { name: newUser.username }), 'success');
     setActiveTab('dashboard');
   };
 
@@ -288,18 +334,18 @@ function App() {
     sessionRevision.current += 1;
     setToken(null);
     setUser(null);
-    localStorage.removeItem('bindarr_token');
-    localStorage.removeItem('bindarr_user');
-    showToast(t('toast.loggedOut'));
+    localStorage.removeItem('manafolio_token');
+    localStorage.removeItem('manafolio_user');
+    showToast(t('toast.loggedOut'), 'success');
   };
 
   const handleUpdateUser = (changes) => {
-    if (!token || token !== localStorage.getItem('bindarr_token')) return;
+    if (!token || token !== localStorage.getItem('manafolio_token')) return;
     sessionRevision.current += 1;
     setUser(current => {
       if (!current || current.id !== user.id) return current;
       const updatedUser = { ...current, ...changes };
-      localStorage.setItem('bindarr_user', JSON.stringify(updatedUser));
+      localStorage.setItem('manafolio_user', JSON.stringify(updatedUser));
       return updatedUser;
     });
   };
@@ -311,7 +357,7 @@ function App() {
       body: JSON.stringify({ theme }),
     });
     const data = await response.json();
-    if (token !== localStorage.getItem('bindarr_token')) return false;
+    if (token !== localStorage.getItem('manafolio_token')) return false;
     if (!response.ok) throw new Error(data.error || t('prefs.themeError'));
     handleUpdateUser({ theme: data.theme });
     return true;
@@ -333,9 +379,25 @@ function App() {
     );
   }
 
+  const toastNotification = toast && (
+    <div
+      key={toast.id}
+      ref={toastRef}
+      className={`toast toast-${toast.kind}`}
+      role={toast.kind === 'error' ? 'alert' : 'status'}
+      aria-live={toast.kind === 'error' ? 'assertive' : 'polite'}
+      aria-atomic="true"
+    >
+      <span className="toast-message">{toast.message}</span>
+      <button type="button" className="toast-dismiss" aria-label={t('common.close')} onClick={() => setToast(null)}>
+        <X size={18} aria-hidden="true" />
+      </button>
+    </div>
+  );
+
   // Render login screen if unauthenticated
   if (!token || !user) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+    return <><Login onLoginSuccess={handleLoginSuccess} />{toastNotification}</>;
   }
 
   const renderContent = () => {
@@ -378,11 +440,11 @@ function App() {
           />
         );
       case 'deckbuilder':
-        return <DeckBuilder key={deckViewKey} showToast={showToast} navigationGuardRef={navigationGuardRef} />;
-      case 'notes':
-        return <Notes showToast={showToast} />;
+        return <DeckBuilder key={deckViewKey} showToast={showToast} navigationGuardRef={navigationGuardRef} onOpenAiSettings={() => { if (goTab('settings')) setSettingsSection('codex-settings-title'); }} />;
+      case 'howto':
+        return <HowTo />;
       case 'settings':
-        return <Settings user={user} onUpdateUser={handleUpdateUser} onSaveTheme={handleSaveTheme} showToast={showToast} />;
+        return <Settings user={user} initialSection={settingsSection} onUpdateUser={handleUpdateUser} onSaveTheme={handleSaveTheme} showToast={showToast} />;
       case 'admin':
         return <AdminPanel user={user} onUpdateUser={handleUpdateUser} showToast={showToast} />;
       default:
@@ -400,16 +462,18 @@ function App() {
       {/* Premium Header */}
       <header className="app-header">
         <div className="logo-section">
+          <h1 className="logo-text">Manafolio</h1>
           <div className="logo-icon">
             <Logo />
           </div>
-          <h1 className="logo-text">Bind<span>arr</span></h1>
+          <span className="app-version">v{import.meta.env.VITE_APP_VERSION}</span>
         </div>
 
         {/* Navigation Tabs (Nested inside header for unified layout) */}
-        <nav className="nav-tabs" style={{ margin: 0 }}>
+        <nav ref={navRef} className="nav-tabs" style={{ margin: 0 }}>
           <button 
             className={`nav-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
+            aria-current={activeTab === 'dashboard' ? 'page' : undefined}
             onClick={() => goTab('dashboard')}
           >
             <LayoutDashboard size={18} />
@@ -417,6 +481,7 @@ function App() {
           </button>
           <button
             className={`nav-tab ${activeTab === 'add-cards' ? 'active' : ''}`}
+            aria-current={activeTab === 'add-cards' ? 'page' : undefined}
             onClick={() => goTab('add-cards')}
           >
             <Plus size={18} />
@@ -424,6 +489,7 @@ function App() {
           </button>
           <button
             className={`nav-tab ${activeTab === 'collection' ? 'active' : ''}`}
+            aria-current={activeTab === 'collection' ? 'page' : undefined}
             onClick={() => goTab('collection')}
           >
             <Database size={18} />
@@ -431,56 +497,73 @@ function App() {
           </button>
           <button
             className={`nav-tab ${activeTab === 'storage' ? 'active' : ''}`}
+            aria-current={activeTab === 'storage' ? 'page' : undefined}
             onClick={() => {
+              if (!goTab('storage')) return;
               setSelectedLocationId(null);
               setFocusEntryId(null);
               setStorageViewKey(key => key + 1);
-              goTab('storage');
             }}
           >
             <MapPin size={18} />
             <span>{t('nav.storage')}</span>
           </button>
           <button
-            className={`nav-tab ${activeTab === 'deckbuilder' ? 'active' : ''}`}
-            onClick={() => {
-              if (activeTab === 'deckbuilder' && navigationGuardRef.current?.() === false) return;
-              if (goTab('deckbuilder')) setDeckViewKey(key => key + 1);
-            }}
+            ref={moreTriggerRef}
+            type="button"
+            className={`nav-tab nav-more-trigger ${['deckbuilder', 'howto', 'settings', 'admin'].includes(activeTab) ? 'active' : ''}`}
+            aria-expanded={moreOpen}
+            aria-controls="nav-secondary"
+            onClick={() => setMoreOpen(open => !open)}
           >
-            <Swords size={18} />
-            <span>{t('nav.deckBuilder')}</span>
+            <MoreHorizontal size={18} aria-hidden="true" />
+            <span>{t('nav.more')}</span>
           </button>
-
-          <button
-            className={`nav-tab ${activeTab === 'notes' ? 'active' : ''}`}
-            onClick={() => goTab('notes')}
-          >
-            <StickyNote size={18} />
-            <span>{t('nav.notes')}</span>
-          </button>
-
-          <button
-            className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => goTab('settings')}
-          >
-            <SettingsIcon size={18} />
-            <span>{t('nav.settings')}</span>
-          </button>
-          {user.role === 'admin' && (
-            <button 
-              className={`nav-tab ${activeTab === 'admin' ? 'active' : ''}`}
-              onClick={() => goTab('admin')}
+          <div id="nav-secondary" className={`nav-secondary ${moreOpen ? 'is-open' : ''}`}>
+            <button
+              className={`nav-tab ${activeTab === 'deckbuilder' ? 'active' : ''}`}
+              aria-current={activeTab === 'deckbuilder' ? 'page' : undefined}
+              onClick={() => {
+                if (activeTab === 'deckbuilder' && navigationGuardRef.current?.() === false) return;
+                if (goTab('deckbuilder')) setDeckViewKey(key => key + 1);
+              }}
             >
-              <ShieldAlert size={18} style={{ color: 'var(--accent-red)' }} />
-              <span>{t('nav.admin')}</span>
+              <Swords size={18} />
+              <span>{t('nav.deckBuilder')}</span>
             </button>
-          )}
+
+            <button
+              className={`nav-tab ${activeTab === 'howto' ? 'active' : ''}`}
+              aria-current={activeTab === 'howto' ? 'page' : undefined}
+              onClick={() => goTab('howto')}
+            >
+              <BookOpen size={18} aria-hidden="true" />
+              <span style={{ whiteSpace: 'nowrap' }}>{t('nav.howto')}</span>
+            </button>
+
+            <button
+              className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
+              aria-current={activeTab === 'settings' ? 'page' : undefined}
+              onClick={() => goTab('settings')}
+            >
+              <SettingsIcon size={18} />
+              <span>{t('nav.settings')}</span>
+            </button>
+            {user.role === 'admin' && (
+              <button
+                className={`nav-tab ${activeTab === 'admin' ? 'active' : ''}`}
+                aria-current={activeTab === 'admin' ? 'page' : undefined}
+                onClick={() => goTab('admin')}
+              >
+                <ShieldAlert size={18} style={{ color: 'var(--accent-red)' }} />
+                <span>{t('nav.admin')}</span>
+              </button>
+            )}
+          </div>
         </nav>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            <Sparkles size={14} style={{ color: 'var(--accent-yellow)' }} />
+        <div className="header-account" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="header-greeting" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
             <span>{t('header.greeting')} <strong style={{ color: 'var(--text-strong)' }}>{user.username}</strong> ({t(`role.${user.role}`)})</span>
           </div>
           <button
@@ -509,12 +592,7 @@ function App() {
         </ErrorBoundary>
       </main>
 
-      {/* Toast Notification */}
-      {toast && (
-        <div className="toast">
-          {toast}
-        </div>
-      )}
+      {toastNotification}
     </div>
   );
 }

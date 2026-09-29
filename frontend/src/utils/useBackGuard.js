@@ -1,21 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { App as CapacitorApp } from '@capacitor/app';
 
-// Make the back gesture (browser edge-swipe, Android system back) mean
-// "close the topmost popup / go back a level" instead of leaving the page or
-// exiting the app.
+// Make browser back (including edge-swipe) mean "close the topmost popup /
+// go back a level" instead of leaving the page.
 //
 // How: when an overlay opens we push a throwaway history entry. A back gesture
 // pops that entry (fires `popstate`) and we run the overlay's close handler
 // rather than navigating away. Closing via a button/backdrop instead consumes
 // the pushed entry with history.back() so history never accumulates.
-//
-// Web: the edge-swipe / browser back fires popstate, so guarding history is
-// enough. Capacitor Android is different -- the native back gesture checks the
-// WebView's own page history (canGoBack), which does NOT see pushState entries,
-// so it would exit the app instead of firing popstate. We bridge that below via
-// @capacitor/app's backButton event, routing it through the same guard stack.
 
 const stack = []; // { close } entries, topmost last
 let ignorePops = 0; // pops we triggered ourselves (programmatic close)
@@ -28,24 +19,14 @@ function onPopState() {
   }
   const entry = stack.pop();
   if (entry && entry.close() === false) {
-    // A canceled leave must still intercept the next browser/native back.
+    // A canceled leave must still intercept the next browser back.
     stack.push(entry);
     window.history.pushState({ backGuard: true }, '');
   }
 }
 
-// Capacitor Android: drive the hardware back button through the guard stack.
-// If anything is open, step back one history entry (fires popstate -> closes
-// the topmost overlay/tab); otherwise let the app exit.
-if (Capacitor.isNativePlatform()) {
-  CapacitorApp.addListener('backButton', () => {
-    if (stack.length > 0) window.history.back();
-    else CapacitorApp.exitApp();
-  });
-}
-
 // Push a guard entry: a back gesture pops it and runs onClose instead of
-// leaving the page / exiting the app. Returns a disposer that removes the
+// leaving the page. Returns a disposer that removes the
 // guard and consumes its history entry (for programmatic close via button).
 export function pushBackGuard(onClose) {
   if (!listening) {
@@ -71,6 +52,15 @@ export function useBackGuard(isOpen, onClose) {
 
   useEffect(() => {
     if (!isOpen) return;
-    return pushBackGuard(() => onCloseRef.current && onCloseRef.current());
+    let active = true;
+    let dispose;
+    // Strict Mode replays mount effects before microtasks; register only the live mount.
+    queueMicrotask(() => {
+      if (active) dispose = pushBackGuard(() => onCloseRef.current && onCloseRef.current());
+    });
+    return () => {
+      active = false;
+      dispose?.();
+    };
   }, [isOpen]);
 }

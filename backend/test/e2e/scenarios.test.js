@@ -5,7 +5,7 @@ const assert = require('assert');
 const { spawn } = require('child_process');
 
 // Isolated temp DB and unique port
-const tmpDb = path.join(os.tmpdir(), `bindarr-scenarios-test-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-scenarios-test-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 const port = '3012';
 
@@ -72,27 +72,6 @@ async function runTests() {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     };
-
-    // F6-TC2: Mixed-game collection sorting (Pokémon type-name vs MTG WUBRG)
-    try {
-      const { sortCards } = require('../../src/utils/compartmentSort');
-      const cards = [
-        { name: 'Swamp', types: ['Black'], game: 'mtg' },
-        { name: 'Charmander', types: ['Fire'], game: 'pokemon' },
-        { name: 'Plains', types: ['White'], game: 'mtg' },
-        { name: 'Bulbasaur', types: ['Grass'], game: 'pokemon' }
-      ];
-      const sorted = sortCards(cards, 'type-name', 'normals_first');
-      // Bulbasaur (Grass) -> Charmander (Fire) -> Plains (White) -> Swamp (Black)
-      assert.strictEqual(sorted[0].name, 'Bulbasaur');
-      assert.strictEqual(sorted[1].name, 'Charmander');
-      assert.strictEqual(sorted[2].name, 'Plains');
-      assert.strictEqual(sorted[3].name, 'Swamp');
-      console.log('PASS: F6-TC2');
-    } catch (err) {
-      console.error('FAIL: F6-TC2 -', err.message);
-      throw err;
-    }
 
     // F6-TC3: Scryfall proxy search & add to binder with price history writing
     try {
@@ -264,7 +243,7 @@ async function runTests() {
       const seedCard = (id, name) => db.run(
         `INSERT OR REPLACE INTO card_cache (id, name, supertype, subtypes, types, rarity, set_id, set_name, number, image_url, price_trend)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, name, 'Pokémon', '[]', '[]', 'Common', 's1', 'Set One', '1', '', 1]
+        [id, name, 'Creature', '[]', '[]', 'Common', 's1', 'Set One', '1', '', 1]
       );
       const addEntry = async (cardId, compId, locId, position) => {
         const r = await db.run(

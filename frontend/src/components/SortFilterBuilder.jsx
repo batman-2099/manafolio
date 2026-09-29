@@ -7,6 +7,7 @@ import { useT } from '../utils/i18n';
 
 // Sortable item wrapper
 function SortableItem({ id, children }) {
+  const { t } = useT();
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -21,10 +22,10 @@ function SortableItem({ id, children }) {
     border: '1px solid rgba(255, 255, 255, 0.1)'
   };
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
-      <div {...listeners} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', touchAction: 'none' }}>
+    <div ref={setNodeRef} style={style}>
+      <button type="button" className="sort-drag-handle" {...attributes} {...listeners} aria-label={t('sort.reorder')} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', touchAction: 'none', background: 'transparent', border: 0, padding: 0 }}>
         <GripVertical size={16} color="var(--text-muted)" />
-      </div>
+      </button>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
         {children}
       </div>
@@ -94,8 +95,8 @@ export function SortBuilder({ value, onChange }) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <label style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{t('sort.title')}</label>
+    <div className="sort-filter-builder" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <strong style={{ fontSize: '0.75rem' }}>{t('sort.title')}</strong>
       <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t('sort.hint')}</span>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
@@ -103,6 +104,7 @@ export function SortBuilder({ value, onChange }) {
             <SortableItem key={item.id} id={item.id}>
               <select
                 className="select-control"
+                aria-label={t('collection.sortBy')}
                 style={{ flex: 1, padding: '0.2rem' }}
                 value={item.by}
                 onChange={(e) => updateCriteria(item.id, { by: e.target.value })}
@@ -116,6 +118,7 @@ export function SortBuilder({ value, onChange }) {
                 return (
                   <select
                     className="select-control"
+                    aria-label={t('sort.direction')}
                     style={{ width: '130px', padding: '0.2rem' }}
                     value={item.dir}
                     onChange={(e) => updateCriteria(item.id, { dir: e.target.value })}
@@ -148,6 +151,7 @@ export function SortBuilder({ value, onChange }) {
               )}
               <button
                 type="button"
+                aria-label={t('common.delete')}
                 className="btn btn-secondary"
                 style={{ padding: '0.2rem', minWidth: 'auto' }}
                 onClick={() => removeCriteria(item.id)}
@@ -185,11 +189,11 @@ const FILTER_OPERATORS = [
 ];
 
 const KNOWN_OPTIONS = {
-  supertype: ['Pokémon', 'Trainer', 'Energy', 'Basic', 'Legendary', 'Snow', 'World', 'Vanguard', 'Plane', 'Scheme', 'Phenomenon', 'Ongoing'],
-  types: ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Darkness', 'Metal', 'Fairy', 'Dragon', 'Colorless', 'White', 'Blue', 'Black', 'Red', 'Green', 'Multicolor', 'Artifact', 'Creature', 'Enchantment', 'Instant', 'Sorcery', 'Planeswalker', 'Land', 'Battle', 'Tribal'],
-  printing: ['Normal', 'Holofoil', 'Reverse Holofoil', '1st Edition', 'Promo'],
+  supertype: ['Basic', 'Legendary', 'Snow', 'World', 'Vanguard', 'Plane', 'Scheme', 'Phenomenon', 'Ongoing'],
+  types: ['Colorless', 'White', 'Blue', 'Black', 'Red', 'Green', 'Multicolor', 'Artifact', 'Creature', 'Enchantment', 'Instant', 'Sorcery', 'Planeswalker', 'Land', 'Battle', 'Tribal'],
+  printing: ['Normal', 'Holofoil'],
   language: LANGUAGE_NAMES,
-  rarity: ['Common', 'Uncommon', 'Rare', 'Mythic', 'Special', 'Bonus', 'Promo', 'Rare Holo', 'Rare Ultra', 'Rare Secret', 'Amazing Rare', 'Radiant Rare', 'Illustration Rare', 'Special Illustration Rare', 'Hyper Rare', 'Classic Collection'],
+  rarity: ['Common', 'Uncommon', 'Rare', 'Mythic', 'Special', 'Bonus', 'Promo'],
   color_identity: ['White', 'Blue', 'Black', 'Red', 'Green', 'Colorless']
 };
 
@@ -210,8 +214,8 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', borderTop: '1px solid var(--border-glass)', paddingTop: '1rem' }}>
-      <label style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{t('filter.title')}</label>
+    <div className="sort-filter-builder" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', borderTop: '1px solid var(--border-glass)', paddingTop: '1rem' }}>
+      <strong style={{ fontSize: '0.75rem' }}>{t('filter.title')}</strong>
       <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t('filter.hint')}</span>
 
       {rules.length === 0 && (
@@ -234,6 +238,7 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
           <div key={rule.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap', background: 'rgba(0,0,0,0.1)', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
             <select
               className="select-control"
+              aria-label={t('filter.action')}
               style={{ width: '80px', padding: '0.2rem', color: rule.action === 'exclude' ? 'var(--accent-red)' : 'var(--accent-green)' }}
               value={rule.action}
               onChange={(e) => updateRule(rule.id, { action: e.target.value })}
@@ -243,6 +248,7 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
             </select>
             <select
               className="select-control"
+              aria-label={t('filter.fieldLabel')}
               style={{ flex: 1, minWidth: '100px', padding: '0.2rem' }}
               value={rule.field}
               onChange={(e) => updateRule(rule.id, { field: e.target.value })}
@@ -251,6 +257,7 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
             </select>
             <select
               className="select-control"
+              aria-label={t('filter.operator')}
               style={{ width: '90px', padding: '0.2rem' }}
               value={rule.operator}
               onChange={(e) => updateRule(rule.id, { operator: e.target.value })}
@@ -264,6 +271,7 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
               options.length > 0 && rule.operator === 'equals' ? (
                 <select
                   className="select-control"
+                  aria-label={t('filter.value')}
                   style={{ flex: 1, minWidth: '100px', padding: '0.2rem' }}
                   value={rule.value || ''}
                   onChange={(e) => updateRule(rule.id, { value: e.target.value })}
@@ -275,6 +283,7 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
                 <>
                   <input
                     className="input-control"
+                    aria-label={t('filter.value')}
                     style={{ flex: 1, minWidth: '100px', padding: '0.2rem' }}
                     placeholder={t('filter.value')}
                     list={`opts-${rule.id}`}
@@ -291,6 +300,7 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
             )}
             <button
               type="button"
+              aria-label={t('common.delete')}
               className="btn btn-secondary"
               style={{ padding: '0.2rem', minWidth: 'auto' }}
               onClick={() => removeRule(rule.id)}

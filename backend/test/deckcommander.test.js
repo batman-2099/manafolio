@@ -3,7 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const tmpDb = path.join(os.tmpdir(), `bindarr-deck-commander-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-deck-commander-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 
@@ -38,7 +38,7 @@ async function testCommanderCreation() {
   `);
   const inventory = await db.all('SELECT * FROM collection ORDER BY id');
   const body = { name: 'First', game: 'mtg', format: 'Commander / EDH', target_size: 100, commander_card_id: 'first' };
-  for (const [inventory_type, commander_card_id, name] of [['collection', 'first', 'First'], ['arena', 'second', 'Second']]) {
+  for (const [inventory_type, commander_card_id, name] of [['collection', 'first', 'First'], ['arena', 'second', 'Second'], ['graveyard', 'outside', 'Unowned archive'], ['arena', 'first', 'Unowned Arena'], ['collection', 'second', 'Unowned Physical']]) {
     const created = await request('post', '/', null, { ...body, inventory_type, commander_card_id, name });
     assert.strictEqual(created.statusCode, 201);
     const details = await request('get', '/:id', created.body.id);
@@ -62,10 +62,7 @@ async function testCommanderCreation() {
     { format: 'Standard' },
     { decklist_text: '2 First' },
     { precon_file: 'test-precon' },
-    { commander_card_id: 'unknown' },
-    { commander_card_id: 'outside' },
-    { inventory_type: 'arena' },
-    { commander_card_id: 'second', inventory_type: 'collection' }
+    { commander_card_id: 'unknown' }
   ]) {
     const rejected = await request('post', '/', null, { ...body, ...invalid });
     assert.strictEqual(rejected.statusCode, 400, JSON.stringify(invalid));
@@ -85,7 +82,7 @@ async function testCommander() {
     await testCommanderCreation();
     const deck = (await db.run(`INSERT INTO decks (name, game, format, user_id) VALUES ('Commanders', 'mtg', 'cOmMaNdEr / eDh', 1)`)).lastID;
     const other = (await db.run(`INSERT INTO decks (name, game, format, user_id) VALUES ('Other', 'mtg', 'Standard', 1)`)).lastID;
-    const legacy = (await db.run(`INSERT INTO decks (name, game, format, user_id) VALUES ('Legacy', 'pokemon', 'Commander', 1)`)).lastID;
+    const legacy = (await db.run(`INSERT INTO decks (name, game, format, user_id) VALUES ('Legacy', 'unsupported', 'Commander', 1)`)).lastID;
     await db.run(`INSERT INTO deck_cards (deck_id, card_id) VALUES (?, 'first'), (?, 'second'), (?, 'outside')`, [deck, deck, other]);
 
     assert.strictEqual((await request('put', '/:id/commander', deck, { card_id: 'first' })).statusCode, 200);

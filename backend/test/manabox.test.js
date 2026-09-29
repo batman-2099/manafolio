@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { parseManaboxText } = require('../src/utils/csvMappers');
 
-const cards = parseManaboxText(fs.readFileSync(path.join(__dirname, '..', '..', 'Patrick.txt'), 'utf8'));
+const cards = parseManaboxText(fs.readFileSync(path.join(__dirname, 'fixtures', 'manabox-collection.txt'), 'utf8'));
 const card = (set, number, printing = 'Normal') => cards.find(c =>
   c.set_code === set && c.collector_number === number && c.printing === printing
 );
@@ -29,7 +29,7 @@ assert.deepStrictEqual(
 
 async function testImportRoute() {
   const os = require('os');
-  const tmpDb = path.join(os.tmpdir(), `bindarr-manabox-test-${process.pid}.db`);
+  const tmpDb = path.join(os.tmpdir(), `manafolio-manabox-test-${process.pid}.db`);
   process.env.DB_PATH = tmpDb;
   process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 
@@ -115,17 +115,21 @@ async function testImportRoute() {
     }, arenaRes);
     assert.strictEqual(arenaRes.statusCode, 200);
     assert.strictEqual((await db.get(`SELECT list_type FROM collection WHERE card_id = ? ORDER BY id DESC LIMIT 1`, ['mtg-caldera'])).list_type, 'arena');
-    const bindarrCsv = fs.readFileSync(path.join(__dirname, '..', '..', 'bindarr_mtg_import.csv'), 'utf8')
-      .split(/\r?\n/).slice(0, 4).join('\n');
-    await db.run(`INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)`, ['mtg-a-brine-comber', 'Stale CSV card', 'pokemon']);
-    const bindarrCsvRes = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+    const manafolioCsv = [
+      '"Card ID","Name","Set Name","Set ID","Card Number","Quantity","Condition","Printing","Language","Purchase Price","Game"',
+      '"mtg-arena-comber","A-Brine Comber","","VOW","","1","Near Mint","Normal","English","0","mtg"',
+      '"mtg-arena-lancer","A-Cobbled Lancer","","VOW","","1","Near Mint","Normal","English","0","mtg"',
+      '"mtg-arena-charger","A-Cosmos Charger","","KHM","","1","Near Mint","Normal","English","0","mtg"'
+    ].join('\n');
+    await db.run(`INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)`, ['mtg-a-brine-comber', 'Stale CSV card', 'mtg']);
+    const manafolioCsvRes = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
     await handler({
-      body: { format: 'internal', data: bindarrCsv, list_type: 'collection' },
+      body: { format: 'internal', data: manafolioCsv, list_type: 'collection' },
       user: { id: 1 }
-    }, bindarrCsvRes);
-    assert.strictEqual(bindarrCsvRes.statusCode, 200);
-    assert.strictEqual(bindarrCsvRes.body.count, 3);
-    assert.deepStrictEqual(bindarrCsvRes.body.summary, {
+    }, manafolioCsvRes);
+    assert.strictEqual(manafolioCsvRes.statusCode, 200);
+    assert.strictEqual(manafolioCsvRes.body.count, 3);
+    assert.deepStrictEqual(manafolioCsvRes.body.summary, {
       added: {
         cards: 3,
         copies: 3,
@@ -152,11 +156,12 @@ async function testImportRoute() {
       ['A-Cobbled Lancer', 'VOW', undefined],
       ['A-Cosmos Charger', 'KHM', undefined]
     ]);
-    await db.run(`UPDATE card_cache SET game = 'pokemon' WHERE id = ?`, ['mtg-a-brine-comber']);
-    await db.initDb();
-    assert.strictEqual((await db.get(`SELECT game FROM card_cache WHERE id = ?`, ['mtg-a-brine-comber'])).game, 'mtg');
-    const arenaCsv = fs.readFileSync(path.join(__dirname, '..', '..', 'mtga_collection.csv'), 'utf8')
-      .split(/\r?\n/).slice(0, 4).join('\n');
+    const arenaCsv = [
+      'Count,Name,Edition,Collector Number,Condition,Language,Foil,Tag',
+      '1,A-Brine Comber,VOW,,Near Mint,English,,',
+      '1,A-Cobbled Lancer,VOW,,Near Mint,English,,',
+      '1,A-Cosmos Charger,KHM,,Near Mint,English,,'
+    ].join('\n');
     const arenaPreview = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; } };
     await previewHandler({ body: { format: 'internal', data: arenaCsv } }, arenaPreview);
     assert.strictEqual(arenaPreview.body.cards, 3);
@@ -208,7 +213,7 @@ async function testImportRoute() {
       failed: { cards: 1, copies: 1, items: [{ name: 'Not A Card', quantity: 1, set_code: 'ABC', collector_number: '1' }] }
     });
     const csvPreview = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; } };
-    await previewHandler({ body: { format: 'internal', data: bindarrCsv } }, csvPreview);
+    await previewHandler({ body: { format: 'internal', data: manafolioCsv } }, csvPreview);
     assert.strictEqual(csvPreview.body.cards, 3);
     assert.strictEqual(csvPreview.body.quantity, 3);
     assert.deepStrictEqual(csvPreview.body.errors, []);

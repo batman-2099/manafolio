@@ -1,12 +1,13 @@
 const express = require('express');
 const db = require('../db');
-const { resolveCardPrice, isVintageSet, parseSqliteUtc } = require('../utils/priceHelpers');
+const { resolveCardPrice, parseSqliteUtc } = require('../utils/priceHelpers');
 const { normalizeMtgColorIdentity } = require('../utils/mtgColors');
 
 const router = express.Router();
 
 // 7. Get Collection Statistics & Analytics
 router.get('/stats', async (req, res) => {
+  if (req.query?.game !== undefined && req.query.game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
   try {
     const { inventory = 'all' } = req.query;
     const gameFilter = ` AND cc.game = 'mtg'`;
@@ -20,7 +21,7 @@ router.get('/stats', async (req, res) => {
     const query = `
       SELECT
         c.quantity, c.purchase_price, c.added_at, c.printing, c.condition, c.card_id, c.market_value, c.list_type,
-        cc.types, cc.subtypes, cc.supertype, cc.game, cc.rarity, cc.set_name, cc.set_id, cc.price_trend, cc.price_normal, cc.price_holofoil, cc.price_reverse_holofoil, cc.price_1st_edition,
+        cc.types, cc.subtypes, cc.supertype, cc.game, cc.rarity, cc.set_name, cc.set_id, cc.price_trend, cc.price_normal, cc.price_holofoil,
         cc.price_avg1, cc.price_avg7, cc.price_avg30, cc.name, cc.color_identity, cc.cmc,
         l.name as location_name
       FROM collection c
@@ -36,7 +37,6 @@ router.get('/stats', async (req, res) => {
     let totalSpent = 0;
     let unsortedCount = 0;
     let nearMintCount = 0;
-    let vintageCount = 0;
     let physicalCards = 0;
     let digitalCards = 0;
     let archivedCards = 0;
@@ -110,9 +110,6 @@ router.get('/stats', async (req, res) => {
         nearMintCount += qty;
       }
 
-      if (isVintageSet(row.set_id)) {
-        vintageCount += qty;
-      }
 
       // Only count a card toward the historical comparison if it was owned
       // that long ago AND has real Cardmarket data for both ends of the
@@ -176,9 +173,10 @@ router.get('/stats', async (req, res) => {
       const loc = row.location_name || 'Unassigned';
       locationCounts[loc] = (locationCounts[loc] || 0) + qty;
     });
-    const deckFilter = inventory === 'collection' || inventory === 'arena'
-      ? ` AND COALESCE(d.inventory_type, 'collection') = ?` : '';
-    const deckRows = inventory === 'graveyard' ? [] : await db.all(`
+    const deckFilter = ['collection', 'arena', 'graveyard'].includes(inventory)
+      ? ` AND COALESCE(d.inventory_type, 'collection') = ?`
+      : ` AND COALESCE(d.inventory_type, 'collection') IN ('collection', 'arena')`;
+    const deckRows = await db.all(`
       SELECT d.id, d.name AS deck_name, COALESCE(d.inventory_type, 'collection') AS inventory_type,
              d.wins, d.losses, dc.card_id, dc.quantity,
              cc.name, cc.types, cc.subtypes, cc.supertype, cc.color_identity, cc.cmc
@@ -187,7 +185,7 @@ router.get('/stats', async (req, res) => {
       LEFT JOIN card_cache cc ON cc.id = dc.card_id
       WHERE d.user_id = ? AND d.game = 'mtg'${deckFilter}
       ORDER BY d.id DESC
-    `, deckFilter ? [req.user.id, inventory] : [req.user.id]);
+    `, ['collection', 'arena', 'graveyard'].includes(inventory) ? [req.user.id, inventory] : [req.user.id]);
     const performanceByDeck = new Map();
     for (const row of deckRows) {
       if (!performanceByDeck.has(row.id)) {
@@ -211,7 +209,7 @@ router.get('/stats', async (req, res) => {
         c.grader, c.grade, c.market_value,
         cc.id as card_id, cc.name, cc.printed_name, cc.rarity, cc.set_name, cc.set_id, cc.number, cc.image_url,
         cc.game, cc.supertype, cc.subtypes, cc.types, cc.cmc, cc.color_identity, cc.price_trend,
-        cc.price_normal, cc.price_holofoil, cc.price_reverse_holofoil, cc.price_1st_edition
+        cc.price_normal, cc.price_holofoil
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
       WHERE c.user_id = ?${listFilter}${gameFilter}
@@ -221,9 +219,7 @@ router.get('/stats', async (req, res) => {
         -- price is exactly how it never would.
         WHEN c.market_value IS NOT NULL AND c.market_value > 0 THEN c.market_value
         WHEN c.printing = 'Holofoil' AND cc.price_holofoil IS NOT NULL AND cc.price_holofoil > 0 THEN cc.price_holofoil
-        WHEN c.printing = 'Reverse Holofoil' AND cc.price_reverse_holofoil IS NOT NULL AND cc.price_reverse_holofoil > 0 THEN cc.price_reverse_holofoil
         WHEN c.printing = 'Normal' AND cc.price_normal IS NOT NULL AND cc.price_normal > 0 THEN cc.price_normal
-        WHEN c.printing = '1st Edition' AND cc.price_1st_edition IS NOT NULL AND cc.price_1st_edition > 0 THEN cc.price_1st_edition
         ELSE cc.price_trend
       END DESC
       LIMIT 6
@@ -236,13 +232,7 @@ router.get('/stats', async (req, res) => {
 
     // Set completion.
     //
-    // Sizes come from the `sets` table, which every provider sync fills in — not
-    // from a hand-kept map. That map listed thirteen Pokémon ids and fell back to a
-    // flat 150 for everything else, so every Magic set and every Pokémon set
-    // released after 151 was measured against a number nobody chose. printed_total
-    // is the right column (the number printed on the card, which is what a player
-    // counts to); `total` includes secret rares and is the fallback when a provider
-    // gives no printed count.
+    // Printed totals count the numbered set; total is the provider fallback.
     //
     // One query for the whole thing, rather than one per set inside a loop: this
     // ran a COUNT(DISTINCT) per set the user owns cards from, which on a broad
@@ -282,7 +272,6 @@ router.get('/stats', async (req, res) => {
     setProgress.sort((a, b) => b.percent - a.percent);
 
     const mintRate = totalCards > 0 ? parseFloat(((nearMintCount / totalCards) * 100).toFixed(1)) : 0.0;
-    const vintageRatio = totalCards > 0 ? parseFloat(((vintageCount / totalCards) * 100).toFixed(1)) : 0.0;
 
     // Recently added cards (most useful "what did I just add" glance)
     const recentRows = await db.all(`
@@ -292,7 +281,7 @@ router.get('/stats', async (req, res) => {
              c.grader, c.grade, c.market_value,
              cc.id as card_id, cc.name, cc.printed_name, cc.rarity, cc.set_name, cc.set_id, cc.number, cc.image_url,
              cc.game, cc.supertype, cc.subtypes, cc.types, cc.cmc, cc.color_identity,
-             cc.price_trend, cc.price_normal, cc.price_holofoil, cc.price_reverse_holofoil, cc.price_1st_edition
+             cc.price_trend, cc.price_normal, cc.price_holofoil
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
       WHERE c.user_id = ?${listFilter}${gameFilter}
@@ -322,7 +311,6 @@ router.get('/stats', async (req, res) => {
         unsortedCount,
         duplicateCopies: Math.max(totalCards - uniqueCards, 0),
         mintRate,
-        vintageRatio,
         // change7d/change30d compare current vs. real Cardmarket avg7/avg30
         // over the same subset of cards that have that data — never
         // simulated. change1y/change5y have no real data source anywhere
@@ -363,6 +351,7 @@ router.get('/stats', async (req, res) => {
 
 // 7b. Get Collection Net Worth Timeline History
 router.get('/stats/history', async (req, res) => {
+  if (req.query?.game !== undefined && req.query.game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
   try {
     const { period = '30d', inventory = 'all' } = req.query;
     const gameFilter = ` AND cc.game = 'mtg'`;
@@ -374,7 +363,7 @@ router.get('/stats/history', async (req, res) => {
 
     // Retrieve all collection items to compute history
     const query = `
-      SELECT c.quantity, c.added_at, c.printing, c.market_value, cc.id as card_id, cc.price_trend, cc.price_normal, cc.price_holofoil, cc.price_reverse_holofoil, cc.price_1st_edition
+      SELECT c.quantity, c.added_at, c.printing, c.market_value, cc.id as card_id, cc.price_trend, cc.price_normal, cc.price_holofoil
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
       WHERE c.user_id = ?${listFilter}${gameFilter}
@@ -484,13 +473,14 @@ router.get('/stats/history', async (req, res) => {
 // Pair it with an API key (Settings -> API access): that credential is read-only
 // and does not expire, so an external tracker keeps working without a login.
 router.get('/stats/networth', async (req, res) => {
+  if (req.query?.game !== undefined && req.query.game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
   try {
     const gameFilter = ` AND cc.game = 'mtg'`;
     const params = [req.user.id];
 
     const rows = await db.all(`
       SELECT c.quantity, c.purchase_price, c.printing, c.market_value, cc.game, cc.price_currency,
-             cc.price_trend, cc.price_normal, cc.price_holofoil, cc.price_reverse_holofoil, cc.price_1st_edition
+             cc.price_trend, cc.price_normal, cc.price_holofoil
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
       WHERE c.user_id = ? AND c.list_type = 'collection'${gameFilter}
@@ -524,10 +514,7 @@ router.get('/stats/networth', async (req, res) => {
       totalCards,
       uniqueEntries: rows.length,
       byGame: Object.fromEntries(Object.entries(byGame).map(([g, v]) => [g, { cards: v.cards, value: round(v.value) }])),
-      // Plural and honest: providers quote in different currencies (Scryfall and
-      // TCGplayer in USD, TCGdex in EUR), and the totals above sum them as-is —
-      // the same arithmetic the dashboard has always done. More than one entry
-      // here means the total is mixed, which a consumer converting it needs to know.
+      // Report every quoted currency so consumers can identify mixed totals.
       currencies: [...currencies].sort(),
       asOf: new Date().toISOString(),
     });
@@ -540,7 +527,7 @@ router.get('/stats/networth', async (req, res) => {
 // Two windows, because two is all anyone can actually fill:
 //   30d — Cardmarket publishes real rolling averages (avg30/avg7/avg1) that give
 //         a genuine month of trend for free, per request, with no storage.
-//   all — everything Bindarr has recorded itself.
+//   all — everything Manafolio has recorded itself.
 // 1y/5y are gone. No card API sells back-history: Scryfall returns only current
 // prices (usd/eur/tix, no historical field at all), so a 5-year MTG chart could
 // never be anything but the same line as the 30-day one.
@@ -620,7 +607,7 @@ router.get('/cards/:id/price-history', async (req, res) => {
     res.json({
       data: data.map(p => ({ price: p.price, recorded_at: new Date(p.time).toISOString(), source: p.source })),
       // What the line is actually made of, so the UI can say so rather than
-      // implying Bindarr knows more than it does.
+      // implying Manafolio knows more than it does.
       marketCount,
       recordedCount,
       insufficientHistory: data.length < 2,

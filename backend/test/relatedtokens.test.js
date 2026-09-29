@@ -7,7 +7,7 @@ const { gzipSync } = require('zlib');
 const express = require('express');
 
 async function main() {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bindarr-related-tokens-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'manafolio-related-tokens-'));
   process.env.DB_PATH = path.join(dir, 'user.db');
   process.env.DEFAULT_ADMIN_PASSWORD = 'related-tokens-test';
   process.env.SCRYFALL_GAP_SCALE = '0';
@@ -78,14 +78,14 @@ async function main() {
     };
     await request({ card_ids: [cardId(1)] }, 401, false);
     for (const body of [{}, { card_ids: 'bad' }, { card_ids: [null] }, { card_ids: ['mtg-../../sets'] },
-      { card_ids: [id(1)] }, { card_ids: ['pokemon-1'] }, { card_ids: Array(501).fill(cardId(1)) }]) {
+      { card_ids: [id(1)] }, { card_ids: ['unsupported-1'] }, { card_ids: Array(501).fill(cardId(1)) }]) {
       const result = await request(body, 400);
       assert.match(result.error, /card_ids/);
     }
-    for (const inventory_type of ['wishlist', 'graveyard', '', null, 1]) {
+    for (const inventory_type of ['wishlist', '', null, 1]) {
       assert.match((await request({ card_ids: [cardId(1)], inventory_type }, 400)).error, /inventory_type/);
     }
-    for (const commander_card_id of [false, 0, 1, {}, [], ' ', 'mtg-../../sets', id(1), 'pokemon-1', cardId(2)]) {
+    for (const commander_card_id of [false, 0, 1, {}, [], ' ', 'mtg-../../sets', id(1), 'unsupported-1', cardId(2)]) {
       assert.match((await request({ card_ids: [cardId(1)], commander_card_id }, 400)).error, /commander_card_id/);
     }
     assert.match((await request({ card_ids: [], commander_card_id: cardId(1) }, 400)).error, /commander_card_id/);
@@ -173,6 +173,9 @@ async function main() {
     arena[1].image_url = 'https://cards.scryfall.io/day.jpg';
     assert.deepStrictEqual(await request({ card_ids: [cardId(10)], inventory_type: 'arena' }), { tokens: arena },
       'Arena ownership is separate and has no physical storage, even on stale located rows');
+    const graveyard = await request({ card_ids: [cardId(10)], inventory_type: 'graveyard' });
+    assert.deepStrictEqual(graveyard.tokens.filter(token => token.owned).map(token => token.id), [cardId(9)],
+      'Graveyard token ownership excludes Physical, Arena, Wishlist and other accounts');
     assert.deepStrictEqual(await snapshot(), inventoryBefore, 'ownership lookups never mutate inventory or cached cards');
     await db.run(`DELETE FROM collection WHERE user_id = 1 AND card_id = ?`, [cardId(3)]);
     const alternate = (await request({ card_ids: [cardId(1)] })).tokens[0];

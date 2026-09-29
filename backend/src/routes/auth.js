@@ -4,6 +4,7 @@ const db = require('../db');
 const { authenticateToken, authLimiter } = require('../middleware/auth');
 const { verifyPassword, generateSession, sanitizeUser } = require('../utils/authHelpers');
 const oidc = require('../utils/oidc');
+const themes = require('../../../shared/themes.json');
 
 const router = express.Router();
 
@@ -80,7 +81,7 @@ router.get('/oidc/callback', authLimiter, async (req, res) => {
     //    username — only when the operator has said their IdP's usernames can be
     //    trusted for it. See isUsernameLinkEnabled: with it on by default, anyone
     //    who could set their own preferred_username to "admin" at the IdP could
-    //    take the Bindarr owner account by signing in once.
+    //    take the Manafolio owner account by signing in once.
     if (!user) {
       const existingUser = await db.get(`SELECT * FROM users WHERE username = ?`, [username]);
       // Linking off and the name is taken: say so, rather than falling through to
@@ -90,7 +91,7 @@ router.get('/oidc/callback', authLimiter, async (req, res) => {
       if (existingUser && !oidc.isUsernameLinkEnabled()) {
         console.warn(`OIDC: "${username}" already exists locally and OIDC_ALLOW_USERNAME_LINK is off — not linking.`);
         return frontendRedirect({
-          oidc_error: 'A Bindarr account with this username already exists. An administrator must set OIDC_ALLOW_USERNAME_LINK=true to attach single sign-on to it.'
+          oidc_error: 'A Manafolio account with this username already exists. An administrator must set OIDC_ALLOW_USERNAME_LINK=true to attach single sign-on to it.'
         });
       }
       if (existingUser) {
@@ -149,7 +150,7 @@ router.get('/oidc/callback', authLimiter, async (req, res) => {
         user = await db.get(`SELECT * FROM users WHERE id = ?`, [result.lastID]);
       } else {
         return frontendRedirect({
-          oidc_error: 'No matching Bindarr account found. Auto-provisioning is disabled; ask an administrator to create your account.'
+          oidc_error: 'No matching Manafolio account found. Auto-provisioning is disabled; ask an administrator to create your account.'
         });
       }
     }
@@ -308,7 +309,7 @@ router.get('/me', authenticateToken, (req, res) => {
   // OTHER provider keys would make it a credential-theft tool: it can be pasted
   // into a dashboard config, and what leaks with it must stay read-only data.
   if (req.user.via_api_key) {
-    const { tcg_api_key, psa_api_token, graded_price_api_key, ...safe } = req.user; // eslint-disable-line no-unused-vars
+    const { psa_api_token, ...safe } = req.user; // eslint-disable-line no-unused-vars
     return res.json({ user: safe });
   }
   res.json({ user: req.user });
@@ -316,7 +317,7 @@ router.get('/me', authenticateToken, (req, res) => {
 
 router.patch('/theme', authenticateToken, async (req, res) => {
   const theme = req.body?.theme;
-  if (!['dark', 'light', 'jenny', 'mtg', 'lcars'].includes(theme)) {
+  if (!themes.includes(theme)) {
     return res.status(400).json({ error: 'Invalid theme' });
   }
 
@@ -357,7 +358,7 @@ router.delete('/api-key', authenticateToken, async (req, res) => {
 
 // Update settings (password, sharing)
 router.put('/settings', authenticateToken, async (req, res) => {
-  const { current_password, password, share_enabled, share_locations, regenerate_share_token, tcg_api_key, psa_api_token, graded_price_api_key } = req.body;
+  const { current_password, password, share_enabled, share_locations, regenerate_share_token, psa_api_token } = req.body;
 
   try {
     if (password !== undefined) {
@@ -380,16 +381,8 @@ router.put('/settings', authenticateToken, async (req, res) => {
       await db.run(`UPDATE users SET share_locations = ? WHERE id = ?`, [share_locations ? 1 : 0, req.user.id]);
     }
 
-    if (tcg_api_key !== undefined) {
-      await db.run(`UPDATE users SET tcg_api_key = ? WHERE id = ?`, [tcg_api_key.trim(), req.user.id]);
-    }
-
     if (psa_api_token !== undefined) {
       await db.run(`UPDATE users SET psa_api_token = ? WHERE id = ?`, [psa_api_token.trim(), req.user.id]);
-    }
-
-    if (graded_price_api_key !== undefined) {
-      await db.run(`UPDATE users SET graded_price_api_key = ? WHERE id = ?`, [graded_price_api_key.trim(), req.user.id]);
     }
 
     let newShareToken = req.user.share_token;

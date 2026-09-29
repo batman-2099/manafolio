@@ -4,13 +4,12 @@ const assert = require('assert');
 const path = require('path');
 const os = require('os');
 
-process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-cardprinting-${process.pid}.db`);
+process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-cardprinting-${process.pid}.db`);
 
 (async () => {
   const db = require('../src/db');
   await db.initDb();
   const scryfall = require('../src/scryfallApi');
-  const tcgdex = require('../src/tcgdexApi');
   const express = require('express');
   const collectionRouter = require('../src/routes/collection');
 
@@ -31,21 +30,6 @@ process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-cardprinting-${process.pid
     };
   };
 
-  // Stub TCGdex
-  tcgdex.client.get = async (url) => {
-    const m = url.match(/^\/([^/]+)\/cards\/(.+)$/);
-    if (!m) throw new Error(`unexpected url ${url}`);
-    const [, lang, id] = m;
-    return {
-      data: {
-        id: decodeURIComponent(id), localId: '4', category: 'Pokemon',
-        name: lang === 'fr' ? 'Dracaufeu' : (lang === 'ja' ? 'リザードン' : 'Charizard'),
-        rarity: 'Rare', set: { id: 'sv03', name: lang === 'fr' ? 'Flammes Obsidiennes' : 'Obsidian Flames' },
-        image: `https://assets.tcgdex.net/${lang}/x`, pricing: {},
-      },
-    };
-  };
-
   const app = express();
   app.use(express.json());
   app.use('/api', collectionRouter);
@@ -57,18 +41,11 @@ process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-cardprinting-${process.pid
     ['mtg-neo-1', 'Ancestral Katana', 'neo', '1', 'mtg', 'English', 'USD']
   );
 
-  // Insert mock Pokemon TCGdex card into cache
+  // Stored unsupported cards remain unchanged and cannot be localized.
   await db.run(
     `INSERT OR REPLACE INTO card_cache (id, name, set_id, number, game, language, price_currency)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ['tcgdex-en-sv03-004', 'Charizard', 'sv03', '4', 'pokemon', 'English', 'USD']
-  );
-
-  // Insert mock Lorcana card into cache
-  await db.run(
-    `INSERT OR REPLACE INTO card_cache (id, name, set_id, number, game, language, price_currency)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ['lorcana-tyler', 'Tyler Nguyen-Baker - 4*Town Fan', 'lorcana-5', '12', 'lorcana', 'English', 'USD']
+    ['legacy-card', 'Legacy Card', 'legacy-set', '12', 'unsupported', 'English', 'USD']
   );
 
   const server = app.listen(0);
@@ -84,47 +61,33 @@ process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-cardprinting-${process.pid
     assert.strictEqual(dataMtg.printed_name, '祖先の刀');
     assert.strictEqual(dataMtg.name, 'Ancestral Katana');
 
-    // 2. Fetch French Pokemon printing
-    const resPkmn = await fetch(`${baseUrl}/cards/tcgdex-en-sv03-004/printing?lang=fr&game=pokemon`);
-    assert.strictEqual(resPkmn.status, 200);
-    const dataPkmn = await resPkmn.json();
-    assert.strictEqual(dataPkmn.language, 'French');
-    assert.strictEqual(dataPkmn.printed_name, 'Dracaufeu');
-    assert.strictEqual(dataPkmn.id, 'tcgdex-fr-sv03-004');
-
-    // 2b. Fetch Japanese pokemontcg.io Pokemon printing (species fallback)
-    await db.run(
-      `INSERT OR REPLACE INTO card_cache (id, name, set_id, number, game, language, price_currency)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      ['base1-4', 'Charizard', 'base1', '4', 'pokemon', 'English', 'USD']
-    );
-    const resBase = await fetch(`${baseUrl}/cards/base1-4/printing?lang=ja&game=pokemon`);
-    assert.strictEqual(resBase.status, 200);
-    const dataBase = await resBase.json();
-    assert.strictEqual(dataBase.language, 'Japanese');
-    assert.strictEqual(dataBase.printed_name, 'リザードン');
-
-    // 3. Lorcana card translation in French
-    const resLorcanaFr = await fetch(`${baseUrl}/cards/lorcana-tyler/printing?lang=fr&game=lorcana`);
-    assert.strictEqual(resLorcanaFr.status, 200);
-    const dataLorcanaFr = await resLorcanaFr.json();
-    assert.strictEqual(dataLorcanaFr.language, 'French');
-    assert.strictEqual(dataLorcanaFr.printed_name, 'Tyler Nguyen-Baker - Fan des 4*Town');
-
-    // 3b. Lorcana card translation in German
-    const resLorcanaDe = await fetch(`${baseUrl}/cards/lorcana-tyler/printing?lang=de&game=lorcana`);
-    assert.strictEqual(resLorcanaDe.status, 200);
-    const dataLorcanaDe = await resLorcanaDe.json();
-    assert.strictEqual(dataLorcanaDe.language, 'German');
-    assert.strictEqual(dataLorcanaDe.printed_name, 'Tyler Nguyen-Baker - 4*Town-Fan');
+    for (const query of ['lang=fr', 'lang=en', 'lang=fr&game=mtg']) {
+      const response = await fetch(`${baseUrl}/cards/legacy-card/printing?${query}`);
+      assert.strictEqual(response.status, 400);
+    }
+    assert.deepStrictEqual(await db.get('SELECT game, language, printed_name FROM card_cache WHERE id = ?', ['legacy-card']),
+      { game: 'unsupported', language: 'English', printed_name: null });
 
     // 4. Missing lang parameter returns 400
-    const resMissing = await fetch(`${baseUrl}/cards/lorcana-tyler/printing`);
+    const resMissing = await fetch(`${baseUrl}/cards/mtg-neo-1/printing`);
     assert.strictEqual(resMissing.status, 400);
 
     // 5. Nonexistent card returns 404
-    const resNotFound = await fetch(`${baseUrl}/cards/nonexistent/printing?lang=ja`);
+    const resNotFound = await fetch(`${baseUrl}/cards/mtg-nonexistent/printing?lang=ja`);
     assert.strictEqual(resNotFound.status, 404);
+
+    const unsupported = await fetch(`${baseUrl}/cards/unsupported-1/printing?lang=ja`);
+    assert.strictEqual(unsupported.status, 400);
+    const mismatched = await fetch(`${baseUrl}/cards/mtg-neo-1/printing?lang=ja&game=unsupported`);
+    assert.strictEqual(mismatched.status, 400);
+
+    await db.run(`INSERT INTO card_cache (id, name, set_id, number, game, language)
+      VALUES ('mtg-lea-1', 'Black Lotus', 'lea', '1', 'mtg', 'English')`);
+    const unavailable = await fetch(`${baseUrl}/cards/mtg-lea-1/printing?lang=ja`);
+    assert.strictEqual(unavailable.status, 404, 'an unavailable translation must not relabel an English printing');
+    const unchanged = await fetch(`${baseUrl}/cards/mtg-lea-1/printing?lang=en`);
+    assert.strictEqual(unchanged.status, 200);
+    assert.strictEqual((await unchanged.json()).language, 'English');
 
     console.log('cardprinting.test.js: all assertions passed');
   } finally {

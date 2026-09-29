@@ -9,7 +9,7 @@ const { TextDecoder } = require('util');
 const languages = require('./utils/languages');
 
 // Separate, rebuildable storage: importing a catalog never writes the user DB.
-const catalogPath = `${process.env.DB_PATH || path.join(__dirname, '../database/bindarr.db')}.scryfall-bulk.sqlite`;
+const catalogPath = `${process.env.DB_PATH || path.join(__dirname, '../database/manafolio.db')}.scryfall-bulk.sqlite`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_LINE = 4 * 1024 * 1024;
 const client = axios.create({
@@ -17,7 +17,7 @@ const client = axios.create({
   timeout: 30000,
   maxRedirects: 0,
   maxContentLength: 1024 * 1024,
-  headers: { 'User-Agent': 'Bindarr/1.0', Accept: 'application/json' }
+  headers: { 'User-Agent': 'Manafolio/1.0', Accept: 'application/json' }
 });
 let refreshing = null;
 

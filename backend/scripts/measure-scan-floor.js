@@ -1,10 +1,6 @@
 // What cosine says "this card is not in the catalog at all"?
 //
-// cvScan's sweep always returns SOMETHING: the nearest row exists whether or not
-// the card being scanned is catalogued. That is how Japanese Pokemon scans came
-// back wrong — TCGdex serves card data for 28 of the 177 Japanese sets it lists,
-// so most Japanese cards had no row and got answered with the nearest of the
-// 3,297 that did, sometimes at a similarity high enough to auto-fill.
+// The nearest catalog row always exists even when the photographed card is absent.
 //
 // cvScan.FLOOR is the line under which the top hit is reported as
 // `notInCatalog`. This measures where that line belongs, per catalog:
@@ -23,22 +19,10 @@
 //
 // Run: node scripts/measure-scan-floor.js [game] [language] [sampleSize]
 const sharp = require('sharp');
-const ort = require('onnxruntime-node');
 const db = require('../src/db');
 const cvScan = require('../src/cvScan');
 
 const SIZE = 448;
-const MEAN = [0.485, 0.456, 0.406];
-const STD = [0.229, 0.224, 0.225];
-
-function toTensor(rgb) {
-  const plane = SIZE * SIZE;
-  const x = new Float32Array(3 * plane);
-  for (let p = 0; p < plane; p++) {
-    for (let c = 0; c < 3; c++) x[c * plane + p] = (rgb[p * 3 + c] / 255 - MEAN[c]) / STD[c];
-  }
-  return new ort.Tensor('float32', x, [1, 3, SIZE, SIZE]);
-}
 
 // A capture, not a scan of the reference image. Two regimes, because they answer
 // different questions:
@@ -101,7 +85,8 @@ function top2(emb, cat, n, dim, skip) {
 const pct = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))];
 
 async function main() {
-  const [game = 'pokemon', lang = 'Japanese', sizeArg = '60'] = process.argv.slice(2);
+  const [game = 'mtg', lang = 'English', sizeArg = '60'] = process.argv.slice(2);
+  if (game !== 'mtg') throw new Error('Unsupported game');
   const sample = Number(sizeArg);
   const s = await cvScan.load(game, lang);
   if (!s.local) throw new Error(`${game}/${lang} has no locally built catalog to measure`);
@@ -130,13 +115,13 @@ async function main() {
     try {
       // The url the catalog was BUILT from, so this measures the pipeline rather
       // than a resolution mismatch (see catalog.js embedUrl).
-      const url = byId.get(id).replace(/\/low\.png$/, '/high.png');
+      const url = byId.get(id);
       const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const art = Buffer.from(await res.arrayBuffer());
       for (const regime of ['mild', 'harsh']) {
         const rgb = await asCapture(art, regime === 'harsh');
-        const out = await s.milo.run({ image: toTensor(rgb) });
+        const out = await s.milo.run({ image: cvScan.toTensor(rgb, SIZE) });
         const emb = out.embedding.data;
         const hit = top2(emb, s.cat, s.n, s.dim, -1);
         if (regime === 'harsh' && hit.i !== i) wrongTop++;

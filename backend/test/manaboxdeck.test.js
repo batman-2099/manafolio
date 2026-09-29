@@ -4,12 +4,12 @@ const os = require('os');
 const path = require('path');
 const { parseManaboxText } = require('../src/utils/csvMappers');
 
-const decklist = fs.readFileSync(path.join(__dirname, '..', '..', 'Zoraline’s Last Light.txt'), 'utf8');
+const decklist = fs.readFileSync(path.join(__dirname, 'fixtures', 'zoraline-deck.txt'), 'utf8');
 const expected = parseManaboxText(decklist);
 const greenRampDecklist = fs.readFileSync(path.join(__dirname, 'fixtures', 'green-ramp-deck.txt'), 'utf8');
 const greenRampExpected = parseManaboxText(greenRampDecklist);
 const firstDeckCardId = `mtg-test-${expected[0].set_code}-${expected[0].collector_number}-0`;
-const tmpDb = path.join(os.tmpdir(), `bindarr-manabox-deck-test-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-manabox-deck-test-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 
@@ -86,7 +86,7 @@ async function testManaBoxDeckCreation() {
     assert.strictEqual((await db.get(`SELECT inventory_type FROM decks WHERE id = ?`, [res.body.id])).inventory_type, 'collection', 'deck switches after every card is available');
     await db.run(`DELETE FROM collection WHERE card_id = ? AND user_id = ? AND list_type = 'arena'`, [firstDeckCardId, 1]);
     await db.run(`INSERT INTO collection (card_id, user_id, quantity, list_type) VALUES (?, ?, ?, ?)`, [firstDeckCardId, 1, 1, 'collection']);
-    const rejected = {
+    const unowned = {
       statusCode: 200,
       status(code) { this.statusCode = code; return this; },
       json(body) { this.body = body; return this; }
@@ -94,8 +94,10 @@ async function testManaBoxDeckCreation() {
     await createDeck({
       body: { name: 'Arena ownership check', game: 'mtg', inventory_type: 'arena', decklist_text: '1 Zoraline, Cosmos Caller' },
       user: { id: 1 }
-    }, rejected);
-    assert.strictEqual(rejected.statusCode, 400, 'Arena deck import rejects physical-only cards');
+    }, unowned);
+    assert.strictEqual(unowned.statusCode, 201, 'Arena creation permits a definition without Arena copies');
+    assert.deepStrictEqual(await db.all('SELECT card_id, quantity FROM deck_cards WHERE deck_id = ?', [unowned.body.id]),
+      [{ card_id: firstDeckCardId, quantity: 1 }]);
     const autoDetected = {
       statusCode: 200,
       status(code) { this.statusCode = code; return this; },

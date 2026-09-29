@@ -1,11 +1,5 @@
 // Runs every unit test in test/, discovered rather than listed.
 //
-// package.json used to name each file by hand. Ten test files had been added since
-// that list was last touched — clientcrop, dbrename, pricehistory, scanfloor,
-// scopedbuild, the three scryfall ones, version and setquery — so they sat in the
-// repo passing nothing, for however many months. A test nobody runs is worse than
-// no test: it reads as coverage on the way past.
-//
 // Non-recursive on purpose: test/e2e has its own runner (test/e2e/run.js), because
 // those suites need a live server and a pinned admin password.
 //
@@ -26,11 +20,11 @@ const { spawnSync } = require('child_process');
 // about how many rows it can see. That is a test failure describing nothing but a
 // dirty temp directory, which is the fastest way to teach people to ignore a suite.
 //
-// Matched tightly — `bindarr-<name>-<digits>.db` in the OS temp dir, plus its WAL
+// Matched tightly — `manafolio-<name>-<digits>.db` in the OS temp dir, plus its WAL
 // sidecars — because that is exactly the shape the tests generate and nothing else.
 function clearStaleTestDatabases() {
   const dir = os.tmpdir();
-  const shape = /^bindarr-[a-z-]+-\d+\.db(-wal|-shm)?$/i;
+  const shape = /^manafolio-[a-z-]+-\d+\.db(-wal|-shm)?$/i;
   let cleared = 0;
   for (const name of fs.readdirSync(dir)) {
     if (!shape.test(name)) continue;

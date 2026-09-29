@@ -1,9 +1,9 @@
 services:
-  bindarr:
+  manafolio:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: bindarr
+    container_name: manafolio
     restart: unless-stopped
     # Same app on both ports — only the transport differs. 3001 is what you point a
     # reverse proxy at; 3443 is what you use directly when there is no proxy (card
@@ -26,7 +26,7 @@ services:
     # extra_hosts:
     #   - "host.docker.internal:host-gateway"
     volumes:
-      - bindarr-data:/app/database
+      - manafolio-data:/app/database
 
 volumes:
-  bindarr-data:
+  manafolio-data:

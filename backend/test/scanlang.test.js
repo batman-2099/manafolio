@@ -11,7 +11,7 @@
 const assert = require('assert');
 
 process.env.DB_PATH = require('path').join(
-  require('os').tmpdir(), `bindarr-scanlang-${process.pid}.db`
+  require('os').tmpdir(), `manafolio-scanlang-${process.pid}.db`
 );
 
 (async () => {
@@ -60,52 +60,7 @@ process.env.DB_PATH = require('path').join(
   assert.strictEqual(again.printed_name, '祖先の刀');
   assert.strictEqual(requested.length, cachedAt, 'cached printing must not re-request');
 
-  // ---- Pokémon ----------------------------------------------------------
-  //
-  // Same defect, different mapping. A TCGdex id carries its language
-  // (tcgdex-<lang>-<set>-<number>) and Western sets share one set id across
-  // languages, so the localized card is addressed by swapping that segment.
-  const tcgdex = require('../src/tcgdexApi');
-  const asked = [];
-  tcgdex.client.get = async (url) => {
-    asked.push(url);
-    const m = url.match(/^\/([a-z-]+)\/cards\/(.+)$/);
-    if (!m) throw Object.assign(new Error('unexpected url'), { response: { status: 404 } });
-    const [, lang, id] = m;
-    // Japanese Pokémon sets are their own releases (S12, SV2a), not localized
-    // editions of sv03 — so an English set id does not exist in Japanese.
-    if (lang === 'ja') throw Object.assign(new Error('not found'), { response: { status: 404 } });
-    return {
-      data: {
-        id, localId: id.split('-').pop(), category: 'Pokemon',
-        name: lang === 'fr' ? 'Scovilain' : 'Halupenjo',
-        set: { id: id.split('-')[0], name: 'Obsidian Flames' },
-        image: `https://assets.tcgdex.net/${lang}/sv/sv03/025`,
-        rarity: 'Rare', pricing: {},
-      },
-    };
-  };
-
-  const fr = await tcgdex.getPrintingInLang('tcgdex-en-sv03-025', 'French');
-  assert.ok(fr, 'a French printing should resolve');
-  assert.strictEqual(fr.id, 'tcgdex-fr-sv03-025', 'id swaps only the language segment');
-  assert.strictEqual(fr.language, 'French');
-  assert.strictEqual(fr.printed_name, 'Scovilain', 'localized name is what the card says');
-  assert.match(fr.image_url, /\/fr\//, 'art must be the French printing');
-
-  // Set does not exist in the target language: keep what the caller had.
-  assert.strictEqual(await tcgdex.getPrintingInLang('tcgdex-en-sv03-025', 'Japanese'), null);
-  // A pokemontcg.io id has no language segment, and its set numbering disagrees
-  // with TCGdex's — no honest translation, so no guess.
-  const beforePtcg = asked.length;
-  assert.strictEqual(await tcgdex.getPrintingInLang('basep-50', 'French'), null);
-  assert.strictEqual(asked.length, beforePtcg, 'a pokemontcg.io id must not be requested');
-  // Already in the requested language (a catalog built in it): nothing to do.
-  const beforeSame = asked.length;
-  assert.strictEqual(await tcgdex.getPrintingInLang('tcgdex-ja-S12-001', 'Japanese'), null);
-  assert.strictEqual(asked.length, beforeSame, 'same-language id must not be requested');
-
-  // The product's active scan route is Magic-only. An unavailable translation
+  // An unavailable translation from the Magic scan route
   // remains an English printing and requires review, never a relabelled copy.
   const router = require('../src/routes/collection');
   const scanLayer = router.stack.find(l => l.route && l.route.path === '/scan-match');
@@ -124,7 +79,7 @@ process.env.DB_PATH = require('path').join(
   const scan = async (lang) => {
     let body;
     await scanMatch(
-      { body: { image: 'x'.repeat(200), lang }, user: { tcg_api_key: '' }, query: {} },
+      { body: { image: 'x'.repeat(200), lang }, user: {}, query: {} },
       { json: value => { body = value; }, status() { return this; } },
     );
     return body;

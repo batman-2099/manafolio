@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import CardImage from './CardImage';
+import { useT } from '../utils/i18n';
 
 // Full-screen card art viewer, shared by the collection inspector and the
 // Search & Add quick-add drawer so "tap the art to enlarge" works the same
@@ -12,8 +14,31 @@ import CardImage from './CardImage';
 // click handler dismisses the popup, so without it, closing the zoom would
 // dismiss the popup underneath as well.
 export default function CardImageZoom({ card, onClose }) {
+  const { t } = useT();
+  const dialogRef = useRef(null);
+  const closeRef = useRef(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const trigger = document.activeElement;
+    dialog.showModal();
+    closeRef.current?.focus();
+    return () => {
+      dialog.close();
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+    };
+  }, []);
+
   return (
-    <div
+    <dialog
+      ref={dialogRef}
+      aria-label={t('inspector.fullScreen')}
+      onKeyDown={(event) => event.stopPropagation()}
+      onCancel={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }}
       className="modal-overlay"
       style={{
         position: 'fixed',
@@ -25,16 +50,19 @@ export default function CardImageZoom({ card, onClose }) {
         justifyContent: 'center',
         zIndex: 1100,
         cursor: 'zoom-out',
-        padding: 'max(1rem, max(env(safe-area-inset-top, 0px), var(--sat, 0px))) 1rem max(1rem, max(env(safe-area-inset-bottom, 0px), var(--sab, 0px))) 1rem'
+        padding: 'max(1rem, env(safe-area-inset-top, 0px)) 1rem max(1rem, env(safe-area-inset-bottom, 0px)) 1rem'
       }}
       onClick={(e) => { e.stopPropagation(); onClose(); }}
     >
       <button
+        ref={closeRef}
+        type="button"
+        aria-label={t('common.close')}
         className="btn btn-secondary btn-icon-only"
         onClick={(e) => { e.stopPropagation(); onClose(); }}
         style={{
           position: 'absolute',
-          top: 'max(1rem, max(env(safe-area-inset-top, 0px), var(--sat, 0px)))',
+          top: 'max(1rem, env(safe-area-inset-top, 0px))',
           right: '1rem',
           borderRadius: '50%',
           zIndex: 10,
@@ -57,6 +85,6 @@ export default function CardImageZoom({ card, onClose }) {
           filter: 'drop-shadow(0 20px 60px rgba(0,0,0,0.8))'
         }}
       />
-    </div>
+    </dialog>
   );
 }

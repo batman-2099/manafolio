@@ -4,11 +4,12 @@ const router = express.Router();
 
 router.get('/', async (req, res) => {
   try {
-    const game = 'mtg';
+    const game = req.query.game === undefined ? 'mtg' : req.query.game;
+    if (game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
     const where = `WHERE game = ?`;
     const params = [game];
     const sets = await db.all(`
-      SELECT id, name, series, printed_total, total, release_date, ptcgo_code, symbol_url, logo_url, game
+      SELECT id, name, series, printed_total, total, release_date, symbol_url, logo_url, game
       FROM sets
       ${where}
       ORDER BY release_date ASC
@@ -24,7 +25,7 @@ router.get('/', async (req, res) => {
       const { getMtgChildSetMap } = require('../cardSets');
       const childMap = await getMtgChildSetMap();
       const childCodes = new Set([...childMap.values()].flatMap(cs => cs.map(c => c.code)));
-      const code = (s) => s.ptcgo_code || String(s.id || '').replace(/^mtg-/, '');
+      const code = (s) => String(s.id || '').replace(/^mtg-/, '');
       return res.json(
         sets
           .filter(s => !childCodes.has(code(s)))

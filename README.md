@@ -1,497 +1,328 @@
 <div align="center">
 
-<img src="frontend/public/logo.svg" width="120" height="120" alt="Bindarr" />
+<img src="frontend/public/logo.svg" width="120" height="120" alt="Manafolio" />
 
-# Bindarr
+# Manafolio
 
-**Self-hosted collection, storage, and deck manager for Magic: The Gathering.**
+**Magic collection, storage, and decks on your own server.**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/thenotoriousJeremy/bindarr/docker-build.yml?branch=main&label=CI&logo=github)](https://github.com/thenotoriousJeremy/bindarr/actions/workflows/docker-build.yml)
-[![Docker image](https://img.shields.io/badge/ghcr.io-bindarr-2496ED?logo=docker&logoColor=white)](https://github.com/thenotoriousJeremy/bindarr/pkgs/container/bindarr)
-[![License: MIT](https://img.shields.io/github/license/thenotoriousJeremy/bindarr?color=blue)](LICENSE)
+Self-hosted collection, storage, and deck manager for Magic: The Gathering.
 
-[Live demo](https://thenotoriousjeremy.github.io/bindarr/) · [Install](#install) · [Workflows](#workflows) · [Architecture](PROJECT.md) · [Report a bug](https://github.com/thenotoriousJeremy/bindarr/issues/new)
+[Install](#install) · [User Guide](docs/USER_GUIDE.md) · [Features](#features) · [Workflows](#workflows) · [Architecture](PROJECT.md) · [MIT License](LICENSE)
 
 </div>
 
-Bindarr keeps the card, its printing, its condition, its value, and—when it is physical—its exact storage position together. It is a React SPA backed by Express and one SQLite database; Docker persists the database, backups, scan models, and scan catalogs in one volume.
-
-The [live demo](https://thenotoriousjeremy.github.io/bindarr/) uses sample data. Changes are not saved there, and camera scanning requires a server installation.
-
-## About this fork
-
-This is [batman-2099/bindarr](https://github.com/batman-2099/bindarr), a fork of [thenotoriousJeremy/bindarr](https://github.com/thenotoriousJeremy/bindarr). It builds on upstream **1.8.5** (`404a659`) and focuses on Magic: The Gathering, physical storage, Arena inventory, and collection-to-deck workflows. The original project and its contributors provide the underlying application; the changes below describe this fork's additions and fixes rather than claiming upstream features as new work.
-
-### Changes on `main`
-
-**Magic-only scope and inventory**
-
-- Made the active product Magic-only: removed Pokémon and Lorcana from core navigation, setup, controls, APIs, and product documentation. Legacy database records are retained rather than deleted.
-- Added separate **Arena** inventory and **Physical/Arena** deck types, with inventory-scoped ownership and availability checks. Arena decks cannot use physical checkout or storage workflows.
-- **Add to Arena** uses a keyboard-accessible on/off toggle instead of a checkbox, highlighted green when enabled; its existing inventory-destination behavior is unchanged.
-- **Graveyard**, immediately after Arena in Collection, archives cards without deleting their quantities or metadata. Archive individual cards from the inspector or selected cards in bulk, then restore explicitly to Physical Collection or Arena. Archived cards are excluded from owned totals, physical storage, and deck/AI availability and remain included in complete backups. Individual-card archiving clears physical placement; individual Physical restores return to Unassigned Pile. Whole-container transfers preserve placement instead. Return checked-out decks before archiving reserved copies.
-- Added Arena-aware Dashboard views and statistics, plus inventory-type changes through deck properties when the destination owns sufficient copies.
-- Added **Collection growth**, **Deck performance**, and **Color identity/Mana value** comparisons to the Dashboard, scoped to **All Cards / Physical / Arena**, with English/German labels and accessible chart-data tables.
-- Added a **Graveyard** Dashboard view for archived quantities, value, purchase cost, and collection history, separate from owned inventory. It uses cards' original addition dates, not archive dates, and does not show deck-performance comparisons.
-- Added an explicit **Add to Wishlist** action and wishlist persistence; wishlist entries are excluded from owned-card statistics.
-- Added an **Unassigned Pile** collection view and filters for unfiled cards.
-- Added checked-out-card collection filters and Missing/Found tracking for individual cards and bulk selections, preserving their last known locations.
-- Added duplication of eligible raw physical collection cards.
-- Removed the Supertype filter from Collection and Search & Add. Collection shows Color before Type, with color options confined to Color and card types/subtypes in Type.
-- Corrected MTG card-type filtering and restored basic-land color classification.
-
-**Collection imports, review, and exports**
+Manafolio brings your Magic collection, physical storage, and decks together on a server you control. Keep exact printings and purchase records, find the box holding a copy, reserve cards for a night of play, and manage Arena inventory without mixing it with physical ownership.
 
-- Added ManaBox plaintext collection imports, including `.txt` uploads from Add Cards, foil markers, duplicate-printing quantities, and exact-printing resolution.
-- Added CSV upload in Add Cards, including MTG Arena collection exports and Bindarr-style CSV files resolved through Scryfall.
-- Added CSV review before saving: detected rows and quantities, validation errors, suggested header mappings, editable column mappings, and refreshed previews.
-- Preserved the selected Collection/Arena import destination and corrected imported Magic cards being hidden from the intended view.
-- Replaced unresolved CSV identifiers with canonical Scryfall printings; preserved set-specific printings when matching by name and retried rate-limited set-scoped lookups.
-- Corrected missing artwork on ManaBox CSV imports.
-- Added completion summaries covering successful cards, entries and copies, failures, skipped/unresolved cards, and downloadable failed-card lists for retry.
-- Added timestamped import activity logs showing real lookup, cache, rate-limit, preparation, saving, completion, and failure events.
-- Added a persistent local Scryfall bulk catalog used by CSV, ManaBox, precon, and container imports before API fallback.
-- Added administrator-controlled daily UTC bulk-catalog refresh scheduling and an immediate download action in Settings.
-- Added CSV and TXT exports of the **current visible collection view**, respecting its inventory tab, filters, sorting, and duplicate stacking; aligned the export controls with collection selection.
+For step-by-step instructions, inventory explanations, backup warnings, and troubleshooting, open **How-to** in the app (**More → How-to** on a phone), or read the [Manafolio help and how-to guide](docs/USER_GUIDE.md). The in-app page includes full-guide search and chapter navigation; guide text is currently English.
 
-**Deck building and play**
+Manafolio was originally forked from [Bindarr](https://github.com/thenotoriousJeremy/bindarr) version 1.8.5, created by **thenotoriousJeremy and contributors**.
 
-- Added ManaBox deck imports and corrected ManaBox detection, Arena inventory lookup, exact-printing identity, import/export icons, and skipped-card summaries.
-- Made **Add a precon deck** and **Quick import decklist** full-width, bordered buttons in Create a New Deck, with larger text and icons. Quick import includes a larger format dropdown and a full-width decklist text area.
-- Added MTGJSON precon imports with independent **Create Storage Container** and **Create Deck** checkboxes, both enabled by default; deck creation imports every card and checks out the new Physical deck atomically.
-- Added editable deck properties, a Deck Type column, deck duplication, and inventory-aware Physical/Arena switching.
-- Added card storage locations and sorting by container, compartment, and slot.
-- Added unavailable-copy warnings and the names of checked-out decks reserving those copies. Ownership and reservations are scoped to the deck's inventory type: checked-out Physical decks never make Arena cards unavailable.
-- Added persistent **Pulled** toggles and resizable deck grid cards. Pulled and Commander controls are green when on and neutral when off in both list and grid views. Choose **Pulled status** in the deck-card sort menu to group **Not pulled** first, then **Pulled**, alphabetically within each group in both list and grid views.
-- **Add Cards to Deck** search and **Browse Collection** results use a responsive artwork grid with printing details, owned/in-deck counts, preview, and add controls.
-- Added mana/color identity and category information to deck lists.
-- Added single-commander selection for Commander decks using card toggles and banners, with persistence in deck copies and complete backups.
-- The deck editor's **Save** button immediately before **Draw Simulator** commits card additions, removals, quantities, Pulled status, commander, and applied properties together. Edits and imports remain local until Save; an **Unsaved changes** marker and leave confirmation protect the draft. Failed saves retain edits for correction and retry. Save before checkout or AI improvement; return checked-out decks before changing their card composition. Wins/losses remain independently saved.
-- **Add Cards** opens with **Search & Add** selected by default; **Scan Cards · Beta** remains available as the last tab.
-- Collection grid and table views show **60 cards per page**. Filters, sorting, counts, exports, and **Select all matching cards** still operate across the full matching collection. Storage galleries load container summaries and cover artwork without downloading the full inventory; detailed workflows load cards when needed. Deck artwork loads near the viewport, using smaller images for list thumbnails.
-- Added per-deck wins/losses and reorganized the detail view: description, overview panels, then full-width card list/grid. Record controls live in **Deck Health & Rules**.
-- Added **Related tokens** in the card inspector and a **Tokens** grid after deck cards in both list/grid views and AI drafts. Each token shows artwork, name, inventory-scoped ownership, physical storage locations, and **Created by:** with each linked card name on its own line below. Locations appear above creator names. See [Find tokens for a card or deck](#find-tokens-for-a-card-or-deck) for matching rules and limitations.
+## Features
 
-**Storage and containers**
+- **Four inventory destinations.** Track Physical and Arena copies separately, plan purchases in Wishlist, and archive cards in Graveyard without deleting their quantities or metadata. Wishlist and Graveyard do not inflate owned totals; archived cards supply only Graveyard deck definitions, never Physical or Arena decks.
+- **Collection detail.** Search Scryfall, track printing, finish, language, condition, purchase price and graded slabs, and mark copies Missing/Found without losing their last known locations. Filter, sort, stack duplicates, and switch between grid and table views.
+- **Dashboard.** Compare All Cards, Physical, and Arena quantities, value, recorded costs, collection growth, color identity, mana value, and saved deck performance. Graveyard has its own archived-card view. Accessible chart-data tables expose the underlying numbers.
+- **Physical storage.** Organize binders and boxes by page, row, and slot. Find unfiled cards in Unassigned Pile; move or auto-file copies, expand capacity, lock compartments, and choose card-art covers for containers. Graveyard containers keep archived storage separate.
+- **Deck building and play.** Create Physical or Arena decks, import lists and precons, select a commander, inspect mana curves and rules, simulate draws, and track wins/losses. Physical checkout reserves copies and creates a storage-aware pull list; Pulled status helps gather cards. Related tokens show ownership and physical locations.
+- **Import, export, and backup.** Review CSV and ManaBox imports, export the current collection view or decklists, and move an account with a complete JSON backup. Automatic SQLite snapshots support server-level recovery.
+- **Optional AI.** Use your own ChatGPT/Codex account, Gemini or OpenRouter API key, or an Ollama service for inventory-aware suggestions and deck improvements. Review and edit drafts before saving; the collection and deck workflows do not require AI.
+- **Your own server.** Multi-user accounts, roles, invite-only registration by default, read-only API keys, optional public shares, account themes, and translated interfaces. Access the same server from desktop and phone browsers.
+- **Mana-inspired themes.** Arcane Blue and Jenny remain available alongside Plains, Island, Swamp, Mountain, Forest, and Wastes palettes. Each retains layered surfaces, metallic branding, and desktop/mobile navigation. Choose your account theme in Settings; removed Light, Magic, and LCARS selections fall back to Arcane Blue.
+- **Camera scanning.** Identify artwork candidates with local models and title/footer OCR, then save them to an account-scoped Scan review queue. Toggle foil or discard drafts before explicitly adding them to your collection; scanning needs additional server assets and HTTPS on phones.
 
-- Added separate **Graveyard containers**, accessible from Collection's Graveyard tab or Storage's **Physical / Graveyard** selector, with inventory-scoped filing, unassigned cards, layouts, locks, capacity, and cover images.
-- Added **Archive to Graveyard** for selected cards inside physical containers.
-- Added reversible whole-container **Move to Graveyard / Restore to Collection** actions. Transfers move all contained cards atomically while preserving quantities, metadata, positions, layout, settings, and cover. Locked containers/compartments and checked-out copies prevent the transfer.
-- Complete backups retain Graveyard containers and archived card placements; archived containers are excluded from physical imports, deck creation, AI deck inventory, and public container shares.
+## At a glance
 
-- Added ManaBox container imports that create a named box and file cards already owned in Unsorted instead of creating missing collection cards.
-- Corrected container imports to split and place stacked copies while retaining unfiled remainders.
-- Added **Move** actions to the full container-import summary to fill remaining quantities from eligible owned copies, without creating cards or moving the same copies twice on retry.
-- Added expandable capacity and movement of selected cards between containers, back to Unsorted, or through automatic filing.
-- Added a scalable container image grid/list with search, filters, card-state labels, missing-card indicators, sorting, grouped results, and duplicate stacking.
-- Added deck-assignment indicators and In Play/Not In Play filtering, corrected to classify only copies actually allocated to checked-out decks.
-- Added an action to put selected container cards into a deck.
-- Alphabetized container selectors and made name sorting the default.
-- Added a searchable, sortable container gallery as the Storage landing page, with card counts and artwork covers.
-- Added user-selected cover artwork from cards in the container, managed through Container Settings, plus automatic-cover fallback and backup persistence.
-- Refined gallery tiles to show full card artwork without card-detail overlays, and made the Storage navigation button return to the gallery.
+| What you want to do | Where to start |
+| --- | --- |
+| Bring in an existing collection | Add Cards: CSV or ManaBox import with review before saving |
+| Find a card you own | Collection filters, then its storage location in the inspector |
+| Prepare a deck for play | Deck Builder: save, check out, and follow the pull list |
+| Keep records without counting cards as owned | Graveyard inventory and archived containers |
+| Move or recover account data | Settings: complete JSON backup; protect server-volume backups separately |
 
-**Settings, backups, and maintenance**
+The application uses React, Express, and SQLite. It runs as one Docker service or from source; there is no required hosted Manafolio account or AI subscription.
 
-- Added configurable default collection, storage, and deck views and default card image scaling.
-- Added the **Jenny** theme: purple backgrounds, lavender highlights, and orange buttons and accents.
-- Added complete collection-data backup and restore, including the fork's inventory, storage, deck, and related metadata.
-- Reworked the README into a Magic-focused product and workflow guide; added repository development guidance, import fixtures, and regression checks for the new workflows.
-- Removed unreachable game pickers and unused helpers/cache paths, consolidated Scryfall queue/retry handling, and replaced duplicate JavaScript language/translation tables with shared JSON imports. Legacy records and live catalog behavior remain intact.
+## Screenshots
 
-### AI Deck Builder and related improvements
+These screenshots use bundled **sample data**, not a personal collection. Names, quantities, prices, history, and deck records are illustrative; the demo does not save changes, and camera scanning requires a server installation.
 
-The following changes were developed on the [`AI-Deck-Builder` branch](https://github.com/batman-2099/bindarr/tree/AI-Deck-Builder) (`47a3c8b`) and merged into `main` through [pull request #2](https://github.com/batman-2099/bindarr/pull/2):
+### Dashboard
 
-- AI deck suggestions through either a per-user ChatGPT/Codex connection or an Ollama service.
-- User Settings controls for provider, model, ChatGPT thinking level, and a per-user Ollama server address, with connection checking and persisted preferences.
-- Physical/Arena inventory selection, color/set filters, and an explicit option to include checked-out physical copies for planning without changing existing reservations.
-- Editable suggested decks, card previews, live generation logs, ownership/quantity/legality validation, and explicit atomic saving.
-- Compact inventory requests, local cached rules, bounded provider requests, cancellation, and isolated Codex sessions that do not receive storage locations, private notes, or other users' collections.
-- Ollama structured-output chat support for thinking models such as Qwen, with unfinished output rejected and context/output-limit errors explained.
-- A compact green **AI Connected** status in Deck Builder; connection details, account identity, and data-sharing notices live in Settings.
-- Development-server watch-path fixes so Codex runtime files do not restart the backend during generation.
-- Additional UI refinements: the Obtained control beside the Arena badge, Collection/Arena/Unassigned/Wishlist tab ordering, alphabetical deck selectors, and resetting Deck Builder when opened from navigation.
-- Corrected basic-land copy-limit detection so nonbasic dual lands are not treated as unlimited basic lands.
+An overview of your collection, its value, and inventory breakdowns.
 
-### Screenshots
+![Manafolio dashboard with sample collection statistics and charts](docs/images/manafolio-dashboard.webp)
 
-These screenshots show the fork's interfaces using sample data, not a personal collection. Model availability and inventory counts depend on your installation.
+### Collection
 
-**Dashboard — All Cards** — combined ownership totals, valuation, investment, gain, and the valuation timeline. All figures and history in these dashboard images are illustrative sample data.
+Browse printings and manage your cards across inventory views.
 
-![Dashboard All Cards view with combined ownership and valuation summary](docs/images/dashboard-all.png)
+![Manafolio collection showing sample Magic cards and collection controls](docs/images/manafolio-collection.webp)
 
-**Dashboard — Physical** — physical inventory metrics and the count of unassigned physical cards.
+### Storage
 
-![Dashboard Physical view with physical card count and unsorted quantity](docs/images/dashboard-physical.png)
+Find cards through artwork-covered containers and their physical layouts.
 
-**Dashboard — Arena** — digital inventory metrics, with Digital Cards replacing the physical count.
+![Manafolio storage gallery with sample card containers](docs/images/manafolio-storage.webp)
 
-![Dashboard Arena view with digital card ownership and valuation metrics](docs/images/dashboard-arena.png)
+### Deck Builder
 
-**AI Deck Builder** — compact green connection status, Physical/Arena selection, checked-out-copy planning, color/set filters, and the deck request. This example has an empty inventory.
+Organize decks and see which inventory supplies them.
 
-![AI Deck Builder with AI Connected status, inventory and format selectors, checked-out-card option, and color/set filters](docs/images/ai-deck-builder.webp)
+![Manafolio Deck Builder showing sample decks](docs/images/manafolio-decks.webp)
 
-**Ollama settings** — choose the provider, enter a per-user service address, check connectivity, and select an installed model. The example uses a local service address.
+### AI Deck Builder
 
-![Ollama settings showing the server address field, Check connection button, connected status, and model selector](docs/images/ollama-settings.webp)
+Choose inventory filters, deck archetype, format, target size, and power level before starting a conversation. This screenshot shows demo setup options; live AI requests are disabled in the demo.
 
-**Storage boxes** — artwork-covered containers with names and card counts, search and sorting, container creation, and ManaBox container import. Box names and quantities shown here are illustrative.
-
-![Storage gallery showing Commander Decks, Draft Staples, and Trade Box containers with card artwork, counts, search, sorting, and import controls](docs/images/storage-boxes.png)
-
-**Inside a container — list view** — sample card contents with search, filters, storage-order sorting, duplicate stacking, and adjustable image size.
-
-![Inside the sample Draft Staples box in list view, showing card images, search, sorting, and duplicate stacking controls](docs/images/container-list.png)
-
-**Inside a container — grid/gallery view** — the box layout presents cards in a carousel with the selected card's details and compartment controls.
-
-![Inside the sample Draft Staples box in grid/gallery view, showing its card carousel and selected card details](docs/images/container-grid.png)
-
-**Deck Builder — table view** — deck names appear first, followed by format (without a game badge); other columns and action labels use larger text while deck names retain their existing size. Compare sample Physical and Arena decks, categories, capacity, and play status in one overview; creation dates are shown only in grid view.
-
-![Deck Builder table showing sample Physical and Arena decks, card counts, readiness, and deck actions](docs/images/deck-builder-table.png)
-
-**Deck Builder — grid view** — the same sample decks as tiles, with completion bars and a highlighted checked-out deck.
-
-![Deck Builder grid showing sample deck tiles with inventory types, capacity bars, and a checked-out deck banner](docs/images/deck-builder-grid.png)
-
-## Highlights
-
-- Search, browse, scan, and catalog Magic: The Gathering cards through Scryfall.
-- Track physical copies, digital **Arena** copies, and wishlist entries separately.
-- Store physical cards in binders, boxes, rows, pages, slots, and an Unassigned Pile.
-- Build decks from the correct inventory, import decklists, find cards by storage position, and check physical decks out for play.
-- Track values, price history, graded slabs, missing copies, and checked-out copies.
-- Import ManaBox exports and MTGJSON preconstructed decks; export CSV, JSON, decklists, and complete backups.
-- Run a private multi-user installation with roles, invite-only registration by default, API keys, and optional public shares.
-
-### Dashboard analytics
-
-- **Graveyard**, after Arena, shows archived-card counts, current values and recorded costs, set progress, color/mana charts, and valuation history without adding archived cards to owned totals. Deck performance and deck-slot comparisons are omitted. Its monthly chart uses original addition dates—not archive dates—and its history values the cards currently archived, not past archive membership.
-- **Collection growth** shows the last 12 calendar months (UTC), split into Physical and Arena quantities. Each month sums the *current* quantities of retained owned records by their `added_at` month. This is not cumulative growth or an immutable acquisition history: quantity edits affect earlier months, deleted records disappear, and wishlist entries never count.
-- **Deck performance** compares saved Magic decks in the selected inventory using wins, losses, games (`wins + losses`), and win rate (`wins / games`). Decks without games have no win rate; fewer than 10 games carries a low-sample caution. Saved deck results remain visible even when the collection is empty. These counters do not contain opponent, matchup, or match-date information.
-- **Color identity and mana value** compare owned copies against saved deck-slot quantities in the same inventory. A card saved in multiple decks counts in each deck, not as unique allocated ownership. Multicolor cards count under every identity color, so color totals overlap. Colorless and missing metadata are separate. Mana charts exclude lands, distinguish zero from unknown, and group values of 7 or more into `7+`.
-- Expand **View chart data** for exact quantities without relying on chart colors or tooltips. Older servers and demo fixtures without analytics show an explicit unavailable state, never invented statistics.
-
-## Recent changes
-
-### AI deck recommendations
-
-- **Settings → AI preferences** selects ChatGPT (your own account with Codex access) or an Ollama service and saves each user's address and model choice. **Deck Builder → AI Deck Builder** uses those saved preferences to suggest decks from their Physical or Arena inventory.
-- Physical suggestions always exclude missing copies. **Improve with AI** includes the source deck's eligible owned copies even outside selected color, set, or container filters, and exempts those copies from the source deck's own checkout reservation. Other decks' reservations remain excluded unless **Include checked-out cards** is enabled. Saving rechecks quantities and creates a separate deck atomically; it never modifies the original deck or releases reservations. Return reserved cards before checking out the new deck for play.
-- Added session-only conversation: ask questions, get explanations, and refine the current draft with earlier messages and manual edits included. Discussion does not replace the draft, and saving remains explicit.
-
-### Local-first Magic imports
-
-- CSV, ManaBox TXT, precon deck, and container imports consult a persistent Scryfall bulk catalog before requesting missing printings from the API.
-- Administrators choose a daily UTC refresh time in **Settings → Scryfall bulk data** (10:00 UTC by default), or force a fresh download immediately. Live import logs distinguish local matches from API fallback.
-
-### Arena inventory and decks
-
-- **Arena** is a first-class digital inventory beside Physical Collection and Wishlist.
-- Add cards directly to Arena, import ManaBox collection entries into Arena, and filter Dashboard statistics by All Cards, Physical, or Arena.
-- Create a **Physical** or **Arena** deck. Arena decks only accept cards owned in Arena; physical decks use physical collection cards.
-- **Edit Properties** can switch a deck between Physical and Arena when every card exists in the destination inventory and the deck is not checked out.
-- Arena decklist imports search Arena inventory instead of physical cards.
-- Arena decks cannot be checked out because they have no physical pull list.
-
-### Deck Builder improvements
-
-- Deck lists identify the deck type in a dedicated **Deck Type** column.
-- **Duplicate deck** copies the deck metadata and card quantities into a new `<name> (Copy)` deck without copying checkout state or wins and losses.
-- Physical deck cards can sort by container, page or row, and slot. Checkout creates a pull checklist and preserves the card's stored position.
-- Cards already allocated to another checked-out deck show their unavailable quantity and deck name.
-- **Description** has its own section. **Supertype Breakdown**, **Color & land distribution**, and **Deck Health & Rules** sit beneath it, above **Add cards to deck**, with Deck Health on the right.
-- **Wins / Losses** controls sit beneath the health statistics. Card grid and list views use the same full width; the mana curve appears below the cards.
-- Precon imports offer side-by-side **Create Storage Container** and **Create Deck** options, both checked by default. Uncheck either to skip that action; a created deck is automatically checked out.
-
-### Collection and storage improvements
-
-- Collection has Collection, Unassigned Pile, Wishlist, and Arena views.
-- Mark a card or multi-selection Missing/Found without losing its last known location.
-- Move selected cards between containers, return them to Unsorted, or auto-file them. When a container is full, Bindarr can add matching pages or rows after confirmation.
-- Storage supports physical layout and image-list views, with search, filters, sorting, duplicate stacking, and 60%–250% image scaling.
-- Storage import actions use the download icon in both the gallery and container toolbar. Import reviews show a quick summary first; expand the full summary for card-level details and the **Move** action in the last column.
-- **Create Deck** in an open container creates a Physical Magic deck from its complete saved contents, independently of the current filters or card selection, including in locked containers.
-
-### Account themes and clearer scrollbars
-
-Choose **Settings → Theme → Jenny** for purple surfaces, lavender text, and warm orange accents. Themes are saved to your account and applied when you sign in on any device. Accounts without a saved choice use Dark; old browser-only choices are not imported. Signing out resets the app to Dark. Public share links can still override the theme for visitors with `?theme=...`; the native status-bar background also matches the active theme.
-
-When people share a computer and browser profile, each person's saved theme applies after they sign in—not the previous user's choice. Select a theme once in Settings to save it to your account; failed saves show an error without changing the selection.
-
-Scrollbars now use the active theme's brighter accent against its background: blue for Dark and Light, lavender for Jenny, sky blue for MTG, and periwinkle for LCARS. This applies to both page scrolling and scrollable panels.
-
-## Workflows
-
-### Add physical, Arena, or wishlist cards
-
-Open **Add Cards**, search by name, set, or collector number, then add the selected printing to Collection, Wishlist, or Arena. Rapid Add supports one-keystroke collector-number entry when a set is pinned. The card inspector can change condition, language, value, graded-slab details, storage placement, and duplicate an eligible raw physical copy.
-
-### Import ManaBox collection exports
-
-In **Add Cards**, select **Choose .txt file** and choose a ManaBox export. Bindarr previews normal, foil, and distinct-printing counts, then resolves each printing by set and collector number. Choose Arena before importing when the export represents your digital inventory.
-
-CSV and ManaBox TXT imports show a live **Import activity** log with local-catalog hits and misses, API fallback counts, set codes, Scryfall rate-limit waits, caching, and save progress. The latest 200 timestamped events remain in the completion summary or failed import dialog. Save preparation is not committed until the log confirms it. Leaving the page disconnects the log but does not roll back the import; check the destination before retrying after a lost connection.
-
-### Export the current collection view
-
-In **Collection**, choose **Export view CSV** or **Export view TXT**. Only the displayed results are exported, in their current order, respecting the active tab, search, filters, and duplicate stacking. CSV includes printing, condition, language, and purchase price; TXT uses decklist lines with quantity, name, set, and collector number. These controls do not export hidden cards or other inventory tabs.
-
-### Create and import decks
-
-1. Open **Deck Builder → Create Deck**.
-2. Choose the game and **Physical** or **Arena** inventory.
-3. Build from owned cards, import a text decklist, or—for Magic—select a preconstructed deck from MTGJSON.
-
-Decklist import accepts plain lines and MTG Arena-style lines such as `4 Llanowar Elves (FDN) 227`. Arena imports resolve only against Arena cards. Imports add only cards you own in the deck's inventory.
-
-Use **Duplicate deck** for a new deck with the same card list. Use **Edit Properties** to adjust metadata or change its deck type after inventory validation.
-
-Track a Physical or Arena deck's **Wins** and **Losses** under **Deck Health & Rules** with the **+** controls; use **−** to undo a result (counts cannot go below zero). The record appears in grid deck lists, but not the table view, persists across reloads, and is preserved in complete backups. New decks, including duplicates and AI-created decks, start at 0 wins and 0 losses.
-
-For **Commander / EDH** and **Brawl** decks, check **Commander** on a deck card in list or grid view. Only one card can be selected; checking another replaces the previous commander, and unchecking clears it. The selected card displays a **Commander** banner. The choice persists in duplicates and complete backups, and is cleared if that card is removed or the format changes away from these formats.
-
-From a physical or Arena card's detail view, choose **Create Commander Deck** to create a Commander / EDH deck named after that card, with a target size of 100 and one copy already designated as commander. The deck uses the card's inventory; creating it does not move collection cards or check out the deck.
-
-### Create a deck from a storage container
-
-Open a container in **Storage** and choose **Create Deck** in its toolbar. The deck name starts with the container name; choose a format (default **Casual**) and confirm. The container stays open after creation; the saved deck is available in **Deck Builder**.
-
-This uses every physical Magic copy recorded in the container, across all rows or pages, including missing copies and copies checked out in other decks. Search, filters, selection, stacking, Arena, and wishlist entries do not change the result. Quantities for the same card printing are combined, and the deck's target size is the full quantity. Empty physical Magic contents cannot create a deck.
-
-Only a deck definition is created: collection cards, storage positions, missing markers, and existing checkout reservations remain unchanged. The new deck is **not checked out**, even from a locked container. Availability warnings and checkout restrictions still apply; return reserved cards or resolve missing copies before checking it out. Any size is saved as an editable draft without trimming to format limits or automatically choosing a commander; review legality and commander choice in Deck Builder.
-
-### Get an AI deck recommendation
-
-1. Open **Settings → AI preferences** and choose **ChatGPT** or **Ollama**. For ChatGPT, choose **Connect ChatGPT**, follow the OpenAI verification link and enter the displayed code. Your account needs Codex access; device code authorization may need enabling in ChatGPT security settings. For Ollama, enter your service's HTTP(S) address or leave it blank to use the server default, then choose **Check connection / refresh models** to load its installed models; no ChatGPT account is needed. Requests come from the Bindarr server: `localhost` means that server (or container), not your browser's device. LAN and private addresses are supported.
-2. Choose a **Model**, then **Save AI preferences** to persist the provider, Ollama address and model for your Bindarr user across reloads and devices. Previewing a provider or address does not switch generation until you save. Editing the address clears the unsaved model and connection status; checking the connection loads models from the new address. ChatGPT offers **Provider default** and the model's supported **Thinking level** choices; **Model default** follows its default effort. Ollama requires an explicit installed model and uses its native thinking defaults. Switching provider resets the unsaved model and effort but retains your Ollama address; switching model resets effort. Unavailable models or an offline Ollama service show an error and retry option—there is no automatic model download or fallback to ChatGPT. Switching providers does not disconnect your ChatGPT account.
-3. Open **Deck Builder → AI Deck Builder**, choose **Physical** or **MTG Arena**, a format and target size, then ask a question or describe the deck you want and choose **Send message**. Leave the request empty and choose **Generate suggestion** for an initial draft without additional preferences. Each request uses the saved provider and sends eligible inventory metadata/counts, this session's conversation, and the current draft—including your edited name and description—not storage locations, saved private notes, or other users' data. ChatGPT sends these to OpenAI and uses your account's Codex limits; Ollama sends them to your saved service (or server default), whose model may process them locally or remotely. Manage connection details in Settings.
-4. Read the assistant's explanation and ask follow-up questions, even before a draft exists or when inventory is empty. Questions leave any draft unchanged; requests to refine it use your latest manual edits. AI replies stand out in black message panels, with the full-width draft card grid below the conversation. Edit the draft's name and description, adjust quantities, or remove cards; ask the AI to add different cards. Commander and Brawl use 100 cards including one commander.
-5. Choose **Add Deck** to save. Nothing is created during generation. The server rechecks current quantities, physical checkout reservations (with the source-deck exception below, or the explicit **Include checked-out cards** planning option), copy limits, and cached format rules before saving every card atomically. Creating a deck neither moves cards nor checks it out; checkout still requires enough unreserved copies.
-
-Conversation is session-only and disappears when you leave the builder. Requests support 4,000 characters; history retains up to 40 user/assistant messages of at most 8,000 characters each, without silent truncation. At the limit, choose **Clear conversation, keep draft** to continue with the current draft and unsent message intact. Failed requests preserve the draft, conversation, and retryable message. Changing inventory, format, target size, filters, containers, or the checked-out option clears both draft and conversation.
-
-To improve a saved Physical or Arena deck, open its detail view and choose **Improve with AI**. Describe the changes you want, generate and edit the suggestion, then choose **Save Deck** to replace the current deck's name, description, cards, and commander, or **Save as New Deck** to create a separate, unchecked-out deck. Replacement preserves the deck's identity, wins/losses, category, and other settings. Both actions recheck inventory and save atomically; failed saves leave the original unchanged. Return a checked-out source deck before replacing it. The source deck's inventory, format, and target size stay fixed; its card IDs, names, quantities, and commander are supplied as context, not its description or private notes. Its card printings remain eligible despite color, set, or container filters, up to their source quantities and your owned, non-missing, format-eligible copies, without counting them twice. The source deck's checked-out copies are allowed for planning; other decks' reservations still apply unless you enable **Include checked-out cards**. Neither save action moves cards or changes checkout reservations. When saving a new deck, return the original before checking out the new deck with those copies.
-
-Use the **Color** and **Set** multi-selects to limit additional eligible inventory sent to AI. Empty selections include all; selected colors match any color in a card's color identity, selected sets match any chosen set, and both filters apply together. Multicolor cards remain eligible when any selected color matches. Select **Colorless** separately for known empty identities. Only matching available cards, plus eligible source-deck copies when improving a deck, are eligible for AI selection; no extra lands or other cards are inserted automatically. Counts update before generation. Changing filters clears the draft and conversation.
-
-For **Physical** inventory, use **Containers** to choose one or more storage containers; leave it empty for all physical inventory, including unassigned cards. Counts, AI eligibility, and editable quantities use copies in those containers plus eligible source-deck copies when using **Improve with AI**, excluding missing copies and respecting other decks' reservations unless the checked-out option is enabled. Source-deck copies outside the selected containers remain eligible up to their source quantities. Changing containers clears the draft and conversation, reloads counts, and preserves color/set filters. Container names and IDs never reach the AI provider. This is a generation/editing filter, not a permanent restriction on the saved deck; Arena has no container selector.
-
-For **Physical** inventory, **Include checked-out cards** also makes reserved copies eligible for the counts, AI suggestion, manual quantity limits, and saved deck. Missing copies remain excluded. This option is off by default, clears the draft and conversation when toggled, and resets when switching inventory. It is for planning only: existing checkout reservations are never released or shared, so return the cards from their other decks before checking out the new deck for play. Arena inventory is unaffected.
-
-During each request, **Request log** shows timestamped inventory loading, request preparation, model selection, response generation, and validation stages. It reports elapsed time every ten seconds while waiting for the model. The latest 200 events remain visible after success or failure; scrolling upward pauses automatic following. The log contains public status information, not private model reasoning. Leaving the builder cancels the request; no deck is saved.
-
-AI recommendations are not guaranteed tournament legal. Cached legality can be incomplete or stale, and this workflow supports a single commander, not partner commanders or sideboards. If no complete valid owned-card deck is possible, the assistant can discuss the shortage; invalid proposed drafts are rejected rather than inventing cards or saving a partial deck. Catalog requests use compact rows retaining every eligible printing, available quantity, and complete cached rules text; unrelated format legalities and redundant display metadata are excluded. Oversized inventories are rejected explicitly, never silently trimmed (10,000 printings / 512 KiB request limit).
-
-**Account security:** connect only to a trusted Bindarr server. The bundled, pinned official Codex CLI stores each user's credentials separately under `<database-directory>/codex/<user-id>/`; server administrators can access them. They are excluded from collection JSON backups, but a whole-volume backup includes them and must be protected. **Disconnect** signs out and removes that user's local Codex data. Serve remote connections over HTTPS.
-
-The ChatGPT integration uses the [official Codex app-server](https://developers.openai.com/codex/app-server/) device-login flow, not copied browser cookies or a shared API key. It requires a Unix server (including the Docker deployment), pins Codex `0.155.1`, disables model access to host files/commands and external tools, and refuses inherited/managed Codex configuration. Upgrading that dependency requires reviewing these isolation settings. ChatGPT permits at most eight concurrent account sessions. Both providers allow 20 suggestions per user per hour and time out generation after three minutes.
-
-**Ollama setup:** install and run [Ollama](https://docs.ollama.com/), then install a suitable structured-output model yourself, for example `ollama pull granite4.1:8b`. Each user can save an Ollama address in Settings. A blank address uses the operator's `OLLAMA_BASE_URL` backend environment setting, which defaults to `http://127.0.0.1:11434`. Addresses must be absolute HTTP(S) URLs of at most 2048 characters; credentials, query strings and fragments are rejected, and redirects are never followed. Keep Ollama private to trusted hosts; the app does not add Ollama authentication. **Deployment security:** signed-in members can contact server-accessible Ollama addresses, including localhost and private/LAN services. Invite only trusted users and restrict outbound access with your deployment's network policy/firewall; URL validation is not a network access allowlist. AI account, model, preference and generation endpoints require browser sessions, not API keys. The integration uses [`GET /api/tags`](https://docs.ollama.com/api/tags) and [`POST /api/chat`](https://docs.ollama.com/api/chat) with a JSON schema and non-streaming output. Model checks time out after ten seconds; responses are limited to 1 MiB. Configure adequate model context on the Ollama service for your collection's full prompt; large inventories are never silently downsampled and model context is not auto-expanded. Incomplete/truncated or invalid drafts fail without saving.
-
-Ollama recommendations use its structured-output chat API, keeping system instructions, user input, and the final answer separate from model thinking. If Ollama reaches its context or output limit, Bindarr rejects the unfinished draft: narrow the inventory with color/set filters or raise the model's limits on the Ollama server. The request byte count is not a token count.
-
-**Docker networking:** `127.0.0.1` inside the Bindarr container is the container, not the host. For a host Ollama service, set `OLLAMA_BASE_URL=http://host.docker.internal:11434` and, on Linux, add `extra_hosts: ["host.docker.internal:host-gateway"]` to the `bindarr` Compose service. Ollama must listen on an interface reachable from that container (configure `OLLAMA_HOST` on the Ollama service and restrict access with your firewall). Alternatively use the Ollama container's service name on a shared Docker network. Do not expose an unauthenticated Ollama port publicly.
-
-### Find tokens for a card or deck
-
-Open a card's inspector and scroll to **Related tokens**, or open a deck and find **Tokens** immediately after its deck cards. AI drafts show the same token grid. Each token appears once per Scryfall printing, even when several cards in the deck reference it.
-
-Each tile shows:
-
-- Token card artwork and name, with the standard card-back fallback if artwork is unavailable.
-- **In collection / Not in collection**, or Arena-specific ownership for an Arena deck.
-- For owned physical tokens, every storage location: container, row/page, and slot. Unfiled copies show **Unassigned Pile**.
-- **Created by:** below the location, followed by each linked card name on a separate line. In deck views, these are the linked cards in that deck or draft, not every possible creator.
-
-Ownership matches card names, ignoring case, in the signed-in user's selected Physical or Arena inventory; double-faced tokens also match their front-face name. Decks and AI drafts prefer owned matches from the commander's set or its corresponding token set (for example, `mkm` and `tmkm`), falling back to any set when none are owned. Without a commander or cached commander set, matching uses any set. Within the chosen matches, the original linked printing is preferred if owned. The tile shows a chosen owned printing's artwork and physical locations from the matching set group. Same-named tokens with different rules or stats also count, so check the artwork when choosing a token. Wishlist and Graveyard entries are excluded; Arena tokens do not show physical storage locations.
-
-Tokens are reference information only: displaying them does not add cards, change deck size, reserve copies, or include them in deck exports. Relations come from Scryfall, using the local bulk catalog where available and the API otherwise. Failed lookups show a retry action. **No related tokens found** means no linked token objects were returned, not that the card cannot create copies or variable tokens.
-
-### Check out a physical deck
-
-Open a Physical deck and choose **Check Out for Play**. Bindarr creates a pull list grouped by container and compartment, reserves the copies used by that deck, and keeps their stored locations intact. Mark each card pulled while gathering it, then return the deck to release the reservation. Arena decks are digital and therefore have no checkout flow.
-
-### Import a Magic preconstructed deck
-
-Open **Add Cards → Precon Deck**, search MTGJSON by name, set code, or type, and inspect the details. The side-by-side **Create Storage Container** and **Create Deck** checkboxes are both checked by default; uncheck either before choosing **Add deck** to skip that action. **Create Storage Container** creates a correctly sized Deck Box for the imported physical cards. **Create Deck** creates a Physical deck with all imported cards and checks it out. If Create Deck is selected, unresolved cards or a failed import prevent the operation from leaving a partial collection, container, or deck.
-
-The link at the bottom of **Add a Precon Deck** opens [mtg.wtf/deck](https://mtg.wtf/deck) in a new tab.
-
-### Import a ManaBox storage container
-
-**Storage** opens a searchable container gallery with card-art covers, names, types, and card counts. Sort by name or quantity, use the **Create Container** tile or **Import ManaBox container** action, and click a container to open it. The **Storage** grid button returns to the gallery; **Unassigned Pile** opens unfiled cards.
-
-In **Container Settings**, choose **Choose container image** to pick artwork from cards currently stored in that container. The selection is saved with the container and included in complete backups. **Automatic image** restores the default cover; if the chosen card leaves the container, the gallery falls back to another available card image.
-
-In **Storage**, choose the import action (download icon) beside **Create Container** and select a ManaBox `.txt` export. The gallery also offers this action. Bindarr creates a Box named after the file and files matching cards already in Unsorted into its first row. It never creates missing collection cards during this workflow.
-
-After import, expand **Full summary** to review requested, moved, and unmoved quantities for each exact Scryfall card/set/collector identity. Repeated rows for the same card are combined; mixed normal and foil requests appear as **Any finish**. Both the initial import and **Move** can use any finish of that exact card, preferring the requested finish when one is specified and always preserving each copy's actual finish and other metadata. The **Moved** column shows the actual finish counts. Cards not moved show where remaining copies already are, including Unsorted, other containers, Arena, and Wishlist; different finishes and missing-marked copies remain labeled for reference. The initial import uses only eligible physical copies in Unsorted. Use **Move** to fill the remaining quantity from other unlocked containers or Unsorted. Checked-out copies can change storage assignments without returning their decks or changing deck quantities; missing, Arena, and Wishlist copies stay put. Legacy stacks carrying a slab certificate cannot be split; individual certified copies retain their certificate when moved. The summary updates from the actual result, including partial moves; retries and simultaneous moves count all destination finishes together and never add more than the requested total for that card. The imported box must still be an unlocked, custom-sorted Magic Box accepting any card, with an unlocked, unrestricted first row and stacking disabled. Unresolved printings have no Move action or guessed locations; if none resolve, no container is created.
-
-To add stored cards to an existing deck, open an unlocked container, choose **Select**, select the cards, and choose a deck from **Add to Deck…** in the selection toolbar. Selected quantities are added subject to the existing deck rules; cards stay in their storage locations.
-
-To archive stored cards, open an unlocked container, choose **Select**, select one or more cards, then choose **Archive to Graveyard**. Cards leave the container and retain their quantities and metadata in Graveyard. Checked-out copies must be returned first.
-
-### Store archived cards in Graveyard containers
-
-Open **Collection → Graveyard → Graveyard containers**, or choose **Graveyard** in Storage. Create a container there and use the existing **Sort & File**, **Auto-File All**, or move controls to file archived cards. Graveyard containers have their own unassigned pile, layouts, capacity, locks, and cover images; physical cards and containers stay separate.
-
-To move an entire container between inventories, open its **⋮** menu and choose **Move to Graveyard** or **Restore to Collection**, then confirm. All contained cards move with it; quantities, metadata, layout, positions, settings, and cover are preserved. Unlock the container and its compartments first; return checked-out copies before archiving. The transfer is atomic—if any card cannot move, nothing is changed.
-
-Restoring an individual card to Physical Collection or Arena clears its Graveyard placement; restoring a whole container to Collection preserves all placements. Deleting a Graveyard container leaves its cards archived and unassigned. Complete backups preserve Graveyard containers and their card placements. These containers cannot supply decks, AI deck builds, physical-container imports, or public container shares.
-
-### Back up or move an account
-
-In **Settings → Collection Backup & Data Options**, select **Export Complete Backup**. The JSON archive contains collection entries, cached card metadata, containers and layouts, and decks. Restoring a complete backup replaces the current account's collection, storage, and decks after confirmation.
-
-## Card scanning
-
-Scanning first matches artwork with local ONNX models, then uses footer OCR to check the set code and collector number against visually plausible candidates. It needs models, a catalog, and native Tesseract with English language data for OCR.
-
-1. Fetch models after deployment:
-
-   ```bash
-   docker exec bindarr node scripts/fetch-models.mjs
-   ```
-
-   From source, run the same command in `backend/`.
-
-2. Build a game/language catalog under **Admin → Catalogs**. A catalog downloads card data and fingerprints card artwork. It can take hours for a large catalog; stopping and resuming retains completed work.
-
-3. Source installations need `tesseract` on the server's PATH with `eng` trained data (`tesseract --list-langs` should list `eng`). On Debian/Ubuntu, install `tesseract-ocr tesseract-ocr-eng`. Source-built Docker images include both; rebuild the image to pick up this change.
-
-**Scan Cards** is the last tab under **Add Cards**, marked **Beta**.
-
-**Hold the card still until verification finishes.** Auto-add, including Turbo, requires two fresh photos to agree on the same printing and pass all safety checks. Changing scan settings, pausing, or leaving the scanner cancels pending verification. A failed request is not automatically retried.
-
-Open **Scan settings → Zoom** to adjust the camera's native zoom when the camera and browser expose it. The slider uses the camera's supported range; **Reset zoom** restores its starting setting (or 1×, limited to that range, if no starting value is available). Changing zoom cancels pending verification and pauses capture until the camera finishes adjusting. If native zoom is unavailable, the settings explain this instead of showing a non-working slider: move the camera closer or farther away. Bindarr does not simulate zoom with an additional digital crop.
-
-The scanner asks for manual review when printings look alike, the image appears blurry or affected by glare, the card may be missing from the catalog, OCR conflicts with the image match, or the selected set/language cannot be honored. These warnings appear inside the candidate picker, with suggestions for correcting the photo or selecting a printing. Set/language choices narrow the search but never prove a match; a fallback language is shown as its actual printing rather than silently relabeled.
-
-OCR reads the footer, not the card name. Older layouts, tiny or obscured text, unusual collector numbers, and sleeves may remain unreadable. OCR resolves ambiguity only when a confident set-and-number pair agrees with a visually plausible candidate. Missing/failed OCR disables auto-add but still permits manual review. Blur/glare checks are conservative heuristics, not condition or foil detection; physical-camera accuracy still depends on lighting and focus.
-
-Scanning from a phone requires HTTPS. Use the built-in HTTPS port or terminate TLS with a reverse proxy. The detailed pipeline and its limitations are in [PROJECT.md](PROJECT.md#image-identification-pipeline).
+![Manafolio AI Deck Builder options showing inventory filters, Aggro archetype guidance, and the target power-level slider](docs/images/manafolio-ai-options.webp)
 
 ## Install
 
 ### Docker
 
-Create `docker-compose.yml`:
-
-```yaml
-services:
-  bindarr:
-    image: ghcr.io/thenotoriousjeremy/bindarr:latest
-    container_name: bindarr
-    restart: unless-stopped
-    ports:
-      - "3001:3001" # HTTP: localhost or behind a TLS proxy
-      - "3443:3443" # HTTPS: direct phone/camera access
-    environment:
-      # DEFAULT_ADMIN_PASSWORD: change-me
-      # PUBLIC_BASE_URL: https://cards.example.com
-      # TRUST_PROXY: "1"
-    volumes:
-      - bindarr-data:/app/database
-
-volumes:
-  bindarr-data:
-```
-
-Start it:
+Clone [the Manafolio repository](https://github.com/batman-2099/manafolio) and build the checked-in Compose service:
 
 ```bash
-docker compose up -d
+git clone https://github.com/batman-2099/manafolio.git
+cd manafolio
+docker compose up -d --build
 ```
 
-Open `http://localhost:3001`. Without `DEFAULT_ADMIN_PASSWORD`, the first browser visit creates the owner account. With it set, startup creates the `admin` account and the first visit is a regular login.
+Open `http://localhost:3001`. Without `DEFAULT_ADMIN_PASSWORD`, the first browser visit creates the owner account; protect access until setup is complete. With it set, startup creates the `admin` account when no users exist, and the first visit is a regular login. Registration is invite-only unless explicitly enabled.
 
-The persistent volume contains the SQLite database, automatic backups, TLS certificate, scan models, and catalogs. Upgrade safely with:
+The `manafolio-data` volume contains the SQLite database, automatic backups, TLS material, scan models, and catalogs. Configure optional variables in the Compose service's environment; [`.env.example`](.env.example) documents available settings. Builds use local source, not an assumed published image or binary. After updating your checkout, run `docker compose up -d --build` again. Existing installations must follow the migration instructions first.
 
-```bash
-docker compose pull && docker compose up -d
-```
+### Migrate an existing installation
 
-The repository's [`docker-compose.yml`](docker-compose.yml) builds from local source instead of pulling the image.
+Manafolio uses its own database, deployment, browser, and backup names. Startup does not rename previous database files or migrate deployment volumes, browser state, or backup formats. Follow the offline procedure before starting the new service. **Do not start the new service against an empty replacement volume.**
+
+1. Record the current `DB_PATH`, Compose project/volume names, and persistent-data location. Stop every service that can write to the database, then make an offline backup of the entire data directory outside the deployment. Keep the original volume until migration is verified.
+2. With all writers stopped, rename the collection database to `manafolio.db` and any matching `-wal` and `-shm` sidecars to `manafolio.db-wal` and `manafolio.db-shm`. Keep them together; never discard a WAL that may contain committed data or overwrite an existing destination.
+3. Rename `<previous-DB_PATH>.scryfall-bulk.sqlite` to `manafolio.db.scryfall-bulk.sqlite` in the same directory, including matching sidecars. This rebuildable catalog is not the collection database.
+4. Update `.env`, service definitions, external scripts, and mounts. Docker uses `/app/database/manafolio.db`; source defaults to `backend/database/manafolio.db`. Copy the stopped persistent volume's complete contents into the new `manafolio-data` volume, preserving ownership, permissions, backups, TLS material, models, catalogs, and account credentials. Compose project names affect actual volume names: inspect the resolved mount rather than assuming it.
+5. Rebuild and restart. Verify accounts, collection quantities, storage, decks, and backups before retiring the old deployment. If a populated installation shows owner creation, stop and correct the mount or `DB_PATH`; do not initialize a replacement collection.
+
+Very old databases containing the `sub_location_1` schema take a destructive legacy migration path that drops collection and location tables. Preserve a verified offline copy and review `backend/src/db.js` before starting Manafolio against such a database.
+
+Browser keys use `manafolio_*`: sign in again and reselect browser-only preferences; old keys are not migrated. Older compatible JSON exports need the explicit [backup format conversion](#back-up-or-move-an-account) before restore.
 
 ### HTTP, HTTPS, and reverse proxies
 
 | Port | Use |
 | --- | --- |
 | `3001` | Localhost or a reverse proxy that terminates TLS. |
-| `3443` | Direct HTTPS access, including camera use from a phone. |
+| `3443` | Direct HTTPS, including camera use from a phone. |
 
-The built-in HTTPS certificate is self-signed and generated inside the persistent volume. Browsers require one explicit acceptance per device. Mount a trusted certificate and set `SSL_CERT_PATH` and `SSL_KEY_PATH` to replace it. When a reverse proxy terminates TLS, set `TRUST_PROXY=1` and usually publish only port `3001`.
+Use HTTPS for remote access. The built-in self-signed certificate is generated in the persistent volume; browsers require explicit acceptance per device. Set `SSL_CERT_PATH` and `SSL_KEY_PATH` to use a trusted certificate. Behind a TLS-terminating reverse proxy, set `TRUST_PROXY=1` and usually publish only port `3001`.
 
 ### Configuration
 
-All settings are optional. The canonical, current list is [`.env.example`](.env.example).
+The canonical list is [`.env.example`](.env.example).
 
 | Variable | Purpose |
 | --- | --- |
-| `DB_PATH` | SQLite database path. Docker defaults to `/app/database/bindarr.db`. |
-| `DEFAULT_ADMIN_PASSWORD` | Bootstrap `admin` password when no users exist. It never changes an existing account. |
-| `PUBLIC_BASE_URL` | External URL used for share links and allowed as a CORS origin. |
+| `DB_PATH` | SQLite database path; Docker uses `/app/database/manafolio.db`. |
+| `DEFAULT_ADMIN_PASSWORD` | Bootstrap `admin` password only when no users exist. |
+| `PUBLIC_BASE_URL` | External URL for share links and an allowed CORS origin. |
 | `TRUST_PROXY` | Reverse-proxy hop count, commonly `1`. |
-| `HTTPS_PORT` | Built-in HTTPS port; set empty for HTTP-only operation. |
+| `HTTPS_PORT` | Built-in HTTPS port; empty for HTTP-only operation. |
 | `SSL_CERT_PATH` / `SSL_KEY_PATH` | Trusted TLS certificate and key. |
-| `ALLOW_REGISTRATION` | Set `true` to allow public self-registration. |
-| `CV_MODEL_DIR` | Persistent location for scan models and catalogs. |
+| `ALLOW_REGISTRATION` | `true` enables public self-registration. |
+| `CV_MODEL_DIR` | Persistent scan models and catalogs. |
 | `BACKUP_INTERVAL_HOURS` / `BACKUP_KEEP_LAST` | Automatic SQLite snapshot schedule and retention. |
+| `OLLAMA_BASE_URL` | Default Ollama service address; users may choose their own. |
 
-`GET /api/health` is unauthenticated and returns `{"status":"ok"}`.
+### Phone browsers
 
-### Prebuilt server and mobile apps
+Open your server's HTTPS address in your phone's browser and sign in with your server account. The responsive web interface includes collection, storage, decks, and [camera scanning](#card-scanning); scanning requires browser camera permission and the server-side assets described below. Manafolio is web-only, with no packaged Android or iOS clients.
 
-Releases include self-contained server binaries for Windows, Linux, and Apple Silicon macOS. Download them from the [latest release](https://github.com/thenotoriousJeremy/bindarr/releases/latest), unpack, run, and open `http://localhost:3001`.
+## Workflows
 
-Release artifacts also include an Android APK; iOS is distributed through TestFlight. Mobile clients connect to your Bindarr server rather than storing a separate collection.
+### Add physical, Arena, or wishlist cards
+
+Open **Add Cards → Search & Add**, search by name, set, or collector number, and choose the exact printing and destination. Rapid Add supports collector-number entry with a pinned set. The card inspector edits condition, language, value, slab details, and storage placement, and can duplicate eligible raw physical copies.
+
+Archive individual cards or a selection to **Graveyard** to retain their metadata without counting them as owned. Return checked-out copies first. Individual archiving clears physical placement; restore explicitly to Physical Collection or Arena, with physical restores returning to Unassigned Pile. Whole-container transfers preserve placement instead.
+
+### Import ManaBox collection exports
+
+In **Add Cards**, upload a ManaBox `.txt` export or a CSV, including Manafolio-style and MTG Arena collection exports. Choose the destination inventory before importing. TXT previews quantities, foil entries, and distinct printings; CSV review shows detected rows, validation errors, and editable column mappings before saving. Printings resolve through the local Scryfall catalog with API fallback.
+
+The **Import activity** log reports lookups, rate-limit waits, preparation, and saving; completion summaries include failures and downloadable retry lists. Preparation is not a committed save. Leaving the page disconnects the log but does not roll back the import—check the destination before retrying after a lost connection.
+
+### Export the current collection view
+
+Choose **Export view CSV** or **Export view TXT** in Collection. Export includes all matching results, not just the current page, respecting the inventory tab, search, filters, sorting, and duplicate stacking. It excludes hidden cards and other tabs. CSV includes printing, condition, language, and purchase price; TXT uses quantity, name, set, and collector number. Use a complete backup for the whole account.
+
+### Create and import decks
+
+1. Open **Deck Builder → Create Deck** and choose **Physical**, **Arena**, or **Graveyard** inventory.
+2. Build from cards in that inventory or import a plain, ManaBox, or MTG Arena-style decklist, such as `4 Llanowar Elves (FDN) 227`. Creation can include unowned cards in all three inventories; missing-copy counts still use only the matching inventory. No owned copies are created.
+3. Review your draft and choose **Save**, immediately before **Draw Simulator**. Card additions/removals, quantities, Pulled status, commander, and applied properties are committed together. Imports and edits remain local until saved; an unsaved marker and leave confirmation protect the draft, and failed saves retain it for retry.
+
+**Edit Properties → Deck Type → Graveyard → Apply Properties → Save** archives a deck definition without moving its cards. Its notes, list, and metadata remain; physical source preferences are cleared. Return checked-out decks first. Restoring to Physical or Arena requires the destination inventory to own every required copy. Graveyard decks cannot check out or use AI improvement. **Duplicate deck** retains inventory and metadata, not checkout state or wins/losses.
+
+Commander / EDH and Brawl support one **Commander** toggle; selecting another replaces it. The card inspector's **Create Commander Deck** starts a 100-card-target deck with that card as commander, using its inventory, without moving or checking out copies. Review format legality yourself.
+
+Below Description, one summary panel groups **Supertype Breakdown**, **Color & Land Distribution**, **Containers needed**, and **Deck Health & Rules**. Color-coded, labeled bars show exact counts with lengths relative to the deck's total card count; multicolor cards can contribute to more than one color. The panel stacks on phones, and win/loss controls remain in Deck Health.
+
+Under Wins and Losses, **Sleeved** records **None**, **Single**, **Double**, or **Triple** for that deck. Changes save immediately without saving or discarding other deck edits; the selection is retained in deck duplicates and complete account backups.
+
+In the always-visible top overview, click the **card back** beneath the commander to preview a solid sleeve color or upload a PNG, JPEG, or WebP image. **Save** stores that deck's choice independently of other edits; **Cancel** leaves it unchanged, and the default option restores the Magic card back. Custom images are resized, kept with the deck in the database, and preserved in duplicates and complete account backups.
+
+You can also enter a direct **Image URL** and choose **Load image** before saving. The browser downloads and resizes a copy; your server does not fetch arbitrary URLs. If the image host blocks cross-origin downloads, download the file yourself and use the upload option.
+
+For Physical decks, **Containers needed** beneath **Supertype Breakdown** lists each source container and the number of copies to gather, including Unassigned Pile and a count of unavailable copies. It uses the saved deck's pull-list plan (reserved locations when checked out); save draft changes to refresh the list. Arena decks do not show physical containers.
+
+### Check out a physical deck
+
+Save first, then choose **Check Out for Play**. Manafolio reserves the copies and creates a pull list grouped by container and compartment while retaining their stored positions. Other decks show unavailable quantities and the reserving deck's name. Mark cards **Pulled** as you gather them; sorting by **Pulled status** puts not-yet-pulled cards first.
+
+Return the deck to release reservations before changing its card composition, individually archiving its reserved copies, or reusing them for another checkout. Whole-container archiving preserves existing reservations. Arena has separate ownership and no physical checkout or storage flow.
+
+### Find tokens for a card or deck
+
+Open **Related tokens** in the card inspector or **Tokens** below a deck's cards; AI drafts have the same grid. Tiles show artwork, inventory-scoped ownership, physical locations (including Unassigned Pile), and **Created by** links to the relevant cards.
+
+Ownership matches names case-insensitively, including double-faced tokens' front names. Decks prefer matches from the commander's set or corresponding token set, then fall back to any set within their inventory. Same-named tokens with different rules or stats can match: check artwork and text. Wishlist does not count; Graveyard token ownership is separate from Physical and Arena.
+
+Tokens are references, not additions to the deck: they do not change size, reserve copies, or enter deck exports. Scryfall supplies relations; failed lookups offer retry. No related tokens found does not prove a card cannot create copies or variable tokens.
+
+### Import a Magic preconstructed deck
+
+Open **Add Cards → Precon Deck**, search MTGJSON by name, set code, or type, and inspect the contents. **Create Storage Container** and **Create Deck** are both enabled by default. The first creates a sized Deck Box; the second creates a Physical deck containing all imported cards and checks it out. Disable either if unwanted. With deck creation selected, unresolved cards or import failure leave no partial collection, container, or deck.
+
+### Import a ManaBox storage container
+
+Storage opens a searchable, sortable gallery. Create a container, choose its cover through **More → Container Settings → Choose container image**, and organize cards by layout or image list. Move selections between containers or back to Unsorted, or use automatic filing. Capacity is advisory: cards stay in the chosen eligible container even when full, and Storage marks containers/pages/rows **Over limit**. Add pages/rows or change capacity manually to match your physical storage.
+
+Choose **Import ManaBox container** and upload a `.txt` export. This creates a box named after the file and files matching, already-owned physical copies from Unsorted into its first row—it does not create missing collection cards.
+
+Expand **Full summary** for requested, moved, and remaining quantities. **Move** fills remaining quantities from eligible copies in unlocked containers or Unsorted, without moving the same copies twice on retry. Matching uses exact printing identity and may use another finish while preserving the actual copy's metadata. Missing, Arena, and Wishlist copies stay put. Checked-out copies may change storage assignments without changing reservations. The imported box and first row must remain unlocked and unrestricted, with custom sorting and stacking disabled.
+
+In an unlocked container, select cards and use **Add to Deck…** to add quantities to an existing deck without moving them, or **Archive to Graveyard** after returning any checked-out copies.
+
+### Create a deck from a storage container
+
+Open a Physical or Graveyard container and choose **Create Deck**. This uses its complete saved contents, not the current filters or selection, combining printing quantities and setting the target size to the full count. The deck uses the container's inventory. Missing and checked-out copies may be included in the definition, even from a locked container.
+
+The container and reservations stay unchanged; the deck is **not checked out**. Review its format, size, and commander. Physical decks must resolve missing or reserved copies before checkout; Graveyard decks cannot check out. Empty containers cannot supply this workflow.
+
+### Create a container from a deck
+
+Open a saved Physical or Graveyard deck and choose **Create Container**. Confirm a name to create a Deck Box and file available matching copies from the same inventory. Review moved/missing counts; no owned cards are created. Locked, missing, and reserved copies stay untouched, and saved physical source selections are respected. Return the deck first to make its reserved copies eligible. Arena decks cannot create storage containers.
+
+### Store archived cards in Graveyard containers
+
+Open **Collection → Graveyard → Graveyard containers**, or select **Graveyard** in Storage. Archived inventory has separate containers, unassigned cards, layouts, capacity, locks, and covers, with the same filing controls.
+
+A container's **More → Move to Graveyard / Restore to Collection** transfers it and all contents atomically, retaining quantities, metadata, positions, layout, settings, and cover. Unlock the container and compartments first. Cards may remain in decks, including checked-out decks: deck lists, checkout state, and exact-copy reservations are preserved. Archived copies do not supply owned totals or new checkouts. Individual restores clear archived placement; whole-container restores preserve it. Deleting an archived container leaves its cards archived and unassigned. Graveyard containers can supply Graveyard deck definitions, but not physical imports, Physical/Arena decks, AI inventory, or public container shares.
+
+### Get an AI deck recommendation
+
+AI is optional. In **Settings → AI preferences**, choose and save a provider and model:
+
+- **ChatGPT:** connect your own account through OpenAI's device verification flow; it needs Codex access and may require enabling device-code authorization in ChatGPT security settings. Choose a model and its supported thinking level.
+- **Ollama:** run [Ollama](https://docs.ollama.com/) and install a structured-output model, for example `ollama pull granite4.1:8b`. Enter the service's HTTP(S) address, check the connection, and choose an installed model. A blank address uses `OLLAMA_BASE_URL` (default `http://127.0.0.1:11434`). Models are not downloaded automatically, and failures never fall back to ChatGPT.
+- **Gemini:** create an API key in [Google AI Studio](https://aistudio.google.com/apikey), select Gemini, save the key, then choose and save an available model. Free-tier quotas and availability depend on your account and model; Google's free-tier data-use terms apply.
+- **OpenRouter:** create an [OpenRouter API key](https://openrouter.ai/settings/keys), select OpenRouter, save the key, then choose and save a structured-output model. Free models are subject to availability and quotas; other models can charge your account. Manafolio does not switch to another model on failure.
+
+Open **Deck Builder → AI Deck Builder**, select inventory, format, and target size, then choose one **Play style** under **Deck setup**. Its explanation and pace appear below the selector and accompany requests to your AI provider. Use **Open AI settings** to jump to connection preferences. Describe a deck or ask a question. Use the always-visible **Card pool & filters** to filter eligible cards by color, set, and, for Physical, containers. Missing physical copies are excluded. **Include checked-out cards** allows planning with reserved copies, not sharing or releasing their reservations.
+
+Set **Target power level** from **1 — Exhibition** through **5 — cEDH**; it defaults to **2 — Core**. These Commander-oriented descriptions are goals, not certified ratings or guaranteed turn counts. The AI tries to match the target within your owned cards and selected format and explains when the pool cannot support it.
+
+Discuss and edit the suggested draft, then explicitly choose **Add Deck**. Questions do not replace the draft. Conversation is session-only; leaving cancels an active request, and changing inventory or filters clears the draft and conversation. Request logs show progress, not private model reasoning.
+
+For a saved deck, save editor changes before **Improve with AI**. **Save Deck** replaces its name, description, cards, and commander while preserving identity, results, and settings; **Save as New Deck** creates a separate unchecked-out deck. Return a checked-out source before replacing it. Eligible source-deck copies remain available despite filters and their own reservation, but other decks' reservations still apply unless explicitly included for planning.
+
+Every generated or improved draft includes an editable **Strategy** with its game plan, opening-hand guidance, play sequencing, synergies, and win conditions. Saving a new deck puts the strategy in **Notes**. Saving an improvement appends it to existing notes without overwriting them; an identical strategy already at the end is not appended again.
+
+Saving rechecks ownership, quantities, copy limits, and cached rules atomically; failed saves leave existing data unchanged. No AI save moves cards or checks out a deck. Suggestions are not guaranteed tournament legal: cached rules may be incomplete or stale, and partner commanders and sideboards are not supported. Oversized inventories and incomplete or invalid responses are rejected rather than silently trimmed or partially saved; narrow filters or increase Ollama's model context when needed.
+
+**Data sharing and credentials.** Requests send eligible card metadata/counts, the session conversation, and the current draft—including manually edited draft descriptions and strategies—to the chosen provider. They do not send storage locations, container names/IDs, saved private notes, or other users' collections. Source-deck context excludes its saved description and private notes. ChatGPT sends data to OpenAI and uses your Codex limits; an Ollama service may process data locally or remotely depending on its configuration.
+
+Connect only to a trusted Manafolio server. The official [Codex app-server](https://developers.openai.com/codex/app-server/) integration requires a Unix server, including Docker, and disables model access to host files, commands, and external tools. Credentials are separated per user under `<database-directory>/codex/<user-id>/`, but administrators can access them. **Disconnect** removes that user's local Codex data. Collection JSON backups exclude credentials; whole-volume backups include them and must be protected. AI endpoints require browser sessions rather than API keys.
+
+Gemini and OpenRouter keys are stored separately per user and provider in the server database, not returned to the browser. **Remove API key** deletes that provider's stored key without affecting other providers; revoke it at the provider to invalidate it externally. Administrators and database/volume backups can access these keys; account JSON exports exclude them. Gemini receives requests at Google's API, while OpenRouter forwards them to the selected model's upstream provider. Review both the gateway's and upstream provider's policies before sending data. Adding providers does not change existing saved provider choices.
+
+**Ollama deployment security.** Requests originate from the server, not the browser. Signed-in users can contact server-accessible HTTP(S) addresses, including localhost and private/LAN services. Invite only trusted users and enforce outbound network restrictions with your firewall; URL validation is not an access allowlist. Manafolio does not add Ollama authentication. Do not expose its port publicly.
+
+In Docker, `127.0.0.1` is the container. To reach host Ollama, use `OLLAMA_BASE_URL=http://host.docker.internal:11434` and, on Linux, add `extra_hosts: ["host.docker.internal:host-gateway"]` to the Compose service. Configure Ollama's `OLLAMA_HOST` to listen on an interface reachable from the container, with firewall restrictions. Alternatively use an Ollama service name on a shared Docker network.
+
+### Back up or move an account
+
+Use **Settings → Collection Backup & Data Options → Export Complete Backup**. The JSON includes collection entries, cached metadata, storage layouts and placements (including Graveyard), decks, commander selections, and deck results. Restore **replaces the signed-in account's collection, storage, and decks** after confirmation; it is not a merge or a server-credential backup.
+
+Only Magic integrations are supported. Records from removed integrations are not deleted or relabeled, and account exports retain them. Restore rejects backups containing unsupported game identities, or attempts to replace unsupported records already in the account, before changing account data. Preserve original backups for use with a compatible older deployment; do not change card IDs or game fields to force a restore.
+
+Restore accepts only the top-level format `manafolio-backup`. For an older compatible export, keep the original outside the deployment, make a copy, and change only that copy's top-level `format` to `manafolio-backup`. Leave its version and data intact: this is a marker conversion, not a schema upgrade or permission to relabel arbitrary JSON. Restore still validates compatibility.
+
+For server recovery, preserve the persistent volume and keep protected backups outside it; snapshots in the same volume do not protect against losing that volume. Stop database writers before an offline whole-volume copy, retaining the database and any WAL/SHM files together. Whole-volume backups may include account credentials and TLS private keys.
+
+## Card scanning
+
+**Add Cards → Scan Cards** uses local ONNX artwork matching, informational title OCR, and footer OCR to verify set code and collector number. It requires a server installation, models, a catalog, and native Tesseract with English data.
+
+1. Fetch models after deployment:
+
+   ```bash
+   docker exec manafolio node scripts/fetch-models.mjs
+   ```
+
+   From source, run `node scripts/fetch-models.mjs` in `backend/`.
+2. Build the relevant language catalog under **Admin → Catalogs**. Downloading data and fingerprinting artwork can take hours; stopped builds retain completed work for resuming.
+3. Source installations need Tesseract at `/usr/bin/tesseract`, the path used by the scanner, with `eng` trained data (`/usr/bin/tesseract --list-langs`). On Debian/Ubuntu, install `tesseract-ocr tesseract-ocr-eng`. Source-built Docker images include both.
+
+Hold the card still until verification finishes. Auto-queue, including Turbo, requires two fresh photos to agree on the printing and pass safety checks. Settings changes, pausing, or leaving cancel pending verification. Native camera zoom is available only when supported by the browser/device; no simulated digital crop is applied.
+
+Automatic and manually selected scans go to **Scan review**, not directly to owned inventory. Drafts survive refreshes and remain outside collection totals, storage, and decks until you choose **Add to Collection**. Selecting a candidate queues one Near Mint, non-foil copy immediately, using the resolved language and market price as purchase price; no second details screen appears. Use **Foil** to toggle a draft's finish, or **Discard** to remove a mistaken match and scan it again. Collection exports and account JSON backups omit these temporary drafts; full database backups retain them.
+
+Similar printings, glare, blur, catalog gaps, and conflicting footer OCR can require manual review. Set/language filters narrow candidates but do not prove a match. Missing or failed footer OCR blocks automatic queuing; unreadable footer text supplies no corroborating evidence but is not, by itself, an unconditional block—the artwork and ambiguity checks still apply. Title OCR is informational: it is never compared against artwork candidates or used to allow or block automatic queuing. Title recognition uses the existing English OCR engine; non-English text, long names, sleeves, and unusual layouts may remain unreadable. These checks do not detect condition or foil, and accuracy depends on lighting and focus.
+
+The results dialog shows the actual OCR reading, including low-confidence text marked **uncertain**. “No readable name” means OCR supplied no title text, not merely that its confidence was low. All title readings are informational.
+
+Phones require HTTPS. See [the image-identification pipeline](PROJECT.md#image-identification-pipeline) for details and limitations.
+
+## Dashboard analytics
+
+- **Collection growth** groups current quantities of retained owned records by their original addition month over the last 12 UTC calendar months. It is not an immutable acquisition ledger: quantity edits affect earlier months and deleted records disappear.
+- **Deck performance** uses saved wins/losses, games, and win rate, scoped to inventory. No games means no win rate; fewer than 10 games carries a low-sample caution. These counters do not record opponents, matchups, or match dates.
+- **Color identity / mana value** compare owned copies with saved deck-slot quantities. A copy represented in multiple decks counts in each; multicolor cards count in each identity color. Mana charts exclude lands, separate zero from unknown, and group values of 7 or more.
+- **Graveyard** shows archived quantities, value, costs, and history separately. Its growth uses original addition dates, not archive dates; history values currently archived cards, not historical archive membership. It omits deck-performance comparisons.
+
+Expand **View chart data** for exact values. Older servers or demo fixtures without analytics show an unavailable state rather than invented statistics.
 
 ## Magic data, pricing, and languages
 
-Bindarr uses Scryfall for Magic cards, sets, artwork, printings, and prices. It stores the exact printing and language, not merely a translated card name. The interface supports English, Brazilian Portuguese, French, German, Italian, Japanese, Korean, Russian, Simplified Chinese, Traditional Chinese, and Spanish.
+Scryfall supplies cards, sets, artwork, printings, and prices. Manafolio retains exact printings and languages. The interface supports English, Brazilian Portuguese, French, German, Italian, Japanese, Korean, Russian, Simplified Chinese, Traditional Chinese, and Spanish.
 
-The server checks Scryfall's `default_cards` bulk metadata daily at the UTC time configured by an administrator in **Settings → Scryfall bulk data** (10:00 UTC by default), downloading only when `updated_at` changes. The setting is saved in the application database and takes effect without a restart; the next check runs at the next occurrence of that UTC time, independent of browser or server timezone and daylight saving time. Startup warms a missing catalog in the background, but an existing catalog waits for the chosen daily time. **Download now** forces an actual download even when the snapshot is unchanged, waits for completion, and reports the catalog entry count and snapshot date. These controls affect the shared catalog for all users and are available only to administrators.
+Collection, deck, precon, and container imports consult a persistent Scryfall bulk catalog first, with API fallback for unresolved printings. Administrators control its daily UTC refresh under **Settings → Scryfall bulk data** (10:00 UTC by default), or use **Download now**. A missing catalog warms in the background; imports do not wait for it. Scheduled checks download changed snapshots; manual download forces a refresh.
 
-The gzip JSONL download is streamed into a separate SQLite catalog at `<DB_PATH>.scryfall-bulk.sqlite` (by default `backend/database/bindarr.db.scryfall-bulk.sqlite`). Allow disk space for the catalog and a temporary replacement during updates. It is rebuildable card data, not your collection database; do not treat it as a collection backup. Successful updates replace it atomically; failed updates keep the previous catalog.
+The separate `<DB_PATH>.scryfall-bulk.sqlite` file is rebuildable card data, not a collection backup. Allow space for it and a temporary replacement; failed updates retain the previous catalog. Imported prices initially reflect the snapshot, while scheduled price sweeps and stale-cache refreshes use the live API.
 
-Collection and Arena CSV/TXT imports, precon imports, ManaBox deck creation, and container imports look there first and send only unresolved rows to the existing Scryfall API. Importing never waits for a bulk download. A missing or unusable catalog falls back to the API, as do printings absent from the snapshot, including foreign-language UUIDs. Exact UUIDs are never replaced with another printing; ambiguous name-only matches fall back to the API.
-
-Imported prices initially reflect the catalog snapshot. Scheduled price sweeps (daily by default, respecting the configured refresh interval) and stale-cache refreshes still query the live API, never the bulk catalog.
-
-Prices come from the provider associated with the printing, primarily Scryfall, TCGplayer, and Cardmarket. Bindarr does not convert currencies: mixed-currency totals are explicitly reported as mixed. A graded copy can use its own per-copy value, which replaces the raw card market price in totals and exports.
+Prices come from the printing's provider, primarily Scryfall, TCGplayer, and Cardmarket. Manafolio does not convert currencies; mixed-currency totals are identified as mixed. A graded copy's per-copy value replaces its raw market price in totals and exports.
 
 ## API access
 
-Create a read-only API key in **Settings → API Keys**, then pass it as a Bearer token:
+Create a read-only key in **Settings → API Keys** and pass it as a Bearer token:
 
 ```bash
 curl -H "Authorization: Bearer <key>" http://localhost:3001/api/stats/networth
 ```
 
-API keys only authorize `GET` requests and cannot access admin endpoints. Useful endpoints include:
-
-- `GET /api/stats/networth` — collection value and per-game totals.
-- `GET /api/stats` — dashboard breakdowns and trends.
-- `GET /api/collection` — owned collection entries.
-- `GET /api/health` — unauthenticated service health.
+Keys authorize only `GET` requests and cannot access admin endpoints. Useful routes include `/api/stats/networth` for valuation, `/api/stats` for dashboard data, and `/api/collection` for collection entries. The unauthenticated `/api/health` returns `{"status":"ok"}`.
 
 ## Development
 
-Node 18.20+ and npm 9+ are required; use a current Node 20 LTS release for server/container parity. Shared JSON imports use native import attributes; ESLint uses an explicitly selected Espree parser that understands that syntax.
+Node 18.20+ and npm 9+ are required; use Node 20 for server/container parity. Shared JSON uses native import attributes.
 
 ```bash
 npm run install:all
 npm run dev
 ```
 
-Development frontend: `https://localhost:5173`.
-
-Development backend: `http://localhost:3001`.
+Frontend: `https://localhost:5173`. Backend: `http://localhost:3001`.
 
 Run the full test set:
 
@@ -508,12 +339,14 @@ npm run check:locales
 npm run build
 ```
 
-Repository architecture, route ordering, database conventions, and contributor guidance are in [PROJECT.md](PROJECT.md) and [AGENTS.md](AGENTS.md).
+Architecture, route ordering, database conventions, and contributor guidance are in [PROJECT.md](PROJECT.md) and [AGENTS.md](AGENTS.md).
 
 ## Translating
 
-Copy [`frontend/src/locales/en.json`](frontend/src/locales/en.json), translate the values, and open a pull request. Partial locales are valid because missing keys fall back to English. Preserve placeholders and plural forms. See [docs/TRANSLATING.md](docs/TRANSLATING.md) for details.
+Copy [`frontend/src/locales/en.json`](frontend/src/locales/en.json), translate values, and open a pull request. Missing keys fall back to English; preserve placeholders and plural forms. See [docs/TRANSLATING.md](docs/TRANSLATING.md).
 
-## License
+## Acknowledgments and license
+
+Manafolio began as a fork of **Bindarr**, by **thenotoriousJeremy and contributors**, based on upstream **1.8.5**. Thank you for the foundation.
 
 [MIT](LICENSE)

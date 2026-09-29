@@ -1,13 +1,15 @@
-// Where Bindarr lives, and how the app hands the user a prefilled issue.
-//
-// Prefilled, never submitted: these build a URL that opens GitHub's new-issue
-// form with the boilerplate already typed in. The user still reads it and presses
-// Submit themselves, which is the point — nothing leaves the browser until they
-// decide it should.
+// Resolve Manafolio's current URL by its stable repository ID.
+// Issue forms are prefilled, never submitted by the app.
+export async function getRepoUrl() {
+  const response = await fetch('https://api.github.com/repositories/1389194597');
+  if (!response.ok) throw new Error(`GitHub HTTP ${response.status}`);
+  const data = await response.json();
+  const url = new URL(data.html_url);
+  if (url.origin !== 'https://github.com') throw new Error('Invalid repository URL');
+  return url.href.replace(/\/$/, '');
+}
 
-export const REPO_URL = 'https://github.com/thenotoriousJeremy/bindarr';
-
-export const issueUrl = ({ labels = '', title = '', body = '' }) =>
-  `${REPO_URL}/issues/new?labels=${encodeURIComponent(labels)}`
+export const issueUrl = (repoUrl, { labels = '', title = '', body = '' }) =>
+  `${repoUrl}/issues/new?labels=${encodeURIComponent(labels)}`
   + `&title=${encodeURIComponent(title)}`
   + `&body=${encodeURIComponent(body)}`;

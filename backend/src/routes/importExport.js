@@ -4,9 +4,10 @@ const db = require('../db');
 const { parseThirdPartyCSV, parseManaboxText } = require('../utils/csvMappers');
 const scryfallApi = require('../scryfallApi');
 const { generateExportCSV } = require('../utils/csvExporters');
-const { resolveCardPrice, rebalanceCompartmentPositions } = require('../utils/priceHelpers');
+const { resolveCardPrice } = require('../utils/priceHelpers');
 const { isBinderType } = require('../utils/compartmentSort');
-const { assertStorageInventory } = require('../utils/collectionHelpers');
+const { assertStorageInventory, checkedOutSources, moveContainerCopies } = require('../utils/collectionHelpers');
+const { normalizeCardBack } = require('../utils/cardBack');
 
 function parseCsvRows(data) {
   const lines = typeof data === 'string' ? data.split(/\r?\n/).map(line => line.trim()).filter(Boolean) : [];
@@ -41,21 +42,63 @@ function csvFormat(headers, format) {
 }
 
 
-function parseCompleteBackup(data) {
+async function parseCompleteBackup(data) {
   const backup = typeof data === 'string' ? JSON.parse(data) : data;
   const arrays = ['collection', 'card_cache', 'locations', 'compartments', 'compartment_assignments', 'decks', 'deck_cards'];
-  if (!backup || backup.format !== 'bindarr-backup' || backup.version !== 1 || !arrays.every(key => Array.isArray(backup[key]))) {
+  if (!backup || backup.format !== 'manafolio-backup' || backup.version !== 1 || !arrays.every(key => Array.isArray(backup[key]))) {
     throw new Error('Invalid backup file');
+  }
+  if (backup.decks.some(deck => !['collection', 'arena', 'graveyard'].includes(deck.inventory_type ?? 'collection')
+      || ((deck.inventory_type ?? 'collection') !== 'collection' && (deck.checked_out || deck.checked_out_at != null)))) {
+    throw new Error('Invalid backup deck inventory or checkout state');
   }
   if (backup.decks.some(deck => ['wins', 'losses'].some(key => Object.hasOwn(deck, key)
       && (!Number.isInteger(deck[key]) || deck[key] < 0 || deck[key] > 2147483647)))) {
     throw new Error('Invalid backup deck record');
+  }
+  if (backup.decks.some(deck => Object.hasOwn(deck, 'sleeved')
+      && (!Number.isInteger(deck.sleeved) || deck.sleeved < 0 || deck.sleeved > 3))) {
+    throw new Error('Invalid backup deck sleeves');
+  }
+  if (backup.decks.some(deck => deck.notes != null && typeof deck.notes !== 'string')) {
+    throw new Error('Invalid backup deck notes');
+  }
+  if (backup.locations.some(location => Object.hasOwn(location, 'sleeved')
+      && (!Number.isInteger(location.sleeved) || location.sleeved < 0 || location.sleeved > 3))) {
+    throw new Error('Invalid backup container sleeves');
+  }
+  for (const deck of backup.decks) {
+    Object.assign(deck, await normalizeCardBack({
+      color: Object.hasOwn(deck, 'card_back_color') ? deck.card_back_color : null,
+      image: Object.hasOwn(deck, 'card_back_image') ? deck.card_back_image : null
+    }, true));
+  }
+  if (['card_cache', 'collection', 'decks'].some(key =>
+    backup[key].some(row => row.game != null && row.game !== 'mtg'))
+    || backup.locations.some(location => location.game != null && !['any', 'mtg'].includes(location.game))
+    || backup.card_cache.some(card => typeof card.id !== 'string'
+      || (card.game !== 'mtg' && !card.id.startsWith('mtg-')))) {
+    throw Object.assign(new Error('Unsupported backup card ID or game'), { status: 400 });
   }
 
   const cardIds = new Set(backup.card_cache.map(card => card.id));
   const locationIds = new Set(backup.locations.map(location => location.id));
   const compartmentIds = new Set(backup.compartments.map(compartment => compartment.id));
   const deckIds = new Set(backup.decks.map(deck => deck.id));
+  const entries = new Map(backup.collection.map(entry => [entry.id, entry]));
+  const allocations = backup.deck_card_allocations ?? [];
+  if (!Array.isArray(allocations)
+      || backup.deck_cards.some(card => card.source_entry_id != null && (
+        !Number.isSafeInteger(card.source_entry_id) || card.source_entry_id === 0
+        || (entries.has(card.source_entry_id) && entries.get(card.source_entry_id).card_id !== card.card_id)
+        || (backup.decks.find(deck => deck.id === card.deck_id)?.inventory_type ?? 'collection') !== 'collection'))
+      || allocations.some(source => !Number.isSafeInteger(source.entry_id) || source.entry_id === 0
+        || !Number.isSafeInteger(source.quantity) || source.quantity < 1
+        || (backup.decks.find(deck => deck.id === source.deck_id)?.inventory_type ?? 'collection') !== 'collection'
+        || !backup.deck_cards.some(card => card.deck_id === source.deck_id && card.card_id === source.card_id)
+        || (entries.has(source.entry_id) && entries.get(source.entry_id).card_id !== source.card_id))) {
+    throw new Error('Invalid backup deck sources');
+  }
   if (
     backup.card_cache.some(card => !card.id || !card.name)
     || backup.locations.some(location => !location.id || !location.name || !location.type || !['collection', 'graveyard'].includes(location.inventory_type ?? 'collection'))
@@ -88,8 +131,31 @@ async function restoreCompleteBackup(backup, userId) {
   const locationIds = new Map();
   const compartmentIds = new Map();
   const deckIds = new Map();
+  const entryIds = new Map();
+  // Deleted sources stay invalid even when restoring into a different database
+  // where their old positive ID could belong to somebody else's collection.
+  const restoredEntryId = id => entryIds.get(id) ?? -Math.abs(id);
 
   await db.withTransaction(async () => {
+    const unsupported = await db.get(`
+      SELECT id FROM collection WHERE user_id = ? AND game NOT IN ('mtg')
+      UNION ALL SELECT id FROM decks WHERE user_id = ? AND game NOT IN ('mtg')
+      UNION ALL SELECT id FROM locations WHERE user_id = ? AND game NOT IN ('mtg', 'any')
+      UNION ALL SELECT c.id FROM collection c JOIN card_cache cc ON cc.id = c.card_id
+        WHERE c.user_id = ? AND cc.game NOT IN ('mtg')
+      UNION ALL SELECT d.id FROM decks d JOIN deck_cards dc ON dc.deck_id = d.id
+        JOIN card_cache cc ON cc.id = dc.card_id WHERE d.user_id = ? AND cc.game NOT IN ('mtg')
+      LIMIT 1
+    `, [userId, userId, userId, userId, userId]);
+    if (unsupported) {
+      throw Object.assign(new Error('Restore would replace unsupported stored records; export them before restoring into a separate account'), { status: 400 });
+    }
+    for (const card of backup.card_cache) {
+      const cached = await db.get('SELECT game FROM card_cache WHERE id = ?', [card.id]);
+      if (cached && cached.game !== card.game) {
+        throw Object.assign(new Error('Backup card identity conflicts with stored data'), { status: 400 });
+      }
+    }
     await db.run('DELETE FROM deck_cards WHERE deck_id IN (SELECT id FROM decks WHERE user_id = ?)', [userId]);
     await db.run('DELETE FROM decks WHERE user_id = ?', [userId]);
     await db.run('DELETE FROM collection WHERE user_id = ?', [userId]);
@@ -99,25 +165,26 @@ async function restoreCompleteBackup(backup, userId) {
       await db.run(`
         INSERT OR IGNORE INTO card_cache (
           id, name, supertype, subtypes, types, rarity, set_id, set_name, number, image_url,
-          price_trend, price_normal, price_holofoil, price_reverse_holofoil, price_avg1, price_avg7,
-          price_avg30, price_1st_edition, price_currency, price_source, cmc, color_identity, game,
+          price_trend, price_normal, price_holofoil, price_avg1, price_avg7,
+          price_avg30, price_currency, price_source, cmc, color_identity, game,
           language, printed_name, tcgplayer_product_id, last_updated
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         card.id, card.name, card.supertype, card.subtypes, card.types, card.rarity, card.set_id, card.set_name, card.number, card.image_url,
-        card.price_trend, card.price_normal, card.price_holofoil, card.price_reverse_holofoil, card.price_avg1, card.price_avg7,
-        card.price_avg30, card.price_1st_edition, card.price_currency, card.price_source, card.cmc, card.color_identity, card.game,
+        card.price_trend, card.price_normal, card.price_holofoil, card.price_avg1, card.price_avg7,
+        card.price_avg30, card.price_currency, card.price_source, card.cmc, card.color_identity, card.game,
         card.language, card.printed_name, card.tcgplayer_product_id, card.last_updated
       ]);
     }
 
     for (const location of backup.locations) {
       const result = await db.run(`
-        INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, locked, allow_stacking, cover_card_id, inventory_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, locked, allow_stacking, cover_card_id, inventory_type, sleeved)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         location.name, location.type, location.sort_order, location.foil_sorting, location.rule_type, location.rule_config,
-        location.game, userId, location.locked || 0, location.allow_stacking || 0, location.cover_card_id || null, location.inventory_type ?? 'collection'
+        location.game, userId, location.locked || 0, location.allow_stacking || 0, location.cover_card_id || null, location.inventory_type ?? 'collection',
+        location.sleeved ?? 0
       ]);
       locationIds.set(location.id, result.lastID);
     }
@@ -140,7 +207,7 @@ async function restoreCompleteBackup(backup, userId) {
     }
 
     for (const card of backup.collection) {
-      await db.run(`
+      const result = await db.run(`
         INSERT INTO collection (
           card_id, quantity, condition, printing, language, purchase_price, location_id, compartment_id,
           position, favorite, is_trade, list_type, game, added_at, notes, grader, grade, cert_number,
@@ -154,26 +221,36 @@ async function restoreCompleteBackup(backup, userId) {
         card.notes || '', card.grader || 'Raw', card.grade, card.cert_number, card.market_value,
         card.market_value_source, card.market_value_at, card.missing || 0, userId
       ]);
+      entryIds.set(card.id, result.lastID);
     }
 
     for (const deck of backup.decks) {
       const result = await db.run(`
         INSERT INTO decks (
-          name, description, checked_out, checked_out_at, game, created_at, format, category,
-          accent_color, target_size, commander_card_id, inventory_type, wins, losses, user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          name, description, notes, checked_out, checked_out_at, game, created_at, format, category,
+          accent_color, target_size, commander_card_id, inventory_type, wins, losses, sleeved, card_back_color, card_back_image, user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        deck.name, deck.description, deck.checked_out || 0, deck.checked_out_at, deck.game, deck.created_at,
+        deck.name, deck.description, deck.notes ?? '', deck.checked_out || 0, deck.checked_out_at, deck.game, deck.created_at,
         deck.format, deck.category, deck.accent_color, deck.target_size, deck.commander_card_id ?? null,
-        deck.inventory_type ?? 'collection', deck.wins ?? 0, deck.losses ?? 0, userId
+        deck.inventory_type ?? 'collection', deck.wins ?? 0, deck.losses ?? 0, deck.sleeved ?? 0, deck.card_back_color, deck.card_back_image, userId
       ]);
       deckIds.set(deck.id, result.lastID);
     }
 
     for (const card of backup.deck_cards) {
-      await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out) VALUES (?, ?, ?, ?)', [
-        deckIds.get(card.deck_id), card.card_id, card.quantity, card.checked_out || 0
+      await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out, source_entry_id) VALUES (?, ?, ?, ?, ?)', [
+        deckIds.get(card.deck_id), card.card_id, card.quantity, card.checked_out || 0,
+        card.source_entry_id == null ? null : restoredEntryId(card.source_entry_id)
       ]);
+    }
+    for (const source of backup.deck_card_allocations ?? []) {
+      await db.run(`INSERT INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+        [deckIds.get(source.deck_id), source.card_id, restoredEntryId(source.entry_id), source.quantity]);
+    }
+    for (const source of await checkedOutSources(userId)) {
+      await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+        [source.deck_id, source.card_id, source.entry_id, source.quantity]);
     }
   });
 
@@ -203,9 +280,9 @@ router.get('/export', async (req, res) => {
         `, [req.user.id, req.user.id])
       ]);
       res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename=bindarr_backup_${new Date().toISOString().slice(0, 10)}.json`);
+      res.setHeader('Content-Disposition', `attachment; filename=manafolio_backup_${new Date().toISOString().slice(0, 10)}.json`);
       return res.json({
-        format: 'bindarr-backup',
+        format: 'manafolio-backup',
         version: 1,
         exported_at: new Date().toISOString(),
         collection,
@@ -214,7 +291,8 @@ router.get('/export', async (req, res) => {
         compartments,
         compartment_assignments: compartmentAssignments,
         decks,
-        deck_cards: deckCards
+        deck_cards: deckCards,
+        deck_card_allocations: await checkedOutSources(req.user.id)
       });
     }
 
@@ -241,8 +319,6 @@ router.get('/export', async (req, res) => {
         cc.price_trend,
         cc.price_normal,
         cc.price_holofoil,
-        cc.price_reverse_holofoil,
-        cc.price_1st_edition,
         l.name as location_name,
         l.type as location_type,
         cp.idx as compartment_idx,
@@ -256,15 +332,13 @@ router.get('/export', async (req, res) => {
     `;
     const raw = await db.all(query, [req.user.id]);
     // market_price used to be cc.price_trend flat, which exported the wrong number
-    // for every foil, every 1st Edition and every slab — the same three cases
-    // resolveCardPrice exists to get right. An export that disagrees with the
-    // dashboard is worse than no export: it is a spreadsheet someone will trust.
+    // for foils and slabs, which resolveCardPrice values consistently.
     // price_trend is destructured OUT along with the per-printing columns: the CSV
     // strategies read `item.price_trend || item.market_price`, so leaving it in
     // would win over the resolved number and export the raw price anyway.
-    const rows = raw.map(({ price_trend, price_normal, price_holofoil, price_reverse_holofoil, price_1st_edition, ...keep }) => ({
+    const rows = raw.map(({ price_trend, price_normal, price_holofoil, ...keep }) => ({
       ...keep,
-      market_price: resolveCardPrice({ price_trend, price_normal, price_holofoil, price_reverse_holofoil, price_1st_edition, ...keep }),
+      market_price: resolveCardPrice({ price_trend, price_normal, price_holofoil, ...keep }),
       // The two sub-location columns the exporters read. They used to be selected
       // straight off the collection table as sub_location_1/2 — columns db.js has
       // DROPPED the table to remove, so every export answered
@@ -329,6 +403,9 @@ router.post('/import/preview', (req, res) => {
 // Import endpoint
 router.post('/import', async (req, res) => {
   const { format = 'internal', data, list_type = 'collection', mapping } = req.body;
+  if (req.body.game !== undefined && req.body.game !== 'mtg') {
+    return res.status(400).json({ error: 'Unsupported game' });
+  }
   if (!data) {
     return res.status(400).json({ error: 'No data provided' });
   }
@@ -370,7 +447,7 @@ router.post('/import', async (req, res) => {
       return res.status(400).json({ error: 'Invalid list_type' });
     }
     if (formatKey === 'backup') {
-      const backup = parseCompleteBackup(data);
+      const backup = await parseCompleteBackup(data);
       onProgress?.({ stage: 'parsed', total: backup.collection.length });
       onProgress?.({ stage: 'saving', current: 0, total: backup.collection.length });
       const restored = await restoreCompleteBackup(backup, req.user.id);
@@ -400,10 +477,23 @@ router.post('/import', async (req, res) => {
     if (!Array.isArray(rawItems)) {
       return res.status(400).json({ error: 'Invalid data payload' });
     }
+    if (rawItems.some(item => !item || (item.game !== undefined && item.game !== 'mtg'))) {
+      return res.status(400).json({ error: 'Unsupported game' });
+    }
+    const inputIds = [...new Set(rawItems.map(item => item.card_id || item.id).filter(Boolean))];
+    for (let offset = 0; offset < inputIds.length; offset += 500) {
+      const ids = inputIds.slice(offset, offset + 500);
+      const cached = await db.all(`SELECT id, game FROM card_cache WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
+      const identities = new Map(cached.map(card => [card.id, card.game]));
+      if (ids.some(id => typeof id !== 'string'
+        || (identities.has(id) ? identities.get(id) !== 'mtg' : !id.startsWith('mtg-')))) {
+        return res.status(400).json({ error: 'Unsupported card ID or game' });
+      }
+    }
     onProgress?.({ stage: 'parsed', total: rawItems.length });
 
     // Resolve Magic CSV rows through the same Scryfall bulk path as ManaBox
-    // text. Card IDs in exported Arena CSVs are Bindarr-local, not Scryfall
+    // text. Card IDs in exported Arena CSVs are Manafolio-local, not Scryfall
     // UUIDs, so writing them straight to card_cache made incomplete placeholder
     // cards instead of real normalized printings.
     const failedItem = item => ({
@@ -440,21 +530,14 @@ router.post('/import', async (req, res) => {
     await db.withTransaction(async () => {
       // A disconnected client stops notifications, not the atomic import.
       for (const item of rawItems) {
-        let cardId = item.card_id || item.id;
-        if (!cardId && item.set_code && item.collector_number) {
-          cardId = `${item.set_code.toLowerCase()}-${item.collector_number}`;
+        const cardId = item.card_id || item.id;
+        const cached = typeof cardId === 'string'
+          ? await db.get(`SELECT id, game FROM card_cache WHERE id = ?`, [cardId]) : null;
+        const idGame = cached ? cached.game : (typeof cardId === 'string' && cardId.startsWith('mtg-') ? 'mtg' : null);
+        if (idGame !== 'mtg' || (item.game !== undefined && item.game !== idGame)) {
+          throw Object.assign(new Error('Unsupported card ID or game'), { status: 400 });
         }
-        if (!cardId && item.name) {
-          cardId = item.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-        }
-
-        if (!cardId) {
-          failedItems.push(failedItem(item));
-          continue;
-        }
-
-        const cached = await db.get(`SELECT id, game FROM card_cache WHERE id = ?`, [cardId]);
-        const game = item.game || 'mtg';
+        const game = idGame;
         if (!cached) {
           await db.run(
             `INSERT OR IGNORE INTO card_cache 
@@ -475,8 +558,6 @@ router.post('/import', async (req, res) => {
               game
             ]
           );
-        } else if (cached.game !== game) {
-          await db.run(`UPDATE card_cache SET game = ? WHERE id = ?`, [game, cardId]);
         }
 
         await db.run(
@@ -595,53 +676,6 @@ async function containerItemReport(userId, cardId, printing, requested, location
   };
 }
 
-// The caller holds a transaction. Reuse whole single copies, split only the
-// selected quantity from legacy stacks, and leave remaining source copies intact.
-async function moveContainerCopies(userId, locationId, compartmentId, entries, quantity) {
-  if (quantity <= 0 || entries.length === 0) return;
-  await rebalanceCompartmentPositions(db, compartmentId, userId);
-  const occupied = await db.get(
-    `SELECT COUNT(*) AS count FROM collection WHERE compartment_id = ? AND user_id = ?`,
-    [compartmentId, userId]
-  );
-  let slot = occupied.count;
-  const sources = new Set();
-  for (const entry of entries) {
-    if (quantity <= 0) break;
-    const copies = Math.min(quantity, entry.available);
-    quantity -= copies;
-    const originalUsed = copies === entry.quantity;
-    if (originalUsed) {
-      await db.run(`
-        UPDATE collection SET quantity = 1, location_id = ?, compartment_id = ?, position = ?
-        WHERE id = ? AND user_id = ?
-      `, [locationId, compartmentId, ++slot * 1000, entry.id, userId]);
-    } else {
-      await db.run(`UPDATE collection SET quantity = quantity - ? WHERE id = ? AND user_id = ?`, [copies, entry.id, userId]);
-    }
-    for (let copy = originalUsed ? 1 : 0; copy < copies; copy++) {
-      await db.run(`
-        INSERT INTO collection (
-          card_id, user_id, quantity, condition, printing, language, purchase_price,
-          favorite, is_trade, list_type, game, added_at, notes, grader, grade,
-          cert_number, market_value, market_value_source, market_value_at, missing,
-          location_id, compartment_id, position
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        entry.card_id, userId, entry.condition, entry.printing, entry.language, entry.purchase_price,
-        entry.favorite, entry.is_trade, entry.list_type, entry.game, entry.added_at, entry.notes, entry.grader,
-        entry.grade, entry.cert_number, entry.market_value, entry.market_value_source, entry.market_value_at, entry.missing,
-        locationId, compartmentId, ++slot * 1000
-      ]);
-    }
-    if (entry.compartment_id) sources.add(entry.compartment_id);
-  }
-  await db.run(`
-    UPDATE compartments SET capacity = MAX(capacity, ?) WHERE id = ?
-      AND location_id IN (SELECT id FROM locations WHERE user_id = ?)
-  `, [slot, compartmentId, userId]);
-  for (const source of sources) await rebalanceCompartmentPositions(db, source, userId);
-}
 
 // Build a physical box from matching, unfiled cards the user already owns.
 router.post('/import-container', async (req, res) => {
@@ -730,6 +764,7 @@ router.post('/import-container', async (req, res) => {
         ));
       }
       count = report.reduce((total, item) => total + item.moved, 0);
+      await db.run(`UPDATE compartments SET capacity = ? WHERE id = ?`, [Math.max(1, count), compartment.lastID]);
     });
 
     const missing = requested - count;

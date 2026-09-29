@@ -63,7 +63,7 @@ function checkScanModels() {
     return;
   }
   // The models ship in neither the image nor the repository: they are AGPL-3.0
-  // while Bindarr is MIT, so fetching them is the operator's deliberate step. That
+  // while Manafolio is MIT, so fetching them is the operator's deliberate step. That
   // makes "no models" the ordinary state of a fresh install rather than a fault,
   // and it deserves the command that fixes it instead of silence until someone
   // points a camera at a card.
@@ -271,15 +271,7 @@ db.initDb()
     }, 1000 * 60 * 60 * 24 * 7);
 
     // Prices. Hourly tick, and NOT forced — shouldSweepPrices decides whether
-    // each provider is actually due, from the admin's price_refresh_days.
-    //
-    // This used to tick daily and pass `force: true`, on the reasoning that the
-    // timer was itself the right cadence. Two things came of that. The interval
-    // could not be configured, which is a problem now that one selectable
-    // provider charges credits per card refreshed. And because the forced path
-    // never called shouldSweepPrices, a provider missing from its SWEEP_COLUMN
-    // map still looked like it was working: Lorcana has been in that state since
-    // it was added, and nobody could have noticed from the outside.
+    // Scryfall is actually due, from the admin's price_refresh_days.
     //
     // Hourly rather than daily because a daily tick against a daily interval
     // skips on any clock drift at all — "23h 59m elapsed" is not due, so the
@@ -315,7 +307,7 @@ db.initDb()
 // Unauthenticated; pings the DB so a wedged database reads as unhealthy.
 // Declared before the /api collection mount so nothing shadows it.
 app.get('/api/health', async (req, res) => {
-  res.setHeader('X-App-Name', 'Bindarr');
+  res.setHeader('X-App-Name', 'Manafolio');
   if (!dbReady) {
     return res.status(503).json({ status: 'db_initializing' });
   }
@@ -434,7 +426,7 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGUSR2']) {
 // Start Express Server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`=========================================`);
-  console.log(`Bindarr Server running on port ${PORT}`);
+  console.log(`Manafolio Server running on port ${PORT}`);
   console.log(`Access local: http://localhost:${PORT}`);
   console.log(`=========================================`);
   // Camera scanning needs a secure context, so a LAN/Docker install serves TLS

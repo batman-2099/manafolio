@@ -7,7 +7,7 @@ const { spawn } = require('child_process');
 // Boots the real Express app against a throwaway DB and exercises it over HTTP.
 // This is the only test that starts server.js end to end, so it catches route
 // wiring / middleware / startup breakage the in-process unit tests can't.
-const tmpDb = path.join(os.tmpdir(), `bindarr-server-test-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-server-test-${process.pid}.db`);
 const projectRoot = path.join(__dirname, '../../../');
 
 async function waitForServer(url) {
@@ -30,10 +30,10 @@ async function runTests() {
   try {
     await waitForServer(`${base}/api/health`);
 
-    // F1-TC1: health endpoint is up and identifies the app
+    // F1-TC1: health endpoint is up and reports readiness
     const res = await fetch(`${base}/api/health`);
     assert.strictEqual(res.status, 200, 'health check should return 200');
-    assert.strictEqual(res.headers.get('x-app-name'), 'Bindarr', 'health header x-app-name must be Bindarr');
+    assert.deepStrictEqual(await res.json(), { status: 'ok' }, 'health check should report readiness');
     console.log('PASS: F1-TC1');
 
     // F1-TC2: a protected route rejects unauthenticated requests

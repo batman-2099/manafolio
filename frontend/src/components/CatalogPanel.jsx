@@ -13,10 +13,7 @@ import { useT } from '../utils/i18n';
 //   1. cache every set's cards, so the app knows the cards exist at all
 //   2. embed their artwork, so the scanner can recognise them
 //
-// Phase 1 is the one that used to be invisible. Card data was only ever cached as
-// a side effect of building a scan index, so a set nobody indexed simply was not
-// in the database — which is why Pokemon sat at 35% of the real card pool while
-// looking, from the old panel, entirely built.
+// Card data is cached before artwork is indexed, including sets not yet scanned.
 const GAME_LABEL = { mtg: 'Magic: The Gathering' };
 const POLL_MS = 1000;
 
@@ -42,7 +39,7 @@ function pct(a, b) {
   return Math.min(100, Math.round((a / b) * 100));
 }
 
-function Bar({ value, tone = 'var(--type-grass)' }) {
+function Bar({ value, tone = 'var(--accent-green)' }) {
   return (
     <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
       <div style={{ width: `${Math.max(0, Math.min(100, value))}%`, height: '100%', background: tone, transition: 'width 0.3s' }} />
@@ -86,7 +83,7 @@ function EngineCard({ engine, onDownload, busy }) {
       icon={<Cpu size={16} style={{ color: 'var(--accent-red)' }} />}
       title={t('catalog.scanEngine')}
       status={missing.length ? t('catalog.requiredNotInstalled') : t('catalog.installed')}
-      tone={missing.length ? 'var(--accent-yellow)' : 'var(--type-grass)'}
+      tone={missing.length ? 'var(--accent-yellow)' : 'var(--accent-green)'}
     >
       <div style={ROW}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: '1 1 20rem' }}>
@@ -130,19 +127,11 @@ function ReadyMadeCard({ engine, onDownload, busy, enginePresent }) {
       icon={<Download size={16} style={{ color: 'var(--accent-red)' }} />}
       title={t('catalog.readyMadeTitle')}
       status={have ? t('catalog.nInstalled', { count: have }) : t('catalog.fastestWay')}
-      tone={have ? 'var(--type-grass)' : 'var(--accent-blue, #60a5fa)'}
+      tone={have ? 'var(--accent-green)' : 'var(--accent-blue, #60a5fa)'}
     >
       <p style={HINT}>
         {t('catalog.readyMadeDesc')}
       </p>
-      {/* The two are NOT equivalent and shipping them as one row was the bug.
-          Magic's published ids are Scryfall ids, so a hit fetches and caches the
-          printing on the spot (routes/collection.js getCardById) — it works on a
-          five-minute-old install with nothing downloaded. Pokémon's are TCGplayer
-          product ids, which used to reach a card only via tcgplayer_product ->
-          card_cache: two tables a fresh install has never filled, so every scan
-          matched and then resolved to nothing. The product map is what closes that
-          gap, and it downloads with the catalog. */}
       <p style={HINT}>The Magic catalog uses Scryfall card IDs, so a scan can fetch and cache a matching printing directly.</p>
       <div className="collection-table-wrapper" style={{ overflowX: 'auto' }}>
         <table className="collection-table">
@@ -162,7 +151,7 @@ function ReadyMadeCard({ engine, onDownload, busy, enginePresent }) {
                 <td className="hide-mobile">{c.snapshot}</td>
                 <td style={{ textAlign: 'right' }}>
                   {c.present
-                    ? <span style={{ color: 'var(--type-grass)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}><Check size={14} /> {t('catalog.installed')}</span>
+                    ? <span style={{ color: 'var(--accent-green)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}><Check size={14} /> {t('catalog.installed')}</span>
                     : (
                       <button type="button" className="btn btn-primary btn-sm" disabled={busy}
                         onClick={() => onDownload(`catalog:${c.game}`)}
@@ -201,11 +190,7 @@ function BuildPicker({ game, lang, disabled, onBuild, showToast, label }) {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const codeOf = (s) => game === 'mtg'
-    ? (s.ptcgo_code || (s.id || '').replace(/^mtg-/, ''))
-    : game === 'lorcana'
-      ? (s.ptcgo_code || (s.id || '').replace(/^lorcana-/, ''))
-      : s.id;
+  const codeOf = (s) => (s.id || '').replace(/^mtg-/, '');
 
   useEffect(() => {
     if (!open || sets.length) return;
@@ -217,7 +202,7 @@ function BuildPicker({ game, lang, disabled, onBuild, showToast, label }) {
     ]).then(([tree, sc]) => {
       setSets(tree);
       setCounts(sc?.sets || null);
-    }).catch(() => showToast?.(t('catalog.errListSets')))
+    }).catch(() => showToast?.(t('catalog.errListSets'), 'error'))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -270,7 +255,7 @@ function BuildPicker({ game, lang, disabled, onBuild, showToast, label }) {
         className="input-control"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder={game === 'mtg' ? t('catalog.searchMtgPlaceholder') : game === 'lorcana' ? t('catalog.searchLorcanaPlaceholder') : t('catalog.searchPokemonPlaceholder')}
+        placeholder={t('catalog.searchMtgPlaceholder')}
         style={{ padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
       />
       {loading
@@ -325,7 +310,7 @@ export default function CatalogPanel({ showToast }) {
         if (e.ok) setEngine(await e.json());
       } catch { /* the panel still lists catalogs without it */ }
     } catch (e) {
-      showToast?.(t('catalog.errLoadCatalogs', { message: e.message }));
+      showToast?.(t('catalog.errLoadCatalogs', { message: e.message }), 'error');
     } finally {
       setLoading(false);
     }
@@ -343,10 +328,7 @@ export default function CatalogPanel({ showToast }) {
   // refuses while the other holds its slot), so a single poll covers whichever is.
   useEffect(() => {
     clearTimeout(timer.current);
-    // The product map is a third job with its own progress, and it is STARTED by a
-    // catalog download finishing — so the poll has to survive the download it
-    // followed, or the bar freezes mid-build until the panel is reopened.
-    if (!progress && !engine?.progress && !engine?.productMap?.progress) return;
+    if (!progress && !engine?.progress) return;
     timer.current = setTimeout(async () => {
       try {
         if (progress) {
@@ -357,21 +339,21 @@ export default function CatalogPanel({ showToast }) {
           // A build that just finished changes the row counts, so refresh the list.
           if (!j.progress) load();
         }
-        if (engine?.progress || engine?.productMap?.progress) {
+        if (engine?.progress) {
           const e = await fetch('/api/admin/models');
           if (e.ok) {
             const ej = await e.json();
             setEngine(ej);
             // A finished download changes what is installed, and a downloaded
             // catalog changes what the list reports as published.
-            if (!ej.progress && !ej.productMap?.progress) load();
+            if (!ej.progress) load();
           }
         }
       } catch { /* a dropped poll is not worth surfacing; the next one retries */ }
     }, POLL_MS);
     return () => clearTimeout(timer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progress, engine?.progress, engine?.productMap?.progress]);
+  }, [progress, engine?.progress]);
 
   const download = async (what) => {
     try {
@@ -381,25 +363,13 @@ export default function CatalogPanel({ showToast }) {
         body: JSON.stringify({ what }),
       });
       const j = await r.json();
-      if (!r.ok) return showToast?.(j.error || t('catalog.errStartDownloadGeneric'));
+      if (!r.ok) return showToast?.(j.error || t('catalog.errStartDownloadGeneric'), 'error');
       setEngine(prev => ({ ...(prev || {}), progress: j.progress }));
     } catch (e) {
-      showToast?.(t('catalog.errStartDownload', { message: e.message }));
+      showToast?.(t('catalog.errStartDownload', { message: e.message }), 'error');
     }
   };
 
-  // Normally started by the Pokémon catalog download itself; this is the refresh
-  // after a set release, or a retry when a run died halfway.
-  const buildProductMap = async () => {
-    try {
-      const r = await fetch('/api/admin/models/product-map', { method: 'POST' });
-      const j = await r.json();
-      if (!r.ok) return showToast?.(j.error || t('catalog.errStartProductMapGeneric'));
-      setEngine(prev => ({ ...(prev || {}), productMap: { ...(prev?.productMap || {}), progress: j.progress } }));
-    } catch (e) {
-      showToast?.(t('catalog.errStartProductMap', { message: e.message }));
-    }
-  };
 
   // `sets` scopes the build. A scoped build MERGES into the existing catalog, so
   // building the two sets you just opened does not discard last week's work.
@@ -411,10 +381,10 @@ export default function CatalogPanel({ showToast }) {
         body: JSON.stringify({ game, lang, sets }),
       });
       const j = await r.json();
-      if (!r.ok) return showToast?.(j.error || t('catalog.errStartBuildGeneric'));
+      if (!r.ok) return showToast?.(j.error || t('catalog.errStartBuildGeneric'), 'error');
       setProgress(j.progress);
     } catch (e) {
-      showToast?.(t('catalog.errStartBuild', { message: e.message }));
+      showToast?.(t('catalog.errStartBuild', { message: e.message }), 'error');
     }
   };
 
@@ -423,9 +393,9 @@ export default function CatalogPanel({ showToast }) {
       const r = await fetch('/api/admin/catalogs/stop', { method: 'POST' });
       const j = await r.json();
       setProgress(j.progress);
-      showToast?.(t('catalog.stoppingToast'));
+      showToast?.(t('catalog.stoppingToast'), 'status');
     } catch (e) {
-      showToast?.(t('catalog.errStop', { message: e.message }));
+      showToast?.(t('catalog.errStop', { message: e.message }), 'error');
     }
   };
 
@@ -461,8 +431,8 @@ export default function CatalogPanel({ showToast }) {
             {GAME_LABEL[c.game] || c.game}
             <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}> · {c.lang}</span>
           </span>
-          <span style={{ fontSize: '0.8rem', color: c.built ? 'var(--type-grass)' : 'var(--text-secondary)' }}>
-            {c.built ? t('catalog.nIndexed', { count: num(indexed) }) : c.published ? t('catalog.readyMadeInUse') : t('catalog.productMapNotBuilt')}
+          <span style={{ fontSize: '0.8rem', color: c.built ? 'var(--accent-green)' : 'var(--text-secondary)' }}>
+            {c.built ? t('catalog.nIndexed', { count: num(indexed) }) : c.published ? t('catalog.readyMadeInUse') : t('catalog.notBuilt')}
           </span>
           {warn && <AlertTriangle size={14} color="var(--accent-yellow)" />}
         </summary>
@@ -558,8 +528,6 @@ export default function CatalogPanel({ showToast }) {
         onDownload={download}
         busy={!!engine?.progress || !!running}
         enginePresent={!(engine?.models || []).some(m => !m.present)}
-        productMap={engine?.productMap}
-        onBuildMap={buildProductMap}
       />
 
       {/* One progress bar for both downloads: models and published catalogs share a
@@ -622,7 +590,7 @@ export default function CatalogPanel({ showToast }) {
           <p style={{ ...HINT, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             {last.phase === 'error'
               ? <><AlertTriangle size={15} color="var(--accent-red)" /> {t('catalog.lastBuildFailed', { message: last.message })}</>
-              : <><Check size={15} color="var(--type-grass)" /> {GAME_LABEL[last.game] || last.game} · {last.lang}: {last.message}</>}
+              : <><Check size={15} color="var(--accent-green)" /> {GAME_LABEL[last.game] || last.game} · {last.lang}: {last.message}</>}
           </p>
         )}
 

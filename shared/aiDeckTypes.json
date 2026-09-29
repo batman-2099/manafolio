@@ -1,0 +1,19 @@
+[
+  { "id": "any", "name": "Any", "description": "Let the AI choose a deck type that suits the available cards and your request", "style": "No archetype preference" },
+  { "id": "aggro", "name": "Aggro", "description": "Kill the opponent quickly with cheap, efficient threats", "style": "Fast, proactive" },
+  { "id": "midrange", "name": "Midrange", "description": "Play increasingly powerful threats and efficient answers", "style": "Flexible, value-focused" },
+  { "id": "control", "name": "Control", "description": "Stop the opponent, gain card advantage, then win late", "style": "Slow, reactive" },
+  { "id": "combo", "name": "Combo", "description": "Assemble specific cards that create a powerful or game-winning interaction", "style": "Setup → explosive turn" },
+  { "id": "tempo", "name": "Tempo", "description": "Deploy an early threat, then disrupt the opponent just enough to stay ahead", "style": "Fast + disruptive" },
+  { "id": "ramp", "name": "Ramp", "description": "Generate extra mana quickly to cast large threats ahead of schedule", "style": "Build mana → huge plays" },
+  { "id": "burn", "name": "Burn", "description": "Deal damage directly to the opponent, often with spells", "style": "Very aggressive" },
+  { "id": "tokens", "name": "Go-Wide / Tokens", "description": "Make lots of creatures and overwhelm the opponent", "style": "Swarm" },
+  { "id": "voltron", "name": "Voltron", "description": "Build one creature into a massive threat with equipment, Auras, or counters", "style": "One super-creature" },
+  { "id": "reanimator", "name": "Reanimator", "description": "Put expensive creatures into the graveyard, then bring them back cheaply", "style": "Cheat big creatures" },
+  { "id": "aristocrats", "name": "Sacrifice / Aristocrats", "description": "Sacrifice your own creatures for value and/or damage", "style": "Synergy-heavy" },
+  { "id": "typal", "name": "Tribal / Typal", "description": "Build around a creature type like Elves, Goblins, Zombies, or Humans", "style": "Creature synergy" },
+  { "id": "mill", "name": "Mill", "description": "Win by putting the opponent's library into their graveyard", "style": "Alternate win condition" },
+  { "id": "stax", "name": "Prison / Stax", "description": "Restrict what opponents can do through taxing or locking effects", "style": "Restrictive/control" },
+  { "id": "toolbox", "name": "Toolbox", "description": "Use tutors or flexible cards to find the right answer for each situation", "style": "Adaptable" },
+  { "id": "spellslinger", "name": "Spellslinger", "description": "Focus heavily on instants and sorceries and cards that reward casting them", "style": "Spell synergy" }
+]

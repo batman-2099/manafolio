@@ -3,7 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bindarr-container-import-'));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'manafolio-container-import-'));
 process.env.DB_PATH = path.join(tmpDir, 'test.db');
 process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 
@@ -176,7 +176,7 @@ async function testContainerImport() {
     await add('5', 17, 'Normal', privateBox, 'collection', 0, 2);
     await add('5', 18, 'Normal', privateBox);
     const wrongGame = (await add('5', 19)).lastID;
-    await db.run("UPDATE collection SET game = 'pokemon' WHERE id = ?", [wrongGame]);
+    await db.run("UPDATE collection SET game = 'unsupported' WHERE id = ?", [wrongGame]);
     const certifiedStack = (await add('5', 20, 'Holofoil')).lastID;
     await db.run("UPDATE collection SET grader = 'PSA', cert_number = 'legacy-cert' WHERE id = ?", [certifiedStack]);
     const foreignReference = (await add('other', 1, 'Normal', source, 'collection', 0, 2)).lastID;
@@ -195,6 +195,7 @@ async function testContainerImport() {
     assert.strictEqual(review.statusCode, 201);
     assert.deepStrictEqual([review.body.items[0].moved, review.body.items[0].unmoved, review.body.items[0].movable], [1, 9, 9],
       'all finishes of checked-out copies can change storage; locks, missing, other owners, other games and nonphysical lists stay excluded');
+    const originalCapacity = await db.get('SELECT capacity FROM compartments WHERE location_id = ?', [review.body.id]);
     const payload = { location_id: review.body.id, card_id: 'mtg-5', printing: 'Normal', requested: 10 };
     const move = (body = payload, user = 1) => invoke(moveContainer, body, user);
     const counts = response => [response.body.moved, response.body.unmoved, response.body.movable];
@@ -220,7 +221,8 @@ async function testContainerImport() {
     assert.deepStrictEqual(await inventory(), inventoryBeforeMove);
     const placed = await db.all('SELECT position FROM collection WHERE location_id = ? ORDER BY position', [review.body.id]);
     assert.deepStrictEqual(placed.map(row => row.position), Array.from({ length: 10 }, (_, index) => (index + 1) * 1000));
-    assert.strictEqual((await db.get('SELECT capacity FROM compartments WHERE location_id = ?', [review.body.id])).capacity, 10);
+    assert.deepStrictEqual(await db.get('SELECT capacity FROM compartments WHERE location_id = ?', [review.body.id]), originalCapacity,
+      'moving more copies preserves the chosen container limit so overflow remains visible');
     assert.deepStrictEqual(await db.get('SELECT * FROM decks WHERE id = ?', [deck]), deckBefore);
     assert.deepStrictEqual(await db.all('SELECT * FROM deck_cards WHERE deck_id = ?', [deck]), deckCardsBefore);
     assert.deepStrictEqual(counts(await move()), [10, 0, 0]);
@@ -245,10 +247,10 @@ async function testContainerImport() {
     for (const invalid of [0, -1, 1.5, '10', 2147483648, Number.MAX_SAFE_INTEGER]) {
       assert.strictEqual((await move({ ...payload, requested: invalid })).statusCode, 400);
     }
-    assert.strictEqual((await move({ ...payload, printing: 'Reverse Holofoil' })).statusCode, 400);
+    assert.strictEqual((await move({ ...payload, printing: 'Unsupported finish' })).statusCode, 400);
     for (const [field, value, original] of [
       ['locked', 1, 0], ['type', 'Binder', 'Box'], ['sort_order', 'name', 'custom'],
-      ['rule_type', 'set', 'any'], ['game', 'pokemon', 'mtg'], ['allow_stacking', 1, 0]
+      ['rule_type', 'set', 'any'], ['game', 'unsupported', 'mtg'], ['allow_stacking', 1, 0]
     ]) {
       await db.run(`UPDATE locations SET ${field} = ? WHERE id = ?`, [value, review.body.id]);
       assert.strictEqual((await move()).statusCode, 409, `changed destination ${field} is rejected`);
@@ -270,9 +272,9 @@ async function testContainerImport() {
     }
     await add('7', 1, 'Holofoil');
     await add('7', 1);
-    const reverse = (await add('7', 5, 'Reverse Holofoil', source)).lastID;
-    await db.run("UPDATE collection SET condition = 'Moderately Played', language = 'French', notes = 'Keep reverse finish' WHERE id = ?", [reverse]);
-    const reverseBefore = await db.get('SELECT * FROM collection WHERE id = ?', [reverse]);
+    const foilStack = (await add('7', 5, 'Holofoil', source)).lastID;
+    await db.run("UPDATE collection SET condition = 'Moderately Played', language = 'French', notes = 'Keep foil provenance' WHERE id = ?", [foilStack]);
+    const foilStackBefore = await db.get('SELECT * FROM collection WHERE id = ?', [foilStack]);
     await add('7', 3, 'Normal', source);
     const anotherPrinting = (await add('8', 20, 'Holofoil')).lastID;
     const anotherPrintingBefore = await db.get('SELECT * FROM collection WHERE id = ?', [anotherPrinting]);
@@ -292,12 +294,12 @@ async function testContainerImport() {
     assert.ok(anyConcurrent.every(response => response.statusCode === 200));
     assert.deepStrictEqual(anyConcurrent.map(counts), [[5, 0, 0], [5, 0, 0]]);
     assert.deepStrictEqual(anyConcurrent.map(response => response.body.moved_finishes), Array(2).fill([
-      { printing: 'Holofoil', quantity: 1 }, { printing: 'Normal', quantity: 1 }, { printing: 'Reverse Holofoil', quantity: 3 }
+      { printing: 'Holofoil', quantity: 4 }, { printing: 'Normal', quantity: 1 }
     ]), 'Any uses source order without a finish preference and counts all destination finishes toward its cap');
-    const reverseCopies = await db.all("SELECT * FROM collection WHERE location_id = ? AND printing = 'Reverse Holofoil'", [mixed.body.id]);
-    assert.deepStrictEqual(reverseCopies.map(metadata), Array(3).fill(metadata(reverseBefore)),
-      'fallback splitting retains other supported finishes and all source metadata');
-    assert.strictEqual((await db.get('SELECT quantity FROM collection WHERE id = ?', [reverse])).quantity, 2);
+    const splitFoilCopies = await db.all("SELECT * FROM collection WHERE location_id = ? AND language = 'French'", [mixed.body.id]);
+    assert.deepStrictEqual(splitFoilCopies.map(metadata), Array(3).fill(metadata(foilStackBefore)),
+      'fallback splitting retains the finish and all source metadata');
+    assert.strictEqual((await db.get('SELECT quantity FROM collection WHERE id = ?', [foilStack])).quantity, 2);
     assert.deepStrictEqual(await db.get('SELECT * FROM collection WHERE id = ?', [anotherPrinting]), anotherPrintingBefore,
       'same-name cards from another exact printing stay untouched');
     const afterAnyMove = await db.all('SELECT * FROM collection ORDER BY id');

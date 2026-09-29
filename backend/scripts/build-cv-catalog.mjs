@@ -1,29 +1,18 @@
 // Build a CollectorVision embedding catalog from THIS install's card_cache.
 //
-// Why not just use the published catalogs: they are keyed by the provider's id,
-// which for MTG happens to be card_cache's primary key but for Pokemon is a
-// TCGplayer product id that has to be joined through tcgplayer_product. Measured
-// on this install, only 23.6% of the published Pokemon catalog resolved to a card
-// the app had ever cached — so three quarters of a correct match could not be
-// turned into an answer.
-//
-// A catalog built from card_cache cannot have that problem: every row IS a card
-// this install knows, so a hit is always resolvable. It is also current (the
-// published ones are dated snapshots) and it covers exactly the sets the user
-// actually has, rather than everything TCGplayer ever listed.
+// Local catalogs use card_cache IDs, so every match resolves to a known printing.
+// Unlike published snapshots, they can incorporate newly cached cards.
 //
 // Output, beside the models:
-//   milo-<game>-local.bin    Float32 embeddings, n * dim, row-major
-//   milo-<game>-local.json   { dim, ids: [...], builtAt, model, views }
+//   milo-mtg-local.bin    Float32 embeddings, n * dim, row-major
+//   milo-mtg-local.json   { dim, ids: [...], builtAt, model, views }
 //
 // Resumable: re-running keeps every embedding already computed and only fetches
-// cards that are new or whose image_url changed. A full Pokemon build is ~13k
-// images; MTG is ~106k and takes hours, which is exactly why it resumes.
+// cards that are new or whose image_url changed. A full MTG build takes hours.
 //
 // Usage, from backend/:
-//   node scripts/build-cv-catalog.mjs --game pokemon
 //   node scripts/build-cv-catalog.mjs --game mtg --limit 2000
-//   node scripts/build-cv-catalog.mjs --game pokemon --views 3   # augmented mean
+//   node scripts/build-cv-catalog.mjs --game mtg --views 3   # augmented mean
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,9 +23,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sharp = require('sharp');
 const ort = require('onnxruntime-node');
 const db = require('../src/db');
+const { toTensor } = require('../src/cvScan');
 
 const arg = (f, d) => { const i = process.argv.indexOf(f); return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
-const game = arg('--game', 'pokemon');
+const game = arg('--game', 'mtg');
+if (game !== 'mtg') throw new Error('Unsupported game');
 const lang = arg('--lang', 'English');
 const limit = parseInt(arg('--limit', '0'), 10);
 const views = Math.max(1, parseInt(arg('--views', '1'), 10));
@@ -44,8 +35,6 @@ const concurrency = Math.max(1, parseInt(arg('--concurrency', '8'), 10));
 
 const MODEL_DIR = process.env.CV_MODEL_DIR || path.join(__dirname, '..', 'data', 'models');
 const SIZE = 448;
-const MEAN = [0.485, 0.456, 0.406];
-const STD = [0.229, 0.224, 0.225];
 // MUST match cvScan's naming, including the English special case: English keeps
 // the bare filename so existing builds stay valid, every other language gets its
 // own file. Without the suffix a `--lang Japanese` build silently OVERWRITES the
@@ -54,17 +43,6 @@ const STD = [0.229, 0.224, 0.225];
 const langSuffix = (l) => (!l || l === 'en' || l === 'English' ? '' : `-${String(l).toLowerCase()}`);
 const binPath = path.join(MODEL_DIR, `milo-${game}${langSuffix(lang)}-local.bin`);
 const metaPath = path.join(MODEL_DIR, `milo-${game}${langSuffix(lang)}-local.json`);
-
-function toTensor(rgb) {
-  const plane = SIZE * SIZE;
-  const x = new Float32Array(3 * plane);
-  for (let p = 0; p < plane; p++) {
-    x[p] = (rgb[p * 3] / 255 - MEAN[0]) / STD[0];
-    x[plane + p] = (rgb[p * 3 + 1] / 255 - MEAN[1]) / STD[1];
-    x[2 * plane + p] = (rgb[p * 3 + 2] / 255 - MEAN[2]) / STD[2];
-  }
-  return new ort.Tensor('float32', x, [1, 3, SIZE, SIZE]);
-}
 
 // The reference image is already a flat, square-on card render — there is nothing
 // to dewarp. `--views` insets the crop instead, which moves the reference a little
@@ -82,7 +60,7 @@ async function embedCard(session, buf) {
       : sharp(buf);
     const { data } = await pipe.resize(SIZE, SIZE, { fit: 'fill' }).removeAlpha()
       .raw().toBuffer({ resolveWithObject: true });
-    const out = await session.run({ image: toTensor(data) });
+    const out = await session.run({ image: toTensor(data, SIZE) });
     vecs.push(out.embedding.data);
   }
   if (vecs.length === 1) return vecs[0];

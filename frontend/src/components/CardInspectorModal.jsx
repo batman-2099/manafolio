@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 import { X, MapPin, Trash2, Star, Maximize2, ExternalLink, Search, Copy } from 'lucide-react';
 import { getCardDisplayName } from '../utils/langHelper';
 import { translatedName, setCode, isEnglish } from '../utils/languages';
@@ -47,7 +47,6 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
   const [grade, setGrade] = useState('');
   const [certNumber, setCertNumber] = useState('');
   const [marketValue, setMarketValue] = useState('');
-  const [fetchingValue, setFetchingValue] = useState(false);
   const [localizedCard, setLocalizedCard] = useState(null);
   const [prevTargetId, setPrevTargetId] = useState(card?.entry_id || card?.id || null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -55,6 +54,22 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
   const [deckListVersion, setDeckListVersion] = useState(0);
   const creatingCommanderDeckRef = useRef(false);
   const hasToggledRef = useRef(false);
+  const dialogRef = useRef(null);
+  const closeRef = useRef(null);
+  const titleId = useId();
+  const isOpen = !!card;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const dialog = dialogRef.current;
+    const trigger = document.activeElement;
+    dialog.showModal();
+    closeRef.current?.focus();
+    return () => {
+      dialog.close();
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+    };
+  }, [isOpen]);
 
   useBackGuard(isFullScreen, () => setIsFullScreen(false));
 
@@ -62,6 +77,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
   if (targetEntryId !== prevTargetId) {
     setPrevTargetId(targetEntryId);
     if (localizedCard) setLocalizedCard(null);
+    if (isFullScreen) setIsFullScreen(false);
   }
 
   const activeCard = card ? (localizedCard || card) : null;
@@ -192,7 +208,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
         // The server resolves this per printing on the next fetch; mirror it here so
         // a screen still holding this object does not show the old printing's price.
         card.price_trend = resolveCardPrice(card, printing);
-        showToast && showToast(t('inspector.entryUpdated'));
+        showToast && showToast(t('inspector.entryUpdated'), 'success');
         onUpdate && onUpdate();
         onClose();
       } else {
@@ -200,39 +216,14 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
         // card already holding it, which a generic failure toast would throw away
         // and leave the user re-typing a number that was never the problem.
         const body = await res.json().catch(() => null);
-        showToast && showToast(body?.error || t('inspector.errUpdate'));
+        showToast && showToast(body?.error || t('inspector.errUpdate'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast && showToast(t('inspector.errEdit'));
+      showToast && showToast(t('inspector.errEdit'), 'error');
     }
   };
 
-  // Ask the graded-price provider what this slab is worth and drop the answer into
-  // the field. One card, one request, because the free tier is metered per day —
-  // so this is a button the owner presses, never a sweep.
-  const handleFetchValue = async () => {
-    if (!targetEntryId) return;
-    setFetchingValue(true);
-    try {
-      const res = await fetch(`/api/collection/${targetEntryId}/market-value/fetch`, { method: 'POST' });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setMarketValue(String(data.market_value));
-        card.market_value = data.market_value;
-        showToast && showToast(t('inspector.valueFetched', { basis: data.basis }));
-      } else {
-        // The provider's refusals name what to do instead ("enter it by hand", "check
-        // the key in Settings"), which a generic failure toast would throw away.
-        showToast && showToast(data.error || t('inspector.errFetchValue'));
-      }
-    } catch (err) {
-      console.error(err);
-      showToast && showToast(t('common.errBackend'));
-    } finally {
-      setFetchingValue(false);
-    }
-  };
 
   const handleDuplicate = async () => {
     try {
@@ -254,11 +245,11 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) throw new Error(body?.error || t('inspector.errDuplicate'));
-      showToast?.(t('inspector.duplicated'));
+      showToast?.(t('inspector.duplicated'), 'success');
       onUpdate?.();
     } catch (error) {
       console.error(error);
-      showToast?.(error.message || t('inspector.errDuplicate'));
+      showToast?.(error.message || t('inspector.errDuplicate'), 'error');
     }
   };
 
@@ -290,7 +281,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
       });
       if (res.ok) {
         hasToggledRef.current = true;
-        showToast && showToast(t('inspector.cardUpdated'));
+        showToast && showToast(t('inspector.cardUpdated'), 'success');
         if (field === 'list_type' && (nextListType === 'graveyard' || listType === 'graveyard')) {
           onUpdate?.();
           onClose?.();
@@ -301,14 +292,14 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
         if (field === 'favorite') { setFavorite(favorite); card.favorite = favorite; }
         if (field === 'list_type') { setListType(listType); card.list_type = listType; }
         const data = await res.json().catch(() => null);
-        showToast && showToast(data?.error || t('inspector.errUpdate'));
+        showToast && showToast(data?.error || t('inspector.errUpdate'), 'error');
       }
     } catch (err) {
       console.error(err);
       if (field === 'is_trade') { setIsTrade(isTrade); card.is_trade = isTrade; }
       if (field === 'favorite') { setFavorite(favorite); card.favorite = favorite; }
       if (field === 'list_type') { setListType(listType); card.list_type = listType; }
-      showToast && showToast(t('inspector.errUpdateGeneric'));
+      showToast && showToast(t('inspector.errUpdateGeneric'), 'error');
     }
   };
 
@@ -321,10 +312,10 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
         body: JSON.stringify({ entry_ids: [targetEntryId], action: 'add_to_deck', value: deckId })
       });
       const data = await res.json().catch(() => ({}));
-      showToast && showToast(res.ok ? (data.message || t('inspector.addedToDeck')) : (data.error || t('inspector.errAddDeck')));
+      showToast && showToast(res.ok ? (data.message || t('inspector.addedToDeck')) : (data.error || t('inspector.errAddDeck')), res.ok ? 'success' : 'error');
     } catch (err) {
       console.error(err);
-      showToast && showToast(t('inspector.errAddDeckGeneric'));
+      showToast && showToast(t('inspector.errAddDeckGeneric'), 'error');
     }
   };
 
@@ -347,14 +338,14 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
-        showToast?.(`${t('deck.errCreate')}${data?.error ? ` ${data.error}` : ''}`);
+        showToast?.(`${t('deck.errCreate')}${data?.error ? ` ${data.error}` : ''}`, 'error');
         return;
       }
       setDeckListVersion(version => version + 1);
-      showToast?.(t('deck.created'));
+      showToast?.(t('deck.created'), 'success');
     } catch (error) {
       console.error(error);
-      showToast?.(t('deck.errCreateGeneric'));
+      showToast?.(t('deck.errCreateGeneric'), 'error');
     } finally {
       creatingCommanderDeckRef.current = false;
       setCreatingCommanderDeck(false);
@@ -367,29 +358,33 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
     try {
       const res = await fetch(`/api/collection/${targetEntryId}`, { method: 'DELETE' });
       if (res.ok) {
-        showToast && showToast(t('collection.cardRemoved', { name: card.name }));
+        showToast && showToast(t('collection.cardRemoved', { name: card.name }), 'success');
         onDeleted && onDeleted(targetEntryId);
         onUpdate && onUpdate();
         onClose();
       } else {
-        showToast && showToast(t('collection.errDelete'));
+        showToast && showToast(t('collection.errDelete'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast && showToast(t('common.errBackend'));
+      showToast && showToast(t('common.errBackend'), 'error');
     }
   };
 
   // Resolved against the printing selected RIGHT NOW, not the one that was saved
   // when this row was fetched. `card.price_trend` arrives from the server already
   // resolved for the stored printing, so rendering it directly meant switching
-  // Normal to Reverse Holofoil in the form changed nothing on screen — the number
+  // Normal to Holofoil in the form changed nothing on screen — the number
   // only caught up after a save and a refetch, which reads as "prices don't
   // respond to the foil type". Same resolution order as the server.
   const displayPrice = resolveCardPrice(activeCard, printing);
 
   return (
-    <div className="modal-overlay" style={{
+    <dialog ref={dialogRef} aria-labelledby={titleId} className="modal-overlay" onCancel={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      handleClose();
+    }} style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.75)',
@@ -398,9 +393,9 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 999
-    }} onClick={handleClose}>
+    }} onClick={(event) => { if (event.target === event.currentTarget) handleClose(); }}>
       <div className={`glass-panel card-inspector ${mode === 'edit' ? 'mode-edit' : ''}`} onClick={(e) => e.stopPropagation()}>
-        <button className="btn btn-secondary btn-icon-only" onClick={handleClose} style={{
+        <button ref={closeRef} type="button" aria-label={t('common.close')} className="btn btn-secondary btn-icon-only" onClick={handleClose} style={{
           position: 'absolute',
           top: '1rem',
           right: '1rem',
@@ -412,7 +407,10 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
 
         {/* Left side: Main Card Image Focus */}
         <div className="ci-image-col" style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div
+          <button
+            type="button"
+            aria-label={t('inspector.zoomHint')}
+            aria-haspopup="dialog"
             className="ci-image-wrap"
             onClick={() => setIsFullScreen(true)}
             title={t('inspector.zoomHint')}
@@ -429,21 +427,18 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
                 width: '100%',
                 aspectRatio: 0.718,
                 objectFit: 'cover',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: '0 12px 36px rgba(0,0,0,0.6), 0 0 20px rgba(255,255,255,0.05)',
-                transition: 'transform 0.2s ease'
+                borderRadius: 'var(--radius-sm)'
               }}
             />
-            <div style={{
+            <span style={{
               position: 'absolute',
               bottom: '0.6rem',
               right: '0.6rem',
               background: 'rgba(0,0,0,0.65)',
-              backdropFilter: 'blur(6px)',
               padding: '0.25rem 0.5rem',
               borderRadius: 'var(--radius-sm)',
               color: '#fff',
-              fontSize: '0.65rem',
+              fontSize: '0.875rem',
               fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
@@ -453,8 +448,8 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
             }}>
               <Maximize2 size={12} />
               <span>{t('inspector.fullScreen')}</span>
-            </div>
-          </div>
+            </span>
+          </button>
           <CardArtEditor
             card={activeCard}
             hasProviderArt={!!activeCard.image_url}
@@ -464,7 +459,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
         </div>
 
         {/* Right side: Information / Edit */}
-        <div className="ci-info-col" style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', gap: '1.25rem', justifyContent: 'space-between' }}>
+        <div className="ci-info-col" style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
               {activeCard.list_type === 'wishlist' && (
@@ -483,29 +478,27 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
                 </span>
               )}
               {activeCard.list_type === 'arena' && (
-                <button type="button" className="btn btn-secondary" style={{ color: 'var(--type-grass)', padding: '0.2rem 0.5rem', fontSize: '0.8rem' }} onClick={() => handleQuickToggle('list_type', 'collection')} title={t('bulk.moveToCollection')}>
+                <button type="button" className="btn btn-secondary" style={{ color: 'var(--accent-green)', padding: '0.2rem 0.5rem', fontSize: '0.8rem' }} onClick={() => handleQuickToggle('list_type', 'collection')} title={t('bulk.moveToCollection')}>
                   {t('inspector.obtained')}
                 </button>
               )}
               {activeCard.is_trade === 1 && (
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(74, 222, 128, 0.15)', color: 'var(--type-grass)', border: '1px solid rgba(74, 222, 128, 0.3)' }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(74, 222, 128, 0.15)', color: 'var(--accent-green)', border: '1px solid rgba(74, 222, 128, 0.3)' }}>
                   {t('inspector.forTrade')}
                 </span>
               )}
             </div>
 
-            <h3 style={{ fontSize: '1.65rem', color: 'var(--text-strong)', fontWeight: 800, lineHeight: 1.15, marginBottom: '0.25rem' }}>
-              {getCardDisplayName(activeCard.name, language, activeCard.printed_name, activeCard.game || activeCard.supertype)}
+            <h3 id={titleId} className="section-heading" style={{ fontSize: '1.5rem', color: 'var(--text-strong)', fontWeight: 700, lineHeight: 1.2, marginBottom: '0.25rem' }}>
+              {getCardDisplayName(activeCard.name, activeCard.printed_name)}
             </h3>
-            {/* The English name when the provider gives us one for this printing
-                (Magic always does). Nothing is shown for a Japan-only Pokémon
-                card — no provider has an English name for it. */}
+            {/* Show the English name alongside a localized printing when available. */}
             {translatedName(activeCard) && (
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500, marginBottom: '0.25rem' }}>
                 {translatedName(activeCard)}
               </p>
             )}
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 500 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', fontWeight: 500 }}>
               {activeCard.set_name}
               {/* Set code alongside the native set name: it reads the same in every
                   language, so it is the part you can search or quote. The collector
@@ -516,8 +509,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
               {(activeCard.number || activeCard.collector_number || activeCard.card_number) ? ` • #${activeCard.number || activeCard.collector_number || activeCard.card_number}` : ''}{activeCard.rarity ? ` • ${activeCard.rarity}` : ''} • {t(activeCard.list_type === 'graveyard' ? 'inspector.archived' : 'inspector.owned', { count: activeCard.quantity ?? 1 })}
             </p>
 
-            {/* MTG cards: show color pips + type line (Pokémon energy types are
-                already conveyed via the type-glow styling elsewhere). */}
+            {/* MTG color pips and type line. */}
             {(activeCard.supertype === 'MTG' || activeCard.game === 'mtg') && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
                 {(Array.isArray(activeCard.types) ? activeCard.types : []).map(color => (
@@ -543,7 +535,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
               {listType !== 'collection' && listType !== 'graveyard' ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(74,222,128,0.1)', padding: '0.6rem 0.9rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(74,222,128,0.2)' }}>
                   <input type="checkbox" checked={listType === 'collection'} onChange={(e) => setListType(e.target.checked ? 'collection' : activeCard.list_type)} id="markOwned" style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
-                  <label htmlFor="markOwned" style={{ cursor: 'pointer', margin: 0, fontWeight: 700, color: 'var(--type-grass)', fontSize: '0.85rem' }}>
+                  <label htmlFor="markOwned" style={{ cursor: 'pointer', margin: 0, fontWeight: 700, color: 'var(--accent-green)', fontSize: '0.85rem' }}>
                     {t('inspector.markObtained')}
                   </label>
                 </div>
@@ -585,14 +577,6 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
                     onChange={(e) => setMarketValue(e.target.value)}
                     placeholder={formatPrice(displayPrice)}
                   />
-                  {grader !== 'Raw' && (
-                    <button
-                      type="button" className="btn btn-secondary" onClick={handleFetchValue} disabled={fetchingValue}
-                      style={{ whiteSpace: 'nowrap', fontSize: '0.75rem' }}
-                    >
-                      {fetchingValue ? t('common.loading') : t('inspector.fetchGradedValue')}
-                    </button>
-                  )}
                 </div>
                 <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '0.3rem', lineHeight: 1.4 }}>
                   {t('inspector.copyValueHint')}
@@ -600,8 +584,8 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
               </div>
 
               <div className="form-group">
-                <label>{t('inspector.storageContainer')}</label>
-                <select className="select-control" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+                <label htmlFor="inspector-location">{t('inspector.storageContainer')}</label>
+                <select id="inspector-location" className="select-control" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
                   <option value="">{t('bulk.unassignedPile')}</option>
                   {locations.slice().sort((a, b) => a.name.localeCompare(b.name)).map((loc) => (
                     <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
@@ -610,8 +594,9 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
               </div>
 
               <div className="form-group">
-                <label>{t('nav.notes')}</label>
+                <label htmlFor="inspector-notes">{t('nav.notes')}</label>
                 <textarea
+                  id="inspector-notes"
                   className="input-control"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -628,6 +613,144 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
             </form>
           ) : (
             <>
+              {/* Specifications Details Grid */}
+              <div className="view-section" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem 1rem', fontSize: '0.875rem', overflowWrap: 'anywhere', marginTop: 0, paddingTop: '0.75rem' }}>
+                {/* A slab reports its grade where a raw card reports its condition:
+                    they answer the same question, and showing 'Near Mint' for a
+                    PSA 9 states an opinion the grader already overruled. */}
+                {activeCard.grader && activeCard.grader !== 'Raw' ? (
+                  <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specGrade')}</span> <span style={{ color: 'var(--accent-yellow)', fontWeight: 700 }}>{activeCard.grader}{activeCard.grade != null ? ` ${activeCard.grade}` : ''}</span></div>
+                ) : (
+                  <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specCondition')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.condition}</span></div>
+                )}
+                {activeCard.cert_number && (
+                  <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specCert')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.cert_number}</span></div>
+                )}
+                <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.printing}</span></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specLanguage')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.language}</span></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specSupertype')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.supertype}</span></div>
+              </div>
+
+              {/* Storage Container details (clickable to view in storage) */}
+              {['collection', 'graveyard'].includes(activeCard.list_type) && (
+                <div
+                  className="view-section ci-storage-link"
+                  onClick={() => onViewStorage?.(activeCard)}
+                  role={onViewStorage ? 'button' : undefined}
+                  tabIndex={onViewStorage ? 0 : undefined}
+                  onKeyDown={(event) => {
+                    if (onViewStorage && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      onViewStorage(activeCard);
+                    }
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    padding: '0.75rem 0', marginTop: 0,
+                    fontSize: '0.875rem', cursor: onViewStorage ? 'pointer' : 'default'
+                  }}
+                  title={onViewStorage ? t('inspector.viewInStorage') : undefined}
+                >
+                  <MapPin size={14} style={{ color: 'var(--accent-red)', flexShrink: 0 }} />
+                  <div style={{ minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>{t('inspector.locationLabel')} </span>
+                    <strong style={{ color: 'var(--text-strong)' }}>
+                      {activeCard.location_name ? `${activeCard.location_name}${activeCard.location_type ? ` (${activeCard.location_type})` : ''}` : t('bulk.unassignedPile')}
+                    </strong>
+                    {activeCard.location_name && activeCard.compartment_display_label && (
+                      <span style={{ color: 'var(--text-secondary)' }}>
+                        {` • ${activeCard.compartment_display_label}`}
+                        {getSlotNumber(activeCard) !== null ? ` • ${t('wizard.slot', { slot: getSlotNumber(activeCard) })}` : ''}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {activeCard.list_type === 'collection' && (
+                <AddToDeckSelect
+                  key={deckListVersion}
+                  onAdd={handleAddToDeck}
+                  placeholder={t('inspector.addToDeck')}
+                  style={{ fontSize: '0.875rem', padding: '0.5rem', width: '100%' }}
+                />
+              )}
+              {(activeCard.game === 'mtg' || activeCard.supertype === 'MTG') && ['collection', 'arena'].includes(activeCard.list_type) && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleCreateCommanderDeck}
+                  disabled={creatingCommanderDeck}
+                  style={{ width: '100%', fontSize: '0.875rem' }}
+                >
+                  {creatingCommanderDeck ? t('common.loading') : t('inspector.createCommanderDeck')}
+                </button>
+              )}
+
+              {activeCard.notes && (
+                <div className="view-section" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 0, paddingTop: '0.75rem' }}>
+                  {activeCard.notes}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {activeCard.list_type === 'graveyard' ? (
+                  <>
+                    <button type="button" className="btn btn-secondary" onClick={() => handleQuickToggle('list_type', 'collection')}>{t('bulk.restoreToCollection')}</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => handleQuickToggle('list_type', 'arena')}>{t('bulk.restoreToArena')}</button>
+                  </>
+                ) : (
+                  <button type="button" className="btn btn-secondary" onClick={() => handleQuickToggle('list_type', 'graveyard')}>{t('bulk.archive')}</button>
+                )}
+              </div>
+
+              {/* Main Actions Row: Edit Card + Icon buttons for Favorite & Delete */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => setMode('edit')}>
+                  {t('inspector.editCard')}
+                </button>
+
+                {activeCard.grader === 'Raw' && (
+                  <button type="button" className="btn btn-secondary btn-icon-only" style={{ borderRadius: 'var(--radius-sm)', padding: '0.6rem' }} onClick={handleDuplicate} title={t('inspector.duplicateCard')} aria-label={t('inspector.duplicateCard')}>
+                    <Copy size={16} />
+                  </button>
+                )}
+
+              {activeCard.list_type !== 'collection' && activeCard.list_type !== 'arena' && activeCard.list_type !== 'graveyard' && (
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ backgroundColor: 'rgba(74,222,128,0.2)', color: 'var(--accent-green)', border: '1px solid rgba(74,222,128,0.3)', padding: '0 0.75rem', fontSize: '0.8rem' }} 
+                  onClick={() => handleQuickToggle('list_type', 'collection')}
+                  title={t('bulk.moveToCollection')}
+                >
+                  {t('inspector.obtained')}
+                </button>
+              )}
+
+                <button
+                  type="button"
+                  className={`btn ${favorite === 1 ? 'btn-primary' : 'btn-secondary'} btn-icon-only`}
+                  style={{ borderRadius: 'var(--radius-sm)', padding: '0.6rem', ...(favorite === 1 ? { backgroundColor: 'rgba(250,204,21,0.2)', color: '#facc15', border: '1px solid rgba(250,204,21,0.3)' } : {}) }}
+                  onClick={() => handleQuickToggle('favorite', favorite === 1 ? 0 : 1)}
+                  title={t(favorite === 1 ? 'inspector.unfavorite' : 'inspector.favorite')}
+                  aria-label={t(favorite === 1 ? 'inspector.unfavorite' : 'inspector.favorite')}
+                  aria-pressed={favorite === 1}
+                >
+                  <Star size={16} fill={favorite === 1 ? '#facc15' : 'none'} />
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-danger btn-icon-only"
+                  style={{ borderRadius: 'var(--radius-sm)', padding: '0.6rem' }}
+                  onClick={handleDelete}
+                  title={t('inspector.deleteCard')}
+                  aria-label={t('inspector.deleteCard')}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              <RelatedTokens compact cardIds={[activeCard.card_id || activeCard.id]} inventoryType={activeCard.list_type === 'arena' ? 'arena' : 'collection'} />
+
               {/* Price Panel */}
               <div style={{ borderTop: '1px solid var(--border-glass)', borderBottom: '1px solid var(--border-glass)', padding: '0.75rem 0', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                 <div>
@@ -650,9 +773,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
                       would be worse than either: confidently wrong. */}
                   {activeCard.market_value > 0 ? (
                     <div style={{ fontSize: '0.62rem', color: 'var(--accent-yellow)', marginTop: '0.1rem', lineHeight: 1.35 }}>
-                      {activeCard.market_value_source && activeCard.market_value_source !== 'manual'
-                        ? t('inspector.valueFromProvider', { source: activeCard.market_value_source })
-                        : t('inspector.valueFromYou')}
+                      {t('inspector.valueFromYou')}
                     </div>
                   ) : activeCard.grader && activeCard.grader !== 'Raw' && (
                     <div style={{ fontSize: '0.62rem', color: 'var(--accent-yellow)', marginTop: '0.1rem', lineHeight: 1.35 }}>
@@ -660,7 +781,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
                     </div>
                   )}
                   {/* Printings are priced separately; conditions are not, by anyone
-                      Bindarr talks to — TCGplayer, Scryfall and Cardmarket all quote
+                      Manafolio talks to — TCGplayer, Scryfall and Cardmarket all quote
                       a Near Mint copy. Saying so beats letting a played card show a
                       NM price with nothing to explain it, and beats inventing a
                       condition multiplier, which would be a made-up number wearing
@@ -726,142 +847,6 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
               {/* Price History Area Chart */}
               <PriceHistoryChart cardId={activeCard.card_id || activeCard.id} currency={activeCard.price_currency} height={100} defaultRange="30d" />
 
-              {/* Specifications Details Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem 1rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-glass)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }}>
-                {/* A slab reports its grade where a raw card reports its condition:
-                    they answer the same question, and showing 'Near Mint' for a
-                    PSA 9 states an opinion the grader already overruled. */}
-                {activeCard.grader && activeCard.grader !== 'Raw' ? (
-                  <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specGrade')}</span> <span style={{ color: 'var(--accent-yellow)', fontWeight: 700 }}>{activeCard.grader}{activeCard.grade != null ? ` ${activeCard.grade}` : ''}</span></div>
-                ) : (
-                  <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specCondition')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.condition}</span></div>
-                )}
-                {activeCard.cert_number && (
-                  <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specCert')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.cert_number}</span></div>
-                )}
-                <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.printing}</span></div>
-                <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specLanguage')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.language}</span></div>
-                <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specSupertype')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.supertype}</span></div>
-              </div>
-
-              {/* Storage Container details (clickable to view in storage) */}
-              {['collection', 'graveyard'].includes(activeCard.list_type) && (
-                <div
-                  onClick={() => onViewStorage?.(activeCard)}
-                  role={onViewStorage ? 'button' : undefined}
-                  tabIndex={onViewStorage ? 0 : undefined}
-                  onKeyDown={(event) => {
-                    if (onViewStorage && (event.key === 'Enter' || event.key === ' ')) {
-                      event.preventDefault();
-                      onViewStorage(activeCard);
-                    }
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.5rem',
-                    background: 'rgba(255, 71, 71, 0.03)', padding: '0.65rem 0.75rem',
-                    borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)',
-                    fontSize: '0.75rem', cursor: onViewStorage ? 'pointer' : 'default',
-                    transition: 'background 0.2s'
-                  }}
-                  title={onViewStorage ? t('inspector.viewInStorage') : undefined}
-                >
-                  <MapPin size={14} style={{ color: 'var(--accent-red)', flexShrink: 0 }} />
-                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                    <span style={{ color: 'var(--text-muted)' }}>{t('inspector.locationLabel')} </span>
-                    <strong style={{ color: 'var(--text-strong)' }}>
-                      {activeCard.location_name ? `${activeCard.location_name}${activeCard.location_type ? ` (${activeCard.location_type})` : ''}` : t('bulk.unassignedPile')}
-                    </strong>
-                    {activeCard.location_name && activeCard.compartment_display_label && (
-                      <span style={{ color: 'var(--text-secondary)' }}>
-                        {` • ${activeCard.compartment_display_label}`}
-                        {getSlotNumber(activeCard) !== null ? ` • ${t('wizard.slot', { slot: getSlotNumber(activeCard) })}` : ''}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-              {activeCard.list_type === 'collection' && (
-                <AddToDeckSelect
-                  key={deckListVersion}
-                  onAdd={handleAddToDeck}
-                  placeholder={t('inspector.addToDeck')}
-                  style={{ fontSize: '0.8rem', padding: '0.45rem 0.5rem', width: '100%' }}
-                />
-              )}
-              {(activeCard.game === 'mtg' || activeCard.supertype === 'MTG') && ['collection', 'arena'].includes(activeCard.list_type) && (
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleCreateCommanderDeck}
-                  disabled={creatingCommanderDeck}
-                  style={{ width: '100%', fontSize: '0.8rem' }}
-                >
-                  {creatingCommanderDeck ? t('common.loading') : t('inspector.createCommanderDeck')}
-                </button>
-              )}
-
-              {activeCard.notes && (
-                <div style={{ background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.6rem 0.75rem', fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {activeCard.notes}
-                </div>
-              )}
-
-              <RelatedTokens cardIds={[activeCard.card_id || activeCard.id]} inventoryType={activeCard.list_type === 'arena' ? 'arena' : 'collection'} />
-
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {activeCard.list_type === 'graveyard' ? (
-                  <>
-                    <button type="button" className="btn btn-secondary" onClick={() => handleQuickToggle('list_type', 'collection')}>{t('bulk.restoreToCollection')}</button>
-                    <button type="button" className="btn btn-secondary" onClick={() => handleQuickToggle('list_type', 'arena')}>{t('bulk.restoreToArena')}</button>
-                  </>
-                ) : (
-                  <button type="button" className="btn btn-secondary" onClick={() => handleQuickToggle('list_type', 'graveyard')}>{t('bulk.archive')}</button>
-                )}
-              </div>
-
-              {/* Main Actions Row: Edit Card + Icon buttons for Favorite & Delete */}
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => setMode('edit')}>
-                  {t('inspector.editCard')}
-                </button>
-
-                {activeCard.grader === 'Raw' && (
-                  <button type="button" className="btn btn-secondary btn-icon-only" style={{ borderRadius: 'var(--radius-sm)', padding: '0.6rem' }} onClick={handleDuplicate} title={t('inspector.duplicateCard')}>
-                    <Copy size={16} />
-                  </button>
-                )}
-
-              {activeCard.list_type !== 'collection' && activeCard.list_type !== 'arena' && activeCard.list_type !== 'graveyard' && (
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ backgroundColor: 'rgba(74,222,128,0.2)', color: 'var(--type-grass)', border: '1px solid rgba(74,222,128,0.3)', padding: '0 0.75rem', fontSize: '0.8rem' }} 
-                  onClick={() => handleQuickToggle('list_type', 'collection')}
-                  title={t('bulk.moveToCollection')}
-                >
-                  {t('inspector.obtained')}
-                </button>
-              )}
-
-                <button
-                  type="button"
-                  className={`btn ${favorite === 1 ? 'btn-primary' : 'btn-secondary'} btn-icon-only`}
-                  style={{ borderRadius: 'var(--radius-sm)', padding: '0.6rem', ...(favorite === 1 ? { backgroundColor: 'rgba(250,204,21,0.2)', color: '#facc15', border: '1px solid rgba(250,204,21,0.3)' } : {}) }}
-                  onClick={() => handleQuickToggle('favorite', favorite === 1 ? 0 : 1)}
-                  title={t(favorite === 1 ? 'inspector.unfavorite' : 'inspector.favorite')}
-                >
-                  <Star size={16} fill={favorite === 1 ? '#facc15' : 'none'} />
-                </button>
-
-                <button
-                  type="button"
-                  className="btn btn-danger btn-icon-only"
-                  style={{ borderRadius: 'var(--radius-sm)', padding: '0.6rem' }}
-                  onClick={handleDelete}
-                  title={t('inspector.deleteCard')}
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
             </>
           )}
         </div>
@@ -870,7 +855,7 @@ function CardInspectorModal({ card, onClose, onUpdate, onDeleted, showToast, onV
       {isFullScreen && (
         <CardImageZoom card={activeCard} onClose={() => setIsFullScreen(false)} />
       )}
-    </div>
+    </dialog>
   );
 }
 

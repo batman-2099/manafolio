@@ -1,585 +1,368 @@
-# Bindarr — Architecture & Developer Guide
+# Manafolio — Architecture & Developer Guide
 
-Developer-facing reference for the codebase. For install/run/deploy and end-user
-features, see [README.md](README.md); this document explains **how the system is
-built and why**.
+Manafolio is a self-hosted **Magic: The Gathering collection, storage, and deck manager**. Its core domain is exact card printings and the copies a user keeps in Physical Collection, Arena, Wishlist, or Graveyard. Physical storage and deck reservations connect those records to the cards on the table; Arena stays a separate inventory.
 
-Bindarr is a self-hosted trading-card collection manager for **Pokémon**,
-**Magic: The Gathering**, and **Disney Lorcana**. It identifies cards from a phone photo (no typing),
-tracks their real-world physical location (which binder page / box row slot),
-values the collection over time, and helps you pull and re-file the cards for a
-deck.
+This guide describes the current implementation and the contracts to preserve when changing it. For installation, migration, and user workflows, start with [README.md](README.md). Manafolio originated as a fork of Bindarr by thenotoriousJeremy and contributors; attribution remains in the [README](README.md#acknowledgments-and-license) and [MIT license](LICENSE).
 
-- **Backend**: Node.js + Express, SQLite (single file), served together with the built frontend from one container.
-- **Frontend**: React + Vite SPA.
-- **Auth**: opaque session tokens in a server-side `sessions` table, sent as a `Bearer` header.
-- **Card data**: Pokémon TCG API / TCGdex / optional pokemontcgapi.com (Pokémon), Scryfall (MTG), and Lorcast (Disney Lorcana), cached locally in `card_cache`.
-- **Image ID**: two small ONNX models — `cornelius` finds the card's corners, `milo` embeds the dewarped card as a 128-d unit vector — then a brute-force cosine sweep over a prebuilt catalog of every cached card's artwork. Corner detection also runs in the browser, so the outline on screen is the crop that gets matched.
+## Contents
 
-Stack: React + Vite + Recharts on the front, Express + `sqlite3` + Helmet +
-`express-rate-limit` on the back, `onnxruntime-node` + `sharp` for images on the
-server and `onnxruntime-web` in a worker on the client, Docker + GitHub Actions
-to ship.
+- [System overview](#system-overview)
+- [Repository layout](#repository-layout)
+- [Domain and data model](#domain-and-data-model)
+- [Backend and API boundaries](#backend-and-api-boundaries)
+- [Database transactions and persistence](#database-transactions-and-persistence)
+- [Card data, languages, and prices](#card-data-languages-and-prices)
+- [Storage and sorting](#storage-and-sorting)
+- [Deck editing, checkout, and check-in](#deck-editing-checkout-and-check-in)
+- [Imports, exports, and backups](#imports-exports-and-backups)
+- [Image identification pipeline](#image-identification-pipeline)
+- [Optional AI decks](#optional-ai-decks)
+- [Frontend and Arcane Blue](#frontend-and-arcane-blue)
+- [Development and verification](#development-and-verification)
 
----
+## System overview
+
+| Layer | Implementation |
+| --- | --- |
+| Browser | React SPA, Vite, Recharts, translated UI, account themes; ONNX corner detection in a worker |
+| Server | Node.js, Express, Helmet, rate limiting, compressed API/static responses |
+| Persistence | SQLite via `sqlite3`; one collection database, plus a separate rebuildable Scryfall bulk database |
+| Magic data | Scryfall cards, sets, images, languages, prices, and token relations; MTGJSON preconstructed decklists |
+| Scanning | `onnxruntime-node` and `sharp` for artwork matching; native Tesseract title and footer OCR |
+| Optional AI | OpenAI Codex app-server, Gemini, OpenRouter, or a user-selected Ollama service |
+| Delivery | One container serves API and built frontend to desktop and phone browsers |
+
+Search, scan, sets, statistics, and deck workflows support Magic only. Preserve stored game and provider identities when maintaining shared code; removing an integration must not delete existing records or relabel them as Magic.
 
 ## Repository layout
 
-```
-backend/
-  src/
-    server.js              Express app: middleware, route mounts, static SPA, health, admin bootstrap
-    db.js                  SQLite connection (promisified run/get/all), schema init, password hashing
-    middleware/auth.js     authenticateToken (session lookup), requireAdmin, rate limiters
-    routes/
-      auth.js              register / login / logout / me / per-user settings
-      collection.js        collection CRUD, locations & compartments, sorting, scan-match, stats, import/export
-      decks.js             deck CRUD, deck cards, checkout / return, /:id/locations locator payload
-      sets.js              set catalog lookup
-      settings.js          app-wide settings (admin)
-      shared.js            public read-only shared collection by share_token
-      admin.js             user management, card seeding
-    tcgApi.js              Pokémon TCG API client (search + fetch by id) -> card_cache shape
-    scryfallApi.js         Scryfall (MTG) client -> same normalized card shape
-    lorcastApi.js          Lorcast (Disney Lorcana) client -> same normalized card shape
-    tcgdexApi.js           TCGdex client: multilingual Pokémon cards
-    pokemontcgapi.js        Optional Pokémon client: Western, Japanese and Simplified Chinese print lines
-    tcgcsvApi.js           TCGCSV pricing + the tcgplayer_product id mapping
-    psaApi.js              PSA cert lookup (what is in the slab), cached forever in psa_cert
-    gradedPrices.js        Graded-price lookup (what the slab is worth) via PokemonPriceTracker
-    cvScan.js              Image ID pipeline: cornelius corners -> dewarp -> milo embedding -> cosine over a catalog
-    catalog.js             Catalog builds: cache every set's cards, then embed their artwork (Admin -> Catalogs)
-    cardSets.js            Set discovery per game/language, and fetching a set's cards into card_cache
-    cardArt.js             Per-card art overrides (user-supplied images)
-    utils/
-      compartmentSort.js   Placement engine: which compartment/slot a card files into; sort comparators
-      priceHelpers.js      Price resolution across printings; vintage-set detection; UTC parsing
-      authHelpers.js       Auth-related helpers
-      npz.js               Minimal .npz reader, for the published (not locally built) catalogs
-      pokemonProvider.js   The single Pokémon provider decision for this language
-      languages.js         Language code/name resolution
-    backup.js              DB backup helpers
-  scripts/                 fetch-models.mjs, catalog builders, the scan-gate measurement harness
-  data/models/             cornelius.onnx, milo.onnx and the built catalogs (CV_MODEL_DIR)
-  test/                    Node test suites and an e2e runner under test/e2e/
-frontend/
-  src/
-    main.jsx, App.jsx      Entry + root: auth state, fetch wrapper (injects Bearer), tab routing, code-split views
-    components/            One component per screen/widget (see Frontend section)
-    utils/                 Pure helpers: sorting, pricing, printing/rarity styling, language, shuffle
-Dockerfile, docker-compose.yml, .github/workflows/docker-build.yml   Container build + CI publish to GHCR
-```
+Paths below are relative to the repository root.
 
-Regenerable/large artifacts live in `backend/data/models` (the two ONNX files and
-the built catalogs, `CV_MODEL_DIR`) and the SQLite DB — both gitignored. A catalog
-is ~5 MB per 10k cards, two orders of magnitude smaller than the per-set ORB
-indexes this replaced (~2.6 GB), but it is still build output, so the container
-points `CV_MODEL_DIR` at `/app/database/models` on the mounted volume — otherwise
-an image update discards every catalog an admin built.
+| Path | Responsibility |
+| --- | --- |
+| `backend/src/server.js` | Middleware ordering, router mounts, readiness, startup jobs, static SPA, HTTP/HTTPS listeners |
+| `backend/src/db.js` | SQLite connection, queued queries, transactions, schema initialization/migrations, password hashing |
+| `backend/src/middleware/auth.js` | Session/API-key authentication, administrator checks, rate limiters |
+| `backend/src/routes/` | HTTP handlers; see the route map below |
+| `backend/src/scryfallApi.js` | Scryfall normalization, search, printing resolution, token relations, live price refresh |
+| `backend/src/scryfallBulk.js`, `scryfallBulkSchedule.js` | Persistent bulk catalog and daily UTC download scheduling |
+| `backend/src/mtgjsonApi.js` | Preconstructed deck discovery and downloads |
+| `backend/src/utils/cardApi.js`, `cardCache.js` | Provider dispatch, hydration, and normalized cache writes |
+| `backend/src/utils/collectionHelpers.js` | Shared placement, stack quantity, and checkout-allocation helpers |
+| `backend/src/utils/compartmentSort.js` | Storage eligibility, sorting, stacking, and slot recommendations |
+| `backend/src/utils/deckRules.js`, `aiDecks.js` | Deck validation and inventory-aware AI request/save rules |
+| `backend/src/codexDeckClient.js`, `ollamaDeckClient.js`, `hostedDeckClient.js` | Provider-specific AI transport and lifecycle |
+| `backend/src/cvScan.js`, `catalog.js`, `cardSets.js` | Scan inference, resumable artwork catalogs, and set caching |
+| `backend/src/utils/scanOcr.js`, `modelAssets.js`, `npz.js` | Card-name/footer OCR, optional model downloads, published catalog reader |
+| `backend/src/utils/priceHelpers.js` | Price precedence, timestamps, price-history recording, sweep gates |
+| `backend/src/psaApi.js` | Certification lookup |
+| `backend/src/cardArt.js`, `backup.js` | Artwork overrides and server-level SQLite snapshots |
+| `backend/scripts/` | Model fetching, catalog tooling, and scan-gate measurements |
+| `backend/test/`, `backend/test/e2e/` | Backend unit and HTTP integration runners |
+| `frontend/src/main.jsx`, `App.jsx` | Initialization, translations, authentication state, fetch wrapper, tab-based navigation |
+| `frontend/src/components/` | Collection, storage, deck, scanner, settings, administration, and shared views |
+| `frontend/src/index.css`, `arcane.css` | Base/component/theme styles and the default dark Arcane Blue overrides |
+| `frontend/src/utils/`, `locales/` | Display/domain helpers, scanner worker, translations, and frontend unit tests |
+| `frontend/src/demo/` | Fixture-backed demonstration build, separate from a server installation |
+| `shared/` | Shared card geometry and domain tables used by client and server |
+| `Dockerfile`, `docker-compose.yml`, `.github/workflows/` | Container packaging, local deployment, and release/demo automation |
 
-The two models are in neither the repository nor the image, and that is a
-licensing decision rather than an omission: they are AGPL-3.0 while Bindarr is MIT,
-so the operator fetches them into `CV_MODEL_DIR` as a deliberate step
-(`node scripts/fetch-models.mjs`, optionally `--catalogs` for the published
-fallbacks). Startup says so when they are absent, because that is the ordinary
-state of a fresh install, and `/api/scan-match` answers `503 notBuilt` rather than
-failing obscurely at session creation.
+The main persistent assets are the collection database and its sidecars, automatic backups, TLS material, uploaded card art, Codex account data, scan models/catalogs, and the separate Scryfall bulk database. In Docker these live under `/app/database`; the Compose service mounts `manafolio-data` there. Models are explicitly downloaded rather than bundled in the image.
 
----
+## Domain and data model
 
-## Backend
+### Inventories and identity
 
-### Request lifecycle
+| User-facing destination | `collection.list_type` | Supplies owned/deck inventory | Physical storage |
+| --- | --- | --- | --- |
+| Physical Collection | `collection` | Physical decks | Physical containers |
+| Arena | `arena` | Arena decks | None |
+| Wishlist | `wishlist` | No | None |
+| Graveyard | `graveyard` | Graveyard deck definitions only; separate archived statistics | Graveyard containers |
 
-`server.js` wires Helmet (with a Report-Only CSP that allow-lists the card-image
-hosts), JSON body limits, the API routers, then serves the
-built SPA and a SPA fallback. `GET /api/health` is unauthenticated and backs the
-Docker `HEALTHCHECK`. An empty `users` table stays empty unless
-`DEFAULT_ADMIN_PASSWORD` is set, which seeds the `admin` account at startup;
-otherwise the first browser visit sets that account's password through
-`POST /api/auth/bootstrap`. Both paths name it `admin` — the bootstrap route ignores
-any username posted to it, because the name has to be knowable to whoever set
-`DEFAULT_ADMIN_PASSWORD` and is what `db.adoptOrphanRows` is reached through. No
-password is ever logged.
+`locations.inventory_type` is `collection` or `graveyard`; `decks.inventory_type` is `collection`, `arena`, or `graveyard`. These fields are related but are not interchangeable enums. Trade status is an `is_trade` flag, not a fifth inventory destination.
 
-Startup also probes `CV_MODEL_DIR` with a real write — `fs.access(W_OK)` reports
-permission bits, which is not the same question as whether the filesystem will
-accept a file — and warms the two ONNX sessions and the default catalog, so the
-first scan of a session does not pay for the load. An unwritable model directory
-is reported and survived: everything except catalog builds still works.
+A provider card ID identifies an exact printing in `card_cache`. A `collection.id`, exposed as `entry_id`, identifies a user's stored entry. Storage highlights, edits, and pull lists use **entry identity**, not `card_id + position`, which can collide across compartments. Add paths normally create individual-copy rows; quantity-bearing rows and aggregated display stacks also exist, so consumers must sum `quantity`, not count rows.
 
-### Auth
+Missing/Found is a flag on an entry, not deletion or archival. Individual inventory transfers clear incompatible placement. Archiving retains quantities and metadata but removes cards from owned totals and Physical/Arena deck supply. Archived cards can supply Graveyard deck definitions. Restoring an individual card to Physical returns it to Unassigned Pile. A whole-container transfer instead preserves its layout and placements.
 
-Authentication is DB-backed session tokens, not JWTs:
+### Main tables
 
-- `POST /api/auth/login` verifies a PBKDF2 password hash and inserts a row into `sessions` (`user_id`, `token`, `expires_at`).
-- `authenticateToken` (`middleware/auth.js`) reads the `Bearer` token, looks it up in `sessions` where `expires_at > now`, and sets `req.user = { id, username, role, tcg_api_key, ... }`.
-- `requireAdmin` gates admin-only routes on `req.user.role === 'admin'`.
-- A bearer token that matches no session is then checked against `users.api_key` — a long-lived read-only credential for external scripts (issue #33). It sets `req.user.via_api_key`, which makes `authenticateToken` refuse any non-GET (403) and `requireAdmin` refuse it outright, and makes `/auth/me` strip the account's other provider keys. Read-only is the whole reason a non-expiring credential is acceptable here; anything that weakens it has to replace it with something scoped.
-- Rate limiters (`authLimiter`, `searchLimiter`, `importLimiter`) protect login and expensive endpoints.
+`db.js` creates the schema and applies column migrations. This is a domain map, not a substitute for the schema when writing SQL.
 
-`collection.js` applies `router.use(authenticateToken)` up front, so every
-collection/location/deck-adjacent route requires a valid session.
+| Table | Meaning and important fields |
+| --- | --- |
+| `users` | Identity, PBKDF2 password hash, role, theme, share controls, OIDC subject, provider credentials, read-only API key, AI preferences |
+| `sessions` | Opaque token, user ID, expiration |
+| `card_cache` | Provider ID, `game`, searchable `name`, `printed_name`, language, set/number, art, Magic rules/identity fields, prices and currency/source |
+| `collection` | User/card relationship, quantity, finish (`printing`), condition, language, purchase price, inventory, storage IDs/position, favorite/trade/missing flags, slab identity, per-copy value |
+| `locations` | User-owned container, type, inventory, sorting/filter rules, locks, stacking and cover configuration |
+| `compartments` | Ordered pages/rows within a container, capacity, label, rules, lock |
+| `compartment_assignments` | Filing categories assigned to compartments |
+| `decks` | User-owned definition, inventory, format, target size, commander, metadata, checkout state, wins/losses |
+| `deck_cards` | Printing quantities and optional source-entry anchor per deck; `checked_out` here records **Pulled**, not the deck's reservation state |
+| `deck_card_allocations` | Exact collection entries and quantities reserved by checked-out decks |
+| `sets` | Provider set metadata and ordering |
+| `price_history` | Changed card prices over time |
+| `notes` | User-owned notes and pinning |
+| `app_settings` | Singleton settings row, including public URL and refresh schedules |
+| `psa_cert` | Cached certification responses |
+| `set_data_gaps` | Catalog coverage gaps |
+
+## Backend and API boundaries
+
+### Request lifecycle and authentication
+
+`server.js` applies security headers, CORS, body parsers, and compression before routing. The default JSON limit is 1 MB; `/api/import`, `/api/scan-match`, and `/api/search` receive a 15 MB parser. Do not infer that every import-related URL has the larger allowance.
+
+Public routes are mounted deliberately **before** the single `app.use('/api', authenticateToken)` gate. Admin routes authenticate and authorize themselves; card-art reads are public and writes authenticate inside their router. Every remaining API router sits behind the central gate. Adding a router above it changes the security boundary.
+
+- Login verifies a PBKDF2 password hash and creates an expiring opaque session in SQLite; this is not JWT authentication.
+- Authentication resolves a Bearer token to `sessions` and `users`, then populates `req.user`.
+- A token matching `users.api_key` instead is GET-only. `requireAdmin` rejects API keys even for administrator accounts, and `/auth/me` removes provider credentials from API-key responses.
+- AI account/model/preferences and suggestion operations require a browser session. The read-only AI inventory endpoint remains accessible with an API key.
+- Local auth/bootstrap and optional OIDC live in `routes/auth.js` and `utils/oidc.js`. Registration is closed unless `ALLOW_REGISTRATION=true`.
+- On an empty installation, `DEFAULT_ADMIN_PASSWORD` seeds `admin`; otherwise `/api/auth/bootstrap` creates that account through first-run setup. Protect access until setup is complete. Passwords must not be logged.
+
+`GET /api/health` is public, checks database readiness and a query, and returns `{"status":"ok"}` when healthy or HTTP 503 while unavailable. It is the Docker healthcheck target.
 
 ### Route map
 
-| Mount | File | Responsibility |
-|-------|------|----------------|
-| `/api/auth` | auth.js | `register`, `login`, `logout`, `me`, `PUT /settings` (per-user, e.g. `tcg_api_key`), `POST/DELETE /api-key` (read-only external key) |
-| `/api` | collection.js | Card `search`, `scan-match`, `collection/cert/:certNumber`; `collection` CRUD + `bulk` + `:id/market-value/fetch`; `locations` & `compartments` CRUD; `recommend(-batch)`, `apply-all`, `resort`; `stats`, `stats/history`, `stats/networth`, `export`, `import`; `cards/:id/price-history` |
-| `/api/decks` | decks.js | Deck CRUD, `:id/cards`, `:id/checkout`, `:id/return`, `:id/locations` (checkout/check-in locator payload) |
-| `/api/sets` | sets.js | Set catalog for dividers and scan scoping; non-English Pokémon set lists come from TCGdex, whose ids differ per language |
-| `/api/settings` | settings.js | App-wide settings (read any; write requires admin) |
-| `/api/shared` | shared.js | Public, read-only collection view by `share_token` (no auth) |
-| `/api/admin` | admin.js | User management, card cache seeding, `catalogs` (list / `build` / `stop` / `progress`), DB backups (admin) |
+File names in this table are under `backend/src/routes/`. The table groups actual router ownership rather than assigning every `/api` operation to `collection.js`.
 
-### Card data sources
-
-`tcgApi.js` (Pokémon), `tcgdexApi.js` (non-English Pokémon) and `scryfallApi.js`
-(MTG) all normalize provider cards into one shape and upsert into `card_cache`, so
-the rest of the app is game-agnostic. Every card carries a `game` field
-(`pokemon` | `mtg`) and a `language`. A user's Pokémon TCG API key (stored
-per-user) is passed through where available.
-
-`utils/pokemonProvider.js` owns the Pokémon provider decision. It is asked,
-never re-derived from the language: four call sites once derived it themselves and
-four of them disagreed, which is how 21,828 rows were cached with the wrong
-normalizer and ended up with no image and no collector number.
-
-#### Optional pokemontcgapi.com provider
-
-`pokemonProvider.apiFor(lang)` maps the central policy to its client. When the
-admin selects `pokemontcgapi`, `en`, `ja` and `zh-cn` use `pokemontcgapi.js`;
-other languages retain TCGdex. The existing default migration is untouched.
-The credential comes only from `POKEMONTCGAPI_KEY` on the server. Merely setting
-it does not enable the provider.
-
-Card and set IDs both use `pokemontcgapi-<canonical-id>`. Aliases are accepted
-upstream but normalized back to the canonical ID. `cardApi` dispatches stored IDs
-independently of today's setting. There is no guessed cross-provider or
-cross-language ID conversion: changing a name's locale does not identify the same
-physical printing in another release line.
-
-The API's card endpoint does not document a region filter. Searches filter
-`print_region` before applying Bindarr's page/limit window, following cursors even
-when a page has no matching region. Set lists use `region=WEST|JP|CN`, and set
-cards use the `/cards?set=...` shortcut. All list requests use `limit=250` and
-include images and translations but NOT prices: prices are what the API's
-credits pay for (a 250-card page measured 1 credit without them and 40 with
-them), so listing rows are cached unpriced (`price_trend` null, which
-`extractPrices` distinguishes from a genuine zero) and `cacheListedCards` copies
-any price already stored onto the incoming row so a listing never erases one.
-The price arrives at the two moments the app shows a value: `hydrateCard`, called
-by `cardApi.hydrate` when a card enters the collection, fetches that one card
-with prices (2 credits); and the automatic sweep prices owned/decked cards in
-batches, only those whose stored price has aged past three days, as often as
-`app_settings.price_refresh_days` allows (`shouldSweepPrices` is the single gate;
-the timer in server.js is unforced). `cacheListedCards` also puts a kept row's
-`last_updated` back, so a listing cannot make an old price look fresh to the sweep.
-User-entered names are quoted as literal query phrases; set IDs go through the
-separate `set` parameter.
-
-`pokemontcgapi_cache` stores complete response bodies, ETags and fetch times for
-up to 1,024 requests. A key digest scopes entries to the account's plan visibility;
-the key itself is never persisted. Responses are reused for 24 hours, then
-conditionally revalidated. In-flight identical requests coalesce, redirects are
-disabled, and only a same-origin, same-endpoint next cursor is accepted. A 429
-pauses further upstream calls for Retry-After (at least one minute), without
-sleeping in the request handler or automatically retrying a paid request.
-`card_cache` remains the normalized, durable store, written through
-`cacheNormalizedCards`. Cached cards can still answer when the API is unavailable.
-
-Price normalization chooses ungraded Cardmarket EUR, then TCGplayer USD, and
-keeps every printing/average column in that source and currency. It ignores slab
-quotes and known different locales; `index_eur` is a composite, so it is not
-presented as a Cardmarket price. Missing quotes stay absent. Source labels are
-`pokemontcgapi-cardmarket` and `pokemontcgapi-tcgplayer`. Its own sweep reads only
-stale owned/decked IDs in batches of 25, with a separate timestamp, and only while
-selected. The older pokemontcg.io and TCGCSV sweeps skip these IDs/sets.
-
-Set browsing, `cardSets` downloads and catalog coverage use the selected client.
-Existing cached cards and scan catalogs survive a switch; a rebuild includes the
-new provider's artwork. A complete catalog can consume many credits and is not
-started by selecting the provider.
-
-Offline contract and HTTP integration tests live in
-`backend/test/pokemontcgapi.test.js`, with documented fixtures under
-`backend/test/fixtures/pokemontcgapi/`. They cover ID routing, admin activation,
-search/add, regions, cursor/UI pagination, persisted ETag revalidation, price
-currencies, quota backoff and cache fallback. No live key is needed by the tests.
-
-#### Two names per card, and which is which
-
-`card_cache.name` is the **searchable** name and `printed_name` is the name **on the
-card**. Display reads `printed_name || name` (`utils/languages.displayName`,
-`langHelper.getCardDisplayName`); search reads both columns (`utils/cardSearchSql`,
-`CollectionList`'s filter); logic that must not split a card across languages — the
-four-copy deck rule, CSV export, marketplace links — reads `name` only.
-
-Scryfall hands over both for free. TCGdex publishes one name per language, so
-`normalizeCard` writes the localized name into both columns and
-`tcgdexApi.learnEnglishName` fills `name` in from the card's own English printing
-when a card is added (plus a backfill on the price sweep). A Japan-exclusive set has
-no English printing and keeps the localized name in both columns.
-
-A copy's language is chosen separately from the card that was picked — Quick Add's
-dropdown, or a scan the English catalog answered — so `cardApi.printingInLanguage`
-swaps the row for that language's printing inside `addCardToCollection`, which every
-add path routes through. MTG resolves by set + collector number (language-invariant),
-TCGdex by the language segment in its id. Null means keep what was picked: a card
-never printed in that language, or a pokemontcg.io id, which is English-only and
-whose set numbering does not map to TCGdex's.
-
-### Image identification pipeline
-
-Artwork identification uses two ONNX models: a corner detector and an embedder.
-The active Magic scanner additionally checks set/collector details using native
-Tesseract OCR; OCR verifies candidates rather than replacing artwork matching.
-
-The browser does the first half. `utils/detectWorker.js` runs **cornelius**
-(384×384, ~4.2 MB, fetched once from `GET /models/cornelius.onnx`) through
-`onnxruntime-web` on a worker thread to draw the live outline, then
-`CameraScanner.localDewarp` perspective-warps the captured frame to an 896×896
-square using the shared `shared/imgproc.mjs` and uploads only that. Two reasons:
-the previous version posted a JPEG per preview frame (~2.7 MB per minute of
-pointing the camera at a card), and the outline on screen is now *by
-construction* the crop that gets matched. Detection is ~80 ms per frame on the
-wasm EP — name the EP explicitly, WebGPU measured 1075 ms for this model.
-
-Server side, `cvScan.match(buffer, game, topK, opts)`:
-
-1. **Dewarp.** An already-rectified upload (`cropped: true`) is only resized to
-   448 — re-running cornelius on a crop that already *is* the card would find the
-   same square again for the price of a decode and a forward pass. A whole frame
-   goes through `detectAndDewarp`: cornelius on a 384 copy, then a homography onto
-   a 448 square sampled from a 1200px decode. Below a sharpness of 0.02 the corner
-   peaks are flat — nothing card-like in frame — and the raw frame is matched
-   instead, which still recovers most of those.
-2. **Embed.** **milo** turns the 448 square into a 128-d L2-normalised vector.
-   One crop, one forward pass, reused by every catalog swept.
-3. **Sweep.** A brute-force dot product against each catalog (both sides are unit
-   vectors, so the dot product *is* the cosine). 21,775 rows costs ~6 ms, which is
-   why there is no ANN index here: building one would cost more than it saves.
-4. **Rank.** Hits from every catalog merge into one list sorted by score —
-   comparable because it is the same model and the same normalisation — deduped by
-   id, and cut to `topK`.
-
-The route (`POST /api/scan-match`) hydrates candidates, evaluates blur/probable
-glare, and checks the rectified footer with `utils/scanOcr.js`. A confident OCR
-set-and-number pair can narrow visually plausible candidates; conflicts and
-same-artwork/near-tied printings remain manual. The response's `safety` object
-includes `autoAddSafe`, reason codes, OCR status, quality, and context fallbacks.
-`CameraScanner` requires two fresh decoded video frames to agree on the resolved
-printing before automatic addition, including Turbo. Settings changes, pause,
-and unmount cancel verification; network failure never counts as agreement.
-
-OCR uses the original 896px client crop when supplied, otherwise the server crop.
-Tesseract runs without a shell, with bounded input/output, a five-second process
-timeout, and at most two concurrent jobs. Source installs require Tesseract and
-`eng` data; the Docker runtime installs both. Missing OCR or execution errors
-block auto-add but preserve manual candidates. Quality thresholds are conservative
-heuristics and still need validation across real cameras, sleeves, and lighting.
-
-#### Language is a fallback chain, not a filter
-
-`loadAll` sweeps the scanned-language catalog and English fallback. For Magic,
-the route attempts the requested printing using set and collector number. If
-that lookup cannot confirm the requested language, it retains the actual
-printing/language and reports `language_fallback`; automatic addition is blocked.
-
-That second sweep is not a nicety. A non-English catalog is only as complete as
-its provider: TCGdex serves card records for **28 of the 177 Japanese Pokémon
-sets it lists**, so a Japanese catalog holds ~3.3k of ~16k cards. A cosine sweep
-never returns nothing, so every card outside those 28 sets used to come back as
-the nearest of the wrong 3.3k, sometimes confidently. The English catalog has a
-row for nearly all of them — verified: Japanese スズナ → Candice at 0.863,
-モンジャラ → Tangela, ダブラン → Duosion, from the English catalog alone. The right
-card in the wrong language beats a wrong card in the right one.
-
-#### Set scoping is a filter, and it is per catalog
-
-Passing set ids skips every row that does not belong *before* scoring: the whole
-point of scoping is that a runner-up from an unwanted set can no longer outrank
-the right card. There is nothing to build — the ORB path needed a per-set index
-first, which was the client's old "preparing set" wait.
-
-The filter is evaluated per catalog, because set ids do not survive a language:
-`SV4a` names no row in the English catalog. A catalog with no rows in scope is
-**dropped** from the sweep rather than searched unscoped, since searching it
-unscoped would reintroduce exactly the wrong-card answer the scope exists to
-prevent. If no catalog has rows in scope, the scan may return global candidates,
-but reports `set_fallback` and requires manual confirmation instead of auto-add.
-
-#### "Nothing here is your card"
-
-A sweep always returns its nearest row, so a card the catalog has never heard of
-arrives in the same shape as one it has. The gate is how far the winner stands
-above **its own catalog's** ranks 2–11 (`GAP_FLOOR`, default 0.10, env
-`CV_SCAN_GAP`) — not its absolute cosine, because absolute cosine tracks photo
-quality and the gap does not. Measured by `scripts/measure-scan-floor.js` over 60
-cards per catalog, each searched with its own row masked out so that it *is* a
-missing card:
-
-| strangers accepted | reference-quality input | blurred / tilted / dim input |
+| Mount | Module | Responsibilities |
 | --- | --- | --- |
-| absolute cosine ≥ 0.65 | 31–41 of 60 | 15–19 of 60 |
-| gap ≥ 0.10 | 12 of 60 | 11–12 of 60 |
+| `/api/auth` | `auth.js` | Config/bootstrap, registration/login/logout/me, OIDC, account settings/theme, API keys |
+| `/api/shared` | `shared.js` | Opt-in public collection and container views by share token |
+| `/api/admin` | `admin.js` | Users, seed data, catalogs/build/stop/progress, model assets, backup management |
+| `/api/card-art` | `cardArt.js` | Public art index/images; authenticated upload/delete |
+| `/api` | `collection.js` | Search, scan coverage/match, certification lookup, collection CRUD/bulk operations/placement/value, printing localization, related tokens, MTGJSON precons/import |
+| `/api` | `storage.js` | Locations/compartments, locks/rules/covers, inventory transfer, recommend/recommend-batch/apply-all/resort |
+| `/api` | `stats.js` | `/stats`, `/stats/history`, `/stats/networth`, `/cards/:id/price-history` |
+| `/api` | `importExport.js` | `/export`, `/import/preview`, `/import`, `/import-container`, `/import-container/move` |
+| `/api` | `notes.js` | `/notes` CRUD |
+| `/api/sets` | `sets.js` | Magic set catalog |
+| `/api/decks` | `decks.js` | CRUD, from-container, complete editor save, records, commander, duplicate, cards/Pulled, checkout/return, locations |
+| `/api/ai-decks` | `aiDecks.js` | AI connection/preferences/models, eligible inventory, streamed suggestions, validated create/replace |
+| `/api/settings` | `settings.js` | Effective settings/version, administrator changes and Scryfall bulk download |
 
-One threshold, same behaviour on a good photo and a bad one, across both the
-3,296 row Japanese catalog and the 21,771 row English one, and no correct answer
-was rejected in any of the four runs (worst genuine gap 0.105). The gap is
-measured within a single catalog on purpose: the same card sits in both the
-Japanese and the English one, and its own twin a rank down would flatten a merged
-neighbourhood and make every correct answer look like a stranger.
+The built frontend is served from `frontend/dist`. Non-API paths fall back to the SPA. `/models/cornelius.onnx` exposes only the public corner-model weights, not the entire model/catalog directory.
 
-When it trips, the response carries `notInCatalog: true` **and** the candidates.
-The client refuses to auto-add and says the card is not in the catalog, but still
-shows the list: a bad photo and a missing card look identical from here, and one
-of the candidates is right often enough to be worth the glance. The strangers
-that do get through are cards whose *artwork* is reprinted elsewhere — right art,
-wrong printing, which no similarity gate can separate and which the client's
-same-name check already routes to the picker.
+### Deployment security
 
-### Why embeddings replaced the ORB stack
+- Helmet's CSP is **Report-Only**, not enforced protection. Its image/font allowlists and WebAssembly directive still matter when preparing enforcement.
+- CORS allows configured public origins plus localhost/private-LAN origins. It is not authentication or an outbound network policy.
+- Phone cameras require HTTPS. Built-in TLS supports persistent self-signed material or operator-provided certificates; use trusted TLS for remote access. Behind a TLS proxy, configure `TRUST_PROXY` correctly for rate limits.
+- Public sharing is explicitly opt-in. Collection sharing and location disclosure have separate controls; Graveyard containers are not public physical-container shares.
+- Treat database files, volume backups, provider tokens, TLS keys, and Codex account directories as sensitive. Client-side session tokens also require protection against script injection.
 
-The previous pipeline was a 64-bit dHash sweep plus a bag-of-visual-words lookup
-for recall, then ORB descriptors with a RANSAC homography to verify. Measured
-against CollectorVision on the same 100-card noisy MTG sample:
+## Database transactions and persistence
 
-| pipeline | exact printing | right card | latency |
-| --- | --- | --- | --- |
-| hash 250 + BoVW 10 + ORB verify | **78.0%** | 88.0% | 1187 ms |
-| cornelius + milo | 76.0% | **90.0%** | 310 ms |
+The main SQLite connection enables foreign keys, WAL, and a five-second busy timeout. Promise wrappers `db.run/get/all` pass through a shared queue. `db.withTransaction(fn)` holds that queue across `BEGIN IMMEDIATE`, the callback, and commit/rollback; `AsyncLocalStorage` lets callback queries use the same transaction without deadlocking behind themselves. Nested transactions are rejected.
 
-Two points of exact printing for 3.8× the speed — and the reason to switch is
-what went with it. ~2.6 GB of per-set ORB indexes plus two whole-game rollups
-became two ONNX files and one catalog per (game, language) at ~5 MB per 10k
-cards. There is no index build in the scan path at all, so set-scoped scanning
-needs no preparation and a scan has no geometric verification stage to be slow in.
+Use this helper for a multi-statement invariant rather than issuing ad hoc `BEGIN`/`COMMIT` calls. Without the queue boundary, another request's statements can enter the same connection's transaction. Keep domain validation and writes that must agree inside the transaction. Checkout validates availability, records exact allocations, and updates its reservation state transactionally.
 
-Both models are AGPL-3.0 ([milo](https://huggingface.co/HanClinto/milo),
-[cornelius](https://huggingface.co/HanClinto/cornelius)) and Bindarr is MIT.
-Shipping them enabled is a licensing decision, not only a technical one.
+Current transactional workflows include complete deck editor saves, AI deck saves/replacements, precon import, collection import, account restore, container import/move, and Physical/Graveyard whole-container transfer. Their details differ: a transaction does not imply every unresolved row is fatal. In particular, ordinary collection import can report individual failures while saving valid entries; precon import with deck creation rejects unresolved cards rather than saving a partial deck.
 
-Test-time augmentation (two extra dewarps at 0.92×/1.08× crop tightness, averaged
-as unit vectors) took exact printing from 76% to 81% with right-card unmoved, for
-two more forward passes — ~100 ms of a ~255 ms scan. Removed for latency; the git
-history has it if that trade ever looks different.
+### Migration and backup cautions
 
-### Catalog builds
+Use [the offline migration procedure](README.md#migrate-an-existing-installation) before changing an existing deployment. Preserve the entire stopped data directory, mount identity, ownership, and matching WAL/SHM sidecars; a WAL can contain committed data not yet in the main file. Never treat an unexpected setup screen as permission to initialize a replacement database.
 
-A catalog is one (game, language) pair, and building it has two phases:
+Startup does not rename previous database files; complete the offline procedure before restarting. **Very old schemas containing `collection.sub_location_1` trigger a destructive collection/location reset in `initDb`.** Back up and inspect such databases before starting this version; automatic initialization is not a lossless upgrade for that schema.
 
-1. **Cache** — walk every set the provider lists for that language and pull its
-   cards into `card_cache` (`cardSets.cacheSetCards`).
-2. **Embed** — run every cached card's artwork through milo and write the
-   embedding table the scanner sweeps (`milo-<game>[-<lang>]-local.bin`, plus a
-   `.json` carrying ids, dimensions and source urls).
+Server snapshots are handled by `backup.js`. For an offline whole-volume copy, stop all writers and retain the database and any sidecars together. Snapshots stored only in the same volume do not protect against loss of that volume.
 
-They are one job rather than two buttons because phase 2 can only ever be as
-complete as phase 1 — and phase 1 is the half that was missing for years.
-Caching used to happen only as a side effect of building a scan index, so a set
-nobody indexed, searched or browsed simply was not there: Pokémon held 7,118 of
-20,460 English cards (35%), with 104 of 174 sets holding only the handful the
-owner happened to have.
+## Card data, languages, and prices
 
-Both phases resume. Phase 1 is idempotent; phase 2 keeps every embedding whose
-**embedded** source url is unchanged, and a cancelled build still writes what it
-has, because a partial catalog is valid and resuming reuses all of it. A set with
-no data in the chosen language raises an *absent* error rather than a failure —
-per-language provider coverage is patchy enough that counting gaps as failures
-would abort every non-English build partway through.
+### Magic catalog and normalization
 
-Admin → Catalogs drives it (`/api/admin/catalogs`, admin-only) and lists what
-exists **with a denominator**, because "built, 3,297 cards" reads as complete and
-is not. English is counted against the `sets` table; a non-English total comes
-from the provider's own set list for that language, so Japanese Pokémon reads
-*3,297 of 16,192*. A catalog can be perfectly built and still cover a fifth of the
-game.
+`Scryfall → scryfallApi.normalizeCard → utils/cardCache.cacheNormalizedCards → card_cache` is the main card-data path. Cache writes use upserts so refreshing a provider's fields does not delete/recreate a row or reset unrelated metadata. Keep normalized fields aligned with consumers and database selections.
 
-The scanner matches card **art**, so a build embeds the highest-resolution image
-the provider offers rather than the one the UI shows: TCGdex's cached url is
-`/low.png` (245×337, chosen so card grids do not pull 312 KB per thumbnail) and is
-swapped to `/high.png` (600×825) at embed time only. Embedding the thumbnail meant
-every TCGdex row was an upscaled blur while the camera handed over a sharp 448
-crop. Because resume keys on the url actually embedded, raising the resolution
-invalidates the old vectors instead of silently reusing them.
+The Scryfall bulk catalog lives at `<DB_PATH>.scryfall-bulk.sqlite`. `scryfallBulk.js` builds and validates a temporary replacement before publishing it, preserving the previous catalog if an update fails. `scryfallBulkSchedule.js` controls the daily UTC refresh; settings default to 10:00 UTC. A missing catalog warms in the background. Imports use local identifier/name resolution first and API fallback for unresolved rows; they do not wait for a full bulk download. Live price sweeps and stale-cache refreshes keep the API path rather than reusing snapshot prices.
 
-Locally built catalogs are keyed by `card_cache.id`, so every hit resolves by
-construction. The published fallback catalogs (`milo-<game>.npz`, read by
-`utils/npz.js`) are keyed by provider id — TCGplayer product ids for Pokémon, of
-which only ~24% map to a card a given install has ever cached — which is why a
-local build always wins when one is present.
+MTGJSON provides precon lists, not user ownership. Scryfall supplies token relations. Related-token ownership is inventory-scoped and name-based, including front names of double-faced tokens; same-named tokens can differ in rules or stats, so the UI must not imply an exact printing/rules match. Token references do not count as deck slots or reserve copies.
 
-### Measuring the scan gate
+### Names and printing languages
 
-`GAP_FLOOR` decides whether an answer is presented as an answer at all, so it is
-measured rather than guessed:
+`card_cache.name` is the searchable/canonical name; `printed_name` is the localized name on the card. Display helpers use `printed_name || name`; search considers both. Name-based copy rules, marketplace queries, and exports must not accidentally split the same card solely because its printed name differs.
+
+A requested language must resolve to a real printing, not overwrite the language label on an English row. `cardApi.printingInLanguage` and Scryfall's set/collector-number lookup perform that resolution for add flows. Scan fallback retains the actual printing and reports language mismatch when it cannot confirm the requested language.
+
+### Pricing and analytics
+
+`utils/priceHelpers.resolveCardPrice` resolves a **positive** per-copy `market_value` first, then an available positive finish-specific price, then `price_trend` (or zero). Queries that value owned copies must select the per-copy value as well as provider price columns. `frontend/src/utils/resolveCardPrice.js` mirrors display-side precedence.
+
+Scryfall pricing chooses a consistent source currency for a row, using USD where applicable and EUR fallback rather than mixing USD normal with EUR foil prices. `price_source` and `price_currency` travel with the record. **No exchange-rate conversion occurs.** Mixed-currency sums are not a converted portfolio value; net-worth responses include currency information.
+
+A manually entered copy value writes `market_value` with source/timestamp metadata. Certification lookup identifies the slab; it is not a market quote. Automatic graded-price lookup is not provided.
+
+`price_history` records price changes rather than duplicate points on every sweep. Parse SQLite's naive timestamp strings as UTC through `parseSqliteUtc`. Dashboard growth is derived from retained owned quantities and original addition dates, not an immutable acquisition ledger. Deck performance is saved wins/losses, not match history. Graveyard analytics are separate and reflect currently archived entries, not historical archive membership.
+
+### Unsupported legacy data
+
+Shared dispatch in `utils/cardApi.js` accepts Magic identities only. Removed integrations do not trigger data deletion or relabeling. Account exports retain saved records; restore rejects unsupported game identities and refuses to replace unsupported records already in the target account. Keep original backups for use with a compatible older deployment rather than editing their game identities.
+
+## Storage and sorting
+
+`utils/compartmentSort.js` chooses eligible compartments and positions. `utils/collectionHelpers.js` is the neutral shared module for collection, storage, and import routes; those route modules should not import each other to share helpers.
+
+- Locations contain ordered compartments: binder pages, box rows, and other layouts. Rules and locks affect filing eligibility.
+- Stored `position` uses slot-scale units: slot 1 is 1000, slot 2 is 2000. Fractional offsets can distinguish split copies before rebalancing. Use the existing position/display helpers rather than a rendered array index.
+- Custom sorting preserves manual order; structured comparators support name, set/number, price, type/color, language, and finish ordering. The same categories drive storage dividers.
+- Capacity is advisory. Placement prefers eligible compartments with room, then accepts excess in the requested container; it never reroutes to another container or Unsorted solely because capacity is exceeded. The UI derives **Over limit** from usage exceeding configured capacity. Stacking counts distinct card/printing/language stacks per compartment rather than every copy.
+- Storage assignment must validate user ownership, the compartment's parent container, and matching inventory. Physical cards cannot silently land in Graveyard storage or vice versa.
+- Whole-container transfer changes the container and all contained entries atomically, preserving placement/configuration. It rejects locked containers/compartments but allows reserved copies, preserving deck state and exact allocations. Legacy checkout allocations are persisted before archiving so they cannot be reassigned when physical inventory changes. Individual archive/restore has different placement and reservation semantics.
+- ManaBox container import files matching **already-owned** physical copies; it does not add missing inventory. Follow-up move requests fill the remaining requested quantities without moving the same copies twice. Missing and nonphysical entries are excluded, and the destination must retain the required unlocked/custom/unrestricted layout.
+
+## Deck editing, checkout, and check-in
+
+`DeckBuilder` maintains a local draft. `PUT /api/decks/:id/editor` validates and writes properties, quantities, Pulled state, source preferences, and commander in one transaction; a failure rolls the save back. Changing a source automatically saves the complete draft. Normal draft saves permit unavailable inventory and retained unavailable sources; checkout remains strict. The UI keeps a failed draft for retry and guards navigation with unsaved changes. Win/loss record updates are separate operations.
+
+Deck definitions use one inventory; checked-out decks cannot switch inventory. `utils/deckRules.js` distinguishes inventory-constrained additions from availability-independent editor drafts while sharing copy-limit checks. Commander selection is a single existing card; the UI's commander workflow is not a promise of full tournament legality, partner commanders, or sideboards.
+
+Deck archiving changes only the definition's inventory, preserving list and metadata even without sufficient archived copies, and atomically clears physical source preferences. Restoring to Physical/Arena validates destination ownership. Deck creation (including precon, decklist, and commander creation) permits unowned cards using draft validation. Graveyard card additions, search, availability, and token ownership remain scoped to archived copies. Duplication and complete backups preserve Graveyard inventory; AI source-deck improvement rejects it.
+
+Physical checkout reserves quantities by setting `decks.checked_out` and `checked_out_at`; it does **not** move collection entries. Availability subtracts copies reserved by other checked-out Physical decks. Arena and Graveyard decks cannot check out.
+
+`GET /api/decks` includes `missing_cards`, the number of unavailable required copies, computed from batched inventory, deck requirements, and reservations. Draft Physical decks respect source groups and other decks' reservations; checked-out decks require their exact reserved copies to remain usable. Arena ownership stays separate. This status does not change the return guide or checkout state.
+
+`GET /api/decks/:id/cards/:cardId/sources` groups available Physical copies by location and compartment. The editor saves nullable `source_entry_id`: null selects automatically; an entry anchors the selected location/compartment, which must supply the entire quantity at checkout. New source assignments validate account/card/Physical identity. Existing stale anchors remain saveable but fail checkout explicitly instead of reverting to automatic selection.
+
+`GET /api/decks/:id/locations` provides specific entries, containers, compartments, slot positions, and missing counts for the pull list. Checkout records exact entries in `deck_card_allocations`; `checkedOutAllocation` uses those records so storage reserves the same copies even after other decks return. Startup materializes legacy reservations. Backup restore remaps source and allocation entry references. **Pulled** remains the per-deck-card checklist state (`deck_cards.checked_out`), distinct from the deck-level reservation flag.
+
+Return clears the deck-level reservation state. Checkout/check-in use the same stored location for pulling and re-filing. Return a deck before changing its composition or individually archiving its reserved copies. Whole-container archiving and storage reassignment retain reservations.
+
+`POST /api/decks/from-container` uses a Physical or Graveyard container's complete saved contents, not the current UI selection/filter, and assigns the same deck inventory. It creates an unchecked-out definition without moving cards, and can include missing/reserved copies that must be resolved before Physical play. Duplicating a deck copies its definition/metadata and inventory, not its checkout state or win/loss record.
+
+## Imports, exports, and backups
+
+`routes/importExport.js` handles CSV/TXT review, collection import, account backup/restore, and ManaBox container workflows. Mapping and export helpers live under `backend/src/utils/`.
+
+- Import preview is validation and mapping, not a committed save. Progress distinguishes lookup/preparation from saving; losing the progress connection does not roll back an in-flight import. Check the destination before retrying.
+- Collection-view CSV/TXT export represents the matching view across pages, including its inventory, filters, ordering, and stacking. It is not a whole-account backup.
+- Complete account backup uses the `manafolio-backup` format. Restore replaces the signed-in user's collection, storage, and decks in a transaction rather than merging. Preserve the original export before any explicit format-marker conversion; see [account backup instructions](README.md#back-up-or-move-an-account).
+- Account JSON contains collection/storage/deck data and cached card metadata, not login/provider credentials or the entire server. Whole-volume backups have a different scope and can contain Codex credentials and TLS private keys.
+- Precon import is handled in `collection.js`: Scryfall resolves MTGJSON entries, optional storage is sized for the cards, and optional deck creation checks out the imported Physical deck. With deck creation requested, unresolved entries fail the operation rather than producing a partial deck.
+
+## Image identification pipeline
+
+Scanning is a beta artwork-matching workflow with informational title OCR and footer verification, not general card OCR or condition/foil detection. It needs the optional models, a usable catalog, and native OCR. Source and Docker setup steps are in [README.md](README.md#card-scanning).
+
+### Capture and match
+
+1. `frontend/src/utils/detectWorker.js` runs **cornelius** in a worker via `onnxruntime-web`, drawing the live corner outline. `CameraScanner.localDewarp` uses shared geometry to rectify the captured card to 896×896 pixels, retaining footer detail for OCR.
+2. `cvScan.match` accepts a rectified upload (`cropped: true`) without repeating corner detection. A whole frame instead goes through server-side detection/dewarping. The embedder receives a 448×448 image.
+3. **milo** produces a 128-dimensional normalized embedding. The server sweeps normalized catalog vectors with dot products (cosine similarity), merges/deduplicates hits, and returns ranked candidates.
+4. `/api/scan-match` overlaps native title/footer OCR with Scryfall candidate hydration and requested-language resolution. Footer text is interpreted after hydrated candidate set codes are available, preserving exact-printing checks; title text is parsed independently of candidates. ID lookups reuse `card_cache`, then the existing local Scryfall bulk snapshot, before the rate-limited provider fallback.
+5. The client requires **two fresh decoded video frames** to agree on the resolved printing and pass safety checks before automatic queuing, including Turbo. Changes to settings, pause, and unmount cancel verification; network failure is not agreement.
+
+The shared image geometry lives in `shared/imgproc.mjs` and `shared/cardDetectPure.mjs`. Do not create a different preview crop from the one used for matching.
+
+Automatic and manual scan saves use account-scoped `/api/scan-drafts` CRUD, stored in `scan_drafts` rather than `collection`. The scanner loads a saved review grid with per-card foil toggling and discard, plus one batch confirmation. The Foil toggle patches only `printing` (`Normal` or `Holofoil`), preserving card identity and copy details. `POST /api/scan-drafts/commit` accepts `{draft_ids: [...]}`, validates unique account-owned draft IDs, reuses `addCardToCollection`, and consumes the submitted drafts in one transaction. A failure retains the entire batch; repeat or overlapping commits cannot duplicate copies. The client snapshots displayed draft IDs so newly queued cards remain for the next batch. Drafts supply no owned totals, storage occupancy, or deck availability. Collection exports/account JSON backups omit this temporary queue; database backups include it. Existing `autoAddSafe` and related internal gate names now govern automatic queuing, not collection writes.
+
+Selecting an identified candidate reuses the direct draft-queuing path and skips the details drawer. The picker blocks repeat submissions while saving, closes on success, and retains its candidates with an error on failure. Automatic recognition safety gates and final batch confirmation are unchanged.
+
+`DELETE /api/scan-drafts` accepts the same draft-ID snapshot to clear a reviewed batch after confirmation. Ownership is checked before deletion and the batch is transactional; collection rows are never touched.
+
+Scan responses expose millisecond `timings` for matching, metadata, OCR, safety, and total processing. OCR/metadata overlap, so stages are not additive. The frontend's optional diagnostics also record capture (including fresh-frame wait), request/JSON, and candidate-resolution time per verification frame. Presets control fallback-upload limits and auto-add confirmation delay, not model recall/ORB settings; client rectification remains 896×896.
+
+### Gates and limitations
+
+A nearest-neighbor search always returns a nearest row, even when the real card is absent. `CV_SCAN_GAP` (default 0.10) gates the winner against ranks 2–11 within **its own catalog**, avoiding duplicate-language matches flattening the neighborhood. `notInCatalog` preserves manual candidates but blocks automatic addition.
+
+Set scope filters rows before scoring, separately for each catalog. A catalog with no in-scope rows is not silently searched unscoped as if it satisfied the filter. Global fallback is reported as `set_fallback` and requires manual selection. Requested-language and English fallback catalogs may both contribute; unresolved printing language reports `language_fallback` and also blocks auto-add.
+
+The response's `safety` object contains `autoAddSafe`, reason codes, footer `ocr` status, informational title `name` data, quality flags, and context. `readCardText` reads bounded title and footer crops; `parseNameTsv(tsv)` returns `read` with text and confidence for one confident title line, or `unreadable` while retaining uncertain text. Title OCR is never compared against artwork candidates or used to allow or block auto-add. Near ties/same-artwork printings remain ambiguous unless printing evidence narrows them. An exact cached footer match outside the visual shortlist can be shown manually but cannot acquire an invented visual score.
+
+`scanOcr.js` spawns **`/usr/bin/tesseract`**, without a shell, using `eng` data. The Docker runtime installs it there; a source installation must provide that path, not merely a differently located executable on PATH. Processing has bounded image/output sizes, a five-second timeout per subprocess, and at most two concurrent requests, each running its footer and title subprocesses sequentially. Missing footer OCR, footer execution errors, and conflicting footer readings block auto-add while preserving manual candidates. An `unreadable` footer result supplies no corroborating evidence but is **not by itself** an auto-add rejection; artwork, ambiguity, quality, and context checks still apply.
+
+These checks are heuristics, not guaranteed printing accuracy. The title crop targets standard upper-left names; long names, non-English scripts (the engine uses English data), alternate title positions, older footers, sleeves, glare, focus, and reprinted artwork may require manual review. No gate detects condition or finish.
+
+### Models and catalogs
+
+[cornelius](https://huggingface.co/HanClinto/cornelius) and [milo](https://huggingface.co/HanClinto/milo) carry **AGPL-3.0** licenses; Manafolio code is MIT. The models are not bundled in the repository/image. Operators deliberately fetch them using `node scripts/fetch-models.mjs` from `backend/` (or the README's Docker command), with optional published catalogs via `--catalogs`. Review the model licenses before redistribution.
+
+`CV_MODEL_DIR` holds models and catalogs: source default `backend/data/models`, Docker `/app/database/models`. Keep the Docker directory on the persistent volume. Models alone do not identify cards. A missing usable catalog returns HTTP 503 with `notBuilt`, not a misleading empty match list.
+
+`catalog.js` builds a `(game, language)` catalog in two resumable phases:
+
+1. Cache the provider's sets/cards with `cardSets.cacheSetCards`.
+2. Embed available artwork and write `milo-<game>[-<language>]-local.bin` plus JSON IDs/dimensions/source URLs.
+
+Completed vectors with unchanged embedded source URLs are reused; stopped builds retain partial work. Scoped set builds merge into the existing local catalog. Local catalogs use `card_cache.id` and take precedence over published NPZ catalogs. Coverage denominators distinguish a completed build from complete provider coverage. The active Admin catalog language picker requests Magic; retained catalog tooling can still contain other games.
+
+For a catalog-backed diagnostic, run from `backend/`:
 
 ```bash
-node scripts/measure-scan-floor.js pokemon Japanese 60
+node scripts/measure-scan-floor.js mtg English 60
 ```
 
-It samples catalog rows evenly (not the first N — ids are ordered by set, so the
-first N would measure one set's internal confusability), degrades each card's own
-art two ways, and reports two distributions per regime: **genuine**, searched
-against the whole catalog, and **impostor**, the same image with its own row
-masked out, which is exactly the missing-card case. It then sweeps candidate
-thresholds for both the absolute cosine and the gap, printing what each would cost
-in strangers accepted and correct answers rejected.
+The harness samples catalog rows, degrades reference art, compares genuine matches with the same rows masked out, and sweeps candidate thresholds. It requires models/catalog data and reference-art access. Synthetic degradation is not a substitute for real-camera verification and does not model every glare/shadow condition; do not turn historical sample measurements into current accuracy promises.
 
-Read the two regimes against each other rather than in isolation: a threshold
-whose columns move between them is measuring photo quality, not card identity.
-Both are optimistic — neither models glare or a shadow across the art — so prefer
-a gate that behaves the same in both over one tuned to either.
+## Optional AI decks
 
-### Prices
+`routes/aiDecks.js` orchestrates provider requests; `utils/aiDecks.js` selects eligible inventory, constructs bounded payloads, validates drafts, and rechecks saves. `AiDeckBuilder` is a review/edit surface, not automatic collection mutation. A suggestion, conversation reply, or progress event is not a saved deck.
 
-`utils/priceHelpers.resolveCardPrice(row)` is the single answer to "what is this
-worth", and its order is: `collection.market_value` (this copy's own value),
-then the price column matching the row's `printing`, then `price_trend`. Any
-query whose result reaches it must select `c.market_value` alongside the
-`cc.price_*` columns, or a graded copy silently reverts to the raw card's price
-in that one view — the failure is invisible, it just reads low.
+Inventory is scoped to the signed-in user and selected Physical/Arena destination, with optional color/set/container filters. Missing physical copies are excluded. Including checked-out cards permits planning with them, not sharing their reservations. Improving a saved deck can retain eligible source-deck copies despite its own reservation/filters; other decks' reservations still matter. Create/replace revalidates ownership, quantities, and cached rules transactionally. Replacing a checked-out deck is rejected; saving never moves cards or checks out a deck.
 
-Where the provider price itself comes from depends on the game AND the language,
-because it depends on which marketplace sells that printing:
+ChatGPT integration uses the pinned official Codex app-server package and device login, with per-user data under `<database-directory>/codex/<user-id>/`. The client disables model host-file, command, and external-tool access, rejects unsupported app-server actions, and requires a Unix server. Administrators can still read persisted credentials. Disconnect removes the user's local Codex data; account JSON backups exclude it, but volume backups include it.
 
-| Rows | Source | `price_source` | Currency |
-|------|--------|----------------|----------|
-| MTG, any language | Scryfall `prices.usd`, else `prices.eur` | `scryfall` | USD or EUR |
-| Pokémon English / Japanese | TCGCSV (TCGplayer categories 3 / 85) | `tcgcsv` | USD |
-| Pokémon other languages | the **English** TCGplayer product | `tcgcsv-en` | USD |
-| Pokémon fallback | TCGdex's Cardmarket block | `tcgdex` | EUR |
+Ollama uses the selected HTTP(S) address or `OLLAMA_BASE_URL`, defaults to server loopback, requires an installed structured-output model, and does not silently fall back to ChatGPT. Requests originate from the **server**. URL syntax validation is not a destination allowlist: signed-in users can reach server-accessible private/LAN services. Use trusted accounts and outbound firewall controls, and do not expose an unauthenticated Ollama port publicly.
 
-Two rules hold that together. **A row is never mixed**: if a printing's USD price is
-missing, the EUR normal *and* foil prices are used together, because a USD normal
-next to a EUR foil is a pair nothing can compare. And **nothing is converted** — an
-exchange rate is a live number this app has no source for, and a stale hardcoded one
-misprices a collection silently — so `price_currency` travels with the row and the UI
-prints the matching symbol (`utils/formatPrice.priceText`). Collection totals sum the
-currencies as-is; `/api/stats/networth` reports `currencies` so a consumer can tell.
+Gemini and OpenRouter use fixed official API endpoints and per-user/provider keys stored in the users table. Browser-session-only credential endpoints never return keys; account JSON exports omit them, while SQLite/volume backups include them. Users explicitly select a model; hosted requests do not fall back to a different model/provider. Structured responses still pass the shared inventory and draft validation before review or saving.
 
-`tcgcsv-en` exists because TCGplayer has no German, Korean or Chinese Pokémon
-catalogue: those cards are priced off the English product for the same set and
-number. That is the closest real quote and much better than 0.00, but it is not the
-printing the user owns, so the inspector labels it "TCGplayer (English printing)"
-rather than presenting it as this card's price.
+Requests contain eligible card metadata/counts, conversation, and the current draft, including editable descriptions and strategies. Keep storage identities, saved private notes, other users' records, and saved source-deck descriptions out of provider context. Model drafts require a nonempty `strategy` of at most 8,000 characters. Saving a new draft writes strategy to `decks.notes`; replacement appends it transactionally without overwriting existing notes or repeating an identical suffix. Suggestions are limited by cached rule data and provider output quality; invalid/incomplete or oversized requests are rejected, not silently trimmed into a different deck. See [the AI workflow and security instructions](README.md#get-an-ai-deck-recommendation).
 
-Coverage is a function of the sweep's scope, not of the cache: `tcgcsvApi`'s daily
-sweep runs over sets the user owns cards from (`scope: 'owned'`, one request per
-set), so a browsed-but-unowned set reads 0.00 until a card from it is added.
+## Frontend and Arcane Blue
 
-`market_value` is written from two places and read as one number: the owner types
-it (`PUT /collection/:id`, source `manual`) or fetches it
-(`POST /collection/:id/market-value/fetch`, source `pokemonpricetracker`). The
-fetch path lives in `gradedPrices.js` and exists because no card API prices
-slabs. It is per-request and never swept: the only free provider meters at 100
-lookups a day. `frontend/src/utils/resolveCardPrice.js` mirrors the same order
-for cards not yet saved.
+`App.jsx` holds session/user state and tab navigation, lazily loads major views, and wraps API fetches with a Bearer header and session-aware logout handling. `/share/:token` and shared-container views are unauthenticated surfaces. The web client uses relative `/api` requests to its server; the demonstration build installs fixture-backed behavior before rendering and is not a writable server.
 
-### Storage & sorting engine
+| Components | Responsibility |
+| --- | --- |
+| `Login`, `SetupWizard` | Sign-in and first-run configuration |
+| `Dashboard`, `DashboardAnalytics`, `PriceHistoryChart` | Inventory value, growth, deck comparisons, and accessible chart data |
+| `AddCards`, `CardSearch`, `MtgDeckImport` | Search/rapid add, collection imports, precons, scanner entry |
+| `CameraScanner` | Camera/detection/capture, verification, candidate review, add flow |
+| `CollectionList`, `CardInspectorModal`, `RelatedTokens` | Inventory views, bulk operations, copy metadata, token references |
+| `LocationManager`, `CompartmentView`, `CreateContainerModal`, `SortFilterBuilder` | Storage gallery/layout, filing, rules, capacity, covers, archives |
+| `DeckBuilder`, `CheckoutWizardModal`, `AiDeckBuilder` | Local deck draft, private deck notes, play/pull list, draw simulation, AI drafts |
+| `Settings`, `CodexSettings`, `AdminPanel`, `CatalogPanel` | Preferences, AI connections, user administration, scan assets |
+| `SharedCollection`, `SharedContainer` | Public sharing |
 
-`utils/compartmentSort.js` decides where a card physically files:
+Pricing, sorting, names/languages, printing/rarity, card options, and shuffling reuse the helpers in `frontend/src/utils/`. `I18nProvider` and locale JSON provide translations with English fallback; shared tables and geometry prevent client/server domain drift.
 
-- A **location** (binder/box/etc.) contains ordered **compartments** (binder pages / box rows).
-- `recommendSlot()` picks the compartment + slot for a card based on the location's `sort_order` scheme and per-compartment `rule_config` filters.
-- **Slot encoding**: a card's `position` is `slot * 1000` (slot 1 → 1000, slot 2 → 2000). `Math.floor(position / 1000)` recovers the human slot number. The gaps leave room for manual reordering.
-- Sort schemes are either `custom` (manual order, honored via stored `position`) or structured (name / set-number / price / type-color / language), optionally foil-aware (`foil_sorting`). Structured schemes also drive the visual set/category **dividers** in the binder view.
+Private deck notes use `decks.notes`, separate from `description`, and save with the existing atomic deck editor draft. Duplication and complete account backups preserve them; AI prompts and public shares exclude them. The additive migration retains standalone account notes, whose former navigation entry and UI have been removed.
 
----
+### Styling contract
 
-## Data model (SQLite)
+`main.jsx` imports **`index.css` first, then `arcane.css`**. Arcane Blue remains the default `dark` account theme. The supported keys are `dark`, `jenny`, `mana-white`, `mana-blue`, `mana-black`, `mana-red`, `mana-green`, and `mana-colorless`, defined in `shared/themes.json`. Account settings, API validation, startup theme selection, and public-share query parameters use this same list. Unsupported or retired themes fall back to `dark`; database startup normalizes obsolete account preferences without changing inventory or game identities.
 
-| Table | Purpose / key columns |
-|-------|-----------------------|
-| `users` | `id`, `username`, `password_hash` (PBKDF2, iterations embedded), `role`, `share_token`, `share_enabled`, `tcg_api_key`, `psa_api_token`, `graded_price_api_key`, `api_key` (read-only external credential) |
-| `sessions` | `user_id`, `token`, `expires_at` — Bearer-token auth |
-| `card_cache` | Normalized card metadata keyed by provider `id`: `name` (searchable) and `printed_name` (as printed), `language`, `set_id`/`set_name`, `number`, `image_url`, `types`/`subtypes`/`supertype`, `rarity`, `cmc`, `color_identity`, `price_*` with `price_source`/`price_currency`, `tcgplayer_product_id`, `tcgplayer_url`/`cardmarket_url`, `game`, `last_updated`. Written only through `utils/cardCache.cacheNormalizedCards`, which upserts — `INSERT OR REPLACE` re-created the row and reset every column outside the provider's own list |
-| `collection` | One row per owned stack: `id` (entry_id), `user_id`, `card_id`→card_cache, `quantity`, `condition`, `printing`, `language`, `purchase_price`, `location_id`, `compartment_id`, `position`, `list_type` (`collection`/`trade`), `is_trade`, `game`, `added_at`; per-copy grading (`grader`, `grade`, `cert_number`) and per-copy value (`market_value`, `market_value_source`, `market_value_at`) |
-| `locations` | Physical containers: `user_id`, `name`, `type`, `sort_order`, `foil_sorting`, `rule_type`, `rule_config`, `game` |
-| `compartments` | Pages/rows within a location: `location_id`, `idx`, `label`, `capacity`, `rule_config` |
-| `compartment_assignments` | Maps sort categories to specific compartments (category→page filing) |
-| `decks` | `user_id`, `name`, `description`, `checked_out`, `checked_out_at`, `created_at` |
-| `deck_cards` | Deck contents: `deck_id`, `card_id`, `quantity` |
-| `price_history` | Per-card price points over time, powering trend charts |
-| `sets` | Set catalog (names/ordering) for dividers and set-scoped scan |
-| `pokemontcgapi_cache` | Bounded persistent response cache: `request` (credential digest + path/query), `body`, `etag`, `fetched_at`; no API keys |
-| `app_settings` | App-wide key/value settings (e.g. registration toggle) |
+`arcane.css` supplies layered surfaces, luminous controls, typography, tables/cards, and focus indicators for Arcane Blue and the six explicitly scoped mana palettes. White uses ivory/gold over warm charcoal; Blue deep sea/cyan; Black charcoal/violet; Red ember; Green forest; Colorless slate/silver. Jenny retains its separate palette. Outfit carries controls and data; Cinzel is reserved for page titles, and the existing logo stays stationary and metallic. Shared layout classes and responsive behavior remain unchanged. Preserve keyboard focus, disabled states, browser zoom, and chart-data access when changing appearance.
 
-**Entry identity**: a `collection.id` (`entry_id`) uniquely identifies one
-physical stack. Features that track individual copies (checkout locator, storage
-highlighting) key on `entry_id`, never on `card_id + position` (which can collide
-across compartments).
+The dashboard uses a compact owned-count/value summary with supporting cost/gain figures and grouped analytics. Collection pagination appears only for multiple pages; ownership, location, and deck actions precede pricing in the inspector. Storage creation is a heading action, not a gallery item. Deck capacity status describes the target count rather than promising format legality. Rarity edges and foil treatments are static; motion is reserved for meaningful state changes.
 
----
+## Development and verification
 
-## Frontend
+Installation prerequisites are in [README.md](README.md#development) and environment settings in [`.env.example`](.env.example). Match the installed toolchain's engine requirements as well as the checked-in container configuration.
 
-`App.jsx` holds auth state (`token`/`user` in `localStorage` under
-`bindarr_*`), installs a `fetch` wrapper that injects the `Bearer` header on
-`/api/*` calls and dispatches a logout event on `401`, and tab-routes between
-code-split view components. `/share/:token` renders the public view without auth.
+From the repository root:
 
-| Component | Role |
-|-----------|------|
-| `Login` | Auth screen (login/register) |
-| `Dashboard` | Collection value, net-worth trends, distributions, milestones |
-| `AddCards` | Wrapper toggling **CameraScanner** vs **CardSearch** |
-| `CameraScanner` | Camera capture, in-browser corner detection + dewarp, POST `/api/scan-match`, confidence gate + manual pick |
-| `CardSearch` | Name/number text search against the card APIs |
-| `CardInspectorModal` | Card detail: pricing, types, printing/rarity, location |
-| `CollectionList` | Browse/filter/sort the collection; bulk actions |
-| `LocationManager` | Manage containers; binder/box views; filing mode; storage select |
-| `CompartmentView` | Renders one compartment (binder pocket grid or box coverflow); highlights cards by `entry_id`; greys checked-out cards |
-| `CreateContainerModal` | New-container wizard |
-| `DeckBuilder` | Deck CRUD, composition charts, draw simulator, checkout/return |
-| `CheckoutWizardModal` | Checkout **and** check-in locator (mode prop): grouped by container→page, grid highlight, select-all per page/container/all |
-| `SortFilterBuilder` | Drag-and-drop sort scheme + filter rule builders |
-| `CatalogPanel` | Scan catalogs: what is built per game/language, coverage against the provider's own totals, build/stop with live progress |
-| `Settings`, `AdminPanel`, `SharedCollection`, `PriceHistoryChart` | Preferences, user admin, public view, price charts |
+```bash
+npm run install:all
+npm run dev
+```
 
-Client utils (`utils/`): `cardSort` (shared sort comparators + `sortCardsByOrder`),
-`resolveCardPrice`/`formatPrice` (pricing display), `cardPrinting`/`cardRarity`
-(badge styling), `langHelper` (Japanese name handling), `cardOptions`
-(condition/printing/language enums), `shuffle` (draw sim), `i18n`/`translate` (UI
-language, React context rather than a library). Scanning adds
-`cardDetector`/`detectWorker` (cornelius on a worker thread), `sharpness` (is the
-frame worth capturing) and `autoCapture` (the steady-hand cadence); the geometry
-they share with the server lives in `shared/imgproc.mjs`, with the detector itself
-in `shared/cardDetectPure.mjs`.
+The Vite frontend uses `https://localhost:5173`; the API uses `http://localhost:3001`. `frontend/vite.config.js` proxies `/api`, `/models`, and `/ort` to port 3001. The frontend's `predev`/`prebuild` scripts stage ONNX browser runtime assets. Backend `npm run dev` uses nodemon; `npm start`/production `node src/server.js` do not reload automatically.
 
----
+| Command from repository root | Scope |
+| --- | --- |
+| `npm test` | Backend unit runner and HTTP e2e runner, then frontend utility tests and locale checks |
+| `npm test --prefix backend` | Backend unit and e2e runners |
+| `npm run test:e2e --prefix backend` | Backend e2e only |
+| `npm test --prefix frontend` | Node frontend utility tests plus locale validation |
+| `npm run lint --prefix frontend` | ESLint, zero warnings |
+| `npm run check:locales --prefix frontend` | Translation key/placeholder checks |
+| `npm run build:frontend` | Production frontend build |
+| `npm start` | Backend serving API and an existing `frontend/dist` build |
 
-## Deck checkout / check-in
-
-Reserving a deck's physical cards. **Checkout and check-in never move cards in
-the DB** — a card's stored slot is both where you grab it and where it returns;
-only `decks.checked_out` changes.
-
-- `PUT /api/decks/:id/checkout` validates availability (owned minus copies locked by other checked-out decks) and sets the flag.
-- `GET /api/decks/:id/locations` returns, per card, the specific stored copies to pull (`entry_id`, container, compartment display, slot from `position`) plus any `missing` count.
-- `GET /api/collection` annotates each entry with `checked_out_qty` (`checkedOutAllocation` greedily allocates checked-out decks' requirements onto owned entries), so `CompartmentView` greys those copies with an "In Play" badge.
-- `CheckoutWizardModal` renders that payload as a grouped checklist with the compartment grid highlighting the pulled cards; `PUT /api/decks/:id/return` flips the flag and reopens the same modal in reverse (`mode="checkin"`).
-
----
-
-## Conventions & gotchas
-
-- **Backend has no auto-reload** in production/local `node src/server.js`; restart it after backend changes so new routes/data load. Frontend uses Vite HMR.
-- **SQLite runs in WAL mode** — checkpoint/stop before file-level backups so `-wal`/`-shm` are flushed.
-- **Everything is game-scoped** (`pokemon` | `mtg`); new card fields must be threaded through both `tcgApi.js` and `scryfallApi.js` normalization.
-- **`position = slot * 1000`** is the single source of truth for slot order; never assume packed array index equals slot.
-- **Scanning needs a catalog**: the two ONNX models identify nothing on their own, and there is no second matcher to fall back to. `/api/scan-match` answers `503 notBuilt` with the fix in the message rather than an empty candidate list, which reads to the user as "your card could not be identified". A catalog is per (game, language) and only as complete as the provider's data for that language.
-- **Frontend lint is strict**: CI runs `eslint --max-warnings 0`, so unused vars/imports and empty blocks fail the Docker build.
-
----
-
-## Build, run, test
-
-Setup and Docker deployment: see [README.md](README.md). Quick reference:
-
-- Backend: `cd backend && npm run dev` (nodemon) or `npm start`; port `3001`.
-- Frontend: `cd frontend && npm run dev` (Vite, port `5173`, proxies `/api` → `3001`).
-- Tests: `npm test` from the root (or `cd backend && npm test`) runs every unit suite in `backend/test/` plus the e2e suites under `backend/test/e2e/`. `npm run test:e2e` runs only the latter. No framework — each file is a plain `node` script.
-- Lint (matches CI): `cd frontend && npm run lint`.
+When changing a workflow, exercise the actual user path as well as relevant tests: inventory boundaries, ownership checks, rollback behavior, lost progress connections, deck draft saves, and physical placement are consumer-visible contracts. Scanner validation needs actual models/catalogs and camera conditions; AI verification needs the selected provider. Do not claim these optional integrations were exercised by an unrelated unit suite.

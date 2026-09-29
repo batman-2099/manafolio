@@ -6,7 +6,7 @@ const assert = require('assert');
 const os = require('os');
 const path = require('path');
 
-process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-version-${process.pid}.db`);
+process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-version-${process.pid}.db`);
 const { isNewer } = require('../src/routes/settings');
 
 // [candidate, current, expected]

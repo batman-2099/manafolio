@@ -20,7 +20,7 @@ const fs = require('fs');
 const http = require('http');
 const assert = require('assert');
 
-const tmpDb = path.join(os.tmpdir(), `bindarr-storagesettings-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-storagesettings-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 
 const express = require('express');
@@ -82,7 +82,7 @@ async function main() {
   for (let i = 0; i < 3; i++) {
     await db.run(
       `INSERT OR REPLACE INTO card_cache (id, name, supertype, subtypes, types, rarity, set_id, set_name, number, image_url, price_trend)
-       VALUES (?, ?, 'Pokémon', '[]', '[]', 'Common', 's1', 'Set One', '1', '', 1)`,
+       VALUES (?, ?, 'Creature', '[]', '[]', 'Common', 's1', 'Set One', '1', '', 1)`,
       [`c${i}`, `Card ${'CBA'[i]}`]
     );
     await db.run(
@@ -136,6 +136,55 @@ async function main() {
   assert.deepStrictEqual(rows.map(r => r.name), ['Card A', 'Card B', 'Card C'], `name-asc order must be baked in, got ${rows.map(r => r.name)}`);
   assert.deepStrictEqual(rows.map(r => r.position), [1000, 2000, 3000], `positions must densify, got ${rows.map(r => r.position)}`);
   console.log('PASS: switching to Custom bakes the sorted order into dense positions');
+
+  // Upgrading an existing container must keep its identity, capacity, and placements.
+  assert.strictEqual((await db.get('SELECT sleeved FROM locations WHERE id = ?', [loc.lastID])).sleeved, 0);
+  await db.run('ALTER TABLE locations DROP COLUMN sleeved');
+  const oldLocation = await db.get('SELECT * FROM locations WHERE id = ?', [loc.lastID]);
+  const compartmentsBefore = await db.all('SELECT * FROM compartments WHERE location_id = ? ORDER BY id', [loc.lastID]);
+  const cardsBefore = await db.all('SELECT * FROM collection ORDER BY id');
+  await db.initDb();
+  assert.deepStrictEqual(await db.get('SELECT * FROM locations WHERE id = ?', [loc.lastID]), { ...oldLocation, sleeved: 0 });
+  assert.deepStrictEqual(await db.all('SELECT * FROM compartments WHERE location_id = ? ORDER BY id', [loc.lastID]), compartmentsBefore);
+  assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), cardsBefore);
+
+  const save = (url, method, body) => fetch(`${base}/api${url}`, {
+    method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const detail = async id => (await fetch(`${base}/api/locations/${id}`)).json();
+  for (const sleeved of [undefined, 0, 1, 2, 3]) {
+    const created = await save('/locations', 'POST', { name: `Sleeves ${sleeved}`, type: 'Box', sleeved });
+    assert.strictEqual(created.status, 200);
+    assert.strictEqual((await detail((await created.json()).id)).sleeved, sleeved ?? 0);
+  }
+  for (const sleeved of [1, 2, 0, 3]) {
+    assert.strictEqual((await save(`/locations/${loc.lastID}`, 'PUT', { sleeved })).status, 200);
+    assert.strictEqual((await detail(loc.lastID)).sleeved, sleeved);
+  }
+  assert.strictEqual((await save(`/locations/${loc.lastID}`, 'PUT', { name: 'Renamed sleeve box' })).status, 200);
+  assert.strictEqual((await detail(loc.lastID)).sleeved, 3, 'unrelated edits preserve sleeves');
+  const savedLocations = await db.all('SELECT * FROM locations ORDER BY id');
+  for (const sleeved of [null, '1', true, 1.5, -1, 4]) {
+    assert.strictEqual((await save('/locations', 'POST', { name: 'Invalid sleeves', type: 'Box', sleeved })).status, 400);
+    assert.strictEqual((await save(`/locations/${loc.lastID}`, 'PUT', { sleeved, name: 'Must not rename' })).status, 400);
+    assert.deepStrictEqual(await db.all('SELECT * FROM locations ORDER BY id'), savedLocations);
+  }
+  for (const sleeved of [null, 0.5, -1, 4]) {
+    await assert.rejects(db.run('UPDATE locations SET sleeved = ? WHERE id = ?', [sleeved, loc.lastID]), /SQLITE_CONSTRAINT/);
+  }
+  const otherUser = await db.run("INSERT INTO users (username, password_hash, share_token) VALUES ('sleeve-other', 'unused', 'sleeve-other-token')");
+  const otherLocation = await db.run("INSERT INTO locations (name, type, user_id, sleeved) VALUES ('Private sleeves', 'Box', ?, 2)", [otherUser.lastID]);
+  assert.strictEqual((await save(`/locations/${otherLocation.lastID}`, 'PUT', { sleeved: 0 })).status, 404);
+  assert.strictEqual((await fetch(`${base}/api/locations/${otherLocation.lastID}`)).status, 404);
+  assert.strictEqual((await db.get('SELECT sleeved FROM locations WHERE id = ?', [otherLocation.lastID])).sleeved, 2);
+  const sleeveLocations = await (await fetch(`${base}/api/locations`)).json();
+  assert.strictEqual(sleeveLocations.find(row => row.id === loc.lastID).sleeved, 3);
+  assert.ok(!sleeveLocations.some(row => row.id === otherLocation.lastID));
+  await db.initDb();
+  assert.strictEqual((await detail(loc.lastID)).sleeved, 3, 'initialization preserves saved sleeves');
+  assert.deepStrictEqual(await db.all('SELECT * FROM compartments WHERE location_id = ? ORDER BY id', [loc.lastID]), compartmentsBefore);
+  assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), cardsBefore);
+  console.log('PASS: container sleeves migrate, validate, persist, and leave storage unchanged');
 }
 
 main()

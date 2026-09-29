@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, LoaderCircle, Sparkles, Trash2 } from 'lucide-react';
 import { useT } from '../utils/i18n';
 import { readProgressStream } from '../utils/importStream';
 import MultiSelectDropdown from './MultiSelectDropdown';
 import CardImage from './CardImage';
 import RelatedTokens from './RelatedTokens';
+import DECK_TYPES from '../../../shared/aiDeckTypes.json';
+import POWER_LEVELS from '../../../shared/aiDeckPowerLevels.json';
 
 const FORMATS = {
   collection: ['Commander / EDH', 'Standard', 'Modern', 'Pioneer', 'Legacy', 'Vintage', 'Pauper', 'Casual'],
@@ -29,7 +31,7 @@ async function request(path, options, fallback) {
   return data;
 }
 
-export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onPreview }) {
+export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onPreview, onOpenAiSettings }) {
   const { t, locale } = useT();
   const [account, setAccount] = useState(null);
   const [accountError, setAccountError] = useState('');
@@ -44,10 +46,13 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   const [inventory, setInventory] = useState([]);
   const [colors, setColors] = useState([]);
   const [sets, setSets] = useState([]);
+  const [setSymbols, setSetSymbols] = useState({});
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [inventoryError, setInventoryError] = useState('');
   const [inventoryRevision, setInventoryRevision] = useState(0);
   const [format, setFormat] = useState(sourceDeck?.format || 'Commander / EDH');
+  const [deckType, setDeckType] = useState('any');
+  const [powerLevel, setPowerLevel] = useState(2);
   const [targetSize, setTargetSize] = useState(sourceDeck?.target_size || 100);
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState([]);
@@ -99,6 +104,17 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   }, [t]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/sets?game=mtg', { signal: controller.signal })
+      .then(response => response.ok ? response.json() : [])
+      .then(rows => {
+        if (!controller.signal.aborted) setSetSymbols(Object.fromEntries(rows.map(set => [set.id.replace(/^mtg-/, ''), set.symbol_url])));
+      })
+      .catch(() => {}); // Symbols are optional; set names and filtering remain usable.
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
     if (inventoryType !== 'collection') return;
     const controller = new AbortController();
     setLocationsLoading(true);
@@ -144,7 +160,13 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
     ...inventory.filter(card => card.set_id).map(card => [
       card.set_id, { value: card.set_id, label: `${card.set_name || card.set_id} (${card.set_id})` },
     ]),
-  ]).values()).sort((a, b) => a.label.localeCompare(b.label, locale)), [inventory, sets, locale]);
+  ]).values()).sort((a, b) => a.label.localeCompare(b.label, locale)).map(option => ({
+    ...option,
+    label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+      {setSymbols[option.value.replace(/^mtg-/, '')] && <img src={setSymbols[option.value.replace(/^mtg-/, '')]} alt="" width="20" height="20" loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+      {option.label}
+    </span>,
+  })), [inventory, sets, locale, setSymbols]);
   const containerOptions = useMemo(() => locations.map(location => ({
     value: location.id, label: location.name,
   })).sort((a, b) => a.label.localeCompare(b.label, locale)), [locations, locale]);
@@ -166,6 +188,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   const saveDisabled = !!busy || inventoryLoading || !!inventoryError || !draft || !draft.name.trim() || draft.cards.length === 0 || total !== Number(targetSize) || invalidCards || (isCommander && !draft.commander_card_id);
   const conversationFull = messages.length >= 40;
   const needsMessage = messages.length > 0 || !!draft;
+  const powerLevelName = t(`aiDeckPowerLevel.${powerLevel}.name`);
 
   const restartConversation = () => { setMessages([]); setError(''); setGenerationLog([]); };
   const clearDraft = () => { setDraft(null); restartConversation(); setPrompt(''); };
@@ -203,9 +226,10 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' }, signal,
         body: JSON.stringify({
           inventory_type: inventoryType, format, target_size: targetSize, prompt: content, colors, sets,
+          deck_type: deckType, power_level: powerLevel,
           messages,
           current_draft: draft ? {
-            name: draft.name, description: draft.description, commander_card_id: draft.commander_card_id,
+            name: draft.name, description: draft.description, strategy: draft.strategy, commander_card_id: draft.commander_card_id,
             cards: draft.cards.map(({ card_id, quantity }) => ({ card_id, quantity })),
             inventory_type: inventoryType, format, target_size: targetSize,
           } : null,
@@ -223,7 +247,8 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
       });
       if (signal.aborted) return;
       if (typeof data.message !== 'string' || !data.message.trim() || data.message.length > 8000
-        || (data.draft !== null && (!data.draft || !Array.isArray(data.draft.cards)))) {
+        || (data.draft !== null && (!data.draft || !Array.isArray(data.draft.cards)
+          || typeof data.draft.strategy !== 'string' || !data.draft.strategy.trim() || data.draft.strategy.length > 8000))) {
         throw new Error(t('aiDeckLog.invalid'));
       }
       if (data.draft !== null) setDraft(data.draft);
@@ -253,7 +278,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
       const data = await request(replace ? `/${sourceDeck.id}` : '', {
         method: replace ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, signal,
         body: JSON.stringify({
-          name: draft.name, description: draft.description, inventory_type: inventoryType,
+          name: draft.name, description: draft.description, strategy: draft.strategy, inventory_type: inventoryType,
           include_checked_out: inventoryType === 'collection' && includeCheckedOut,
           ...(sourceDeck ? { source_deck_id: sourceDeck.id } : {}),
           format, target_size: targetSize, commander_card_id: isCommander ? draft.commander_card_id : null,
@@ -277,18 +302,75 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
       </div>
       {sourceDeck && <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.improveHint', { name: sourceDeck.name })}</p>}
       <section>
-        <span role="status" style={{ color: account?.connected ? 'var(--type-grass)' : 'var(--text-secondary)' }}>
+        <span role="status" style={{ color: account?.connected ? 'var(--accent-green)' : 'var(--text-secondary)' }}>
           {account?.connected ? t('aiDeck.aiConnected') : account === null && !accountError ? t('common.loading') : t('aiDeck.disconnected')}
         </span>
         {account && !account.connected && <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.connectInSettings')}</p>}
         {accountError && <p role="alert" style={{ color: 'var(--status-error)' }}>{accountError}</p>}
+        <button type="button" className="btn btn-secondary" disabled={!!busy} onClick={onOpenAiSettings}>{t('aiDeck.openSettings')}</button>
       </section>
 
       <div>
         <fieldset disabled={!!busy} style={{ ...fieldsetStyle, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '1.25rem', alignItems: 'start' }}>
-          <section className="glass-panel" aria-labelledby="ai-pool-title" style={{ minWidth: 0 }}>
-            <h3 id="ai-pool-title" style={{ marginBottom: '1rem' }}>{t('aiDeck.poolTitle')}</h3>
+          <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.resetWarning')}</p>
+          <div className="ai-deck-setup">
+          <section aria-labelledby="ai-setup-title" style={{ minWidth: 0 }}>
+            <h3 id="ai-setup-title" style={{ marginBottom: '1rem' }}>{t('aiDeck.setupTitle')}</h3>
+          <div style={{ ...rowStyle, alignItems: 'start' }}>
+            <div className="form-group" style={{ flex: '1 1 180px' }}>
+              <label htmlFor="ai-inventory">{t('aiDeck.inventory')}</label>
+              <select id="ai-inventory" className="input-control" disabled={!!sourceDeck} value={inventoryType} onChange={event => { clearInventory(); setContainerIds([]); setColors([]); setSets([]); setIncludeCheckedOut(false); setInventoryType(event.target.value); setFormat(event.target.value === 'arena' ? 'Standard' : 'Commander / EDH'); setTargetSize(event.target.value === 'arena' ? 60 : 100); }}>
+                <option value="collection">{t('aiDeck.physical')}</option><option value="arena">MTG Arena</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ flex: '1 1 180px' }}>
+              <label htmlFor="ai-format">{t('deck.format')}</label>
+              <select id="ai-format" className="input-control" disabled={!!sourceDeck} value={format} onChange={event => { clearDraft(); setFormat(event.target.value); setTargetSize(/commander|edh|brawl/i.test(event.target.value) ? 100 : 60); }}>
+                {sourceDeck && !FORMATS[inventoryType].includes(format) && <option>{format}</option>}
+                {FORMATS[inventoryType].map(value => <option key={value}>{value}</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ flex: '1 1 100px' }}>
+              <label htmlFor="ai-target">{t('deck.targetSize')}</label>
+              <input id="ai-target" form="ai-conversation-form" className="input-control" type="number" min="1" max="250" step="1" required readOnly={!!sourceDeck || isCommander} value={targetSize} onChange={event => { clearDraft(); setTargetSize(event.target.value === '' ? '' : Number(event.target.value)); }} />
+            </div>
+          </div>
+            <div className="form-group" style={{ marginTop: '1rem' }}>
+              <label htmlFor="ai-deck-type">{t('aiDeck.playStyle')} ({t('aiDeck.deckTypeRequired')})</label>
+              <select id="ai-deck-type" name="deck_type" form="ai-conversation-form" className="input-control" required value={deckType} aria-describedby={deckType ? 'ai-deck-type-description ai-deck-type-style' : undefined} onChange={event => { clearDraft(); setDeckType(event.target.value); }}>
+                {DECK_TYPES.map(type => <option key={type.id} value={type.id}>{t(`aiDeckType.${type.id}.name`)}</option>)}
+              </select>
+              {deckType && <section style={{ marginTop: '0.75rem', overflowWrap: 'anywhere' }}>
+                <p id="ai-deck-type-description">{t(`aiDeckType.${deckType}.description`)}</p>
+                <p id="ai-deck-type-style" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{t(`aiDeckType.${deckType}.style`)}</p>
+              </section>}
+            </div>
+            <div className="form-group" style={{ marginTop: '1rem', minWidth: 0, overflowWrap: 'anywhere' }}>
+              <label htmlFor="ai-power-level">{t('aiDeck.powerLevel')}: {powerLevel} — {powerLevelName}</label>
+              <input
+                id="ai-power-level"
+                name="power_level"
+                form="ai-conversation-form"
+                type="range"
+                min="1"
+                max="5"
+                step="1"
+                value={powerLevel}
+                aria-valuetext={`${powerLevel} — ${powerLevelName}`}
+                aria-describedby="ai-power-description ai-power-pace ai-power-hint"
+                onChange={event => { clearDraft(); setPowerLevel(Number(event.target.value)); }}
+                style={{ display: 'block', width: '100%', minHeight: 44, margin: 0, accentColor: 'var(--accent-green)' }}
+              />
+              <div aria-hidden="true" style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                {POWER_LEVELS.map(({ level }) => <span key={level}>{level}</span>)}
+              </div>
+              <p id="ai-power-description" style={{ marginTop: '0.75rem' }}>{t(`aiDeckPowerLevel.${powerLevel}.description`)}</p>
+              <p id="ai-power-pace" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}><strong>{t('aiDeck.pace')}:</strong> {t(`aiDeckPowerLevel.${powerLevel}.pace`)}</p>
+            </div>
+          </section>
+          <section aria-labelledby="ai-pool-title">
+            <h3 id="ai-pool-title">{t('aiDeck.poolTitle')}</h3>
+            <div style={{ paddingBlock: '0.75rem' }}>
           {inventoryType === 'collection' && (
             <div className="form-group">
               <fieldset disabled={locationsLoading || !!locationsError} style={fieldsetStyle} aria-describedby="ai-container-hint">
@@ -301,19 +383,26 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
                   onChange={value => { if (!busy) { clearInventory(); setContainerIds(value); } }}
                 />
               </fieldset>
-              <p id="ai-container-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.containerHint')}</p>
-              {sourceDeck && <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.improveContainerHint')}</p>}
               {locationsLoading && <p role="status">{t('common.loading')}</p>}
               {locationsError && <p role="alert">{locationsError} <button type="button" className="btn btn-secondary" onClick={() => setLocationsRevision(value => value + 1)}>{t('aiDeck.retry')}</button></p>}
             </div>
           )}
           {inventoryType === 'collection' && (
             <div className="form-group">
-              <label style={rowStyle}>
-                <input type="checkbox" checked={includeCheckedOut} aria-describedby="ai-checked-out-hint" onChange={event => { clearInventory(); setIncludeCheckedOut(event.target.checked); }} />
+              <button
+                type="button"
+                role="switch"
+                aria-checked={includeCheckedOut}
+                aria-describedby="ai-checked-out-hint"
+                className="btn btn-secondary"
+                style={includeCheckedOut ? { background: 'var(--accent-green)', borderColor: 'var(--accent-green)', color: 'var(--bg-primary)' } : undefined}
+                onClick={() => { clearInventory(); setIncludeCheckedOut(current => !current); }}
+              >
                 {t('aiDeck.includeCheckedOut')}
-              </label>
-              <p id="ai-checked-out-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.includeCheckedOutHint')}</p>
+                <span aria-hidden="true" style={{ width: 28, height: 16, borderRadius: 999, background: includeCheckedOut ? 'var(--text-on-accent)' : 'var(--text-muted)', position: 'relative', flexShrink: 0 }}>
+                  <span style={{ position: 'absolute', top: 2, left: includeCheckedOut ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: includeCheckedOut ? 'var(--accent-green)' : 'var(--bg-primary)' }} />
+                </span>
+              </button>
             </div>
           )}
           <fieldset disabled={inventoryLoading || !!inventoryError} style={fieldsetStyle} aria-describedby="ai-filter-hint">
@@ -342,35 +431,27 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
               </div>
             </div>
           </fieldset>
-          <p id="ai-filter-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.filterHint')}</p>
+            </div>
+          </section>
+          </div>
+          <div>
           <p role="status">{inventoryLoading ? t('common.loading') : t('aiDeck.matchingCounts', counts)}</p>
           {inventoryError && <p role="alert">{inventoryError} <button type="button" className="btn btn-secondary" onClick={() => { clearInventory(); setInventoryRevision(value => value + 1); }}>{t('aiDeck.retry')}</button></p>}
           {!inventoryLoading && !inventoryError && counts.available === 0 && <p>{t(colors.length || sets.length || containerIds.length ? 'aiDeck.emptyFilters' : 'aiDeck.emptyInventory')}</p>}
-          </section>
-          <section className="glass-panel" aria-labelledby="ai-setup-title" style={{ minWidth: 0 }}>
-            <h3 id="ai-setup-title" style={{ marginBottom: '1rem' }}>{t('aiDeck.setupTitle')}</h3>
-          <div style={{ ...rowStyle, alignItems: 'start' }}>
-            <div className="form-group" style={{ flex: '1 1 180px' }}>
-              <label htmlFor="ai-inventory">{t('aiDeck.inventory')}</label>
-              <select id="ai-inventory" className="input-control" disabled={!!sourceDeck} value={inventoryType} onChange={event => { clearInventory(); setContainerIds([]); setColors([]); setSets([]); setIncludeCheckedOut(false); setInventoryType(event.target.value); setFormat(event.target.value === 'arena' ? 'Standard' : 'Commander / EDH'); setTargetSize(event.target.value === 'arena' ? 60 : 100); }}>
-                <option value="collection">{t('aiDeck.physical')}</option><option value="arena">MTG Arena</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ flex: '1 1 180px' }}>
-              <label htmlFor="ai-format">{t('deck.format')}</label>
-              <select id="ai-format" className="input-control" disabled={!!sourceDeck} value={format} onChange={event => { clearDraft(); setFormat(event.target.value); setTargetSize(/commander|edh|brawl/i.test(event.target.value) ? 100 : 60); }}>
-                {sourceDeck && !FORMATS[inventoryType].includes(format) && <option>{format}</option>}
-                {FORMATS[inventoryType].map(value => <option key={value}>{value}</option>)}
-              </select>
-            </div>
-            <div className="form-group" style={{ flex: '1 1 100px' }}>
-              <label htmlFor="ai-target">{t('deck.targetSize')}</label>
-              <input id="ai-target" form="ai-conversation-form" className="input-control" type="number" min="1" max="250" step="1" required readOnly={!!sourceDeck || isCommander} value={targetSize} onChange={event => { clearDraft(); setTargetSize(event.target.value === '' ? '' : Number(event.target.value)); }} />
-            </div>
+            {inventoryType === 'collection' && (
+              <p id="ai-checked-out-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.includeCheckedOutHint')}</p>
+            )}
           </div>
+          <section>
+            <h3>{t('aiDeck.eligibilityDetails')}</h3>
+            <div className="deck-details-content">
             <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.inventoryHint')}</p>
+              <p id="ai-container-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.containerHint')}</p>
+              {sourceDeck && <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.improveContainerHint')}</p>}
+          <p id="ai-filter-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.filterHint')}</p>
+              <p id="ai-power-hint" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{t('aiDeck.powerLevelHint')}</p>
+            </div>
           </section>
-          </div>
         </fieldset>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1.25rem', alignItems: 'start' }}>
@@ -378,7 +459,11 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
         <fieldset disabled={!!busy} style={fieldsetStyle}>
           <section className="glass-panel" aria-labelledby="ai-conversation-title" style={{ minWidth: 0 }}>
             <h3 id="ai-conversation-title">{t('aiDeck.conversationTitle')}</h3>
-            <p id="ai-conversation-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.conversationHint')}</p>
+            <p id="ai-conversation-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.privacySummary')}</p>
+            <section>
+              <h3>{t('aiDeck.conversationDetails')}</h3>
+              <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.conversationHint')}</p>
+            </section>
             {messages.length > 0 && <>
               <div ref={conversationContainer} role="log" aria-labelledby="ai-conversation-title" aria-live="polite" aria-relevant="additions" tabIndex={0} style={{ maxHeight: 'min(400px, 50dvh)', overflowY: 'auto', overflowWrap: 'anywhere', overscrollBehavior: 'contain', padding: '0.75rem', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)' }}>
                 {messages.map((message, index) => (
@@ -397,8 +482,8 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
             <textarea id="ai-prompt" className="input-control" rows={3} maxLength={4000} required={needsMessage} aria-describedby="ai-conversation-hint ai-prompt-limit" value={prompt} onChange={event => setPrompt(event.target.value)} placeholder={t(needsMessage ? 'aiDeck.followUpPlaceholder' : sourceDeck ? 'aiDeck.improvePromptPlaceholder' : 'aiDeck.promptPlaceholder')} />
             <p id="ai-prompt-limit" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.promptLimit')} ({prompt.length}/4000)</p>
           </div>
-          <button className="btn btn-primary" type="submit" disabled={!!busy || !account?.connected || inventoryLoading || !!inventoryError || conversationFull || (needsMessage && !prompt.trim())}>
-            <Sparkles size={16} /> {t(busy === 'generate' ? 'aiDeck.generating' : needsMessage || prompt.trim() ? 'aiDeck.send' : 'aiDeck.generate')}
+          <button className="btn btn-primary" type="submit" aria-busy={busy === 'generate'} disabled={!!busy || !account?.connected || inventoryLoading || !!inventoryError || conversationFull || (needsMessage && !prompt.trim())}>
+            {busy === 'generate' ? <LoaderCircle size={16} className="spin-animation ai-waiting-icon" aria-hidden="true" /> : <Sparkles size={16} aria-hidden="true" />} {t(busy === 'generate' ? 'aiDeck.generating' : needsMessage || prompt.trim() ? 'aiDeck.send' : 'aiDeck.generate')}
           </button>
           </section>
         </fieldset>
@@ -416,6 +501,11 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
             <div className="form-group">
               <label htmlFor="ai-description">{t('deck.descriptionOptional')}</label>
               <textarea id="ai-description" className="input-control" rows={3} maxLength={4000} value={draft.description} onChange={event => setDraft(current => ({ ...current, description: event.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label htmlFor="ai-strategy">{t('aiDeck.strategy')}</label>
+              <textarea id="ai-strategy" className="input-control" rows={8} maxLength={8000} aria-describedby="ai-strategy-hint" style={{ fontSize: '1rem', resize: 'vertical' }} value={draft.strategy} onChange={event => setDraft(current => ({ ...current, strategy: event.target.value }))} />
+              <p id="ai-strategy-hint" style={{ color: 'var(--text-secondary)' }}>{t(sourceDeck ? 'aiDeck.improveStrategyHint' : 'aiDeck.strategyHint')}</p>
             </div>
             {isCommander && (
               <div className="form-group">

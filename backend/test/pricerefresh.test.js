@@ -1,25 +1,10 @@
-// The configurable price-refresh interval, and the bug that made it necessary
-// to look at shouldSweepPrices in the first place.
-//
-// Every price provider gates on shouldSweepPrices when it is not forced. Until
-// now server.js's daily timer passed force: true, so in the one case that
-// actually drove the schedule this function's answer was thrown away. Two
-// consequences, both pinned below:
-//
-//   · the interval could not be configured at all, which matters now that one
-//     selectable provider charges credits per card refreshed
-//   · a provider missing from SWEEP_COLUMN still looked like it worked, because
-//     the forced path never asked. Lorcana has been in that state since it was
-//     added: lorcastApi asks for 'lorcana', db.js has had the column all along,
-//     and the map had no key — so shouldSweepPrices('lorcana') answered false
-//     forever and lorcana_prices_swept_at was never written on any install.
-//
+// The configurable Magic price-refresh interval survives restarts.
 // No framework — plain node + assert. Run: `node test/pricerefresh.test.js`
 const assert = require('assert');
 const os = require('os');
 const path = require('path');
 
-process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-pricerefresh-${process.pid}.db`);
+process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-pricerefresh-${process.pid}.db`);
 const db = require('../src/db');
 const {
   shouldSweepPrices,
@@ -37,10 +22,6 @@ const sweptDaysAgo = (col, days) =>
 // never swept, which is the whole point of the last case below.
 const PROVIDERS = [
   ['mtg', 'mtg_prices_swept_at'],
-  ['pokemon', 'pokemon_prices_swept_at'],
-  ['tcgdex', 'tcgdex_prices_swept_at'],
-  ['tcgcsv', 'tcgcsv_prices_swept_at'],
-  ['lorcana', 'lorcana_prices_swept_at'],
 ];
 
 async function main() {
@@ -56,11 +37,6 @@ async function main() {
   }
 
   // --- 3. Every provider actually records its sweep.
-  //
-  // This is the Lorcana bug. markPricesSwept returns early for a game missing
-  // from SWEEP_COLUMN, so the column stays NULL and shouldSweepPrices keeps
-  // answering "never swept" — or, worse, false. Asserted for all five so the
-  // next provider added to server.js and forgotten here fails loudly.
   for (const [game, col] of PROVIDERS) {
     await markPricesSwept(game);
     const row = await db.get(`SELECT ${col} AS at FROM app_settings WHERE id = 1`);

@@ -1,24 +1,18 @@
 const express = require('express');
 const db = require('../db');
-const tcgApi = require('../tcgApi');
-const tcgdexApi = require('../tcgdexApi');
 const scryfallApi = require('../scryfallApi');
-const lorcastApi = require('../lorcastApi');
 const mtgjsonApi = require('../mtgjsonApi');
 const cvScan = require('../cvScan');
 const scanOcr = require('../utils/scanOcr');
 const scryfallBulk = require('../scryfallBulk');
-const tcgplayerCatalog = require('../tcgplayerCatalog');
 const languages = require('../utils/languages');
-const pokemonProvider = require('../utils/pokemonProvider');
 const psaApi = require('../psaApi');
-const gradedPrices = require('../gradedPrices');
 const cardApi = require('../utils/cardApi');
 const { searchLimiter } = require('../middleware/auth');
 const { resolveCardPrice, parseCardRow, recordPrice } = require('../utils/priceHelpers');
 const { parseSetList } = require('../utils/setQuery');
-const { compartmentLabel, isBinderType, rebalanceCompartmentByScheme, stackKey, STACK_KEY_SQL } = require('../utils/compartmentSort');
-const { checkedOutAllocation, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, setStackQuantity, defaultCompartmentPlan } = require('../utils/collectionHelpers');
+const { compartmentLabel, isBinderType, rebalanceCompartmentByScheme, stackKey } = require('../utils/compartmentSort');
+const { checkedOutAllocation, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, setStackQuantity, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { splitPrice } = require('../utils/splitPrice');
 
@@ -43,46 +37,26 @@ async function attachOwnedQty(cards, userId, listType = 'collection') {
     `SELECT card_id, SUM(quantity) AS qty FROM collection
      WHERE user_id = ? AND list_type = ? AND card_id IN (${ids.map(() => '?').join(',')})
      GROUP BY card_id`,
-    [userId, listType === 'arena' ? 'arena' : 'collection', ...ids]
+    [userId, listType ?? 'collection', ...ids]
   );
   const owned = new Map(rows.map(r => [r.card_id, r.qty]));
   for (const c of cards) c.owned_qty = owned.get(c.id) || 0;
 }
 
-// 1. Search cards (proxies to Pokémon TCG, Scryfall, Lorcast or TCGdex + database cache).
-// `game` and the PROVIDER route the request; all return the same card shape.
-//
-// Language alone is not enough, and getting that wrong is not cosmetic. TCGdex can
-// serve English too, and when it is the selected provider the scan indexes are
-// built from its catalogue — so a match hands back TCGdex set ids (swsh10.5,
-// sv01, me01). Routing those to pokemontcg.io, which numbers the same sets pgo,
-// sv1 and me1, finds nothing; the client then retries by name alone and gets some
-// unrelated printing of the right card. On screen that is a card with the correct
-// name, the wrong set and number, and frequently no art at all.
-//
-// So: non-English always goes to TCGdex (pokemontcg.io is English-only), and
-// English follows whichever provider actually built the data being searched.
-// That rule lives in utils/pokemonProvider — this only maps its answer to a module.
-async function pokemonApiFor(lang) {
-  return pokemonProvider.apiFor(lang);
-}
-
-// Collector numbers as both providers can agree on. TCGdex zero-pads ('013')
-// where pokemontcg.io and TCGplayer do not ('13'), and letters have to survive
-// ('TG12', 'SWSH284') or every promo in a set collides into one key.
+// Compare collector numbers without insignificant leading zeros.
 const sameNumber = (a, b) => {
   const norm = (n) => String(n == null ? '' : n).trim().toLowerCase().replace(/^0+(?=\d)/, '');
   return !!norm(a) && norm(a) === norm(b);
 };
-// Normalize search inputs so combined queries (e.g. "Kangaskhan 5/64", "5/64",
-// "Kangaskhan #5", "FDN 540") decompose cleanly into name, number, and set.
+// Normalize combined queries (e.g. "Lightning Bolt #5", "FDN 540").
 function normalizeSearchParams({ name = '', number = '', set = '', q = '' }) {
   let cleanName = String(name || '').trim();
   let cleanNumber = String(number || '').trim();
   let cleanSet = String(set || '').trim();
   const rawQuery = String(q || '').trim();
 
-  const input = (!cleanName && !cleanNumber && !cleanSet && rawQuery) ? rawQuery : cleanName;
+  if (!cleanName && !cleanNumber && !cleanSet) cleanName = rawQuery;
+  const input = cleanName;
 
   if (input && !cleanNumber) {
     const pureFrac = input.match(/^#?([A-Z0-9★\-]+)\s*\/\s*[A-Z0-9★\-]+$/i);
@@ -123,15 +97,16 @@ function normalizeSearchParams({ name = '', number = '', set = '', q = '' }) {
 router.all('/search', searchLimiter, async (req, res) => {
   const query = req.method === 'POST' ? { ...req.query, ...req.body } : req.query;
   const { name: rawName, number: rawNumber, set: rawSet, scope = 'database', lang, prints, q, image, cropped, list_type } = query;
-  const game = 'mtg';
+  const game = query.game === undefined ? 'mtg' : query.game;
+  if (game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
+  if (list_type !== undefined && !LIST_TYPES.includes(list_type)) return res.status(400).json({ error: 'Invalid list_type' });
   const { name, number, set } = normalizeSearchParams({ name: rawName, number: rawNumber, set: rawSet, q });
   const page = Math.max(1, parseInt(query.page, 10) || 1);
   const limit = Math.min(250, Math.max(1, parseInt(query.limit, 10) || 60));
   try {
-    const api = scryfallApi;
-    let { cards, total } = await api.searchCards({
+    let { cards, total } = await scryfallApi.searchCards({
       name, number, set, scope, userId: req.user.id, lang,
-      apiKey: req.user.tcg_api_key, allPrints: prints === '1', page, limit,
+      allPrints: prints === '1', page, limit, listType: list_type,
     });
 
     // When an image from a camera scan is attached, score each candidate card
@@ -156,14 +131,8 @@ router.all('/search', searchLimiter, async (req, res) => {
     res.json(cards);
   } catch (error) {
     console.error(error);
-    if (error.message === 'INVALID_API_KEY') {
-      return res.status(403).json({ error: 'Invalid API Key' });
-    }
     if (error.message === 'RATE_LIMIT_EXCEEDED') {
       return res.status(429).json({ error: 'Rate limit exceeded' });
-    }
-    if (['POKEMONTCGAPI_KEY_REQUIRED', 'POKEMONTCGAPI_KEY_INVALID'].includes(error.message)) {
-      return res.status(503).json({ error: 'The administrator needs to configure a valid POKEMONTCGAPI_KEY on the server.' });
     }
     if (error.message === 'UPSTREAM_UNAVAILABLE') {
       return res.status(503).json({ error: 'Card API is having trouble. Try again in a moment.' });
@@ -174,13 +143,7 @@ router.all('/search', searchLimiter, async (req, res) => {
 
 // 1a2. Identify a graded slab from the cert number printed on its label.
 //
-// Returns the cert AND a list of candidate cards — it does not pick one. PSA
-// labels a card as 'CHARIZARD-HOLO' with year 1999 and brand 'POKEMON GAME',
-// which names a card without identifying a printing: that name+number exists in
-// Base Set, Base Set 2 and a dozen reprints, and PSA's label does not distinguish
-// them. Auto-picking would file the wrong printing silently and confidently, so
-// the user picks and the client then adds through POST /collection as usual with
-// grader/grade/cert_number filled in.
+// Returns the cert and candidate printings for the user to choose before adding.
 //
 // GET, and cheap on a repeat: psaApi caches every cert permanently, so re-checking
 // a number costs no quota and works with no token configured.
@@ -189,12 +152,9 @@ router.all('/search', searchLimiter, async (req, res) => {
 router.get('/collection/cert/:certNumber', searchLimiter, async (req, res) => {
   try {
     const cert = await psaApi.lookupCert(req.params.certNumber, req.user.psa_api_token || '');
-    // Which game to search is read off PSA's own brand/category text. Unknown means
-    // unknown — PSA grades sports cards and tickets too, and guessing 'pokemon' for
-    // a 1986 Fleer basketball card would return nonsense candidates rather than an
-    // honest empty list.
     const brand = `${cert.brand || ''} ${cert.category || ''}`.toUpperCase();
-    const game = /POKEMON/.test(brand) ? 'pokemon' : (/MAGIC|GATHERING/.test(brand) ? 'mtg' : (/LORCANA/.test(brand) ? 'lorcana' : null));
+    const game = /MAGIC|GATHERING/.test(brand) ? 'mtg' : null;
+    if (!game) return res.status(400).json({ error: 'Unsupported certification game' });
     let candidates = [];
     if (game) {
       const name = psaApi.searchableName(cert.subject);
@@ -203,9 +163,8 @@ router.get('/collection/cert/:certNumber', searchLimiter, async (req, res) => {
         // discriminator between printings of the same name, and the search treats
         // it as optional so a label without one still returns something.
         const number = cert.card_number || '';
-        const api = game === 'mtg' ? scryfallApi : (game === 'lorcana' ? lorcastApi : await pokemonApiFor(null));
-        ({ cards: candidates } = await api.searchCards({
-          name, number, userId: req.user.id, apiKey: req.user.tcg_api_key,
+        ({ cards: candidates } = await scryfallApi.searchCards({
+          name, number, userId: req.user.id,
           allPrints: true, limit: 24,
         }));
         await attachOwnedQty(candidates, req.user.id);
@@ -227,12 +186,10 @@ router.get('/collection/cert/:certNumber', searchLimiter, async (req, res) => {
 // Not admin-only: this is what the set filter needs to stop offering sets that
 // match nothing. Read-only counts, no build controls.
 router.get('/scan-sets', async (req, res) => {
-  const game = 'mtg';
+  const game = req.query.game === undefined ? 'mtg' : req.query.game;
+  if (game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
   try {
-    // `builtLangs` rides along because the scanner's language picker has no other
-    // way to know: it offered all eleven languages, and for ten of them a Pokémon
-    // scan is answered by the English catalog and filed as an English printing.
-    // Offering a choice without its consequence is what made that a surprise.
+    // Report built languages so the picker can explain catalog coverage.
     res.json({
       ...await require('../catalog').setCounts(game, languages.toName(req.query.lang)),
       builtLangs: cvScan.builtLangs(game),
@@ -243,42 +200,6 @@ router.get('/scan-sets', async (req, res) => {
   }
 });
 
-// A scanned Pokémon card, expressed in the language being scanned.
-//
-// Returns the card unchanged when it is already in that language (a catalog built
-// in it returns localised ids, so this is the normal case) or when no localised
-// row can be reached — see tcgdexApi.getPrintingInLang for which cases those are
-// and why guessing at them would be worse than answering in English.
-//
-// When no localised row can be reached the English card comes back carrying
-// `langFallback`, the language that was asked for and could not be served. The
-// unmarked English card was indistinguishable from a genuine English printing, so
-// the picker showed English art and an English name with nothing to say why —
-// which for Korean, Japanese and Chinese (their sets are their own releases, not
-// localised editions, so there is no id to swap to) is EVERY scan. The client
-// prints a disclaimer on it; the copy is still filed in the scanned language.
-async function localizedPokemon(card, langName) {
-  if (!card || languages.isEnglish(langName)) return card;
-  if (card.language === langName) return card;
-  const localized = await tcgdexApi.getPrintingInLang(card.id, langName).catch(() => null);
-  return localized || { ...card, langFallback: langName };
-}
-
-// The card a TCGplayer product is, found by set + collector number.
-//
-// `setId` comes from the TCGplayer catalogue and is therefore always an ENGLISH
-// set id, which is why this is asked twice on a non-English scan (see the call
-// site): once in the scanned language, then in English.
-async function pokemonBySetNumber(langName, number, setId, tcgApiKey) {
-  const provider = await pokemonApiFor(langName);
-  const { cards } = await provider.searchCards({
-    number, set: setId, lang: languages.toCode(langName), apiKey: tcgApiKey, limit: 5,
-  }).catch(() => ({ cards: [] }));
-  // Leading zeros, not string equality: TCGdex writes '013' where
-  // pokemontcg.io writes '13', so an exact compare silently rejected every
-  // TCGdex answer and reported the card as unresolvable.
-  return (cards || []).find(c => sameNumber(c.number, number)) || null;
-}
 
 const scanSetCode = value => String(value || '').trim().toLowerCase().replace(/^mtg-/, '');
 const scanPrintingId = candidate => candidate.card?.id || candidate.cardId || String(candidate.productId);
@@ -308,20 +229,15 @@ async function scanArtworkPrintings(candidates, sets, langName) {
     && (art.get(card.id) || []).some(id => topArt.has(id)));
 }
 
-async function applyScanSafety(result, buf, { cropped, sets, langName }) {
+async function applyScanSafety(result, footer, { sets, langName }) {
   const candidates = result.candidates;
   const codes = await db.all(`SELECT id AS code FROM sets WHERE game = 'mtg'
     UNION SELECT DISTINCT set_id AS code FROM card_cache WHERE game = 'mtg'`);
-  let ocr;
-  try {
-    const image = cropped ? buf : (result.crop ? Buffer.from(result.crop.split(',').pop(), 'base64') : null);
-    ocr = image && result.detected !== false
-      ? await scanOcr.readPrinting(image, { setCodes: [...codes.map(r => scanSetCode(r.code)), ...candidates.map(c => scanSetCode(c.set))] })
-      : { status: 'unreadable' };
-  } catch (error) {
-    console.warn('scan-match OCR failed:', error.message);
-    ocr = { status: 'error' };
-  }
+  let ocr = typeof footer.tsv === 'string'
+    ? scanOcr.parsePrintingTsv(footer.tsv, {
+      setCodes: [...codes.map(r => scanSetCode(r.code)), ...candidates.map(c => scanSetCode(c.set))],
+    })
+    : footer;
   const artPrintings = await scanArtworkPrintings(candidates, sets, candidates[0]?.card?.language || langName);
   const topScore = candidates[0]?.score;
   const nearby = candidates.filter(c => topScore - c.score < cvScan.STRONG_MARGIN);
@@ -348,6 +264,8 @@ async function applyScanSafety(result, buf, { cropped, sets, langName }) {
     }
   }
   const top = result.candidates[0];
+  const name = typeof footer.nameTsv === 'string'
+    ? scanOcr.parseNameTsv(footer.nameTsv) : { status: 'unreadable' };
   const choices = ocr.status === 'matched' ? result.candidates : nearby;
   const identities = new Set(choices.map(scanPrintingId));
   for (const card of artPrintings) {
@@ -370,15 +288,17 @@ async function applyScanSafety(result, buf, { cropped, sets, langName }) {
   if (['conflict', 'unavailable', 'error'].includes(ocr.status)) reasons.push(`ocr_${ocr.status}`);
   result.margin = result.candidates.length > 1
     ? top.score - result.candidates[1].score : (top?.score || 0);
-  result.safety = { autoAddSafe: reasons.length === 0, reasons, ocr, quality, context };
+  result.safety = { autoAddSafe: reasons.length === 0, reasons, ocr, name, quality, context };
   result.context = context;
   result.lang = languages.toCode(top?.card?.language || langName);
 }
 
 router.post('/scan-match', searchLimiter, async (req, res) => {
+  const started = performance.now();
   try {
     const { image, set = '', lang, cropped = false } = req.body || {};
-    const game = 'mtg';
+    const game = req.body?.game === undefined ? 'mtg' : req.body.game;
+    if (game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
     if (!image || typeof image !== 'string') return res.status(400).json({ error: 'Missing image' });
     const base64 = image.includes(',') ? image.slice(image.indexOf(',') + 1) : image;
     const buf = Buffer.from(base64, 'base64');
@@ -408,220 +328,51 @@ router.post('/scan-match', searchLimiter, async (req, res) => {
     }
 
     const sets = parseSetList(set);
+    const timings = {};
+    const matchStarted = performance.now();
     const result = await cvScan.match(buf, game, 8, { sets, lang: langName, cropped: !!cropped });
+    timings.matchMs = performance.now() - matchStarted;
 
-    result.candidates = await Promise.all(result.candidates.map(async (cand, i) => {
-      // MTG goes through getCardById because it can fetch and cache a printing
-      // this install has never seen. A locally built catalog is drawn FROM
-      // card_cache, so a primary-key read is both sufficient and the only thing
-      // that works for Pokemon, whose ids Scryfall knows nothing about.
-      if (cand.cardId) {
-        if (game === 'mtg') {
-          const card = await scryfallApi.getCardById(cand.cardId).catch(() => null);
-          if (!card) return cand;
-          // The preference selects a real translated printing, never a relabelled
-          // English fallback. Keep the provider's language authoritative.
-          const localized = languages.toCode(card.language) === languages.toCode(langName) ? null
-            : await scryfallApi.getPrintingInLang(card.set_id, card.number, langName).catch(() => null);
-          const use = localized && languages.toCode(localized.language) === languages.toCode(langName)
-            ? localized : card;
-          const marked = languages.toCode(use.language) === languages.toCode(langName)
-            ? use : { ...use, langFallback: langName };
-          return { ...cand, name: use.name, set: use.set_id, number: use.number, card: marked };
-        }
-        if (game === 'lorcana') {
-          let row = await db.get(
-            `SELECT * FROM card_cache WHERE id = ? AND image_url IS NOT NULL AND image_url != '' LIMIT 1`,
-            [cand.cardId]
-          );
-          if (!row) {
-            const card = await lorcastApi.getCardById(cand.cardId).catch(() => null);
-            if (card) return { ...cand, name: card.name, set: card.set_id, number: card.number, card };
-            return cand;
-          }
-          const card = parseCardRow(row);
-          return { ...cand, name: card.name, set: card.set_id, number: card.number, card };
-        }
-        const row = await db.get(
-          `SELECT * FROM card_cache WHERE id = ? AND image_url IS NOT NULL AND image_url != '' LIMIT 1`,
-          [cand.cardId]
-        );
-        if (!row) return cand;
-        const card = parseCardRow(row);
-        // Same re-expression as MTG above. A catalog built in the scanned language
-        // returns localised ids already, so this is a no-op then; it matters when
-        // the match fell back to the English catalog (no catalog in that language,
-        // or a card the localised one does not cover).
-        const use = await localizedPokemon(card, langName);
-        return { ...cand, name: use.name, set: use.set_id, number: use.number, card: use };
+    // Recognition needs the crop, not metadata. Catch immediately so a failed
+    // subprocess never rejects unobserved while provider requests are pending.
+    const ocrPromise = (async () => {
+      const ocrStarted = performance.now();
+      try {
+        const footer = cropped ? buf : (result.crop ? Buffer.from(result.crop.split(',').pop(), 'base64') : null);
+        return footer && result.detected !== false
+          ? await scanOcr.readCardText(footer) : { status: 'unreadable' };
+      } catch (error) {
+        console.warn('scan-match OCR failed:', error.message);
+        return { status: 'error' };
+      } finally {
+        timings.ocrMs = performance.now() - ocrStarted;
       }
-      if (game === 'lorcana') {
-        const row = await db.get(
-          `SELECT c.* FROM tcgplayer_product t
-             JOIN card_cache c ON c.id = t.card_id
-            WHERE t.product_id = ? AND c.game = 'lorcana'
-              AND c.image_url IS NOT NULL AND c.image_url != ''
-            LIMIT 1`,
-          [cand.productId]
-        );
-        if (row) {
-          const card = parseCardRow(row);
-          return { ...cand, name: card.name, set: card.set_id, number: card.number, card };
-        }
-        const directRow = await db.get(
-          `SELECT * FROM card_cache WHERE tcgplayer_product_id = ? AND game = 'lorcana' AND image_url IS NOT NULL AND image_url != '' LIMIT 1`,
-          [cand.productId]
-        );
-        if (directRow) {
-          const card = parseCardRow(directRow);
-          return { ...cand, name: card.name, set: card.set_id, number: card.number, card };
-        }
-        const p = await tcgplayerCatalog.lookup(cand.productId);
-        if (!p) return cand;
-        const hint = { ...cand, name: p.name, set: p.set_id || p.group_name, number: p.number };
-        if (p.name) {
-          const { cards } = await lorcastApi.searchCards({ name: p.name, number: p.number, limit: 5 }).catch(() => ({ cards: [] }));
-          const card = (cards || []).find(c => sameNumber(c.number, p.number)) || cards?.[0];
-          if (card) {
-            await db.run(
-              `INSERT OR REPLACE INTO tcgplayer_product (card_id, product_id, category_id, confidence, matched_at)
-               VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)`,
-              [card.id, cand.productId, 71]
-            ).catch(() => {});
-            return { ...hint, name: card.name, set: card.set_id, number: card.number, card };
-          }
-        }
-        return hint;
-      }
-      // The published Pokemon catalog is keyed by TCGplayer product id.
-      // tcgplayer_product is the authoritative mapping — card_cache's own column
-      // is a denormalised copy written only when the card also had a price, so
-      // joining on it silently drops every unpriced card.
-      const row = await db.get(
-        `SELECT c.* FROM tcgplayer_product t
-           JOIN card_cache c ON c.id = t.card_id
-          WHERE t.product_id = ? AND c.game = 'pokemon'
-            AND c.image_url IS NOT NULL AND c.image_url != ''
-          LIMIT 1`,
-        [cand.productId]
-      );
-      if (row) {
-        const card = parseCardRow(row);
-        const use = await localizedPokemon(card, langName);
-        return { ...cand, name: use.name, set: use.set_id, number: use.number, card: use };
-      }
-      // Nothing cached under that product id. Ask TCGplayer's own catalogue what
-      // the product IS, and hand back a set and a number — which is all the client
-      // needs to resolve it through /api/search, provider fetch and cache included.
-      //
-      // This is what makes the ready-made Pokémon catalog work on an install with
-      // an empty card_cache. The join above can only ever answer for cards already
-      // downloaded AND priced, so before this every such scan named nothing.
-      const p = await tcgplayerCatalog.lookup(cand.productId);
-      if (!p) return cand;
-      const hint = { ...cand, name: p.name, set: p.set_id || p.group_name, number: p.number };
-      if (!p.set_id) return hint;
-      // The TOP candidate is resolved here whatever the language; the rest are left
-      // to the client on an English scan.
-      //
-      // Not a speed fix — the same provider round trip happens either way, it just
-      // happens before the response instead of after. What it buys is the product
-      // id -> card id row written below, and one less HTTP hop on the auto-add
-      // path, which fires on the top candidate alone.
-      //
-      // Measured, first sight of a card: 971-1963 ms to resolve a Pokémon candidate
-      // (set+number search against pokemontcg.io, which answers 5xx often enough to
-      // carry its own retry policy) against 164 ms for an MTG candidate (one
-      // Scryfall by-id fetch, because the MTG catalog stores card ids and the
-      // Pokémon one stores TCGplayer product ids). Both are ~1 ms once card_cache
-      // holds the row. That gap is why Pokémon feels slow and Magic feels instant,
-      // and it is the provider and the key shape, not this code path.
-      if (i > (languages.isEnglish(langName) ? 0 : 2)) return hint;
+    })();
+    const metadataStarted = performance.now();
 
-      // Non-English, and this is where a correct match used to die. The published
-      // catalog is TCGplayer's ENGLISH products, so what it hands back is an
-      // English set id — and a non-English search goes to TCGdex, which has never
-      // heard of 'base6'. Verified: tcgdex(ja, set=base6, number=96) returns 0
-      // cards, so all eight candidates resolved to null and a scan that had
-      // identified the card correctly reported "no confident match".
-      //
-      // So resolve it here, the same way the cached branch does: find the English
-      // printing, then re-express it in the scanned language. Capped above at the
-      // first three candidates for a non-English scan — each costs a provider round
-      // trip, and the picker only needs the alternatives a person will look at.
-      // Through the configured provider, not hardcoded pokemontcg.io: a TCGdex
-      // install has no pokemontcg.io rows and its set ids are different, so asking
-      // the wrong one returns nothing at all.
-      //
-      // And when THAT finds nothing, ask in English — because for Korean,
-      // Japanese and Chinese it never finds anything. Those regions get their own
-      // releases (SM1M, S12, SV2a) rather than localised editions of the English
-      // sets, so TCGdex's ko/ja/zh catalogues share no set id with the English
-      // 'base6' the TCGplayer product carries: verified 0 results for every
-      // candidate, so a Korean scan that had identified the card correctly
-      // resolved nothing at all and reported "no confident match" — while the same
-      // photo scanned as English named the card immediately.
-      //
-      // The English card IS the right answer to "which card is this"; only its
-      // language is wrong, and localizedPokemon below marks that so the client can
-      // say so rather than passing it off as an English printing.
-      let card = await pokemonBySetNumber(langName, p.number, p.set_id, req.user.tcg_api_key);
-      if (!card && !languages.isEnglish(langName)) {
-        card = await pokemonBySetNumber('English', p.number, p.set_id, req.user.tcg_api_key);
-      }
-      if (!card) return hint;
-      // Remember the mapping the price sweep would eventually have written. The
-      // next scan of this product then takes the indexed join above instead of a
-      // set+number search — both are ~1 ms once cached, so this is tidiness rather
-      // than a speed-up, but it is also the row the marketplace link and the price
-      // sweep want and it costs one insert to have it.
-      await db.run(
-        `INSERT OR REPLACE INTO tcgplayer_product (card_id, product_id, category_id, confidence, matched_at)
-         VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)`,
-        [card.id, cand.productId, 3]
-      ).catch(() => {});
-      const use = await localizedPokemon(card, langName);
-      return { ...hint, name: use.name, set: use.set_id, number: use.number, card: use };
+    result.candidates = await Promise.all(result.candidates.map(async (cand) => {
+      if (!cand.cardId) return cand;
+      const card = await scryfallApi.getCardById(cand.cardId).catch(() => null);
+      if (!card) return cand;
+      // Keep the provider's actual printing language authoritative.
+      const localized = languages.toCode(card.language) === languages.toCode(langName) ? null
+        : await scryfallApi.getPrintingInLang(card.set_id, card.number, langName).catch(() => null);
+      const use = localized && languages.toCode(localized.language) === languages.toCode(langName)
+        ? localized : card;
+      const marked = languages.toCode(use.language) === languages.toCode(langName)
+        ? use : { ...use, langFallback: langName };
+      return { ...cand, name: use.name, set: use.set_id, number: use.number, card: marked };
     }));
 
     result.candidates = result.candidates.filter((candidate, index, all) =>
       all.findIndex(other => scanPrintingId(other) === scanPrintingId(candidate)) === index);
-    await applyScanSafety(result, buf, { cropped: !!cropped, sets, langName });
-
-    // The ready-made Pokémon catalog identified something and NONE of it could be
-    // named. That is a install-state problem, not a bad photo, and it has to say so.
-    //
-    // Its ids are TCGplayer product ids, which reach a card only through
-    // tcgplayer_product -> card_cache. Both tables are filled by work this install
-    // may never have done: card_cache by a set walk, tcgplayer_product as a side
-    // effect of the Pokémon price sweep over already-cached sets. On a fresh install
-    // both are empty, every candidate came back bare, the client dropped all eight
-    // (resolveCandidates needs a set+number or a name) and the user was told "no
-    // confident match" — while the panel had just promised scanning would work.
-    //
-    // MTG has no such gap: its published ids ARE Scryfall ids, so getCardById above
-    // fetches and caches a printing this install has never seen.
-    // `!c.set` matters: with the product map built, a bare candidate still carries
-    // a set and a number for the client to resolve, and that is a working scan.
-    // This fires only when nothing could be said about the product at all.
-    const unresolvedPublished = game === 'pokemon'
-      && result.candidates.length > 0
-      && result.candidates.every(c => !c.card && !c.set && c.productId != null);
-    if (unresolvedPublished) {
-      const map = await tcgplayerCatalog.summary();
-      console.log('scan-match: ready-made Pokemon catalog hit but no product id could be named'
-        + ` — product map holds ${map.rows} rows${map.progress ? ' (building)' : ''}`);
-      return res.json({
-        ...result,
-        unresolvedPublished: true,
-        productMapRows: map.rows,
-        error: map.progress
-          ? 'The TCGplayer product map is still building — the ready-made Pokémon catalog cannot name'
-            + ' its matches until it finishes.'
-          : 'The ready-made Pokémon catalog recognises cards by TCGplayer product id, and this install'
-            + ' has no product map to look them up in. An admin can build it in Admin → Scan catalogs.',
-      });
-    }
+    timings.metadataMs = performance.now() - metadataStarted;
+    const footer = await ocrPromise;
+    const safetyStarted = performance.now();
+    await applyScanSafety(result, footer, { sets, langName });
+    timings.safetyMs = performance.now() - safetyStarted;
+    // Overlapping wall-clock stages: these durations are not additive.
+    result.timings = { ...timings, totalMs: performance.now() - started };
 
     return res.json(result);
   } catch (error) {
@@ -632,6 +383,7 @@ router.post('/scan-match', searchLimiter, async (req, res) => {
 
 // 2. Get User's Collection
 router.get('/collection', async (req, res) => {
+  if (req.query?.game !== undefined && req.query.game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
   try {
     const listType = req.query.list_type || 'collection';
     if (!LIST_TYPES.includes(listType)) return res.status(400).json({ error: 'Invalid list_type' });
@@ -690,8 +442,6 @@ router.get('/collection', async (req, res) => {
         cc.price_trend,
         cc.price_normal,
         cc.price_holofoil,
-        cc.price_reverse_holofoil,
-        cc.price_1st_edition,
         cc.price_currency,
         cc.price_source,
         cc.game,
@@ -754,7 +504,7 @@ class AddCardError extends Error {
 // and means an ungraded card, not a missing value.
 const GRADERS = ['Raw', 'PSA', 'BGS', 'CGC', 'SGC', 'TAG'];
 
-async function addCardToCollection(user, body) {
+async function addCardToCollection(user, body, preparedCard = null) {
   const {
     card_id,
     quantity = 1,
@@ -775,6 +525,10 @@ async function addCardToCollection(user, body) {
 
   if (!card_id) {
     throw new AddCardError(400, 'card_id is required');
+  }
+  if (game !== 'mtg') throw new AddCardError(400, 'Unsupported game');
+  if (typeof card_id !== 'string') {
+    throw new AddCardError(400, 'Unsupported card ID');
   }
   if (!LIST_TYPES.includes(list_type)) {
     throw new AddCardError(400, 'Invalid list_type');
@@ -812,17 +566,16 @@ async function addCardToCollection(user, body) {
   }
 
   {
-    await cardApi.hydrate(card_id);
-
-    let card = await db.get(`SELECT * FROM card_cache WHERE id = ?`, [card_id]);
+    let card = preparedCard || await db.get(`SELECT * FROM card_cache WHERE id = ?`, [card_id]);
     if (!card) {
-      card = await cardApi.getCardById(card_id, { game, tcgApiKey: req.user.tcg_api_key });
+      if (!card_id.startsWith('mtg-')) throw new AddCardError(400, 'Unsupported card ID');
+      card = await cardApi.getCardById(card_id, { game });
       if (!card) throw new AddCardError(404, `Card ID ${card_id} not found.`);
     }
     if (card.game !== 'mtg') throw new AddCardError(400, 'Only Magic: The Gathering cards are supported.');
 
     let cardId = card_id;
-    const localized = await cardApi.printingInLanguage(card, language);
+    const localized = preparedCard ? null : await cardApi.printingInLanguage(card, language);
     if (localized) {
       card = localized;
       cardId = localized.id;
@@ -905,17 +658,187 @@ async function addCardToCollection(user, body) {
       placement: resolved.compartment_id
         ? await describePlacement(db, lastInsertedId, req.user.id)
         : null,
-      container_full: !!resolved.full,
       rule_rejected: !!resolved.rejected
     };
   }
 }
 
+const SCAN_DRAFT_SELECT = `
+  SELECT cc.*, d.id AS draft_id, d.card_id, d.quantity, d.condition, d.printing,
+    d.language, d.purchase_price, d.location_id
+  FROM scan_drafts d JOIN card_cache cc ON cc.id = d.card_id
+  WHERE d.user_id = ?`;
+
+async function getScanDraft(userId, id) {
+  const row = await db.get(`${SCAN_DRAFT_SELECT} AND d.id = ?`, [userId, id]);
+  if (!row) throw new AddCardError(404, 'Scan draft not found');
+  return parseCardRow(row);
+}
+
+async function normalizeScanDraft(body, previous = {}) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new AddCardError(400, 'Invalid scan draft');
+  }
+  const draft = {
+    card_id: previous.card_id, quantity: 1, condition: 'Near Mint', printing: 'Normal',
+    language: 'English', purchase_price: 0, location_id: null, ...previous, ...body
+  };
+  if (typeof draft.card_id !== 'string' || !cardApi.isMtgId(draft.card_id)) {
+    throw new AddCardError(400, 'Unsupported card ID');
+  }
+  if (!Number.isInteger(draft.quantity) || draft.quantity < 1 || draft.quantity > 250) {
+    throw new AddCardError(400, 'quantity must be an integer from 1 to 250');
+  }
+  if (!['Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged'].includes(draft.condition)) {
+    throw new AddCardError(400, 'Invalid condition');
+  }
+  if (!['Normal', 'Holofoil'].includes(draft.printing)) {
+    throw new AddCardError(400, 'Invalid printing');
+  }
+  const language = typeof draft.language === 'string' && languages.LANGUAGES.find(l =>
+    [l.name.toLowerCase(), l.code, l.scryfall].includes(draft.language.trim().toLowerCase()));
+  if (!language) throw new AddCardError(400, 'Invalid language');
+  draft.language = language.name;
+  if (!Number.isFinite(draft.purchase_price) || draft.purchase_price < 0) {
+    throw new AddCardError(400, 'purchase_price must be a nonnegative number');
+  }
+  if (draft.location_id !== null) {
+    if (!['number', 'string'].includes(typeof draft.location_id) ||
+        !Number.isSafeInteger(Number(draft.location_id)) || Number(draft.location_id) < 1) {
+      throw new AddCardError(400, 'Invalid location ID');
+    }
+    draft.location_id = Number(draft.location_id);
+  }
+  // Resolve and cache the reviewed printing before taking a write transaction.
+  let card = await db.get('SELECT * FROM card_cache WHERE id = ?', [draft.card_id]);
+  if (!card) card = await cardApi.getCardById(draft.card_id, { game: 'mtg' });
+  if (!card || card.game !== 'mtg') throw new AddCardError(400, 'Invalid Magic card');
+  card = await cardApi.printingInLanguage(card, draft.language) || card;
+  draft.card_id = card.id;
+  return draft;
+}
+
+async function assertScanDraftLocation(draft, userId) {
+  if (draft.location_id === null) return;
+  const location = await db.get('SELECT inventory_type FROM locations WHERE id = ? AND user_id = ?', [draft.location_id, userId]);
+  if (!location) throw new AddCardError(400, 'Invalid location ID');
+  assertStorageInventory(location, 'collection');
+}
+
+function scanDraftError(res, error) {
+  if (error.status === 400 || error.status === 404) return res.status(error.status).json({ error: error.message });
+  console.error(error);
+  return res.status(500).json({ error: 'Failed to save scan draft' });
+}
+
+router.get('/scan-drafts', async (req, res) => {
+  try {
+    res.json((await db.all(`${SCAN_DRAFT_SELECT} ORDER BY d.id DESC`, [req.user.id])).map(parseCardRow));
+  } catch (error) {
+    scanDraftError(res, error);
+  }
+});
+
+router.post('/scan-drafts', async (req, res) => {
+  try {
+    const draft = await normalizeScanDraft(req.body);
+    const result = await db.withTransaction(async () => {
+      await assertScanDraftLocation(draft, req.user.id);
+      const inserted = await db.run(`INSERT INTO scan_drafts
+        (user_id, card_id, quantity, condition, printing, language, purchase_price, location_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+        req.user.id, draft.card_id, draft.quantity, draft.condition, draft.printing,
+        draft.language, draft.purchase_price, draft.location_id
+      ]);
+      return getScanDraft(req.user.id, inserted.lastID);
+    });
+    res.json(result);
+  } catch (error) {
+    scanDraftError(res, error);
+  }
+});
+
+router.patch('/scan-drafts/:id', async (req, res) => {
+  try {
+    const previous = await getScanDraft(req.user.id, req.params.id);
+    const draft = await normalizeScanDraft(req.body, previous);
+    const result = await db.withTransaction(async () => {
+      await assertScanDraftLocation(draft, req.user.id);
+      const updated = await db.run(`UPDATE scan_drafts SET
+        card_id = ?, quantity = ?, condition = ?, printing = ?, language = ?, purchase_price = ?, location_id = ?
+        WHERE id = ? AND user_id = ?`, [
+        draft.card_id, draft.quantity, draft.condition, draft.printing,
+        draft.language, draft.purchase_price, draft.location_id, req.params.id, req.user.id
+      ]);
+      if (!updated.changes) throw new AddCardError(404, 'Scan draft not found');
+      return getScanDraft(req.user.id, req.params.id);
+    });
+    res.json(result);
+  } catch (error) {
+    scanDraftError(res, error);
+  }
+});
+
+function scanDraftIds(body) {
+  const ids = body?.draft_ids;
+  if (!Array.isArray(ids) || !ids.length ||
+      ids.some(id => !Number.isSafeInteger(id) || id < 1) || new Set(ids).size !== ids.length) {
+    throw new AddCardError(400, 'draft_ids must be a nonempty array of unique positive integer IDs');
+  }
+  return ids;
+}
+
+router.delete('/scan-drafts', async (req, res) => {
+  try {
+    const ids = scanDraftIds(req.body);
+    await db.withTransaction(async () => {
+      for (const id of ids) await getScanDraft(req.user.id, id);
+      for (const id of ids) {
+        await db.run('DELETE FROM scan_drafts WHERE id = ? AND user_id = ?', [id, req.user.id]);
+      }
+    });
+    res.json({ drafts: ids.length });
+  } catch (error) {
+    scanDraftError(res, error);
+  }
+});
+
+router.delete('/scan-drafts/:id', async (req, res) => {
+  try {
+    const deleted = await db.run('DELETE FROM scan_drafts WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    if (!deleted.changes) throw new AddCardError(404, 'Scan draft not found');
+    res.json({ message: 'Scan draft discarded' });
+  } catch (error) {
+    scanDraftError(res, error);
+  }
+});
+
+router.post('/scan-drafts/commit', async (req, res) => {
+  try {
+    const ids = scanDraftIds(req.body);
+    const result = await db.withTransaction(async () => {
+      const drafts = [];
+      for (const id of ids) drafts.push(await getScanDraft(req.user.id, id));
+      let added = 0;
+      for (const draft of drafts) {
+        // Reviewed printings are cached; committing never needs the provider.
+        await addCardToCollection(req.user, draft, draft);
+        await db.run('DELETE FROM scan_drafts WHERE id = ? AND user_id = ?', [draft.draft_id, req.user.id]);
+        added += draft.quantity;
+      }
+      return { added, drafts: drafts.length };
+    });
+    res.json(result);
+  } catch (error) {
+    scanDraftError(res, error);
+  }
+});
+
 router.post('/cards/related-tokens', async (req, res) => {
   try {
     const inventoryType = req.body?.inventory_type === undefined ? 'collection' : req.body.inventory_type;
-    if (!['collection', 'arena'].includes(inventoryType)) {
-      return res.status(400).json({ error: 'inventory_type must be collection or arena' });
+    if (!['collection', 'arena', 'graveyard'].includes(inventoryType)) {
+      return res.status(400).json({ error: 'inventory_type must be collection, arena or graveyard' });
     }
     const commanderId = req.body?.commander_card_id;
     if (commanderId != null && commanderId !== ''
@@ -982,13 +905,19 @@ router.get('/cards/:id/printing', async (req, res) => {
     const cardId = req.params.id;
     const targetLang = req.query.lang;
     const game = req.query.game;
+    if (game !== undefined && game !== 'mtg') {
+      return res.status(400).json({ error: 'Unsupported game' });
+    }
     if (!targetLang) {
       return res.status(400).json({ error: 'lang query parameter is required' });
     }
 
     let card = await db.get(`SELECT * FROM card_cache WHERE id = ?`, [cardId]);
+    if (!cardApi.isMtgId(cardId) || (card && card.game !== 'mtg')) {
+      return res.status(400).json({ error: 'Unsupported card ID or game' });
+    }
     if (!card) {
-      card = await cardApi.getCardById(cardId, { game, tcgApiKey: req.user?.tcg_api_key });
+      card = await cardApi.getCardById(cardId, { game });
     }
     if (!card) {
       return res.status(404).json({ error: `Card ID ${cardId} not found.` });
@@ -996,14 +925,14 @@ router.get('/cards/:id/printing', async (req, res) => {
 
     const localized = await cardApi.printingInLanguage(card, targetLang);
     if (localized) {
-      const learned = await tcgdexApi.learnEnglishName(localized);
-      return res.status(200).json(learned || localized);
+      return res.status(200).json(localized);
     }
 
-    // Fallback: if no distinct localized printing exists, return the card with the target language tag
-    res.status(200).json({ ...card, language: languages.toName(targetLang) });
+    if (languages.toCode(card.language) === languages.toCode(targetLang)) return res.json(card);
+    res.status(404).json({ error: 'No printing found in the requested language' });
   } catch (error) {
     console.error('Error fetching card localized printing:', error);
+    if (error.status) return res.status(error.status).json({ error: error.message });
     res.status(500).json({ error: 'Failed to fetch card printing' });
   }
 });
@@ -1172,6 +1101,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
     }
 
     if (deckId) {
+      await reserveDeckSources({ id: deckId, game: 'mtg', checked_out: 0 }, req.user.id);
       await db.run('UPDATE decks SET checked_out = 1, checked_out_at = CURRENT_TIMESTAMP WHERE id = ?', [deckId]);
     }
     return { locationId, deckId, added, failed };
@@ -1204,6 +1134,9 @@ router.put('/collection/:id', async (req, res) => {
   try {
     const entry = await db.get(`SELECT * FROM collection WHERE id = ? AND user_id = ?`, [id, req.user.id]);
     if (!entry) return res.status(404).json({ error: 'Collection entry not found' });
+    if (entry.game !== 'mtg' || (game !== undefined && game !== entry.game)) {
+      return res.status(400).json({ error: 'Unsupported game' });
+    }
     if (list_type !== undefined && !LIST_TYPES.includes(list_type)) return res.status(400).json({ error: 'Invalid list_type' });
     const nextListType = list_type ?? entry.list_type;
     const listChanged = nextListType !== entry.list_type;
@@ -1211,7 +1144,6 @@ router.put('/collection/:id', async (req, res) => {
     let finalCompartmentId = listChanged ? null : entry.compartment_id;
     let finalLocationId = listChanged ? null : entry.location_id;
     let finalPosition = listChanged ? 0 : entry.position;
-    let resolvedFull = false;
     let resolvedRejected = false;
 
     if (location_id !== undefined || compartment_id !== undefined) {
@@ -1229,7 +1161,6 @@ router.put('/collection/:id', async (req, res) => {
       finalCompartmentId = resolved.compartment_id;
       finalLocationId = resolved.compartment_id ? resolved.location_id : null;
       finalPosition = resolved.position;
-      resolvedFull = !!resolved.full;
       resolvedRejected = !!resolved.rejected;
     }
 
@@ -1250,7 +1181,6 @@ router.put('/collection/:id', async (req, res) => {
         if (card) {
           const localized = await cardApi.printingInLanguage(card, language);
           if (localized && localized.id && localized.id !== entry.card_id) {
-            await tcgdexApi.learnEnglishName(localized);
             updates.push('card_id = ?');
             params.push(localized.id);
           }
@@ -1342,53 +1272,11 @@ router.put('/collection/:id', async (req, res) => {
     }
 
     const finalPlacement = isMoving && finalCompartmentId ? await describePlacement(db, id, req.user.id) : null;
-    res.json({ message: 'Collection entry updated successfully', placement: finalPlacement, container_full: resolvedFull, rule_rejected: resolvedRejected });
+    res.json({ message: 'Collection entry updated successfully', placement: finalPlacement, rule_rejected: resolvedRejected });
   } catch (error) {
     if (error.status) return res.status(error.status).json({ error: error.message });
     console.error(error);
     res.status(500).json({ error: 'Failed to update entry' });
-  }
-});
-
-// 4a. Fetch this copy's graded value from the price provider and store it.
-//
-// Deliberately one entry per request and never automatic: the free tier of the
-// only provider that publishes slab prices is metered per day, and a sweep over a
-// collection would spend a week's allowance in one boot. The button is the budget.
-router.post('/collection/:id/market-value/fetch', searchLimiter, async (req, res) => {
-  try {
-    const entry = await db.get(`
-      SELECT c.id, c.grade, c.grader, cc.name, cc.set_name, cc.number, cc.game, cc.tcgplayer_product_id
-      FROM collection c JOIN card_cache cc ON cc.id = c.card_id
-      WHERE c.id = ? AND c.user_id = ?`, [req.params.id, req.user.id]);
-    if (!entry) return res.status(404).json({ error: 'Collection entry not found' });
-    if (!entry.grader || entry.grader === 'Raw') {
-      return res.status(400).json({ error: 'This copy is not graded. Graded prices apply to slabs only.' });
-    }
-
-    const result = await gradedPrices.fetchGradedPrice({
-      game: entry.game,
-      name: entry.name,
-      setName: entry.set_name,
-      number: entry.number,
-      grader: entry.grader,
-      grade: entry.grade,
-      // The exact-card lookup: one card returned instead of a page of them, which
-      // is the difference between 2 credits and a hundred.
-      tcgPlayerId: entry.tcgplayer_product_id,
-      apiKey: req.user.graded_price_api_key,
-    });
-
-    await db.run(
-      `UPDATE collection SET market_value = ?, market_value_source = ?, market_value_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND user_id = ?`,
-      [result.price, result.source, req.params.id, req.user.id]
-    );
-    res.json({ market_value: result.price, source: result.source, basis: result.basis });
-  } catch (error) {
-    const status = error.status || 500;
-    if (status >= 500) console.error('graded price fetch failed:', error.message);
-    res.status(status).json({ error: error.message || 'Failed to fetch graded price' });
   }
 });
 
@@ -1439,14 +1327,6 @@ router.post('/collection/:id/place', async (req, res) => {
 
     if (!Number.isInteger(slot) || slot < 1) return res.status(400).json({ error: 'Invalid slot' });
 
-    if (entry.compartment_id !== compartment_id) {
-      // Slots used, not cards held, once copies are allowed to share a pocket.
-      const cnt = await db.get(
-        `SELECT ${comp.allow_stacking ? `COUNT(DISTINCT ${STACK_KEY_SQL})` : 'COALESCE(SUM(quantity), 0)'} AS n
-         FROM collection WHERE compartment_id = ? AND user_id = ? AND COALESCE(list_type, 'collection') = ?`, [compartment_id, req.user.id, entry.list_type]);
-      if (cnt.n + (comp.allow_stacking ? 1 : entry.quantity) > comp.capacity) return res.status(400).json({ error: 'COMPARTMENT_FULL' });
-    }
-
     const sourceComp = entry.compartment_id;
     if (isBinder) {
       await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
@@ -1454,13 +1334,13 @@ router.post('/collection/:id/place', async (req, res) => {
     } else {
       await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
         [compartment_id, comp.loc_id, slot * 1000 - 500, id, req.user.id]);
-      await rebalanceCompartmentByScheme(db, compartment_id, req.user.id, { sort_order: 'custom' });
+      await rebalanceCompartmentByScheme(db, compartment_id, 'custom');
     }
 
     if (sourceComp && sourceComp !== compartment_id) {
       const src = await db.get(`SELECT l.type AS loc_type FROM compartments c JOIN locations l ON c.location_id = l.id WHERE c.id = ?`, [sourceComp]);
       if (src && !isBinderType(src.loc_type)) {
-        await rebalanceCompartmentByScheme(db, sourceComp, req.user.id, { sort_order: 'custom' });
+        await rebalanceCompartmentByScheme(db, sourceComp, 'custom');
       }
     }
 
@@ -1492,7 +1372,7 @@ router.delete('/collection/:id', async (req, res) => {
 const BULK_ACTIONS = ['delete', 'move', 'trade', 'untrade', 'list_type', 'condition', 'printing', 'purchase_split', 'add_to_deck', 'missing'];
 // Allowed field values mirror the collection table CHECK constraints in db.js.
 const BULK_CONDITIONS = ['Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged'];
-const BULK_PRINTINGS = ['Normal', 'Holofoil', 'Reverse Holofoil', '1st Edition', 'Promo'];
+const BULK_PRINTINGS = ['Normal', 'Holofoil'];
 router.post('/collection/bulk', async (req, res) => {
   const { entry_ids = [], action, value } = req.body;
   if (!Array.isArray(entry_ids) || entry_ids.length === 0) {
@@ -1509,29 +1389,30 @@ router.post('/collection/bulk', async (req, res) => {
     if (action === 'add_to_deck') {
       const deckId = parseInt(value, 10);
       if (!deckId) return res.status(400).json({ error: 'Invalid deck_id' });
-      const deck = await db.get(`SELECT id FROM decks WHERE id = ? AND user_id = ?`, [deckId, req.user.id]);
+      const deck = await db.get(`SELECT id, inventory_type FROM decks WHERE id = ? AND user_id = ?`, [deckId, req.user.id]);
       if (!deck) return res.status(404).json({ error: 'Deck not found' });
 
       const rows = await db.all(
-        `SELECT card_id, SUM(quantity) as total_qty FROM collection WHERE id IN (${placeholders}) AND user_id = ? AND COALESCE(list_type, 'collection') != 'graveyard' GROUP BY card_id`,
-        [...ids, req.user.id]
+        `SELECT card_id, SUM(quantity) as total_qty FROM collection WHERE id IN (${placeholders}) AND user_id = ? AND COALESCE(list_type, 'collection') = ? GROUP BY card_id`,
+        [...ids, req.user.id, deck.inventory_type ?? 'collection']
       );
 
       let added = 0;
       const rejected = [];
       for (const row of rows) {
-        const existing = await db.get(`SELECT quantity FROM deck_cards WHERE deck_id = ? AND card_id = ?`, [deckId, row.card_id]);
-        const current = existing ? existing.quantity : 0;
-        const newQty = current + row.total_qty;
-        // Enforce deck rules (owned cap + max 4 per name) so this path can't
-        // bypass the limits the deck builder enforces.
-        const check = await validateDeckAddition({ deckId, userId: req.user.id, cardId: row.card_id, newQty });
+        const check = await db.withTransaction(async () => {
+          const existing = await db.get(`SELECT quantity FROM deck_cards WHERE deck_id = ? AND card_id = ?`, [deckId, row.card_id]);
+          const newQty = (existing?.quantity || 0) + row.total_qty;
+          const validation = await validateDeckAddition({ deckId, userId: req.user.id, cardId: row.card_id, newQty });
+          if (!validation.ok) return validation;
+          await db.run(
+            `INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, ?)
+             ON CONFLICT(deck_id, card_id) DO UPDATE SET quantity = excluded.quantity`,
+            [deckId, row.card_id, newQty]
+          );
+          return validation;
+        });
         if (!check.ok) { rejected.push(check.error); continue; }
-        await db.run(
-          `INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, ?)
-           ON CONFLICT(deck_id, card_id) DO UPDATE SET quantity = excluded.quantity`,
-          [deckId, row.card_id, newQty]
-        );
         added += row.total_qty;
       }
       const msg = rejected.length

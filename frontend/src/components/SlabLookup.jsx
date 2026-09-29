@@ -12,10 +12,8 @@ import { displayName } from '../utils/languages';
 // error-prone way in — type eight digits and the grader tells you what the card is
 // and what it scored. Nothing else in the app can do that.
 //
-// It stops short of picking the printing, and that is deliberate. PSA labels a card
-// as year + brand + name + number ('1999 POKEMON GAME CHARIZARD-HOLO 4'), which
-// names a card without identifying a printing: Base Set, Base Set 2 and several
-// reprints share that name and number, and the label does not distinguish them.
+// It stops short of picking the printing, and that is deliberate. A PSA label's
+// year, brand, name and number may not distinguish every edition or treatment.
 // Choosing one automatically would file the wrong printing silently — right name,
 // wrong set, wrong price, and nothing on screen to reveal it. So the server returns
 // candidates and the collector picks, which they can do from the slab in their hand.
@@ -76,14 +74,14 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
-        showToast && showToast(body?.error || t('slab.errAdd'));
+        showToast && showToast(body?.error || t('slab.errAdd'), 'error');
         return;
       }
       showToast && showToast(t('slab.added', {
         grader: result.cert.grader,
         grade: result.cert.grade ?? '',
         name: card.name,
-      }));
+      }), 'success');
       onAddSuccess && onAddSuccess();
       // Cleared so the next slab starts from an empty box. The cert is cached
       // server-side, so re-entering this one costs nothing if they want it back.
@@ -91,7 +89,7 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
       setResult(null);
     } catch (err) {
       console.error(err);
-      showToast && showToast(t('slab.errAdd'));
+      showToast && showToast(t('slab.errAdd'), 'error');
     } finally {
       setAdding(null);
     }

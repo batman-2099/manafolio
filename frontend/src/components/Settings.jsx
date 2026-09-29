@@ -1,13 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
+import { useScrollReveal } from '../utils/useScrollReveal';
 import { ShieldAlert, Share2, Clipboard, RefreshCw, KeyRound, Check, Database, Download, Upload, Eye, EyeOff, SlidersHorizontal, Info, Bug, Lightbulb, MessagesSquare, ScrollText, Github, Languages } from 'lucide-react';
 import { CURRENCIES, getCurrency, setCurrency } from '../utils/formatPrice';
 import { LOCALES, localeName, useT } from '../utils/i18n';
-import { REPO_URL } from '../utils/repo';
+import { getRepoUrl, issueUrl } from '../utils/repo';
+import { downloadBlob } from '../utils/downloadBlob';
 import CodexSettings from './CodexSettings';
+import themes from '../../../shared/themes.json';
+import './Settings.css';
 
 
-function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
+function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }) {
   const { locale, setLocale, t } = useT();
+  const revealRef = useScrollReveal();
+  useEffect(() => {
+    if (!initialSection) return;
+    const frame = requestAnimationFrame(() => {
+      const heading = document.getElementById(initialSection);
+      heading?.focus({ preventScroll: true });
+      heading?.scrollIntoView({ block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [initialSection]);
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,16 +42,16 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
   const [bulkNotice, setBulkNotice] = useState(null);
   const mountedRef = useRef(true);
 
-  const theme = user?.theme || 'dark';
+  const theme = themes.includes(user?.theme) ? user.theme : 'dark';
   const [themeLoading, setThemeLoading] = useState(false);
 
   const handleThemeChange = async (value) => {
     setThemeLoading(true);
     try {
       const saved = await onSaveTheme(value);
-      if (saved && mountedRef.current) showToast(t('prefs.themeSet', { theme: t(`theme.${value}`) }));
+      if (saved && mountedRef.current) showToast(t('prefs.themeSet', { theme: t(`theme.${value}`) }), 'success');
     } catch {
-      if (mountedRef.current) showToast(t('prefs.themeError'));
+      if (mountedRef.current) showToast(t('prefs.themeError'), 'error');
     } finally {
       if (mountedRef.current) setThemeLoading(false);
     }
@@ -55,6 +69,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
   const [versionInfo, setVersionInfo] = useState(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [backendReachable, setBackendReachable] = useState(true);
+  const [repoUrl, setRepoUrl] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,10 +128,15 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
   const isDemo = !!import.meta.env.VITE_DEMO;
 
   useEffect(() => {
+    let cancelled = false;
+    getRepoUrl()
+      .then(url => { if (!cancelled) setRepoUrl(url); })
+      .catch(() => { /* Offline support instructions remain visible. */ });
     fetch('/api/settings/version')
       .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then(data => { setVersionInfo(data); setBackendReachable(true); })
       .catch(() => setBackendReachable(false));
+    return () => { cancelled = true; };
   }, []);
 
   const handleCheckUpdate = async () => {
@@ -127,13 +147,13 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
       const data = await res.json();
       setVersionInfo(data);
       setBackendReachable(true);
-      if (data.check_failed) showToast(t('settings.updateNoGithub'));
-      else if (data.update_available) showToast(t('settings.updateAvailable', { version: data.latest }));
-      else showToast(t('settings.updateLatest'));
+      if (data.check_failed) showToast(t('settings.updateNoGithub'), 'error');
+      else if (data.update_available) showToast(t('settings.updateAvailable', { version: data.latest }), 'status');
+      else showToast(t('settings.updateLatest'), 'success');
     } catch (err) {
       console.error(err);
       setBackendReachable(false);
-      showToast(t('settings.updateNoServer'));
+      showToast(t('settings.updateNoServer'), 'error');
     } finally {
       setCheckingUpdate(false);
     }
@@ -163,75 +183,73 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
       '2. ',
       '',
       '### Environment',
-      `- Bindarr (app): ${shownVersion || 'unknown'}`,
-      `- Bindarr (server): ${versionInfo?.version || (backendReachable ? 'unknown' : 'unreachable')}`,
+      `- Manafolio (app): ${shownVersion || 'unknown'}`,
+      `- Manafolio (server): ${versionInfo?.version || (backendReachable ? 'unknown' : 'unreachable')}`,
       `- Platform: ${navigator.platform || 'unknown'}`,
       `- Browser: ${navigator.userAgent}`,
       `- Screen: ${window.screen?.width}x${window.screen?.height}`,
       '',
       '<!-- Screenshots help a lot. Please remove anything you would rather not share. -->',
     ].join('\n');
-    return `${REPO_URL}/issues/new?labels=bug&title=${encodeURIComponent('[Bug] ')}&body=${encodeURIComponent(body)}`;
+    return issueUrl(repoUrl, { labels: 'bug', title: '[Bug] ', body });
   };
 
   const featureRequestUrl = () => {
     const body = [
-      '### What would you like Bindarr to do?',
+      '### What would you like Manafolio to do?',
       '',
       '',
       '### Why would that help?',
       '',
       '',
-      `<!-- Bindarr ${shownVersion || 'unknown'} -->`,
+      `<!-- Manafolio ${shownVersion || 'unknown'} -->`,
     ].join('\n');
-    return `${REPO_URL}/issues/new?labels=enhancement&title=${encodeURIComponent('[Feature] ')}&body=${encodeURIComponent(body)}`;
+    return issueUrl(repoUrl, { labels: 'enhancement', title: '[Feature] ', body });
   };
 
-  const handleImportFile = (e) => {
+  const handleImportFile = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    const filename = file.name.toLowerCase();
-    reader.onload = async (event) => {
-      try {
-        const fileData = event.target.result;
-        let format = filename.endsWith('.json') ? 'json' : (filename.endsWith('.txt') ? 'manabox' : 'csv');
-        let completeBackup = false;
-        if (format === 'json') {
-          try {
-            const parsed = JSON.parse(fileData);
-            completeBackup = parsed?.format === 'bindarr-backup' && parsed.version === 1;
-          } catch { /* The server returns the normal JSON-import error. */ }
-        }
-        if (!window.confirm(t(completeBackup ? 'settings.confirmRestore' : 'settings.confirmImport', { file: file.name }))) return;
-        if (completeBackup) format = 'backup';
-
-        showToast(t('settings.importing'));
-        const response = await fetch('/api/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ format, data: fileData })
-        });
-
-        const result = await response.json();
-        if (response.ok) {
-          showToast(result.message || t('settings.importOk'));
-        } else {
-          showToast(t('settings.importFailed', { error: result.error || t('settings.unknownError') }));
-        }
-      } catch (err) {
-        console.error(err);
-        showToast(t('settings.importFailed', { error: err.message }));
-      }
-    };
-
-    reader.onerror = () => {
-      showToast(t('settings.errReadFile'));
-    };
-
-    reader.readAsText(file);
     e.target.value = null;
+
+    let fileData;
+    try {
+      fileData = await file.text();
+    } catch {
+      showToast(t('settings.errReadFile'), 'error');
+      return;
+    }
+
+    const filename = file.name.toLowerCase();
+    try {
+      let format = filename.endsWith('.json') ? 'json' : (filename.endsWith('.txt') ? 'manabox' : 'csv');
+      let completeBackup = false;
+      if (format === 'json') {
+        try {
+          const parsed = JSON.parse(fileData);
+          completeBackup = parsed?.format === 'manafolio-backup' && parsed.version === 1;
+        } catch { /* The server returns the normal JSON-import error. */ }
+      }
+      if (!window.confirm(t(completeBackup ? 'settings.confirmRestore' : 'settings.confirmImport', { file: file.name }))) return;
+      if (completeBackup) format = 'backup';
+
+      showToast(t('settings.importing'), 'status');
+      const response = await fetch('/api/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format, data: fileData })
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        showToast(result.message || t('settings.importOk'), 'success');
+      } else {
+        showToast(t('settings.importFailed', { error: result.error || t('settings.unknownError') }), 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(t('settings.importFailed', { error: err.message }), 'error');
+    }
   };
 
   // Containers to offer share links for. Only fetched once both share toggles are
@@ -255,15 +273,15 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     if (!currentPassword) {
-      showToast(t('settings.errCurrentPassword'));
+      showToast(t('settings.errCurrentPassword'), 'error');
       return;
     }
     if (password.length < 8) {
-      showToast(t('login.errPasswordShort', { count: 8 }));
+      showToast(t('login.errPasswordShort', { count: 8 }), 'error');
       return;
     }
     if (password !== confirmPassword) {
-      showToast(t('login.errPasswordMismatch'));
+      showToast(t('login.errPasswordMismatch'), 'error');
       return;
     }
 
@@ -276,17 +294,17 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
       });
 
       if (response.ok) {
-        showToast(t('settings.passwordUpdated'));
+        showToast(t('settings.passwordUpdated'), 'success');
         setCurrentPassword('');
         setPassword('');
         setConfirmPassword('');
       } else {
         const data = await response.json();
-        showToast(data.error || t('settings.errPasswordUpdate'));
+        showToast(data.error || t('settings.errPasswordUpdate'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('settings.errPasswordUpdateGeneric'));
+      showToast(t('settings.errPasswordUpdateGeneric'), 'error');
     } finally {
       setPasswordLoading(false);
     }
@@ -296,21 +314,14 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
     try {
       const response = await fetch(`/api/export?format=${format}`);
       if (!response.ok) {
-        showToast(t('settings.errExport'));
+        showToast(t('settings.errExport'), 'error');
         return;
       }
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = format === 'backup' ? 'bindarr_backup.json' : `bindarr_collection.${format === 'json' ? 'json' : 'csv'}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, format === 'backup' ? 'manafolio_backup.json' : `manafolio_collection.${format === 'json' ? 'json' : 'csv'}`);
     } catch (err) {
       console.error(err);
-      showToast(t('settings.errExportGeneric'));
+      showToast(t('settings.errExportGeneric'), 'error');
     }
   };
 
@@ -327,15 +338,15 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
       if (response.ok) {
         const data = await response.json();
         onUpdateUser({ share_enabled: data.user.share_enabled });
-        showToast(t(checked ? 'settings.sharingOn' : 'settings.sharingOff'));
+        showToast(t(checked ? 'settings.sharingOn' : 'settings.sharingOff'), 'success');
       } else {
         setShareEnabled(!checked); // Revert
-        showToast(t('settings.errSharing'));
+        showToast(t('settings.errSharing'), 'error');
       }
     } catch (err) {
       console.error(err);
       setShareEnabled(!checked);
-      showToast(t('settings.errSharingGeneric'));
+      showToast(t('settings.errSharingGeneric'), 'error');
     } finally {
       setShareLoading(false);
     }
@@ -353,15 +364,15 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
       if (response.ok) {
         const data = await response.json();
         onUpdateUser({ share_locations: data.user.share_locations });
-        showToast(t(checked ? 'settings.locationsOn' : 'settings.locationsOff'));
+        showToast(t(checked ? 'settings.locationsOn' : 'settings.locationsOff'), 'success');
       } else {
         setShareLocations(!checked);
-        showToast(t('settings.errLocations'));
+        showToast(t('settings.errLocations'), 'error');
       }
     } catch (err) {
       console.error(err);
       setShareLocations(!checked);
-      showToast(t('settings.errLocationsGeneric'));
+      showToast(t('settings.errLocationsGeneric'), 'error');
     } finally {
       setShareLoading(false);
     }
@@ -383,13 +394,13 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
       if (response.ok) {
         const data = await response.json();
         onUpdateUser({ share_token: data.user.share_token });
-        showToast(t('settings.tokenRegenerated'));
+        showToast(t('settings.tokenRegenerated'), 'success');
       } else {
-        showToast(t('settings.errRegenerate'));
+        showToast(t('settings.errRegenerate'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('settings.errRegenerateGeneric'));
+      showToast(t('settings.errRegenerateGeneric'), 'error');
     } finally {
       setShareLoading(false);
     }
@@ -410,13 +421,13 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         setAccessKey(next);
         setShowAccessKey(action !== 'revoke');
         onUpdateUser({ api_key: next });
-        showToast(t(action === 'revoke' ? 'settings.accessRevoked' : 'settings.accessCreated'));
+        showToast(t(action === 'revoke' ? 'settings.accessRevoked' : 'settings.accessCreated'), 'success');
       } else {
-        showToast(data?.error || t('settings.errAccessKey'));
+        showToast(data?.error || t('settings.errAccessKey'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('settings.errAccessKey'));
+      showToast(t('settings.errAccessKey'), 'error');
     } finally {
       setAccessKeyLoading(false);
     }
@@ -436,61 +447,64 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
   const copyToClipboard = (url, type, messageType = type) => {
     navigator.clipboard.writeText(url).then(() => {
       setCopiedType(type);
-      showToast(t(`settings.copied.${messageType}`));
+      showToast(t(`settings.copied.${messageType}`), 'success');
       setTimeout(() => setCopiedType(''), 2000);
     }).catch(() => {
-      showToast(t('settings.errCopy'));
+      showToast(t('settings.errCopy'), 'error');
     });
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Title Panel */}
-      <div className="glass-panel">
-        <h2 style={{ fontSize: '1.25rem', color: 'var(--text-strong)' }}>{t('settings.title')}</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('settings.subtitle')}</p>
-      </div>
+    <div ref={revealRef} className="settings-page" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <header className="page-heading">
+        <div>
+          <h2 className="page-title">{t('settings.title')}</h2>
+          <p style={{ color: 'var(--text-secondary)', margin: '0.5rem 0 0' }}>{t('settings.subtitle')}</p>
+        </div>
+      </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }} className="settings-grid">
+      <div className="settings-layout">
+      <nav className="settings-sections" aria-label={t('settings.title')} onClick={event => {
+        const link = event.target.closest('a');
+        if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const heading = document.getElementById(link.hash.slice(1));
+        if (!heading) return;
+        event.preventDefault();
+        heading.focus({ preventScroll: true });
+        heading.scrollIntoView({ block: 'start' });
+      }}>
+        <a href="#settings-sharing">{t('settings.sharingTitle')}</a>
+        <a href="#settings-security">{t('settings.securityTitle')}</a>
+        <a href="#settings-keys">{t('settings.keysTitle')}</a>
+        {user && <a href="#codex-settings-title">{t('codexSettings.title')}</a>}
+        {user?.role === 'admin' && <a href="#settings-bulk-title">{t('settings.bulkTitle')}</a>}
+        <a href="#settings-backup">{t('settings.backupTitle')}</a>
+        <a href="#settings-preferences">{t('prefs.title')}</a>
+        <a href="#settings-about">{t('settings.aboutTitle')}</a>
+      </nav>
+      <div className="settings-grid">
         {/* Sharing Panel */}
-        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
-            <Share2 size={20} style={{ color: 'var(--accent-red)' }} />
-            <h3 style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('settings.sharingTitle')}</h3>
+        <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Share2 size={20} aria-hidden="true" />
+            <h3 id="settings-sharing" tabIndex={-1} className="section-heading">{t('settings.sharingTitle')}</h3>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.01)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
             <div>
               <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: '0.95rem' }}>{t('settings.shareLibrary')}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t('settings.shareLibraryHint')}</div>
+              <div id="settings-share-hint" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>{t('settings.shareLibraryHint')}</div>
             </div>
-            <label className="switch-control" style={{ position: 'relative', display: 'inline-block', width: '46px', height: '24px' }}>
-              <input 
-                type="checkbox" 
-                checked={shareEnabled} 
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '44px', minHeight: '44px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                aria-label={t('settings.shareLibrary')}
+                aria-describedby="settings-share-hint"
+                checked={shareEnabled}
                 onChange={(e) => handleShareToggle(e.target.checked)}
                 disabled={shareLoading}
-                style={{ opacity: 0, width: 0, height: 0 }}
+                style={{ width: '22px', height: '22px', accentColor: 'var(--accent-red)' }}
               />
-              <span className={`switch-slider ${shareEnabled ? 'active' : ''}`} style={{
-                position: 'absolute',
-                cursor: 'pointer',
-                top: 0, left: 0, right: 0, bottom: 0,
-                backgroundColor: shareEnabled ? 'var(--type-grass)' : '#334155',
-                transition: '0.3s',
-                borderRadius: '24px'
-              }}>
-                <span style={{
-                  position: 'absolute',
-                  height: '18px', width: '18px',
-                  left: shareEnabled ? '24px' : '4px',
-                  bottom: '3px',
-                  backgroundColor: '#fff',
-                  transition: '0.3s',
-                  borderRadius: '50%',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                }}></span>
-              </span>
             </label>
           </div>
 
@@ -498,51 +512,54 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
               
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>{t('settings.linkCollection')}</label>
+                <label htmlFor="settings-share-collection">{t('settings.linkCollection')}</label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <input 
+                    id="settings-share-collection"
                     type="text" 
                     className="input-control" 
                     value={shareUrl} 
                     readOnly 
-                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', color: 'var(--text-secondary)', cursor: 'default' }}
+                    style={{ flex: 1, minWidth: 0, color: 'var(--text-secondary)', cursor: 'default' }}
                   />
                   <button className="btn btn-secondary" onClick={() => copyToClipboard(shareUrl, 'collection')} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
-                    {copiedType === 'collection' ? <Check size={14} style={{ color: 'var(--type-grass)' }} /> : <Clipboard size={14} />}
+                    {copiedType === 'collection' ? <Check size={14} style={{ color: 'var(--accent-green)' }} /> : <Clipboard size={14} />}
                     <span>{t('settings.copy')}</span>
                   </button>
                 </div>
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>{t('settings.linkTrade')}</label>
+                <label htmlFor="settings-share-trade">{t('settings.linkTrade')}</label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <input 
+                    id="settings-share-trade"
                     type="text" 
                     className="input-control" 
                     value={tradeUrl} 
                     readOnly 
-                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', color: 'var(--text-secondary)', cursor: 'default' }}
+                    style={{ flex: 1, minWidth: 0, color: 'var(--text-secondary)', cursor: 'default' }}
                   />
                   <button className="btn btn-secondary" onClick={() => copyToClipboard(tradeUrl, 'trade')} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
-                    {copiedType === 'trade' ? <Check size={14} style={{ color: 'var(--type-grass)' }} /> : <Clipboard size={14} />}
+                    {copiedType === 'trade' ? <Check size={14} style={{ color: 'var(--accent-green)' }} /> : <Clipboard size={14} />}
                     <span>{t('settings.copy')}</span>
                   </button>
                 </div>
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>{t('settings.linkWishlist')}</label>
+                <label htmlFor="settings-share-wishlist">{t('settings.linkWishlist')}</label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <input 
+                    id="settings-share-wishlist"
                     type="text" 
                     className="input-control" 
                     value={wishlistUrl} 
                     readOnly 
-                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', color: 'var(--text-secondary)', cursor: 'default' }}
+                    style={{ flex: 1, minWidth: 0, color: 'var(--text-secondary)', cursor: 'default' }}
                   />
                   <button className="btn btn-secondary" onClick={() => copyToClipboard(wishlistUrl, 'wishlist')} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}>
-                    {copiedType === 'wishlist' ? <Check size={14} style={{ color: 'var(--type-grass)' }} /> : <Clipboard size={14} />}
+                    {copiedType === 'wishlist' ? <Check size={14} style={{ color: 'var(--accent-green)' }} /> : <Clipboard size={14} />}
                     <span>{t('settings.copy')}</span>
                   </button>
                 </div>
@@ -552,46 +569,29 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
                 {/* The three query strings go in as placeholders rather than as
                     <code> elements: that keeps the sentence one translatable unit
                     and stops a translator from accidentally localising a URL. */}
-                💡 <strong>{t('settings.tipLabel')}</strong> {t('settings.themeTip', {
-                  theme: activeTheme,
-                  lcars: '?theme=lcars',
-                  light: '?theme=light',
+                <strong>{t('settings.tipLabel')}</strong> {t('settings.themeTip', {
+                  theme: t(`theme.${activeTheme}`),
+                  manaWhite: '?theme=mana-white',
+                  manaBlue: '?theme=mana-blue',
                   dark: '?theme=dark',
                 })}
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.01)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
                 <div>
                   <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: '0.95rem' }}>{t('settings.showLocations')}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t('settings.showLocationsHint')}</div>
+                  <div id="settings-share-locations-hint" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>{t('settings.showLocationsHint')}</div>
                 </div>
-                <label className="switch-control" style={{ position: 'relative', display: 'inline-block', width: '46px', height: '24px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '44px', minHeight: '44px', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
+                    aria-label={t('settings.showLocations')}
+                    aria-describedby="settings-share-locations-hint"
                     checked={shareLocations}
                     onChange={(e) => handleLocationsToggle(e.target.checked)}
                     disabled={shareLoading}
-                    style={{ opacity: 0, width: 0, height: 0 }}
+                    style={{ width: '22px', height: '22px', accentColor: 'var(--accent-red)' }}
                   />
-                  <span className={`switch-slider ${shareLocations ? 'active' : ''}`} style={{
-                    position: 'absolute',
-                    cursor: 'pointer',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: shareLocations ? 'var(--type-grass)' : '#334155',
-                    transition: '0.3s',
-                    borderRadius: '24px'
-                  }}>
-                    <span style={{
-                      position: 'absolute',
-                      height: '18px', width: '18px',
-                      left: shareLocations ? '24px' : '4px',
-                      bottom: '3px',
-                      backgroundColor: '#fff',
-                      transition: '0.3s',
-                      borderRadius: '50%',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                    }}></span>
-                  </span>
                 </label>
               </div>
 
@@ -612,7 +612,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
                           onClick={() => copyToClipboard(`${origin}/share/${user?.share_token}?container=${loc.id}${themeQuery}`, `container-${loc.id}`, 'container')}
                           style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', whiteSpace: 'nowrap' }}
                         >
-                          {copiedType === `container-${loc.id}` ? <Check size={14} style={{ color: 'var(--type-grass)' }} /> : <Clipboard size={14} />}
+                          {copiedType === `container-${loc.id}` ? <Check size={14} style={{ color: 'var(--accent-green)' }} /> : <Clipboard size={14} />}
                           <span>{t('settings.copy')}</span>
                         </button>
                       </div>
@@ -636,7 +636,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
           )}
 
           {!shareEnabled && (
-            <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255, 71, 71, 0.05)', border: '1px solid rgba(255,71,71,0.1)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
               <ShieldAlert size={16} style={{ color: 'var(--accent-red)', flexShrink: 0 }} />
               <span>{t('settings.privateNotice')}</span>
             </div>
@@ -644,13 +644,13 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         </div>
 
         {/* Change Password Panel */}
-        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
-            <KeyRound size={20} style={{ color: 'var(--accent-yellow)' }} />
-            <h3 style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('settings.securityTitle')}</h3>
+        <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <KeyRound size={20} aria-hidden="true" />
+            <h3 id="settings-security" tabIndex={-1} className="section-heading">{t('settings.securityTitle')}</h3>
           </div>
 
-          <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <form className="settings-password-form" onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label htmlFor="current-password">{t('settings.currentPassword')}</label>
               <input
@@ -712,23 +712,19 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
           </form>
         </div>
 
-        {/* Every key in one panel. These were four panels — four headers, four
-            bordered intro boxes, four save buttons — for what is three text inputs
-            and a generated credential. The explanations survive as a line under
-            each field, because which key does what is the part nobody remembers. */}
-        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
-            <KeyRound size={20} style={{ color: 'var(--accent-red)' }} />
-            <h3 style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('settings.keysTitle')}</h3>
+        <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <KeyRound size={20} aria-hidden="true" />
+            <h3 id="settings-keys" tabIndex={-1} className="section-heading">{t('settings.keysTitle')}</h3>
           </div>
 
 
-          {/* The one key that points the other way: not a credential Bindarr uses
-              to reach a service, but one something else uses to read Bindarr. Shown
+          {/* The one key that points the other way: not a credential Manafolio uses
+              to reach a service, but one something else uses to read Manafolio. Shown
               in full rather than once-at-creation — read-only is what makes that
               acceptable, and a write-once secret is one people rotate repeatedly
               until they manage to catch it. */}
-          <div style={{ borderTop: '1px solid var(--border-glass)', paddingTop: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label htmlFor="settings-access-key">{t('settings.accessTitle')}</label>
               {accessKey ? (
@@ -793,10 +789,10 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         {user && <CodexSettings key={user.id} />}
 
         {user?.role === 'admin' && (
-          <section className="glass-panel" aria-labelledby="settings-bulk-title" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
-              <Database size={20} style={{ color: 'var(--accent-red)' }} aria-hidden="true" />
-              <h3 id="settings-bulk-title" style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('settings.bulkTitle')}</h3>
+          <section className="view-section" aria-labelledby="settings-bulk-title" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Database size={20} aria-hidden="true" />
+              <h3 id="settings-bulk-title" tabIndex={-1} className="section-heading">{t('settings.bulkTitle')}</h3>
             </div>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>{t('settings.bulkHint')}</p>
             <form onSubmit={(e) => { e.preventDefault(); handleBulkAction('save'); }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -838,13 +834,13 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         )}
 
         {/* Collection Backup & Data Options Panel */}
-        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
-            <Database size={20} style={{ color: 'var(--accent-red)' }} />
-            <h3 style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('settings.backupTitle')}</h3>
+        <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Database size={20} aria-hidden="true" />
+            <h3 id="settings-backup" tabIndex={-1} className="section-heading">{t('settings.backupTitle')}</h3>
           </div>
 
-          <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-glass)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+          <div style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
             {t('settings.backupHint')}
           </div>
 
@@ -894,10 +890,10 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         </div>
 
         {/* Preferences Panel */}
-        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
-            <SlidersHorizontal size={20} style={{ color: 'var(--accent-yellow)' }} />
-            <h3 style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('prefs.title')}</h3>
+        <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <SlidersHorizontal size={20} aria-hidden="true" />
+            <h3 id="settings-preferences" tabIndex={-1} className="section-heading">{t('prefs.title')}</h3>
           </div>
 
           {/* Interface language. The picker only appears once a second locale file
@@ -928,12 +924,12 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
                 {t('prefs.languageOnlyEnglish')}
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', marginTop: '0.5rem' }}>
+            {repoUrl && <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', marginTop: '0.5rem' }}>
               <Languages size={13} style={{ color: 'var(--accent-yellow)', flexShrink: 0 }} />
               <span style={{ color: 'var(--text-secondary)' }}>
                 {t('prefs.translateCta')}{' '}
                 <a
-                  href={`${REPO_URL}/blob/main/docs/TRANSLATING.md`}
+                  href={`${repoUrl}/blob/main/docs/TRANSLATING.md`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: 'var(--accent-yellow)', fontWeight: 600 }}
@@ -941,28 +937,24 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
                   {t('prefs.translateCtaLink')}
                 </a>
               </span>
-            </div>
+            </div>}
           </div>
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label htmlFor="settings-theme">{t('prefs.theme')}</label>
-            <select
-              id="settings-theme"
-              className="select-control"
-              value={theme}
-              disabled={themeLoading}
-              onChange={(e) => handleThemeChange(e.target.value)}
-            >
-              <option value="dark">{t('theme.dark')}</option>
-              <option value="light">{t('theme.light')}</option>
-              <option value="mtg">{t('theme.mtg')}</option>
-              <option value="lcars">{t('theme.lcars')}</option>
-              <option value="jenny">{t('theme.jenny')}</option>
-            </select>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>
-              {t('prefs.themeHint')}
+          <fieldset className="theme-choices" aria-busy={themeLoading} aria-describedby="settings-theme-hint">
+            <legend>{t('prefs.theme')}</legend>
+            <div className="theme-choice-grid">
+              {themes.map(value => (
+                <label key={value} className="theme-choice" data-mana-theme={value}>
+                  <input type="radio" name="settings-theme" value={value} checked={theme === value} aria-disabled={themeLoading} onChange={() => { if (!themeLoading) handleThemeChange(value); }} />
+                  <span className="mana-theme-symbol" aria-hidden="true" />
+                  <span className="theme-choice-name">{t(`theme.${value}`)}</span>
+                </label>
+              ))}
             </div>
-          </div>
+            <p id="settings-theme-hint" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+              {t('prefs.themeHint')}
+            </p>
+          </fieldset>
 
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label htmlFor="settings-currency">{t('prefs.currency')}</label>
@@ -974,7 +966,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
                 const val = e.target.value;
                 setCurrencyState(val);
                 setCurrency(val);
-                showToast(t('prefs.currencySet', { currency: val }));
+                showToast(t('prefs.currencySet', { currency: val }), 'success');
               }}
             >
               {CURRENCIES.map(c => (
@@ -996,7 +988,7 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
                 ['deck', deckDefaultView, setDeckDefaultView, 'deck_default_view', [['list', t('deck.tableView')], ['grid', t('deck.gridView')]]]
               ].map(([key, value, setValue, storageKey, options]) => (
                 <div key={key}>
-                  <label htmlFor={`settings-${key}-view`} style={{ fontSize: '0.75rem' }}>{t(`prefs.defaultView.${key}`)}</label>
+                  <label htmlFor={`settings-${key}-view`}>{t(`prefs.defaultView.${key}`)}</label>
                   <select id={`settings-${key}-view`} className="select-control" value={value} onChange={(e) => { setValue(e.target.value); localStorage.setItem(storageKey, e.target.value); }}>
                     {options.map(([option, label]) => <option key={option} value={option}>{label}</option>)}
                   </select>
@@ -1027,25 +1019,25 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
         </div>
 
         {/* About / version */}
-        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
-            <Info size={20} style={{ color: 'var(--accent-yellow)' }} />
-            <h3 style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('settings.aboutTitle')}</h3>
+        <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Info size={20} aria-hidden="true" />
+            <h3 id="settings-about" tabIndex={-1} className="section-heading">{t('settings.aboutTitle')}</h3>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', background: 'rgba(255,255,255,0.01)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span>{shownVersion ? `Bindarr v${shownVersion}` : t('settings.versionUnknown')}</span>
+                <span>{shownVersion ? `Manafolio v${shownVersion}` : t('settings.versionUnknown')}</span>
                 <button
                   type="button"
                   className="btn btn-secondary"
                   title={t('settings.copyVersionHint')}
                   onClick={() => {
-                    const text = `Bindarr app v${shownVersion || 'unknown'} | server v${versionInfo?.version || (backendReachable ? 'unknown' : 'unreachable')} | ${navigator.platform || 'unknown'} | ${navigator.userAgent}`;
+                    const text = `Manafolio app v${shownVersion || 'unknown'} | server v${versionInfo?.version || (backendReachable ? 'unknown' : 'unreachable')} | ${navigator.platform || 'unknown'} | ${navigator.userAgent}`;
                     navigator.clipboard?.writeText(text)
-                      .then(() => showToast(t('settings.versionCopied')))
-                      .catch(() => showToast(t('settings.errCopyShort')));
+                      .then(() => showToast(t('settings.versionCopied'), 'success'))
+                      .catch(() => showToast(t('settings.errCopyShort'), 'error'));
                   }}
                   style={{ padding: '0.15rem 0.45rem', fontSize: '0.7rem' }}
                 >
@@ -1097,29 +1089,29 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
               prefilled, never submitted, so nothing is posted without the user
               reading it and pressing the button on GitHub. */}
           <div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.5rem' }}>
+            <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-strong)', marginBottom: '0.5rem' }}>
               {t('settings.getInvolvedTitle')}
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {repoUrl ? <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <a className="btn btn-secondary" href={bugReportUrl()} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <Bug size={16} /> {t('settings.reportBug')}
               </a>
               <a className="btn btn-secondary" href={featureRequestUrl()} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <Lightbulb size={16} /> {t('settings.requestFeature')}
               </a>
-              <a className="btn btn-secondary" href={`${REPO_URL}/blob/main/docs/TRANSLATING.md`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+              <a className="btn btn-secondary" href={`${repoUrl}/blob/main/docs/TRANSLATING.md`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <Languages size={16} /> {t('settings.helpTranslate')}
               </a>
-              <a className="btn btn-secondary" href={`${REPO_URL}/issues`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+              <a className="btn btn-secondary" href={`${repoUrl}/issues`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <MessagesSquare size={16} /> {t('settings.browseIssues')}
               </a>
-              <a className="btn btn-secondary" href={`${REPO_URL}/releases`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+              <a className="btn btn-secondary" href={`${repoUrl}/releases`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <ScrollText size={16} /> {t('settings.changelog')}
               </a>
-              <a className="btn btn-secondary" href={REPO_URL} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+              <a className="btn btn-secondary" href={repoUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <Github size={16} /> {t('settings.source')}
               </a>
-            </div>
+            </div> : <p>{t('settings.supportUnavailable')}</p>}
             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem', lineHeight: 1.4 }}>
               {t('settings.reportNote')}
             </div>
@@ -1127,11 +1119,12 @@ function Settings({ user, onUpdateUser, onSaveTheme, showToast }) {
 
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
             {t('settings.updateChecksNote')}{' '}
-            <a href={versionInfo?.releases_url || `${REPO_URL}/releases`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-yellow)' }}>
-              thenotoriousJeremy/bindarr
-            </a>
+            {repoUrl && <a href={`${repoUrl}/releases`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-yellow)' }}>
+              {t('settings.source')}
+            </a>}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

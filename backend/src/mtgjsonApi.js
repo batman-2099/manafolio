@@ -3,7 +3,7 @@ const axios = require('axios');
 const client = axios.create({
   baseURL: 'https://mtgjson.com/api/v5',
   timeout: 15000,
-  headers: { 'User-Agent': 'Bindarr/1.0', Accept: 'application/json' },
+  headers: { 'User-Agent': 'Manafolio/1.0', Accept: 'application/json' },
 });
 
 const DECK_LIST_TTL = 1000 * 60 * 60 * 24;

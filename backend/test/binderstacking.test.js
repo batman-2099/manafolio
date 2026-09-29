@@ -13,7 +13,7 @@ const fs = require('fs');
 const http = require('http');
 const assert = require('assert');
 
-const tmpDb = path.join(os.tmpdir(), `bindarr-binderstacking-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-binderstacking-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 
 const express = require('express');
@@ -60,11 +60,11 @@ async function main() {
   const page = await db.run(`INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 3)`, [locId]);
   const pageId = page.lastID;
 
-  for (const id of ['pika', 'charm']) {
+  for (const id of ['elves', 'bear']) {
     await db.run(
       `INSERT OR REPLACE INTO card_cache (id, name, supertype, subtypes, types, rarity, set_id, set_name, number, image_url, price_trend, game)
-       VALUES (?, ?, 'Pokémon', '[]', '[]', 'Common', 's1', 'Set One', '1', '', 1, 'pokemon')`,
-      [id, id === 'pika' ? 'Pikachu' : 'Charmander']
+       VALUES (?, ?, 'Creature', '[]', '[]', 'Common', 's1', 'Set One', '1', '', 1, 'mtg')`,
+      [id, id === 'elves' ? 'Llanowar Elves' : 'Grizzly Bears']
     );
   }
 
@@ -74,21 +74,21 @@ async function main() {
     [cardId, locId, compartmentId, position, userId]
   )).lastID;
 
-  // Four Pikachus in one pocket, and the page still has two free pockets.
-  await addCopy('pika', pageId, 1000);
-  await addCopy('pika', pageId, 1000);
-  await addCopy('pika', pageId, 1000);
-  await addCopy('pika', pageId, 1000);
+  // Four copies of Llanowar Elves in one pocket leave two free pockets.
+  await addCopy('elves', pageId, 1000);
+  await addCopy('elves', pageId, 1000);
+  await addCopy('elves', pageId, 1000);
+  await addCopy('elves', pageId, 1000);
 
   const comps = await loadCompartments(db, locId, userId);
   assert.strictEqual(comps[0].count, 1, `four copies in one pocket must count as one slot, got ${comps[0].count}`);
   assert.strictEqual(comps[0].free, 2, `a three-pocket page with one slot used has two free, got ${comps[0].free}`);
   console.log('PASS: occupancy counts slots used, not cards held');
 
-  // Auto-filing a fifth Pikachu joins the pocket the others are in.
+  // Auto-filing a fifth copy joins the pocket the others are in.
   const location = await db.get(`SELECT * FROM locations WHERE id = ?`, [locId]);
   const stacked = await recommendSlot(db, location, {
-    card_id: 'pika', name: 'Pikachu', printing: 'Normal', language: 'English', types: [], supertype: 'Pokémon'
+    card_id: 'elves', name: 'Llanowar Elves', printing: 'Normal', language: 'English', types: [], supertype: 'Creature'
   });
   assert.strictEqual(stacked.compartment_id, pageId, 'a duplicate must be filed on the page its twin is on');
   assert.strictEqual(stacked.position, 1000, `a duplicate must take its twin's slot, got ${stacked.position}`);
@@ -96,15 +96,15 @@ async function main() {
 
   // A different card is not a duplicate: it gets a slot of its own.
   const fresh = await recommendSlot(db, location, {
-    card_id: 'charm', name: 'Charmander', printing: 'Normal', language: 'English', types: [], supertype: 'Pokémon'
+    card_id: 'bear', name: 'Grizzly Bears', printing: 'Normal', language: 'English', types: [], supertype: 'Creature'
   });
-  assert.notStrictEqual(fresh.position, 1000, 'a different card must not be stacked onto the Pikachu pocket');
+  assert.notStrictEqual(fresh.position, 1000, 'a different card must not be stacked onto the Llanowar Elves pocket');
   assert.ok(!fresh.stacked, 'a card with no twin here is not a stacked placement');
   console.log('PASS: auto-filing sends a duplicate to its twin\'s slot and nothing else');
 
   // Manual drop of a copy onto its own twin: stacks rather than swapping.
-  const loose = await addCopy('pika', null, 0);
-  const twin = await db.get(`SELECT id FROM collection WHERE compartment_id = ? AND card_id = 'pika' LIMIT 1`, [pageId]);
+  const loose = await addCopy('elves', null, 0);
+  const twin = await db.get(`SELECT id FROM collection WHERE compartment_id = ? AND card_id = 'elves' LIMIT 1`, [pageId]);
   const res = await fetch(`${base}/api/collection/${loose}/place`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

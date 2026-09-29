@@ -6,18 +6,14 @@
 //   MODELS (cornelius + milo, ~9.6 MB) — the detector and the embedder. Nothing
 //   scans without them, and they are the same two files for every install. NOT in
 //   this repository and NOT baked into the container image: both are AGPL-3.0
-//   while Bindarr is MIT, so shipping them inside an MIT artifact is a licensing
+//   while Manafolio is MIT, so shipping them inside an MIT artifact is a licensing
 //   decision this project declines to make for its operators. Fetching them into
 //   your own install is your call, which is why this is a button and not a
 //   background task.
 //
-//   PUBLISHED CATALOGS (~70 MB) — precomputed embeddings for a whole game,
-//   published by the model's author. Instant, but a dated snapshot: they are keyed
-//   by PROVIDER ids (Scryfall ids, TCGplayer product ids) rather than this
-//   install's card_cache ids, so a hit still has to be mapped back to a card the
-//   install knows — and for Pokemon only ~24% of those product ids map to a cached
-//   card. They also cannot be updated: a card printed after the snapshot date is
-//   simply not in them, and never will be.
+//   PUBLISHED CATALOG (~56 MB) — precomputed Magic embeddings from the model's
+//   author, keyed by Scryfall IDs. It is a dated snapshot; new cards require a
+//   local catalog build.
 //
 //   LOCAL BUILDS (catalog.js) — embeddings computed here from card_cache. Slower
 //   to create (minutes per set, hours for a whole game) but keyed by card_cache
@@ -29,6 +25,7 @@
 // cvScan.hasLocal.
 const fs = require('fs');
 const path = require('path');
+const { pipeline } = require('node:stream/promises');
 
 const MODEL_DIR = process.env.CV_MODEL_DIR || path.join(__dirname, '..', '..', 'data', 'models');
 const HF = 'https://huggingface.co';
@@ -45,10 +42,6 @@ const CATALOGS = [
   {
     name: 'milo-mtg.npz', repo: 'HanClinto/milo', game: 'mtg',
     file: 'catalogs/milo1-scryfall-mtg-2026-07-09.npz', bytes: 56252182, snapshot: '2026-07-09',
-  },
-  {
-    name: 'milo-pokemon.npz', repo: 'HanClinto/milo', game: 'pokemon',
-    file: 'catalogs/milo1-tcgplayer-pokemon-2026-05-07.npz', bytes: 13236761, snapshot: '2026-05-07',
   },
 ];
 
@@ -91,27 +84,25 @@ function status() {
 
 // Stream to a temp file and rename, so an interrupted download cannot leave a
 // half file that the size check above would have to catch later.
-async function fetchAsset(a, onProgress) {
+async function fetchAsset(a, onProgress, { timeoutMs = 900000 } = {}) {
   const dest = assetPath(a);
-  if (isPresent(a)) return 'present';
   fs.mkdirSync(MODEL_DIR, { recursive: true });
   const res = await fetch(`${HF}/${a.repo}/resolve/main/${a.file}`, {
     headers: { 'User-Agent': 'Mozilla/5.0' },
-    redirect: 'follow', signal: AbortSignal.timeout(900000),
+    redirect: 'follow', signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${a.name}`);
   const tmp = `${dest}.tmp`;
-  const out = fs.createWriteStream(tmp);
   let got = 0;
   try {
-    for await (const chunk of res.body) {
-      got += chunk.length;
-      if (!out.write(chunk)) await new Promise(r => out.once('drain', r));
-      onProgress?.(got);
-    }
-    await new Promise((resolve, reject) => out.end(err => err ? reject(err) : resolve()));
+    await pipeline(res.body, async function* (chunks) {
+      for await (const chunk of chunks) {
+        got += chunk.length;
+        yield chunk;
+        onProgress?.(got);
+      }
+    }, fs.createWriteStream(tmp));
   } catch (e) {
-    out.destroy();
     fs.rmSync(tmp, { force: true });
     throw e;
   }
@@ -143,7 +134,8 @@ function start(what) {
     try {
       for (const a of wanted) {
         job.name = a.name;
-        const result = await fetchAsset(a, (got) => { job.done = base + got; });
+        const result = isPresent(a) ? 'present'
+          : await fetchAsset(a, (got) => { job.done = base + got; });
         if (result === 'fetched') fetched++;
         base += a.bytes;
         job.done = base;
@@ -153,16 +145,8 @@ function start(what) {
       // A newly installed catalog or model has to be picked up without a restart.
       try {
         const cvScan = require('../cvScan');
-        for (const game of ['mtg', 'pokemon', 'lorcana']) cvScan.reload(game);
+        cvScan.reload('mtg');
       } catch { /* nothing loaded yet is fine — the next scan loads it */ }
-      // The published Pokémon catalog is keyed by TCGplayer product id, and a
-      // product id names no card without the product map. Downloading one without
-      // the other is a scanner that matches and then says nothing, so the download
-      // pulls its own second half rather than leaving it as a step to discover.
-      if (what === 'catalog:pokemon') {
-        try { require('../tcgplayerCatalog').start(); }
-        catch (e) { console.warn(`product map not started: ${e.message}`); }
-      }
     } catch (e) {
       job.phase = 'error';
       job.message = e.message;
@@ -175,4 +159,4 @@ function start(what) {
   return state();
 }
 
-module.exports = { MODELS, CATALOGS, LICENSE, MODEL_DIR, status, start, state, lastResult, isPresent };
+module.exports = { MODELS, CATALOGS, LICENSE, MODEL_DIR, status, start, state, lastResult, isPresent, fetchAsset };

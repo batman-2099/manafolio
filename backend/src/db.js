@@ -4,50 +4,16 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { BASIC_LAND_COLORS } = require('./utils/mtgColors');
 const { AsyncLocalStorage } = require('async_hooks');
+const themes = require('../../shared/themes.json');
 
-// The app began life as "PokeKeep", a Pokémon-only tracker, so its database was
-// called pokemon_cards.db. It has handled Magic since v1.4.x, and the file name
-// is the last thing still carrying the old name.
-const DB_FILENAME = 'bindarr.db';
-const LEGACY_DB_FILENAME = 'pokemon_cards.db';
-
-// Rename an existing pokemon_cards.db to the new name, WAL sidecars included.
-// Getting this wrong loses collections: point SQLite at a name that isn't there
-// and it cheerfully creates an empty database, which looks exactly like the app
-// wiping everything. So: never overwrite, move the -wal/-shm files with the
-// main one (un-checkpointed transactions live in the WAL), and on any failure
-// keep using the old file rather than silently starting fresh.
-// Returns the path that should actually be opened.
-function resolveDbPath(target) {
-  // Only ever migrate INTO the canonical name. A custom DB_PATH is the
-  // operator's decision and must not attract someone else's old file.
-  if (path.basename(target) !== DB_FILENAME) return target;
-
-  const legacy = path.join(path.dirname(target), LEGACY_DB_FILENAME);
-  if (fs.existsSync(target) || !fs.existsSync(legacy)) return target;
-
-  try {
-    for (const suffix of ['', '-wal', '-shm']) {
-      if (fs.existsSync(legacy + suffix)) fs.renameSync(legacy + suffix, target + suffix);
-    }
-    console.log(`Renamed legacy database ${LEGACY_DB_FILENAME} -> ${DB_FILENAME}.`);
-    return target;
-  } catch (err) {
-    console.error(
-      `Could not rename ${LEGACY_DB_FILENAME} to ${DB_FILENAME} (${err.message}). ` +
-      `Continuing with ${LEGACY_DB_FILENAME} — your data is safe, but please rename it manually.`
-    );
-    return legacy;
-  }
-}
-
+const DB_FILENAME = 'manafolio.db';
 // Ensure database directory exists
 const requestedDbPath = process.env.DB_PATH || path.join(__dirname, `../database/${DB_FILENAME}`);
 const dbDir = path.dirname(requestedDbPath);
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
-const dbPath = resolveDbPath(requestedDbPath);
+const dbPath = requestedDbPath;
 
 console.log(`Connecting to SQLite database at: ${dbPath}`);
 const dbConnection = new sqlite3.Database(dbPath, (err) => {
@@ -184,6 +150,7 @@ async function initDb() {
       rule_config TEXT,
       game TEXT DEFAULT 'any',
       inventory_type TEXT NOT NULL DEFAULT 'collection' CHECK(inventory_type IN ('collection', 'graveyard')),
+      sleeved INTEGER NOT NULL DEFAULT 0 CHECK (sleeved IN (0, 1, 2, 3)),
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
     )
   `);
@@ -216,7 +183,6 @@ async function initDb() {
       printed_total INTEGER,
       total INTEGER,
       release_date TEXT,
-      ptcgo_code TEXT,
       symbol_url TEXT,
       logo_url TEXT,
       game TEXT DEFAULT 'mtg'
@@ -238,11 +204,9 @@ async function initDb() {
       price_trend REAL,
       price_normal REAL,
       price_holofoil REAL,
-      price_reverse_holofoil REAL,
       price_avg1 REAL,
       price_avg7 REAL,
       price_avg30 REAL,
-      price_1st_edition REAL,
       price_currency TEXT DEFAULT 'USD',
       price_source TEXT,
       cmc REAL,
@@ -261,7 +225,7 @@ async function initDb() {
       card_id TEXT NOT NULL,
       quantity INTEGER DEFAULT 1,
       condition TEXT CHECK(condition IN ('Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged')) DEFAULT 'Near Mint',
-      printing TEXT CHECK(printing IN ('Normal', 'Holofoil', 'Reverse Holofoil', '1st Edition', 'Promo')) DEFAULT 'Normal',
+      printing TEXT CHECK(printing IN ('Normal', 'Holofoil')) DEFAULT 'Normal',
       language TEXT DEFAULT 'English',
       purchase_price REAL,
       location_id INTEGER,
@@ -280,6 +244,21 @@ async function initDb() {
   `);
 
   await run(`
+    CREATE TABLE IF NOT EXISTS scan_drafts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES card_cache(id),
+      quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity BETWEEN 1 AND 250 AND quantity = CAST(quantity AS INTEGER)),
+      condition TEXT NOT NULL DEFAULT 'Near Mint' CHECK(condition IN ('Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged')),
+      printing TEXT NOT NULL DEFAULT 'Normal' CHECK(printing IN ('Normal', 'Holofoil')),
+      language TEXT NOT NULL DEFAULT 'English',
+      purchase_price REAL NOT NULL DEFAULT 0 CHECK(purchase_price >= 0),
+      location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL
+    )
+  `);
+  await run(`CREATE INDEX IF NOT EXISTS idx_scan_drafts_user ON scan_drafts(user_id)`);
+
+  await run(`
     CREATE TABLE IF NOT EXISTS price_history (
       card_id TEXT NOT NULL,
       price REAL NOT NULL,
@@ -288,61 +267,10 @@ async function initDb() {
     )
   `);
 
-  // card_cache id -> TCGplayer productId, for the Pokémon rows whose providers do
-  // not carry one (TCGdex supplies none at all; Scryfall gives MTG its id directly,
-  // so MTG never needs a row here).
-  //
-  // Its own table rather than a card_cache column because the mapping is derived,
-  // not provider data: it is rebuilt by matching set+number against TCGplayer's
-  // catalogue, and `confidence` records how — 1 for an exact set match, 0.8 for one
-  // recovered from a name suffix. Keeping it separate means a rebuild can be
-  // discarded and redone without touching a single real card row.
-  await run(`
-    CREATE TABLE IF NOT EXISTS tcgplayer_product (
-      card_id TEXT PRIMARY KEY,
-      product_id INTEGER NOT NULL,
-      category_id INTEGER NOT NULL,
-      confidence REAL DEFAULT 1,
-      matched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(card_id) REFERENCES card_cache(id)
-    )
-  `);
-  await run(`CREATE INDEX IF NOT EXISTS idx_tcgplayer_product_pid ON tcgplayer_product(product_id)`);
-
-  // TCGplayer's own product catalogue, keyed the way the READY-MADE Pokémon scan
-  // catalog is keyed: by product id.
-  //
-  // tcgplayer_product above is the other direction — cards this install holds, for
-  // which a product was found — so it can only ever answer for cards already
-  // downloaded and priced. The published scan catalog needs the reverse: given a
-  // product id the model matched, what card is that? Without this table the answer
-  // was nothing at all, and every scan against the ready-made Pokémon catalog
-  // matched and then named no card (see routes/collection.js scan-match).
-  //
-  // Cards only: a product with no collector number is sealed product, and no
-  // photograph of a card will ever be one.
-  await run(`
-    CREATE TABLE IF NOT EXISTS tcgplayer_catalog (
-      product_id INTEGER PRIMARY KEY,
-      category_id INTEGER NOT NULL,
-      group_id INTEGER NOT NULL,
-      group_name TEXT,
-      set_id TEXT,
-      name TEXT,
-      number TEXT,
-      built_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
   // Sets the provider LISTS but has no usable card data for — no cards at all, or
   // cards with no artwork, which a scan catalog cannot use either way.
   //
-  // Recorded so "N sets have no cards here yet" stops counting them. Measured on a
-  // real install: all 46 uncached English Pokemon sets were of this kind (promos,
-  // samples, jumbo cards, trainer kits), so the panel told the user to build sets
-  // that can never be built, and the weekly auto-update chased a number that could
-  // never drop. A build fills this in as it walks; a set whose data appears later
-  // clears its own row.
+  // A build records unavailable data and clears the row when cards appear.
   await run(`
     CREATE TABLE IF NOT EXISTS set_data_gaps (
       game TEXT NOT NULL,
@@ -377,12 +305,16 @@ async function initDb() {
       user_id INTEGER NOT NULL,
       name TEXT NOT NULL,
       description TEXT,
+      notes TEXT NOT NULL DEFAULT '',
       checked_out INTEGER DEFAULT 0,
       checked_out_at DATETIME,
       game TEXT DEFAULT 'mtg',
       inventory_type TEXT DEFAULT 'collection',
       wins INTEGER NOT NULL DEFAULT 0,
       losses INTEGER NOT NULL DEFAULT 0,
+      sleeved INTEGER NOT NULL DEFAULT 0 CHECK (sleeved IN (0, 1, 2, 3)),
+      card_back_color TEXT,
+      card_back_image TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
     )
@@ -394,8 +326,21 @@ async function initDb() {
       card_id TEXT NOT NULL,
       quantity INTEGER DEFAULT 1,
       checked_out INTEGER DEFAULT 0,
+      source_entry_id INTEGER,
       PRIMARY KEY(deck_id, card_id),
       FOREIGN KEY(deck_id) REFERENCES decks(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Keep entry IDs after deletion: a stale source must fail, never become automatic.
+  await run(`
+    CREATE TABLE IF NOT EXISTS deck_card_allocations (
+      deck_id INTEGER NOT NULL,
+      card_id TEXT NOT NULL,
+      entry_id INTEGER NOT NULL,
+      quantity INTEGER NOT NULL CHECK(quantity > 0),
+      PRIMARY KEY(deck_id, card_id, entry_id),
+      FOREIGN KEY(deck_id, card_id) REFERENCES deck_cards(deck_id, card_id) ON DELETE CASCADE
     )
   `);
 
@@ -413,12 +358,7 @@ async function initDb() {
   `);
 
   // --- MIGRATIONS ---
-  // Older databases defaulted card_cache.game to Pokémon. CSV imports that
-  // supplied a Magic collection row but omitted this column were persisted, then
-  // hidden by the Magic-only collection query.
-  await run(`UPDATE card_cache SET game = 'mtg' WHERE id LIKE 'mtg-%' AND game <> 'mtg'`);
-
-  // When each game's price sweep last ran. Scryfall updates prices once a day,
+  // When the Magic price sweep last ran. Scryfall updates prices once a day,
   // so a sweep more often than that cannot return anything new — and the boot
   // sweep would otherwise re-run on every restart (constantly, under nodemon).
   // Persisted rather than in-memory precisely because restarts are the problem.
@@ -426,39 +366,14 @@ async function initDb() {
   if (!appSettingsCols.some(c => c.name === 'mtg_prices_swept_at')) {
     await run(`ALTER TABLE app_settings ADD COLUMN mtg_prices_swept_at DATETIME`);
   }
-  if (!appSettingsCols.some(c => c.name === 'pokemon_prices_swept_at')) {
-    await run(`ALTER TABLE app_settings ADD COLUMN pokemon_prices_swept_at DATETIME`);
-  }
-  if (!appSettingsCols.some(c => c.name === 'tcgdex_prices_swept_at')) {
-    await run(`ALTER TABLE app_settings ADD COLUMN tcgdex_prices_swept_at DATETIME`);
-  }
-  if (!appSettingsCols.some(c => c.name === 'pokemontcgapi_prices_swept_at')) {
-    await run(`ALTER TABLE app_settings ADD COLUMN pokemontcgapi_prices_swept_at DATETIME`);
-  }
-  // Keep ETags and complete pages across restarts: card_cache alone cannot tell
-  // whether a set or a search result was fully paged. Credentials are never stored.
-  await run(`CREATE TABLE IF NOT EXISTS pokemontcgapi_cache (
-    request TEXT PRIMARY KEY, body TEXT NOT NULL, etag TEXT, fetched_at INTEGER NOT NULL
-  )`);
-  // TCGCSV mirrors TCGplayer once a day, so its gate is the same 24h as the rest.
-  if (!appSettingsCols.some(c => c.name === 'tcgcsv_prices_swept_at')) {
-    await run(`ALTER TABLE app_settings ADD COLUMN tcgcsv_prices_swept_at DATETIME`);
-  }
   // How many days between automatic price refreshes; 0 switches them off.
-  // Daily is what every install did before this column existed, so that is the
-  // default and nothing changes for anyone who never touches it. It exists for
-  // the metered provider: pokemontcgapi.com charges credits per card refreshed,
-  // and a daily sweep of a large collection is a recurring bill.
+  // Daily is the default for installs that have not configured an interval.
   if (!appSettingsCols.some(c => c.name === 'price_refresh_days')) {
     await run(`ALTER TABLE app_settings ADD COLUMN price_refresh_days INTEGER NOT NULL DEFAULT 1`);
   }
   if (!appSettingsCols.some(c => c.name === 'scryfall_bulk_download_time')) {
     await run(`ALTER TABLE app_settings ADD COLUMN scryfall_bulk_download_time TEXT NOT NULL DEFAULT '10:00'`);
   }
-  if (!appSettingsCols.some(c => c.name === 'lorcana_prices_swept_at')) {
-    await run(`ALTER TABLE app_settings ADD COLUMN lorcana_prices_swept_at DATETIME`);
-  }
-
   // VESTIGIAL. This gated non-admin members building an individual per-set ORB
   // index, and there are no per-set indexes any more — scanning is CollectorVision
   // embeddings over a catalog, and catalog builds are admin-only (they walk a whole
@@ -467,34 +382,6 @@ async function initDb() {
   // dropping it would mean a table rebuild for no gain.
   if (!appSettingsCols.some(c => c.name === 'allow_member_set_builds')) {
     await run(`ALTER TABLE app_settings ADD COLUMN allow_member_set_builds INTEGER NOT NULL DEFAULT 0`);
-  }
-  // Which API English Pokémon cards and sets come from.
-  //
-  // TCGdex for a NEW install: 218 English sets against pokemontcg.io's 174, every
-  // other language in the same place, no API key, and measured 57-206 ms per card
-  // lookup against 971-1963 ms (pokemontcg.io also answers 5xx often enough to need
-  // a retry policy — see tcgApi's interceptor).
-  //
-  // pokemontcg.io for an install that ALREADY HAS DATA, and this half is the point
-  // of the WHERE clause. The two providers number the same sets differently — sv1
-  // vs sv01, pgo vs swsh10.5, me1 vs me01 — and every cached card, every scan
-  // catalog and every collection row was built against one of those numberings.
-  // Flipping an existing install underneath its own data is how the set list ends
-  // up describing sets none of its cards belong to. An upgrade keeps what it was
-  // built with; the admin can switch deliberately in Admin → Instance Settings,
-  // which re-syncs the set table and rebuilds the product map behind it.
-  //
-  // "Already has data" is read off the Pokémon set catalogue and card cache, not
-  // off `users`: this migration runs before the startup set sync, so a brand new
-  // database genuinely has neither, while any install that has ever run has both.
-  // Same shape as the setup_complete migration below.
-  if (!appSettingsCols.some(c => c.name === 'pokemon_provider')) {
-    await run(`ALTER TABLE app_settings ADD COLUMN pokemon_provider TEXT DEFAULT 'tcgdex'`);
-    await run(`
-      UPDATE app_settings SET pokemon_provider = 'pokemontcg'
-       WHERE (SELECT COUNT(*) FROM sets WHERE game = 'pokemon') > 0
-          OR (SELECT COUNT(*) FROM card_cache WHERE game = 'pokemon') > 0
-    `);
   }
   if (!appSettingsCols.some(c => c.name === 'scan_exclude_tokens')) {
     await run(`ALTER TABLE app_settings ADD COLUMN scan_exclude_tokens INTEGER NOT NULL DEFAULT 0`);
@@ -507,18 +394,6 @@ async function initDb() {
   }
   if (!appSettingsCols.some(c => c.name === 'scan_exclude_promos')) {
     await run(`ALTER TABLE app_settings ADD COLUMN scan_exclude_promos INTEGER NOT NULL DEFAULT 0`);
-  }
-  // The one scan exclusion that defaults ON, and the only one that is not a
-  // matter of taste: Pokémon TCG Pocket cards exist solely in the phone game, so
-  // no camera will ever be pointed at one. Indexing them costs a linear pass over
-  // 2,321 extra vectors on every unscoped scan and — because Pocket art is
-  // largely redrawn from paper cards — invites confident matches naming a set the
-  // user cannot own. MTG has always excluded digital sets (cardSets.listAllSets
-  // filters Scryfall's `digital` flag); this is the Pokémon half of that rule
-  // finally catching up, which is why existing installs get it applied on
-  // migration rather than grandfathered off.
-  if (!appSettingsCols.some(c => c.name === 'scan_exclude_digital')) {
-    await run(`ALTER TABLE app_settings ADD COLUMN scan_exclude_digital INTEGER NOT NULL DEFAULT 1`);
   }
 
   // Whether the first-run wizard has been seen through to the end. Server-side,
@@ -544,48 +419,19 @@ async function initDb() {
   if (!cardCacheCols.some(c => c.name === 'printed_name')) {
     await run(`ALTER TABLE card_cache ADD COLUMN printed_name TEXT`);
   }
-  // Marketplace links as the PROVIDER gives them. Building them from name+set+number
-  // only works for English cards: searching TCGplayer for "ヒトカゲ ポケモンカード151"
-  // returns nothing, because those sites index English names. Scryfall and
-  // pokemontcg.io both hand us a real product/search URL per card, so store it.
+  // Store marketplace URLs supplied by the provider rather than guessing from names.
   for (const col of ['tcgplayer_url', 'cardmarket_url']) {
     if (!cardCacheCols.some(c => c.name === col)) {
       await run(`ALTER TABLE card_cache ADD COLUMN ${col} TEXT`);
     }
   }
-  // TCGplayer's own product id, which is what turns a link into the actual card.
-  // The stored `tcgplayer_url` above is NOT reliably a product page: Scryfall
-  // hands back a name search whenever it has no product for a printing (6,109 of
-  // 106,163 cached MTG rows), and TCGdex supplies no TCGplayer link at all. An id
-  // is unambiguous — /product/<id> either resolves or the card is not listed.
-  //
-  // Provider-agnostic on purpose: Scryfall publishes it as `tcgplayer_id`, and
-  // the Pokémon rows get theirs from the TCGCSV catalogue mapping.
-  // collection.printing has allowed '1st Edition' since v1.0, and resolveCardPrice
-  // had no column to read for it — so a 1st Edition Base Set card was valued at the
-  // Unlimited price, which for a Charizard is a difference of thousands. TCGplayer
-  // prices the two separately and always has; this is where that number lands.
-  if (!cardCacheCols.some(c => c.name === 'price_1st_edition')) {
-    await run(`ALTER TABLE card_cache ADD COLUMN price_1st_edition REAL`);
-  }
-
-  // Which marketplace a row's prices came from, and in what currency.
-  //
-  // The price columns have always been unit-less, and until now they mixed
-  // TCGplayer USD (English) with Cardmarket EUR (everything TCGdex served) while
-  // the UI rendered one '$' over both. Recording the source per row is what lets
-  // the inspector say which number it is showing, instead of inferring it from
-  // whether a Cardmarket URL happens to exist.
+  // Track the source and currency of cached marketplace prices.
   if (!cardCacheCols.some(c => c.name === 'price_currency')) {
     await run(`ALTER TABLE card_cache ADD COLUMN price_currency TEXT DEFAULT 'USD'`);
   }
   if (!cardCacheCols.some(c => c.name === 'price_source')) {
     await run(`ALTER TABLE card_cache ADD COLUMN price_source TEXT`);
-    // Backfill from what each row's id already tells us: TCGdex is the only source
-    // that ever wrote EUR, and its ids are prefixed. No network needed.
     await run(`UPDATE card_cache SET price_source = 'scryfall', price_currency = 'USD' WHERE id LIKE 'mtg-%'`);
-    await run(`UPDATE card_cache SET price_source = 'tcgdex', price_currency = 'EUR' WHERE id LIKE 'tcgdex-%'`);
-    await run(`UPDATE card_cache SET price_source = 'pokemontcg', price_currency = 'USD' WHERE price_source IS NULL AND game = 'pokemon'`);
   }
   if (!cardCacheCols.some(c => c.name === 'tcgplayer_product_id')) {
     await run(`ALTER TABLE card_cache ADD COLUMN tcgplayer_product_id INTEGER`);
@@ -645,7 +491,7 @@ async function initDb() {
     await run(`ALTER TABLE collection ADD COLUMN position REAL DEFAULT 0`);
   }
   if (!collectionCols.some(c => c.name === 'game')) {
-    await run(`ALTER TABLE collection ADD COLUMN game TEXT DEFAULT 'pokemon'`);
+    await run(`ALTER TABLE collection ADD COLUMN game TEXT DEFAULT 'mtg'`);
   }
   if (!collectionCols.some(c => c.name === 'notes')) {
     await run(`ALTER TABLE collection ADD COLUMN notes TEXT DEFAULT ''`);
@@ -722,11 +568,15 @@ async function initDb() {
   if (!locationsCols.some(c => c.name === 'inventory_type')) {
     await run(`ALTER TABLE locations ADD COLUMN inventory_type TEXT NOT NULL DEFAULT 'collection' CHECK(inventory_type IN ('collection', 'graveyard'))`);
   }
+  if (!locationsCols.some(c => c.name === 'sleeved')) {
+    await run(`ALTER TABLE locations ADD COLUMN sleeved INTEGER NOT NULL DEFAULT 0 CHECK (sleeved IN (0, 1, 2, 3))`);
+  }
 
   const usersCols = await all(`PRAGMA table_info(users)`);
   if (!usersCols.some(c => c.name === 'theme')) {
     await run(`ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'dark'`);
   }
+  await run(`UPDATE users SET theme = 'dark' WHERE theme IS NULL OR theme NOT IN (${themes.map(() => '?').join(',')})`, themes);
   if (!usersCols.some(c => c.name === 'ai_provider')) {
     await run(`ALTER TABLE users ADD COLUMN ai_provider TEXT NOT NULL DEFAULT 'chatgpt'`);
   }
@@ -739,22 +589,15 @@ async function initDb() {
   if (!usersCols.some(c => c.name === 'ai_ollama_url')) {
     await run(`ALTER TABLE users ADD COLUMN ai_ollama_url TEXT`);
   }
-  if (!usersCols.some(c => c.name === 'tcg_api_key')) {
-    await run(`ALTER TABLE users ADD COLUMN tcg_api_key TEXT DEFAULT ''`);
+  for (const column of ['ai_gemini_api_key', 'ai_openrouter_api_key']) {
+    if (!usersCols.some(c => c.name === column)) await run(`ALTER TABLE users ADD COLUMN ${column} TEXT`);
   }
   if (!usersCols.some(c => c.name === 'share_locations')) {
     await run(`ALTER TABLE users ADD COLUMN share_locations INTEGER DEFAULT 0`);
   }
-  // PSA's public API token. Per user, alongside tcg_api_key, because PSA issues
-  // these per account and rate-limits per token — one shared instance token would
-  // let one member's bulk entry exhaust everyone's quota.
+  // PSA tokens are per user so one member cannot exhaust another's quota.
   if (!usersCols.some(c => c.name === 'psa_api_token')) {
     await run(`ALTER TABLE users ADD COLUMN psa_api_token TEXT DEFAULT ''`);
-  }
-  // PokemonPriceTracker key, for graded (PSA 8/9/10) prices. Same per-user
-  // reasoning as the PSA token: its free tier is 100 credits/day per key.
-  if (!usersCols.some(c => c.name === 'graded_price_api_key')) {
-    await run(`ALTER TABLE users ADD COLUMN graded_price_api_key TEXT DEFAULT ''`);
   }
   // Read-only key for scripts and dashboards (issue #33): a Bearer credential that
   // does not expire the way a session does, so a finance tracker polling net worth
@@ -766,7 +609,7 @@ async function initDb() {
   await run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key) WHERE api_key IS NOT NULL`);
 
   // OIDC / SSO unique identifier (subject claim `sub`). Links an external IdP
-  // user account to a Bindarr user row.
+  // user account to a Manafolio user row.
   if (!usersCols.some(c => c.name === 'oidc_sub')) {
     await run(`ALTER TABLE users ADD COLUMN oidc_sub TEXT`);
   }
@@ -776,10 +619,16 @@ async function initDb() {
   if (!deckCardsCols.some(c => c.name === 'checked_out')) {
     await run(`ALTER TABLE deck_cards ADD COLUMN checked_out INTEGER DEFAULT 0`);
   }
+  if (!deckCardsCols.some(c => c.name === 'source_entry_id')) {
+    await run(`ALTER TABLE deck_cards ADD COLUMN source_entry_id INTEGER`);
+  }
 
   const decksCols = await all(`PRAGMA table_info(decks)`);
+  if (!decksCols.some(c => c.name === 'notes')) {
+    await run(`ALTER TABLE decks ADD COLUMN notes TEXT NOT NULL DEFAULT ''`);
+  }
   if (!decksCols.some(c => c.name === 'game')) {
-    await run(`ALTER TABLE decks ADD COLUMN game TEXT DEFAULT 'pokemon'`);
+    await run(`ALTER TABLE decks ADD COLUMN game TEXT DEFAULT 'mtg'`);
   }
   if (!decksCols.some(c => c.name === 'format')) {
     await run(`ALTER TABLE decks ADD COLUMN format TEXT DEFAULT 'Standard'`);
@@ -804,6 +653,15 @@ async function initDb() {
   }
   if (!decksCols.some(c => c.name === 'losses')) {
     await run(`ALTER TABLE decks ADD COLUMN losses INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!decksCols.some(c => c.name === 'sleeved')) {
+    await run(`ALTER TABLE decks ADD COLUMN sleeved INTEGER NOT NULL DEFAULT 0 CHECK (sleeved IN (0, 1, 2, 3))`);
+  }
+  if (!decksCols.some(c => c.name === 'card_back_color')) {
+    await run(`ALTER TABLE decks ADD COLUMN card_back_color TEXT`);
+  }
+  if (!decksCols.some(c => c.name === 'card_back_image')) {
+    await run(`ALTER TABLE decks ADD COLUMN card_back_image TEXT`);
   }
 
   // Lock flags: a locked compartment/location is skipped by auto-filing
@@ -882,6 +740,17 @@ async function initDb() {
     await adoptOrphanRows(adminId);
     await seedStarterLocations(adminId);
   }
+  // Freeze legacy checkouts once, so later additions cannot change their return list.
+  const { checkedOutSources } = require('./utils/collectionHelpers');
+  await withTransaction(async () => {
+    const users = await all(`SELECT DISTINCT user_id FROM decks WHERE checked_out = 1 AND inventory_type = 'collection'`);
+    for (const { user_id } of users) {
+      for (const source of await checkedOutSources(user_id)) {
+        await run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+          [source.deck_id, source.card_id, source.entry_id, source.quantity]);
+      }
+    }
+  });
 }
 
 // Cards and locations from before multi-user carry `user_id IS NULL`. They belong
@@ -932,9 +801,5 @@ module.exports = {
   seedStarterLocations,
   adoptOrphanRows,
   hashPassword,
-  // Exported for tests — the rename runs at module load, so it can't be
-  // exercised through a normal require.
-  resolveDbPath,
-  DB_FILENAME,
-  LEGACY_DB_FILENAME
+  DB_FILENAME
 };

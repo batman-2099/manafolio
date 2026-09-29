@@ -1,28 +1,30 @@
 import { useState, useEffect, useLayoutEffect } from 'react';
 import { Plus, Minus, Trash2, Copy, X, ChevronLeft, Play, BarChart2, Search, LogOut, PackageCheck, LayoutGrid, List, Download, Upload, Eye, Filter, CheckCircle, AlertTriangle, Layers, Zap, Swords, Gamepad2, SlidersHorizontal, ArrowRight, FolderPlus, FileText, MapPin } from 'lucide-react';
-import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { shuffleArray } from '../utils/shuffle';
-import { translateJapaneseName } from '../utils/langHelper';
 import { displayName } from '../utils/languages';
 import CheckoutWizardModal from './CheckoutWizardModal';
 import { useBackGuard } from '../utils/useBackGuard';
 import { arenaCardKey, buildDeckExport, parseDeckLine } from '../utils/deckText';
+import { deckContainers } from '../utils/deckContainers';
 import { defaultGame, isGameEnabled } from '../utils/games';
 import { MTG_FORMATS } from '../utils/cardOptions';
+import { preconFormat } from '../utils/preconFormat';
 import CardImage from './CardImage';
 import { useT } from '../utils/i18n';
 import MtgDeckImport from './MtgDeckImport';
 import AiDeckBuilder from './AiDeckBuilder';
 import RelatedTokens from './RelatedTokens';
+import Modal from './Modal';
+import DeckCardBack from './DeckCardBack';
+import DeckContainerModal from './DeckContainerModal';
+import './DeckBuilder.css';
 
-// Basic Energy (Pokémon) & Basic Lands (MTG) are exempt from the "max 4 of a card" deck rule.
-const isBasicEnergyOrLand = (card, game = 'mtg') => {
-  if (!card) return false;
-  if (game === 'mtg' || card.game === 'mtg') {
-    const subs = card.subtypes || [];
-    return (subs.includes('Land') || card.supertype === 'Land') && (subs.includes('Basic') || /^(?:Snow-Covered )?(?:Plains|Island|Swamp|Mountain|Forest|Wastes)$/.test(card.name));
-  }
-  return card.supertype === 'Energy' && (!card.subtypes || !card.subtypes.includes('Special'));
+// Basic lands are exempt from the "max 4 of a card" deck rule.
+const isBasicLand = (card, game = 'mtg') => {
+  if (!card || game !== 'mtg') return false;
+  const subs = card.subtypes || [];
+  return (subs.includes('Land') || card.supertype === 'Land') && (subs.includes('Basic') || /^(?:Snow-Covered )?(?:Plains|Island|Swamp|Mountain|Forest|Wastes)$/.test(card.name));
 };
 
 // Total copies of a card (matched by name) already in a deck's card list.
@@ -30,21 +32,21 @@ const deckCountByName = (deckCards, name) =>
   (deckCards || []).filter(c => c.name === name).reduce((s, c) => s + c.quantity, 0);
 
 // Initial and reset values for deck creation.
-const newDeckDefaults = (game) => {
-  if (game === 'mtg') return { format: 'Commander / EDH', targetSize: 100 };
-  if (game === 'lorcana') return { format: 'Core (Constructed)', targetSize: 60 };
-  return { format: 'Standard', targetSize: 60 };
-};
+const NEW_DECK_DEFAULTS = { format: 'Commander / EDH', targetSize: 100 };
 
 const deckEditorState = (deck) => ({
   name: deck.name.trim(),
   description: deck.description || '',
-  format: deck.format || newDeckDefaults(deck.game).format,
+  notes: deck.notes || '',
+  format: deck.format || NEW_DECK_DEFAULTS.format,
   category: deck.category || 'Competitive',
   accent_color: deck.accent_color || '#eab308',
-  target_size: Number(deck.target_size || newDeckDefaults(deck.game).targetSize),
-  inventory_type: deck.inventory_type === 'arena' ? 'arena' : 'collection',
-  cards: deck.cards.map(card => ({ card_id: card.id, quantity: card.quantity, pulled: !!card.checked_out }))
+  target_size: Number(deck.target_size || NEW_DECK_DEFAULTS.targetSize),
+  inventory_type: deck.inventory_type || 'collection',
+  cards: deck.cards.map(card => ({
+    card_id: card.id, quantity: card.quantity, pulled: deck.inventory_type === 'collection' && !!card.checked_out,
+    source_entry_id: deck.inventory_type === 'collection' ? card.source_entry_id ?? null : null
+  }))
     .sort((a, b) => a.card_id.localeCompare(b.card_id)),
   commander_card_id: deck.commander_card_id || null
 });
@@ -54,6 +56,15 @@ const formatCardLocations = (locations) => locations.map(({ take, location_name,
 ).join(', ');
 
 const locationCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+const DECK_DISTRIBUTION_COLORS = {
+  Creature: '#4ade80', Land: '#c4b5fd', Instant: '#fbbf24', Sorcery: '#60a5fa',
+  Enchantment: '#f87171', Artifact: '#cbd5e1', Planeswalker: '#f0abfc', Battle: '#fb923c',
+  White: '#fef08a', Blue: '#60a5fa', Black: '#a78bfa', Red: '#f87171',
+  Green: '#4ade80', Colorless: '#cbd5e1',
+  'Land (Plains)': '#fef08a', 'Land (Island)': '#60a5fa', 'Land (Swamp)': '#a78bfa',
+  'Land (Mountain)': '#f87171', 'Land (Forest)': '#4ade80', 'Land (Nonbasic)': '#fbbf24',
+};
 
 const MANA_SYMBOLS = [
   ['white_cards', 'White', -475],
@@ -71,14 +82,14 @@ function ManaCounts({ deck }) {
           <svg aria-hidden="true" width="16" height="16" viewBox={`${x - 50} 0 100 100`}>
             <image href="/mana.svg" x="-945" y="-210.002" width="1045" height="730.002" />
           </svg>
-          <span style={{ fontSize: 'var(--deck-mana-count-size, 0.7rem)', fontWeight: 700, color: 'var(--text-secondary)' }}>{deck[field]}</span>
+          <span style={{ fontSize: 'var(--deck-mana-count-size, 0.875rem)', fontWeight: 700, color: 'var(--text-secondary)' }}>{deck[field]}</span>
         </span>
       ))}
     </span>
   );
 }
 
-function DeckBuilder({ showToast, navigationGuardRef }) {
+function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const { t } = useT();
   const [decks, setDecks] = useState([]);
   const [activeDeck, setActiveDeck] = useState(null);
@@ -93,11 +104,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     const scale = Number(localStorage.getItem('card_default_scale'));
     return scale >= 0.6 && scale <= 2.5 ? scale : 1;
   });
+  const deckListImageScale = 1 + Math.max(0, deckCardScale - 1) * 0.25;
   const [previewCard, setPreviewCard] = useState(null);
+  const [cardSources, setCardSources] = useState(null);
+  const [sourceRetry, setSourceRetry] = useState(0);
 
   // Deck Creation States & Constants
-  const POKEMON_FORMATS = ['Standard', 'Expanded', 'GLC (Gym Leader Challenge)', 'Unlimited', 'Retro'];
-  const LORCANA_FORMATS = ['Core (Constructed)', 'Casual', 'Draft / Sealed'];
   const DECK_CATEGORIES = ['Competitive', 'Casual', 'Tournament', 'Theorycraft', 'Proxy', 'Trade'];
   const DECK_ACCENT_COLORS = [
     { name: 'Gold', hex: '#eab308' },
@@ -111,17 +123,18 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   ];
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creatingDeck, setCreatingDeck] = useState(false);
+  const [createDeckError, setCreateDeckError] = useState(null);
   const [showAiBuilder, setShowAiBuilder] = useState(false);
   const [aiSourceDeck, setAiSourceDeck] = useState(null);
   const closeAiBuilder = () => { setShowAiBuilder(false); setAiSourceDeck(null); };
   const [newDeckName, setNewDeckName] = useState('');
   const [newDeckDesc, setNewDeckDesc] = useState('');
-  const [newDeckGame, setNewDeckGame] = useState(() => defaultGame()); // 'pokemon' | 'mtg'
   const [newDeckInventoryType, setNewDeckInventoryType] = useState('collection');
-  const [newDeckFormat, setNewDeckFormat] = useState(() => newDeckDefaults(defaultGame()).format);
+  const [newDeckFormat, setNewDeckFormat] = useState(NEW_DECK_DEFAULTS.format);
   const [newDeckCategory, setNewDeckCategory] = useState('Competitive');
   const [newDeckAccentColor, setNewDeckAccentColor] = useState('#eab308');
-  const [newDeckTargetSize, setNewDeckTargetSize] = useState(() => newDeckDefaults(defaultGame()).targetSize);
+  const [newDeckTargetSize, setNewDeckTargetSize] = useState(NEW_DECK_DEFAULTS.targetSize);
   const [newDeckImportText, setNewDeckImportText] = useState('');
   const [newDeckImportFormat, setNewDeckImportFormat] = useState('plain');
   const [showImportDecklistArea, setShowImportDecklistArea] = useState(false);
@@ -129,32 +142,32 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const [showPreconPicker, setShowPreconPicker] = useState(false);
   const [deckDraft, setDeckDraft] = useState(null);
   const [savingDeck, setSavingDeck] = useState(false);
+  const [saveDeckError, setSaveDeckError] = useState(null);
   const [refreshingInventory, setRefreshingInventory] = useState(false);
   
   // Card Search States inside editor
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [deckSearchGame, setDeckSearchGame] = useState(() => defaultGame()); // 'pokemon' | 'mtg'
+  const [deckSearchGame, setDeckSearchGame] = useState(() => defaultGame());
 
   // Deck Selection Menu Controls
   const [deckSearchTerm, setDeckSearchTerm] = useState('');
-  const deckGameFilter = defaultGame();
-  const [deckStatusFilter, setDeckStatusFilter] = useState('all'); // 'all' | 'ready' | 'in_progress' | 'in_play'
+  const [deckStatusFilter, setDeckStatusFilter] = useState('all'); // 'all' | 'ready' | 'missing' | 'in_progress' | 'in_play'
   const [deckSortBy, setDeckSortBy] = useState('created_desc'); // 'created_desc' | 'created_asc' | 'name_asc' | 'cards_desc'
+  const [showGraveyardDecks, setShowGraveyardDecks] = useState(false);
   const [deckSelectionViewMode, setDeckSelectionViewMode] = useState('table'); // 'grid' | 'table'
 
   // Draw Simulator States
   const [showSimulator, setShowSimulator] = useState(false);
   const [simulatorDeck, setSimulatorDeck] = useState([]);
   const [hand, setHand] = useState([]);
-  const [prizeCards, setPrizeCards] = useState([]);
   const [mulliganCount, setMulliganCount] = useState(0);
 
   // Import / Export Modals
   const [showImportModal, setShowImportModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [exportFormat, setExportFormat] = useState(null); // null = auto by deck game
+  const [exportFormat, setExportFormat] = useState('mtga');
   const [importText, setImportText] = useState('');
   const [importComparison, setImportComparison] = useState(null);
   const [comparingImport, setComparingImport] = useState(false);
@@ -167,17 +180,75 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const [checkoutMode, setCheckoutMode] = useState('checkout'); // 'checkout' | 'checkin'
   const [checkoutDeckId, setCheckoutDeckId] = useState(null); // deck the open modal acts on
   const [deckCardLocations, setDeckCardLocations] = useState({});
+  const [deckLocationsError, setDeckLocationsError] = useState(false);
+  const [savingSleeved, setSavingSleeved] = useState(false);
+  const [sleevedError, setSleevedError] = useState(false);
+  const [savingCardBack, setSavingCardBack] = useState(false);
+  const [showDeckContainerModal, setShowDeckContainerModal] = useState(false);
 
-  const editorBusy = savingDeck || loading || refreshingInventory || comparingImport || checkingOut || showCheckoutModal;
+  const editorBusy = savingDeck || savingSleeved || savingCardBack || loading || refreshingInventory || comparingImport || checkingOut || showCheckoutModal || showDeckContainerModal;
   const hasUnsavedChanges = !!activeDeck && (
     JSON.stringify(deckEditorState(activeDeck)) !== savedEditorState
     || (!!deckDraft && JSON.stringify(deckEditorState({ ...activeDeck, ...deckDraft })) !== JSON.stringify(deckEditorState(activeDeck)))
   );
   const [savingRecord, setSavingRecord] = useState(false);
 
+  const previewDeckCard = !showAiBuilder && activeDeck?.inventory_type === 'collection'
+    ? activeDeck?.cards.find(card => card.id === previewCard?.id)
+    : null;
+  const sourceKey = previewDeckCard ? `${activeDeck.id}/${previewDeckCard.id}` : null;
+  const sourcesReady = cardSources?.key === sourceKey && cardSources?.status === 'ready';
+  const sourcesError = cardSources?.key === sourceKey && cardSources?.status === 'error';
+  const selectedSourceId = previewDeckCard?.source_entry_id ?? null;
+  const selectedSource = sourcesReady
+    ? cardSources.sources.find(source => source.entry_id === selectedSourceId)
+    : null;
+  const selectedSourceUnavailable = sourcesReady && selectedSourceId !== null
+    && (!selectedSource || selectedSource.available < previewDeckCard.quantity);
+
+  useEffect(() => {
+    if (!sourceKey) {
+      setCardSources(null);
+      return;
+    }
+    const controller = new AbortController();
+    setCardSources({ key: sourceKey, status: 'loading' });
+    const loadSources = async () => {
+      try {
+        const [deckId, cardId] = sourceKey.split('/');
+        const response = await fetch(`/api/decks/${deckId}/cards/${encodeURIComponent(cardId)}/sources`, { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data.sources)) throw new Error(data.error || t('deck.errSources'));
+        if (!controller.signal.aborted) setCardSources({ key: sourceKey, status: 'ready', sources: data.sources });
+      } catch (error) {
+        if (!controller.signal.aborted) setCardSources({ key: sourceKey, status: 'error', error: error.message });
+      }
+    };
+    loadSources();
+    return () => controller.abort();
+  }, [sourceKey, sourceRetry, activeDeck?.checked_out, savedEditorState, t]);
+
+  const handleSourceChange = (value) => {
+    if (!previewDeckCard || editorBusy || savingRecord || searching || deckDraft || activeDeck.checked_out || !sourcesReady) return;
+    const sourceId = value === '' ? null : Number(value);
+    if (sourceId !== null && !cardSources.sources.some(source => source.entry_id === sourceId && source.available >= previewDeckCard.quantity)) return;
+    const updatedDeck = {
+      ...activeDeck,
+      cards: activeDeck.cards.map(card => card.id === previewDeckCard.id ? { ...card, source_entry_id: sourceId } : card)
+    };
+    setActiveDeck(updatedDeck);
+    handleSaveDeck(updatedDeck);
+  };
+
+  const sourceLabel = (source) => [
+    source.location_name || t('bulk.unassignedPile'),
+    source.compartment_display,
+    t('deck.sourceAvailable', { available: source.available, quantity: source.quantity })
+  ].filter(Boolean).join(' · ');
+
   const confirmLeaveEditor = () => {
     if (activeDeck && (editorBusy || savingRecord)) {
-      showToast(t('deck.waitForOperation'));
+      showToast(t('deck.waitForOperation'), 'status');
       return false;
     }
     return !hasUnsavedChanges || window.confirm(t('deck.confirmDiscard'));
@@ -188,6 +259,8 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     setActiveDeck(null);
     setSavedEditorState(null);
     setDeckDraft(null);
+    setSaveDeckError(null);
+    setSleevedError(false);
     setSearchResults([]);
     setImportComparison(null);
     setViewMode('list');
@@ -210,8 +283,25 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [hasUnsavedChanges, savingDeck]);
 
+  const closeCreateModal = () => {
+    setCreateDeckError(null);
+    setNewDeckName('');
+    setNewDeckDesc('');
+    setNewDeckFormat(NEW_DECK_DEFAULTS.format);
+    setNewDeckCategory('Competitive');
+    setNewDeckAccentColor('#eab308');
+    setNewDeckTargetSize(NEW_DECK_DEFAULTS.targetSize);
+    setNewDeckImportText('');
+    setNewDeckImportFormat('plain');
+    setNewDeckPreconFile('');
+    setNewDeckInventoryType('collection');
+    setShowPreconPicker(false);
+    setShowImportDecklistArea(false);
+    setShowCreateModal(false);
+  };
+
   useBackGuard(viewMode === 'detail' && !!activeDeck, leaveDeck);
-  useBackGuard(showCreateModal, () => setShowCreateModal(false));
+  useBackGuard(showCreateModal, () => creatingDeck ? false : closeCreateModal());
   useBackGuard(showSimulator, () => setShowSimulator(false));
   useBackGuard(!!deckDraft, () => refreshingInventory ? false : setDeckDraft(null));
   useBackGuard(showImportModal, () => setShowImportModal(false));
@@ -231,11 +321,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       const response = await fetch('/api/decks');
       if (response.ok) {
         const data = await response.json();
-        setDecks(data);
+        setDecks(data.filter(deck => isGameEnabled(deck.game)));
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errLoadDecks'));
+      showToast(t('deck.errLoadDecks'), 'error');
     } finally {
       setLoading(false);
     }
@@ -243,7 +333,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
   const handleCreateDeck = async (e) => {
     e.preventDefault();
-    if (!newDeckName.trim()) return;
+    if (creatingDeck || !newDeckName.trim()) return;
+    setCreatingDeck(true);
+    setCreateDeckError(null);
 
     try {
       const response = await fetch('/api/decks', {
@@ -252,7 +344,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
         body: JSON.stringify({ 
           name: newDeckName, 
           description: newDeckDesc, 
-          game: newDeckGame,
+          game: 'mtg',
           format: newDeckFormat,
           category: newDeckCategory,
           accent_color: newDeckAccentColor,
@@ -266,48 +358,38 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
       const data = await response.json();
       if (response.ok) {
-        showToast(data.message || t('deck.created'));
-        setNewDeckName('');
-        setNewDeckDesc('');
-        setNewDeckGame(defaultGame());
-        setNewDeckFormat(newDeckDefaults(defaultGame()).format);
-        setNewDeckCategory('Competitive');
-        setNewDeckAccentColor('#eab308');
-        setNewDeckTargetSize(newDeckDefaults(defaultGame()).targetSize);
-        setNewDeckImportText('');
-        setNewDeckImportFormat('plain');
-        setNewDeckPreconFile('');
-        setNewDeckInventoryType('collection');
-        setShowPreconPicker(false);
-        setShowImportDecklistArea(false);
-        fetchDecks();
+        showToast(data.message || t('deck.created'), 'success');
+        closeCreateModal();
+        await fetchDecks();
+        await loadDeckDetails(data.id);
       } else {
-        showToast(data.error || t('deck.errCreate'));
+        setCreateDeckError(data.error || t('deck.errCreate'));
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errCreateGeneric'));
+      setCreateDeckError(t('deck.errCreateGeneric'));
+    } finally {
+      setCreatingDeck(false);
     }
   };
 
-  const handleManaBoxDeckFile = (event) => {
+  const handleManaBoxDeckFile = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setNewDeckImportText(String(reader.result || ''));
+    event.target.value = '';
+    try {
+      setNewDeckImportText(await file.text());
       setNewDeckImportFormat('manabox');
       setNewDeckPreconFile('');
-    };
-    reader.onerror = () => showToast(t('settings.errReadFile'));
-    reader.readAsText(file);
-    event.target.value = '';
+    } catch {
+      showToast(t('settings.errReadFile'), 'error');
+    }
   };
 
   const handleApplyDeckProperties = async () => {
     if (!activeDeck || !deckDraft?.name.trim() || editorBusy) return;
     if (activeDeck.checked_out && deckDraft.inventory_type !== activeDeck.inventory_type) {
-      showToast(t('deck.returnBeforeEditing'));
+      showToast(t('deck.returnBeforeEditing'), 'error');
       return;
     }
     let cards = activeDeck.cards;
@@ -316,12 +398,13 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       try {
         const inventory = await loadInventoryCards(activeDeck.game, deckDraft.inventory_type);
         const owned = new Map(inventory.map(card => [card.id, card.owned_qty]));
-        cards = cards.map(card => ({ ...card, owned_qty: owned.get(card.id) || 0, locked_qty: 0, locked_decks: null }));
+        cards = cards.map(card => ({ ...card, source_entry_id: null, owned_qty: owned.get(card.id) || 0, locked_qty: 0, locked_decks: null }));
         setSearchResults([]);
         setImportComparison(null);
         setDeckCardLocations({});
+        setDeckCardSortBy('type');
       } catch (error) {
-        showToast(error.message);
+        showToast(error.message, 'error');
         return;
       } finally {
         setRefreshingInventory(false);
@@ -334,22 +417,25 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     setDeckDraft(null);
   };
 
-  const handleSaveDeck = async () => {
-    if (!activeDeck || !hasUnsavedChanges || editorBusy || savingRecord || searching) return;
+  const handleSaveDeck = async (deck = activeDeck) => {
+    if (!deck || JSON.stringify(deckEditorState(deck)) === savedEditorState || editorBusy || savingRecord || searching || deckDraft) return;
     setSavingDeck(true);
+    setSaveDeckError(null);
     try {
-      const response = await fetch(`/api/decks/${activeDeck.id}/editor`, {
+      const response = await fetch(`/api/decks/${deck.id}/editor`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(deckEditorState(activeDeck))
+        body: JSON.stringify(deckEditorState(deck))
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || t('deck.errSave'));
-      if (await loadDeckDetails(activeDeck.id)) showToast(data.message);
+      if (await loadDeckDetails(deck.id)) showToast(data.message, 'success');
+      else setSaveDeckError(t('deck.errLoadDetails'));
       await fetchDecks();
     } catch (error) {
       console.error(error);
-      showToast(error.message);
+      setSaveDeckError(error.message);
+      showToast(error.message, 'error');
     } finally {
       setSavingDeck(false);
     }
@@ -358,25 +444,28 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const loadDeckDetails = async (deckId) => {
     try {
       setLoading(true);
-      const [response, locationsResponse] = await Promise.all([
-        fetch(`/api/decks/${deckId}`),
-        fetch(`/api/decks/${deckId}/locations`)
-      ]);
+      const response = await fetch(`/api/decks/${deckId}`);
       if (!response.ok) throw new Error(t('deck.errLoadDetails'));
       const data = await response.json();
-      const locations = locationsResponse.ok ? await locationsResponse.json() : [];
+      if (!isGameEnabled(data.game)) throw new Error(t('deck.errLoadDetails'));
+      const locationsResponse = data.inventory_type === 'collection' ? await fetch(`/api/decks/${deckId}/locations`) : null;
+      const locations = locationsResponse?.ok ? await locationsResponse.json() : [];
+      setDeckLocationsError(data.inventory_type === 'collection' && !locationsResponse?.ok);
       setDeckCardLocations(Object.fromEntries(locations.map(({ card_id, locations: cardLocations }) => [card_id, cardLocations])));
       setActiveDeck(data);
+      if (data.inventory_type !== 'collection') setDeckCardSortBy('type');
       setSavedEditorState(JSON.stringify(deckEditorState(data)));
       setDeckDraft(null);
+      setSaveDeckError(null);
+      setSleevedError(false);
       setSearchResults([]);
       setImportComparison(null);
-      setDeckSearchGame(data.game || 'mtg');
+      setDeckSearchGame(data.game);
       setViewMode('detail');
       return true;
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errLoadDetails'));
+      showToast(t('deck.errLoadDetails'), 'error');
       return false;
     } finally {
       setLoading(false);
@@ -402,9 +491,32 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       setDecks(current => current.map(deck => deck.id === deckId ? { ...deck, ...record } : deck));
     } catch (error) {
       console.error(error);
-      showToast(t('deck.errRecord'));
+      showToast(t('deck.errRecord'), 'error');
     } finally {
       setSavingRecord(false);
+    }
+  };
+
+  const handleSleevedChange = async (sleeved) => {
+    if (!activeDeck || editorBusy || sleeved === (activeDeck.sleeved ?? 0)) return;
+    const deckId = activeDeck.id;
+    setSavingSleeved(true);
+    setSleevedError(false);
+    try {
+      const response = await fetch(`/api/decks/${deckId}/sleeved`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sleeved })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || t('deck.errSleeved'));
+      setActiveDeck(deck => deck?.id === deckId ? { ...deck, sleeved: data.sleeved } : deck);
+      setDecks(current => current.map(deck => deck.id === deckId ? { ...deck, sleeved: data.sleeved } : deck));
+    } catch (error) {
+      console.error(error);
+      setSleevedError(true);
+    } finally {
+      setSavingSleeved(false);
     }
   };
 
@@ -430,7 +542,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const handleUpdateCardQty = (cardId, newQty, newCard = null) => {
     if (!activeDeck || editorBusy || !Number.isSafeInteger(newQty)) return;
     if (activeDeck.checked_out) {
-      showToast(t('deck.returnBeforeEditing'));
+      showToast(t('deck.returnBeforeEditing'), 'error');
       return;
     }
     if (newQty <= 0) {
@@ -446,11 +558,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     if (!card) return;
     if (newQty > (existing?.quantity || 0)) {
       if (newQty > (card.owned_qty || 0)) {
-        showToast(t('deck.errOwnedLimit', { count: card.owned_qty || 0, name: displayName(card) }));
+        showToast(t('deck.errOwnedLimit', { count: card.owned_qty || 0, name: displayName(card) }), 'error');
         return;
       }
-      if (!isBasicEnergyOrLand(card, activeDeck.game) && deckCountByName(activeDeck.cards, card.name) - (existing?.quantity || 0) + newQty > 4) {
-        showToast(t('deck.errCopyLimit', { count: 4, name: displayName(card) }));
+      if (!isBasicLand(card, activeDeck.game) && deckCountByName(activeDeck.cards, card.name) - (existing?.quantity || 0) + newQty > 4) {
+        showToast(t('deck.errCopyLimit', { count: 4, name: displayName(card) }), 'error');
         return;
       }
     }
@@ -458,7 +570,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       ...deck,
       cards: existing
         ? deck.cards.map(current => current.id === cardId ? { ...current, quantity: newQty } : current)
-        : [...deck.cards, { ...card, quantity: newQty, checked_out: 0 }]
+        : [...deck.cards, { ...card, quantity: newQty, checked_out: 0, source_entry_id: null }]
     }));
   };
 
@@ -471,12 +583,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       });
 
       if (response.ok) {
-        showToast(t('deck.deleted'));
+        showToast(t('deck.deleted'), 'success');
         fetchDecks();
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errDelete'));
+      showToast(t('deck.errDelete'), 'error');
     }
   };
 
@@ -484,18 +596,18 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     try {
       const response = await fetch(`/api/decks/${deckId}/duplicate`, { method: 'POST' });
       const data = await response.json();
-      if (!response.ok) return showToast(data.error || t('deck.errDuplicate'));
-      showToast(t('deck.duplicated'));
+      if (!response.ok) return showToast(data.error || t('deck.errDuplicate'), 'error');
+      showToast(t('deck.duplicated'), 'success');
       await fetchDecks();
       loadDeckDetails(data.id);
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errDuplicate'));
+      showToast(t('deck.errDuplicate'), 'error');
     }
   };
 
   const loadInventoryCards = async (game, inventoryType) => {
-    const response = await fetch(`/api/collection?game=${game || 'mtg'}&list_type=${inventoryType}`);
+    const response = await fetch(`/api/collection?game=${game}&list_type=${inventoryType}`);
     if (!response.ok) throw new Error(t('deck.errSearch'));
     const byId = new Map();
     // Collection rows are physical entries; the editor needs totals per printing.
@@ -513,24 +625,23 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     if (e) e.preventDefault();
     try {
       setSearching(true);
-      const inventoryType = activeDeck?.inventory_type === 'arena' ? 'arena' : 'collection';
-      if (forceBrowse || !searchQuery.trim() || inventoryType === 'arena') {
+      const inventoryType = activeDeck?.inventory_type || 'collection';
+      if (forceBrowse || !searchQuery.trim() || inventoryType !== 'collection') {
         const cards = await loadInventoryCards(deckSearchGame, inventoryType);
         const query = searchQuery.trim().toLowerCase();
         setSearchResults(cards.filter(card => !query || card.name.toLowerCase().includes(query) || card.printed_name?.toLowerCase().includes(query)));
       } else {
-        const finalQuery = deckSearchGame === 'mtg' ? searchQuery : (translateJapaneseName(searchQuery) || searchQuery);
-        const response = await fetch(`/api/search?name=${encodeURIComponent(finalQuery)}&scope=collection&game=${deckSearchGame}`);
+        const response = await fetch(`/api/search?name=${encodeURIComponent(searchQuery)}&scope=collection&game=${deckSearchGame}`);
         if (response.ok) {
           const data = await response.json();
           setSearchResults(data);
         } else {
-          showToast(t(response.status === 429 ? 'deck.errRateLimit' : 'deck.errSearch'));
+          showToast(t(response.status === 429 ? 'deck.errRateLimit' : 'deck.errSearch'), 'error');
         }
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errSearch'));
+      showToast(t('deck.errSearch'), 'error');
     } finally {
       setSearching(false);
     }
@@ -539,14 +650,14 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   // --- CHECKOUT / RETURN ---
   const handleCheckout = async (deck = null) => {
     const targetDeck = deck || activeDeck;
-    if (!targetDeck) return;
+    if (!targetDeck || targetDeck.inventory_type !== 'collection') return;
     if (editorBusy) return;
-    if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'));
+    if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
     try {
       setCheckingOut(true);
       const res = await fetch(`/api/decks/${targetDeck.id}/checkout`, { method: 'PUT' });
       if (res.ok) {
-        showToast(t('deck.checkedOut', { name: targetDeck.name }));
+        showToast(t('deck.checkedOut', { name: targetDeck.name }), 'success');
         if (activeDeck && activeDeck.id === targetDeck.id) {
           setActiveDeck(prev => ({ ...prev, checked_out: 1, checked_out_at: new Date().toISOString() }));
         }
@@ -563,14 +674,14 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       } else {
         const errData = await res.json().catch(() => null);
         if (errData && errData.details && errData.details.length > 0) {
-          showToast(t('deck.errCheckout', { detail: errData.details[0], extra: errData.details.length > 1 ? t('deck.andMore', { count: errData.details.length - 1 }) : '' }));
+          showToast(t('deck.errCheckout', { detail: errData.details[0], extra: errData.details.length > 1 ? t('deck.andMore', { count: errData.details.length - 1 }) : '' }), 'error');
         } else {
-          showToast(errData?.error || 'Failed to check out deck.');
+          showToast(errData?.error || 'Failed to check out deck.', 'error');
         }
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errCheckoutGeneric'));
+      showToast(t('deck.errCheckoutGeneric'), 'error');
     } finally {
       setCheckingOut(false);
     }
@@ -578,9 +689,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
   const handleReturn = async (deck = null) => {
     const targetDeck = deck || activeDeck;
-    if (!targetDeck) return;
+    if (!targetDeck || targetDeck.inventory_type !== 'collection') return;
     if (editorBusy) return;
-    if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'));
+    if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
     try {
       setCheckingOut(true);
       // Capture where each card lives before flipping the flag, so the check-in
@@ -590,7 +701,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       const locData = locRes.ok ? await locRes.json() : null;
       const res = await fetch(`/api/decks/${targetDeck.id}/return`, { method: 'PUT' });
       if (res.ok) {
-        showToast(t('deck.returned', { name: targetDeck.name }));
+        showToast(t('deck.returned', { name: targetDeck.name }), 'success');
         if (activeDeck && activeDeck.id === targetDeck.id) {
           setActiveDeck(prev => ({ ...prev, checked_out: 0, checked_out_at: null }));
         }
@@ -602,11 +713,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
           setShowCheckoutModal(true);
         }
       } else {
-        showToast(t('deck.errReturn'));
+        showToast(t('deck.errReturn'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errReturnGeneric'));
+      showToast(t('deck.errReturnGeneric'), 'error');
     } finally {
       setCheckingOut(false);
     }
@@ -621,23 +732,23 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     const undo = checkoutMode === 'checkout' ? 'return' : 'checkout';
     try {
       const res = await fetch(`/api/decks/${id}/${undo}`, { method: 'PUT' });
-      if (!res.ok) { showToast(t('deck.errUndo')); return; }
+      if (!res.ok) { showToast(t('deck.errUndo'), 'error'); return; }
       if (activeDeck && activeDeck.id === id) {
         const back = checkoutMode === 'checkout';
         setActiveDeck(prev => ({ ...prev, checked_out: back ? 0 : 1, checked_out_at: back ? null : new Date().toISOString() }));
       }
       fetchDecks();
-      showToast(t(checkoutMode === 'checkout' ? 'deck.checkoutCanceled' : 'deck.returnCanceled'));
+      showToast(t(checkoutMode === 'checkout' ? 'deck.checkoutCanceled' : 'deck.returnCanceled'), 'success');
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errUndo'));
+      showToast(t('deck.errUndo'), 'error');
     }
   };
 
   // --- DRAW SIMULATOR LOGIC ---
   const startSimulator = () => {
     if (!activeDeck || activeDeck.cards.length === 0) {
-      showToast(t('deck.errEmptyDeck'));
+      showToast(t('deck.errEmptyDeck'), 'error');
       return;
     }
 
@@ -652,11 +763,6 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     const shuffled = shuffleArray(fullDeck);
     setSimulatorDeck(shuffled);
     setHand(shuffled.slice(0, 7));
-    if (activeDeck?.game !== 'mtg' && shuffled.length >= 13) {
-      setPrizeCards(shuffled.slice(7, 13));
-    } else {
-      setPrizeCards([]);
-    }
     setMulliganCount(0);
     setShowSimulator(true);
   };
@@ -667,35 +773,29 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     const drawCount = Math.max(1, 7 - nextMulligan);
     setSimulatorDeck(shuffled);
     setHand(shuffled.slice(0, drawCount));
-    if (activeDeck?.game !== 'mtg' && shuffled.length >= drawCount + 6) {
-      setPrizeCards(shuffled.slice(drawCount, drawCount + 6));
-    }
     setMulliganCount(nextMulligan);
   };
 
   const handleDrawCard = () => {
-    // Deck is laid out as [hand][prizes][rest]; hand grows by drawing from rest.
-    const nextIndex = prizeCards.length + hand.length;
+    const nextIndex = hand.length;
     if (nextIndex >= simulatorDeck.length) {
-      showToast(t('deck.errNoCardsLeft'));
+      showToast(t('deck.errNoCardsLeft'), 'error');
       return;
     }
     setHand([...hand, simulatorDeck[nextIndex]]);
   };
 
   // --- EXPORT & IMPORT LOGIC ---
-  const effectiveExportFormat = exportFormat || ((activeDeck?.game === 'mtg') ? 'mtga' : 'ptcgl');
-
   const handleExportDeckText = () => {
     if (!activeDeck) return '';
-    return buildDeckExport(activeDeck.cards, effectiveExportFormat);
+    return buildDeckExport(activeDeck.cards, exportFormat);
   };
 
   const handleCopyExportText = () => {
     const text = handleExportDeckText();
     navigator.clipboard.writeText(text)
-      .then(() => showToast(t('deck.copied')))
-      .catch(() => showToast(t('deck.errCopy')));
+      .then(() => showToast(t('deck.copied'), 'success'))
+      .catch(() => showToast(t('deck.errCopy'), 'error'));
   };
 
   // Copy the buylist and open TCGplayer Mass Entry — user pastes (their mass
@@ -703,15 +803,14 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   // reliable path).
   const handleOpenMassEntry = () => {
     const text = buildDeckExport(activeDeck?.cards, 'buylist');
-    if (!text) { showToast(t('deck.nothingToBuy')); return; }
-    const line = (activeDeck?.game === 'mtg') ? 'Magic' : 'Pokemon';
+    if (!text) { showToast(t('deck.nothingToBuy'), 'status'); return; }
     navigator.clipboard.writeText(text).catch(() => {});
-    window.open(`https://www.tcgplayer.com/massentry?productline=${line}`, '_blank', 'noopener');
-    showToast(t('deck.buylistCopied'));
+    window.open('https://www.tcgplayer.com/massentry?productline=Magic', '_blank', 'noopener');
+    showToast(t('deck.buylistCopied'), 'success');
   };
 
-  const loadArenaImportCards = async () => {
-    const cards = await loadInventoryCards(activeDeck.game, 'arena');
+  const loadOwnedImportCards = async () => {
+    const cards = await loadInventoryCards(activeDeck.game, activeDeck.inventory_type);
     const byName = new Map();
     const byPrinting = new Map();
     for (const card of cards) {
@@ -732,7 +831,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       }
       return arenaCards.byName.get(parsed.name.toLowerCase()) || null;
     }
-    const res = await fetch(`/api/search?name=${encodeURIComponent(parsed.name)}&scope=collection&game=${activeDeck.game || 'mtg'}`);
+    const res = await fetch(`/api/search?name=${encodeURIComponent(parsed.name)}&scope=collection&game=${activeDeck.game}`);
     if (!res.ok) return null;
     return (await res.json())[0] || null;
   };
@@ -744,11 +843,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     const results = [];
     let arenaCards = null;
     try {
-      if (activeDeck.inventory_type === 'arena') arenaCards = await loadArenaImportCards();
+      if (activeDeck.inventory_type !== 'collection') arenaCards = await loadOwnedImportCards();
     } catch (err) {
       console.error(err);
       setComparingImport(false);
-      showToast(t('deck.errSearch'));
+      showToast(t('deck.errSearch'), 'error');
       return;
     }
 
@@ -792,7 +891,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const handleImportDeck = () => {
     if (!activeDeck || !importComparison || editorBusy) return;
     if (activeDeck.checked_out) {
-      showToast(t('deck.returnBeforeEditing'));
+      showToast(t('deck.returnBeforeEditing'), 'error');
       return;
     }
     let cards = [...activeDeck.cards];
@@ -806,14 +905,14 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       }
       const quantity = Math.min(item.requestedQty, item.ownedQty);
       const existing = cards.find(card => card.id === item.card.id);
-      if (!isBasicEnergyOrLand(item.card, activeDeck.game)
+      if (!isBasicLand(item.card, activeDeck.game)
         && deckCountByName(cards, item.card.name) - (existing?.quantity || 0) + quantity > 4) {
         skipped.push({ name: item.rawName, quantity, reason: 'deck.importCopyLimit' });
         continue;
       }
       cards = existing
         ? cards.map(card => card.id === existing.id ? { ...card, quantity } : card)
-        : [...cards, { ...item.card, quantity, checked_out: 0 }];
+        : [...cards, { ...item.card, quantity, checked_out: 0, source_entry_id: null }];
       addedCount++;
       if (item.requestedQty > quantity) {
         skipped.push({ name: item.rawName, quantity: item.requestedQty - quantity, reason: 'deck.notOwned' });
@@ -829,38 +928,17 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     setShowImportModal(false);
   };
 
-  // The game the active deck is built for (legacy decks default to Pokémon).
-  const deckGame = activeDeck?.game || 'mtg';
+  const deckGame = activeDeck?.game;
 
   // MTG card-type buckets, read off the parsed type line stored in subtypes.
   const MTG_MAIN_TYPES = ['Creature', 'Planeswalker', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Battle', 'Land'];
-  const mtgCardType = (card) => {
+  const cardGroup = (card) => {
     const subs = card.subtypes || [];
     for (const t of MTG_MAIN_TYPES) if (subs.includes(t)) return t;
     return 'Other';
   };
-  const LORCANA_MAIN_TYPES = ['Character', 'Action', 'Item', 'Location'];
-  const lorcanaCardType = (card) => {
-    const supertype = card.supertype || 'Character';
-    if (LORCANA_MAIN_TYPES.includes(supertype)) return supertype;
-    const subs = card.subtypes || [];
-    for (const t of LORCANA_MAIN_TYPES) if (subs.includes(t)) return t;
-    return 'Character';
-  };
-  const cardGroup = (card) => {
-    if (deckGame === 'mtg') return mtgCardType(card);
-    if (deckGame === 'lorcana') return lorcanaCardType(card);
-    let type = card.supertype || 'Pokémon';
-    if (type === 'Pokemon') type = 'Pokémon';
-    return ['Pokémon', 'Trainer', 'Energy'].includes(type) ? type : 'Pokémon';
-  };
 
-  // Groups order based on game
-  const GROUP_ORDER = deckGame === 'mtg'
-    ? ['Creature', 'Planeswalker', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Battle', 'Land', 'Other']
-    : (deckGame === 'lorcana'
-      ? ['Character', 'Action', 'Item', 'Location', 'Other']
-      : ['Pokémon', 'Trainer', 'Energy', 'Other']);
+  const GROUP_ORDER = [...MTG_MAIN_TYPES, 'Other'];
 
   const deckCardGroups = activeDeck && deckCardSortBy === 'pulled'
     ? [false, true].map(pulled => ({
@@ -884,7 +962,8 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       }]
     : GROUP_ORDER.map(name => ({
         name,
-        cards: activeDeck?.cards.filter(card => cardGroup(card).toLowerCase() === name.toLowerCase()) || []
+        cards: activeDeck?.cards.filter(card => cardGroup(card).toLowerCase() === name.toLowerCase())
+          .sort((a, b) => displayName(a).localeCompare(displayName(b))) || []
       }));
 
   // --- CHART DATA GENERATION ---
@@ -902,9 +981,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     if (!activeDeck) return [];
     const counts = { '0': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0, '7+': 0 };
     activeDeck.cards.forEach(c => {
-      const val = c.cmc !== undefined && c.cmc !== null
-        ? c.cmc
-        : (c.convertedEnergyCost !== undefined && c.convertedEnergyCost !== null ? c.convertedEnergyCost : null);
+      const val = c.cmc ?? null;
       if (val !== null) {
         const bucket = val >= 7 ? '7+' : String(Math.floor(val));
         if (counts[bucket] !== undefined) counts[bucket] += c.quantity;
@@ -913,7 +990,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
     return Object.keys(counts).map(cost => ({ cost, count: counts[cost] }));
   };
 
-  const getEnergyChartData = () => {
+  const getColorChartData = () => {
     if (!activeDeck) return [];
     const map = {};
     if (deckGame === 'mtg') {
@@ -940,49 +1017,35 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       });
       return Object.keys(map).map(key => ({ name: key, value: map[key] }));
     }
-    if (deckGame === 'lorcana') {
-      activeDeck.cards.forEach(c => {
-        const inks = Array.isArray(c.types) && c.types.length ? c.types : (c.ink ? [c.ink] : []);
-        if (inks.length === 0) {
-          map['Colorless'] = (map['Colorless'] || 0) + c.quantity;
-        } else {
-          inks.forEach(ink => { map[ink] = (map[ink] || 0) + c.quantity; });
-        }
-      });
-      return Object.keys(map).map(key => ({ name: key, value: map[key] }));
-    }
-    activeDeck.cards.forEach(c => {
-      if (c.supertype === 'Energy') {
-        const name = c.name.replace(/\s*Energy/i, '').trim() || 'Special';
-        map[name] = (map[name] || 0) + c.quantity;
-      } else if (c.types && c.types.length > 0) {
-        c.types.forEach(t => { map[t] = (map[t] || 0) + c.quantity; });
-      }
-    });
     return Object.keys(map).map(key => ({ name: key, value: map[key] }));
   };
 
   const totalDeckCardsCount = activeDeck ? activeDeck.cards.reduce((sum, c) => sum + c.quantity, 0) : 0;
   const commanderCard = activeDeck?.cards.find(card => card.id === activeDeck.commander_card_id);
+  const commanderChoices = activeDeck?.cards
+    .filter(card => ['Creature', 'Planeswalker'].includes(cardGroup(card)) || card.id === activeDeck.commander_card_id)
+    .sort((a, b) => displayName(a).localeCompare(displayName(b))) || [];
   const targetDeckCardsCount = activeDeck?.target_size || 60;
   const supertypeData = getSupertypeChartData();
-  const energyData = getEnergyChartData();
+  const colorData = getColorChartData();
   const manaCurveData = getManaCurveData();
+  const neededContainers = deckContainers(deckCardLocations);
+  const unavailableCopies = Math.max(0, totalDeckCardsCount - neededContainers.reduce((sum, container) => sum + container.quantity, 0));
 
-  const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#64748b'];
 
   // --- SELECTION MENU METRICS & FILTERING ---
   const filteredDecks = decks.filter(deck => {
+    if (!showGraveyardDecks && deck.inventory_type === 'graveyard') return false;
     const q = deckSearchTerm.trim().toLowerCase();
     const matchesSearch = !q ||
       deck.name.toLowerCase().includes(q) ||
       (deck.description && deck.description.toLowerCase().includes(q));
 
-    const deckGameVal = deck.game || 'pokemon';
-    const matchesGame = deckGameFilter === 'all' || deckGameVal === deckGameFilter;
+    const matchesGame = isGameEnabled(deck.game);
 
     let matchesStatus = true;
-    if (deckStatusFilter === 'ready') matchesStatus = deck.total_cards === (deck.target_size || 60);
+    if (deckStatusFilter === 'ready') matchesStatus = deck.total_cards === (deck.target_size || 60) && !(deck.missing_cards > 0);
+    else if (deckStatusFilter === 'missing') matchesStatus = deck.missing_cards > 0;
     else if (deckStatusFilter === 'in_progress') matchesStatus = (deck.total_cards || 0) < (deck.target_size || 60);
     else if (deckStatusFilter === 'in_play') matchesStatus = !!deck.checked_out;
 
@@ -995,16 +1058,17 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   });
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
       {showAiBuilder && (
         <AiDeckBuilder
           sourceDeck={aiSourceDeck}
           onPreview={setPreviewCard}
           onClose={closeAiBuilder}
+          onOpenAiSettings={onOpenAiSettings}
           onSaved={async id => {
             closeAiBuilder();
-            showToast(t(id === aiSourceDeck?.id ? 'aiDeck.saved' : 'deck.created'));
+            showToast(t(id === aiSourceDeck?.id ? 'aiDeck.saved' : 'deck.created'), 'success');
             await fetchDecks();
             await loadDeckDetails(id);
           }}
@@ -1012,18 +1076,15 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       )}
       {/* 1. SELECTION MENU VIEW OF ALL DECKS */}
       {viewMode === 'list' && !showAiBuilder && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="deck-gallery" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
           {/* Top Banner Header & Primary Action */}
-          <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', padding: '1.25rem 1.5rem', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8))', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+          <div className="deck-gallery-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.4rem', color: 'var(--text-strong)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
                 <Layers size={22} style={{ color: 'var(--accent-yellow)' }} />
                 {t('deck.vaultTitle')}
               </h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-                {t('deck.vaultSubtitle')}
-              </p>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
               {isGameEnabled('mtg') && <button className="btn btn-secondary" onClick={() => { setAiSourceDeck(null); setShowAiBuilder(true); }}>
@@ -1040,16 +1101,17 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
           </div>
 
           {/* Search, Filters, Sorting & View Toolbar */}
-          <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem 1.25rem' }}>
+          <div className="deck-overview-toolbar" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
               
               {/* Search input */}
-              <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px' }}>
+              <div className="deck-overview-search" style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px' }}>
                 <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type="text"
                   className="input-control"
                   placeholder={t('deck.filterPlaceholder')}
+                  aria-label={t('deck.filterPlaceholder')}
                   value={deckSearchTerm}
                   onChange={e => setDeckSearchTerm(e.target.value)}
                   style={{ paddingLeft: '2.25rem', width: '100%', fontSize: '0.85rem' }}
@@ -1058,6 +1120,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   <button
                     className="btn btn-secondary btn-icon-only"
                     onClick={() => setDeckSearchTerm('')}
+                    aria-label={t('deck.clearFilters')}
                     style={{ position: 'absolute', right: '0.4rem', top: '50%', transform: 'translateY(-50%)', width: '20px', height: '20px', padding: 0, fontSize: '0.7rem' }}
                   >
                     <X size={12} />
@@ -1075,14 +1138,16 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   <Filter size={14} style={{ color: 'var(--text-muted)' }} />
                   <select
                     className="select-control"
+                    aria-label={t('admin.colStatus')}
                     value={deckStatusFilter}
                     onChange={e => setDeckStatusFilter(e.target.value)}
                     style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', height: 'auto' }}
                   >
                     <option value="all">{t('deck.allStatuses')}</option>
                     <option value="ready">{t('deck.statusBattleReady')}</option>
+                    <option value="missing">{t('deck.statusMissingCards')}</option>
                     <option value="in_progress">{t('deck.statusBuildingCount')}</option>
-                    <option value="in_play">{t('deck.statusInPlayEmoji')}</option>
+                    <option value="in_play">{t('deck.inPlay')}</option>
                   </select>
                 </div>
 
@@ -1091,6 +1156,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   <SlidersHorizontal size={14} style={{ color: 'var(--text-muted)' }} />
                   <select
                     className="select-control"
+                    aria-label={t('collection.sortBy')}
                     value={deckSortBy}
                     onChange={e => setDeckSortBy(e.target.value)}
                     style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', height: 'auto' }}
@@ -1101,6 +1167,14 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     <option value="cards_desc">{t('deck.sortMostCards')}</option>
                   </select>
                 </div>
+                <button type="button" role="switch" aria-checked={showGraveyardDecks} className="btn btn-secondary"
+                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', height: 'auto', ...(showGraveyardDecks ? { background: 'var(--accent-green)', borderColor: 'var(--accent-green)', color: 'var(--bg-primary)' } : {}) }}
+                  onClick={() => setShowGraveyardDecks(current => !current)}>
+                  {t('deck.showGraveyard')}
+                  <span aria-hidden="true" style={{ width: 28, height: 16, borderRadius: 999, background: showGraveyardDecks ? 'var(--text-on-accent)' : 'var(--text-muted)', position: 'relative', flexShrink: 0 }}>
+                    <span style={{ position: 'absolute', top: 2, left: showGraveyardDecks ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: showGraveyardDecks ? 'var(--accent-green)' : 'var(--bg-primary)' }} />
+                  </span>
+                </button>
               </div>
 
               {/* View Mode Toggle: Grid vs Table */}
@@ -1110,18 +1184,18 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   className={`btn ${deckSelectionViewMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                   onClick={() => setDeckSelectionViewMode('grid')}
-                  title={t('deck.gridView')}
+                  aria-pressed={deckSelectionViewMode === 'grid'} title={t('deck.gridView')}
                 >
-                  <LayoutGrid size={13} /> Grid
+                  <LayoutGrid size={13} /> {t('deck.gridView')}
                 </button>
                 <button
                   type="button"
                   className={`btn ${deckSelectionViewMode === 'table' ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                   onClick={() => setDeckSelectionViewMode('table')}
-                  title={t('deck.tableView')}
+                  aria-pressed={deckSelectionViewMode === 'table'} title={t('deck.tableView')}
                 >
-                  <List size={13} /> Table
+                  <List size={13} /> {t('deck.tableView')}
                 </button>
               </div>
 
@@ -1148,15 +1222,14 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             </div>
           ) : deckSelectionViewMode === 'grid' ? (
             /* --- GRID VIEW --- */
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
+            <div className="deck-overview-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(320px, 100%), 1fr))', gap: '1.25rem' }}>
               {filteredDecks.map(deck => {
-                const deckGameVal = deck.game || 'pokemon';
-                const isMtg = deckGameVal === 'mtg';
                 const targetSize = deck.target_size || 60;
                 const totalCards = deck.total_cards || 0;
                 const isComplete = totalCards >= targetSize;
+                const hasMissingCards = deck.missing_cards > 0;
                 const percent = Math.min(100, Math.round((totalCards / targetSize) * 100));
-                const accentColor = deck.accent_color || (isMtg ? '#ef4444' : '#eab308');
+                const accentColor = deck.accent_color || '#ef4444';
 
                 return (
                   <div
@@ -1175,9 +1248,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                       overflow: 'hidden',
                       cursor: 'pointer',
                       transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                      background: isMtg
-                        ? 'linear-gradient(145deg, rgba(211,32,42,0.06), rgba(15,23,42,0.65))'
-                        : 'linear-gradient(145deg, rgba(234,179,8,0.06), rgba(15,23,42,0.65))'
+                      background: 'linear-gradient(145deg, rgba(211,32,42,0.06), rgba(15,23,42,0.65))'
                     }}
                     onClick={() => loadDeckDetails(deck.id)}
                     onMouseEnter={e => {
@@ -1224,7 +1295,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     ) : null}
 
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                      <div className="deck-overview-card-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                             <h3 style={{ color: 'var(--text-strong)', fontSize: '1.15rem', fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>
@@ -1237,15 +1308,14 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                               letterSpacing: '0.05em',
                               padding: '0.1rem 0.45rem',
                               borderRadius: '4px',
-                              background: isMtg ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)',
-                              color: isMtg ? '#f87171' : 'var(--accent-yellow)',
-                              border: isMtg ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(234,179,8,0.3)',
+                              background: 'rgba(239,68,68,0.15)',
+                              color: '#f87171',
+                              border: '1px solid rgba(239,68,68,0.3)',
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '3px'
                             }}>
-                              {isMtg ? <Swords size={10} /> : <Zap size={10} />}
-                              {isMtg ? 'MTG' : 'Pokémon'}
+                              <Swords size={10} /> MTG
                             </span>
 
                             <span style={{
@@ -1257,7 +1327,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                               color: deck.inventory_type === 'arena' ? '#c084fc' : '#4ade80',
                               border: deck.inventory_type === 'arena' ? '1px solid rgba(168,85,247,0.25)' : '1px solid rgba(74,222,128,0.25)'
                             }}>
-                              {deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}
+                              {deck.inventory_type === 'graveyard' ? t('collection.graveyard') : deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}
                             </span>
 
                             {deck.format && (
@@ -1296,23 +1366,21 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           fontWeight: 700,
                           padding: '0.2rem 0.5rem',
                           borderRadius: '12px',
-                          backgroundColor: isComplete ? 'rgba(74, 222, 128, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                          color: isComplete ? '#4ade80' : '#60a5fa',
-                          border: isComplete ? '1px solid rgba(74, 222, 128, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
+                          backgroundColor: hasMissingCards ? 'color-mix(in srgb, var(--text-negative) 15%, transparent)' : isComplete ? 'rgba(74, 222, 128, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                          color: hasMissingCards ? 'var(--text-negative)' : isComplete ? '#4ade80' : '#60a5fa',
+                          border: hasMissingCards ? '1px solid var(--text-negative)' : isComplete ? '1px solid rgba(74, 222, 128, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
                           whiteSpace: 'nowrap'
                         }}>
-                          {t(isComplete ? 'deck.statusReady' : 'deck.statusBuilding')}
+                          {t(hasMissingCards ? 'deck.statusMissingCards' : isComplete ? 'deck.statusReady' : 'deck.statusBuilding')}
                         </span>
                       </div>
 
                       <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '0.6rem', minHeight: '34px', lineHeight: '1.4' }}>
                         {deck.description || 'No description provided.'}
                       </p>
-                      {isMtg && (
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.4rem', fontVariantNumeric: 'tabular-nums' }}>
-                          {t('deck.recordSummary', { wins: deck.wins ?? 0, losses: deck.losses ?? 0 })}
-                        </p>
-                      )}
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.4rem', fontVariantNumeric: 'tabular-nums' }}>
+                        {t('deck.recordSummary', { wins: deck.wins ?? 0, losses: deck.losses ?? 0 })}
+                      </p>
                     </div>
 
                     {/* Progress Bar & Details */}
@@ -1337,13 +1405,13 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     </div>
 
                     {/* Card Footer Actions */}
-                    <div style={{ borderTop: '1px solid var(--border-glass)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="deck-overview-card-footer" style={{ borderTop: '1px solid var(--border-glass)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                         Created {new Date(deck.created_at).toLocaleDateString()}
                       </span>
 
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        {deck.checked_out ? (
+                      <div className="deck-overview-actions" style={{ display: 'flex', gap: '0.4rem' }}>
+                        {deck.inventory_type === 'collection' && (deck.checked_out ? (
                           <button
                             className="btn btn-secondary"
                             style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid rgba(234,179,8,0.4)', color: '#eab308' }}
@@ -1361,7 +1429,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           >
                             <LogOut size={12} /> Checkout
                           </button>
-                        )}
+                        ))}
 
                         <button
                           className="btn btn-primary"
@@ -1383,7 +1451,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           className="btn btn-danger btn-icon-only"
                           style={{ padding: '0.3rem' }}
                           onClick={(e) => { e.stopPropagation(); handleDeleteDeck(deck.id, deck.name); }}
-                          title={t('deck.deleteDeck')}
+                          aria-label={t('deck.deleteDeck')} title={t('deck.deleteDeck')}
                         >
                           <Trash2 size={12} />
                         </button>
@@ -1412,7 +1480,6 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 </thead>
                 <tbody>
                   {filteredDecks.map(deck => {
-                    const isMtg = (deck.game || 'pokemon') === 'mtg';
                     const targetSize = deck.target_size || 60;
                     const totalCards = deck.total_cards || 0;
                     const isComplete = totalCards >= targetSize;
@@ -1426,17 +1493,17 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                       >
-                        <td style={{ padding: '0.75rem 1rem' }}>
+                        <td data-label={t('deck.deckName')} style={{ padding: '0.75rem 1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{deck.name}</span>
                           </div>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
+                        <td data-label={t('deck.format')} style={{ padding: '0.75rem 1rem' }}>
                           <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
                             {deck.format}
                           </span>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
+                        <td data-label={t('deck.inventoryType')} style={{ padding: '0.75rem 1rem' }}>
                           <span style={{
                             fontSize: 'inherit',
                             fontWeight: 700,
@@ -1446,20 +1513,20 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                             color: deck.inventory_type === 'arena' ? '#c084fc' : '#4ade80',
                             border: deck.inventory_type === 'arena' ? '1px solid rgba(168,85,247,0.25)' : '1px solid rgba(74,222,128,0.25)'
                           }}>
-                            {deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}
+                            {deck.inventory_type === 'graveyard' ? t('collection.graveyard') : deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}
                           </span>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
-                          {isMtg && <ManaCounts deck={deck} />}
+                        <td data-label={t('filter.field.color_identity')} style={{ padding: '0.75rem 1rem' }}>
+                          <ManaCounts deck={deck} />
                         </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
+                        <td data-label={t('deck.category')} style={{ padding: '0.75rem 1rem' }}>
                           {deck.category && (
                             <span style={{ fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.25)' }}>
                               {deck.category}
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', width: '160px' }}>
+                        <td data-label={t('deck.colCapacity')} style={{ padding: '0.75rem 1rem', width: '160px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                             <div style={{ fontWeight: 700, color: isComplete ? '#4ade80' : 'var(--text-strong)' }}>
                               {totalCards} / {targetSize} Cards
@@ -1469,8 +1536,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
-                          {deck.checked_out ? (
+                        <td data-label={t('admin.colStatus')} style={{ padding: '0.75rem 1rem' }}>
+                          {deck.missing_cards > 0 ? (
+                            <span style={{ fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: 'color-mix(in srgb, var(--text-negative) 15%, transparent)', color: 'var(--text-negative)', border: '1px solid var(--text-negative)' }}>
+                              {t('deck.statusMissingCards')}
+                            </span>
+                          ) : deck.checked_out ? (
                             <span style={{ fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid rgba(234,179,8,0.4)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <Gamepad2 size={11} /> {t('deck.inPlay')}
                             </span>
@@ -1484,9 +1555,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
-                            {deck.checked_out ? (
+                        <td data-label={t('admin.colActions')} style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                          <div className="deck-overview-actions" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                            {deck.inventory_type === 'collection' && (deck.checked_out ? (
                               <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: 'inherit', color: '#eab308' }} onClick={() => handleReturn(deck)} disabled={checkingOut}>
                                 {t('deck.return')}
                               </button>
@@ -1494,14 +1565,14 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                               <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: 'inherit' }} onClick={() => handleCheckout(deck)} disabled={checkingOut}>
                                 {t('deck.checkout')}
                               </button>
-                            )}
+                            ))}
                             <button className="btn btn-primary" style={{ padding: '0.25rem 0.6rem', fontSize: 'inherit' }} onClick={() => loadDeckDetails(deck.id)}>
                               {t('deck.open')}
                             </button>
-                            <button className="btn btn-secondary btn-icon-only" style={{ padding: '0.25rem' }} onClick={() => handleDuplicateDeck(deck.id)} title={t('deck.duplicateDeck')}>
+                            <button className="btn btn-secondary btn-icon-only" style={{ padding: '0.25rem' }} onClick={() => handleDuplicateDeck(deck.id)} aria-label={t('deck.duplicateDeck')} title={t('deck.duplicateDeck')}>
                               <Copy size={12} />
                             </button>
-                            <button className="btn btn-danger btn-icon-only" style={{ padding: '0.25rem' }} onClick={() => handleDeleteDeck(deck.id, deck.name)}>
+                            <button className="btn btn-danger btn-icon-only" style={{ padding: '0.25rem' }} onClick={() => handleDeleteDeck(deck.id, deck.name)} aria-label={t('deck.deleteDeck')} title={t('deck.deleteDeck')}>
                               <Trash2 size={12} />
                             </button>
                           </div>
@@ -1517,17 +1588,18 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
         </div>
       )}
 
+
       {/* 2. DECK EDITOR / DETAIL VIEW */}
       {viewMode === 'detail' && activeDeck && !showAiBuilder && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="deck-editor" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
           {/* Header */}
           {deckDraft && (
-            <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.7)' }} onClick={() => { if (!refreshingInventory) setDeckDraft(null); }}>
-              <div className="glass-panel" style={{ width: '480px', maxWidth: '100%', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }} onClick={(event) => event.stopPropagation()}>
+            <Modal onClose={() => { if (!refreshingInventory) setDeckDraft(null); }} aria-labelledby="deck-properties-title">
+              <div className="glass-panel deck-properties-panel">
                 <fieldset disabled={refreshingInventory} style={{ display: 'contents' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: 0 }}>{t('deck.editProperties')}</h3>
-                  <button className="btn btn-secondary btn-icon-only" onClick={() => setDeckDraft(null)}><X size={15} /></button>
+                  <h3 id="deck-properties-title" style={{ margin: 0 }}>{t('deck.editProperties')}</h3>
+                  <button className="btn btn-secondary btn-icon-only" aria-label={t('common.close')} onClick={() => setDeckDraft(null)}><X size={15} /></button>
                 </div>
                 <label className="form-group" style={{ margin: 0 }}>
                   {t('deck.deckName')}
@@ -1538,13 +1610,15 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   <div className="sub-nav-tabs" style={{ margin: 0 }}>
                     <button type="button" className={`sub-nav-tab ${deckDraft.inventory_type === 'collection' ? 'active' : ''}`} onClick={() => setDeckDraft({ ...deckDraft, inventory_type: 'collection' })}>{t('deck.physical')}</button>
                     <button type="button" className={`sub-nav-tab ${deckDraft.inventory_type === 'arena' ? 'active' : ''}`} onClick={() => setDeckDraft({ ...deckDraft, inventory_type: 'arena' })}>{t('deck.arena')}</button>
+                    <button type="button" className={`sub-nav-tab ${deckDraft.inventory_type === 'graveyard' ? 'active' : ''}`} disabled={!!activeDeck.checked_out} aria-describedby={activeDeck.checked_out ? 'deck-inventory-hint' : undefined} onClick={() => setDeckDraft({ ...deckDraft, inventory_type: 'graveyard' })}>{t('collection.graveyard')}</button>
                   </div>
+                  {!!activeDeck.checked_out && <p id="deck-inventory-hint" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>{t('deck.returnBeforeEditing')}</p>}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
+                <div className="deck-format-fields">
                   <label className="form-group" style={{ margin: 0 }}>
                     {t('deck.format')}
                     <select className="input-control" value={deckDraft.format} onChange={(event) => setDeckDraft({ ...deckDraft, format: event.target.value })}>
-                      {(activeDeck.game === 'mtg' ? MTG_FORMATS : activeDeck.game === 'lorcana' ? LORCANA_FORMATS : POKEMON_FORMATS).map(format => <option key={format} value={format}>{format}</option>)}
+                      {MTG_FORMATS.map(format => <option key={format} value={format}>{format}</option>)}
                     </select>
                   </label>
                   <label className="form-group" style={{ margin: 0 }}>
@@ -1575,10 +1649,10 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>{t('deck.saveDraftHint')}</p>
                 </fieldset>
               </div>
-            </div>
+            </Modal>
           )}
 
-          <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', position: 'relative', overflow: 'hidden' }}>
+          <div className="glass-panel deck-editor-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', position: 'relative', overflow: 'hidden' }}>
             
             {/* Checked out banner */}
             {activeDeck.checked_out ? (
@@ -1599,7 +1673,8 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
               <div>
                 <h2 style={{ fontSize: '1.25rem', color: 'var(--text-strong)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   {activeDeck.name}
-                  <span style={{ fontSize: '0.8rem', color: totalDeckCardsCount === targetDeckCardsCount ? 'var(--type-grass)' : 'var(--accent-yellow)', fontWeight: 600 }}>
+                  {activeDeck.inventory_type === 'graveyard' && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t('collection.graveyard')}</span>}
+                  <span style={{ fontSize: '0.8rem', color: totalDeckCardsCount === targetDeckCardsCount ? 'var(--accent-green)' : 'var(--accent-yellow)', fontWeight: 600 }}>
                     ({totalDeckCardsCount}/{targetDeckCardsCount} cards)
                   </span>
                   {hasUnsavedChanges && <span role="status" style={{ fontSize: '0.75rem', color: 'var(--accent-yellow)' }}>{t('deck.unsavedChanges')}</span>}
@@ -1631,11 +1706,38 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {activeDeck.game === 'mtg' && (
+              {/* Checkout / Return button */}
+              {activeDeck.inventory_type === 'collection' && (activeDeck.checked_out ? (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => handleReturn(activeDeck)}
+                  disabled={editorBusy}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', border: '1px solid rgba(234,179,8,0.4)', color: '#eab308' }}
+                >
+                  <PackageCheck size={14} /> Return to Storage
+                </button>
+              ) : (
+                <button
+                  className={`btn ${hasUnsavedChanges ? 'btn-secondary' : 'btn-primary'}`}
+                  onClick={() => handleCheckout(activeDeck)}
+                  disabled={editorBusy}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <LogOut size={14} /> Check Out for Play
+                </button>
+              ))}
+              <button className="btn btn-primary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
+                <button className="btn btn-secondary" onClick={startSimulator} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <Play size={14} /> Draw Simulator
+                </button>
+            </div>
+          </div>
+            <div className="deck-tools">
+              {activeDeck.game === 'mtg' && activeDeck.inventory_type !== 'graveyard' && (
                 <button
                   className="btn btn-secondary"
                   onClick={() => {
-                    if (hasUnsavedChanges) return showToast(t('deck.saveFirst'));
+                    if (hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
                     setAiSourceDeck(activeDeck);
                     setShowAiBuilder(true);
                   }}
@@ -1651,11 +1753,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 onClick={() => setDeckDraft({
                   name: activeDeck.name,
                   description: activeDeck.description || '',
-                  format: activeDeck.format || newDeckDefaults(activeDeck.game).format,
+                  format: activeDeck.format || NEW_DECK_DEFAULTS.format,
                   category: activeDeck.category || 'Competitive',
                   accent_color: activeDeck.accent_color || '#eab308',
-                  target_size: activeDeck.target_size || newDeckDefaults(activeDeck.game).targetSize,
-                  inventory_type: activeDeck.inventory_type === 'arena' ? 'arena' : 'collection'
+                  target_size: activeDeck.target_size || NEW_DECK_DEFAULTS.targetSize,
+                  inventory_type: activeDeck.inventory_type || 'collection'
                 })}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
               >
@@ -1678,140 +1780,147 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
               >
                 <Download size={14} /> Import
               </button>
-              {/* Checkout / Return button */}
-              {activeDeck.checked_out ? (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => handleReturn(activeDeck)}
-                  disabled={editorBusy}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', border: '1px solid rgba(234,179,8,0.4)', color: '#eab308' }}
-                >
-                  <PackageCheck size={14} /> Return to Storage
-                </button>
-              ) : (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => handleCheckout(activeDeck)}
-                  disabled={editorBusy}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                >
-                  <LogOut size={14} /> Check Out for Play
-                </button>
+              {['collection', 'graveyard'].includes(activeDeck.inventory_type) && (
+                <div>
+                  <button
+                    className="btn btn-secondary"
+                    disabled={editorBusy || savingRecord || searching || hasUnsavedChanges || !!deckDraft || !activeDeck.cards.length}
+                    aria-describedby={hasUnsavedChanges ? 'deck-container-save-first' : undefined}
+                    onClick={() => setShowDeckContainerModal(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minHeight: '44px' }}
+                  >
+                    <FolderPlus size={14} aria-hidden="true" /> {t('deck.createContainer')}
+                  </button>
+                  {hasUnsavedChanges && <p id="deck-container-save-first" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>{t('deck.saveFirst')}</p>}
+                </div>
               )}
-              <button className="btn btn-secondary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={handleSaveDeck}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
-                <button className="btn btn-primary" onClick={startSimulator} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Play size={14} /> Draw Simulator
-                </button>
             </div>
-          </div>
+          {saveDeckError && !previewDeckCard && <p role="alert" className="deck-source-error">{saveDeckError} {t('deck.saveRetryHint')}</p>}
 
-          <section className="glass-panel" aria-labelledby="deck-description-heading">
-            <h3 id="deck-description-heading" style={{ marginBottom: '0.75rem' }}>{t('deck.description')}</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-              {activeDeck.description || '—'}
-            </p>
-          </section>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem', alignItems: 'start' }}>
-                {/* Pie Chart: Supertypes */}
-                {supertypeData.length > 0 && (
-                  <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <BarChart2 size={14} style={{ color: 'var(--accent-red)' }} /> Supertype Breakdown
-                    </h3>
-                    <div style={{ width: '100%', height: '180px' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={supertypeData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={50}
-                            outerRadius={70}
-                            paddingAngle={3}
-                            dataKey="value"
-                          >
-                            {supertypeData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.8)', border: '1px solid var(--border-glass)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-strong)' }} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    {/* Legend */}
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                      {supertypeData.map((d, index) => (
-                        <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}>
-                          <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}></div>
-                          <span style={{ color: 'var(--text-secondary)' }}>{d.name}: <strong>{d.value}</strong></span>
-                        </div>
+
+          {/* Checked out info banner */}
+          {!!activeDeck.checked_out && (
+            <div style={{
+              background: 'rgba(234,179,8,0.06)',
+              border: '1px solid rgba(234,179,8,0.25)',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.85rem 1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              fontSize: '0.85rem',
+              color: '#eab308'
+            }}>
+              <span style={{ fontSize: '1.25rem' }}>🎮</span>
+              <div>
+                <strong>{t('deck.checkedOutBanner')}</strong>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  {t('deck.checkedOutHint')}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className={`deck-summary-layout${commanderCard || activeDeck.game === 'mtg' ? ' deck-summary-layout--commander' : ''}`}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
+            <div className="deck-overview">
+              <div className="deck-overview-column">
+                <section className="deck-overview-section" aria-labelledby="deck-types-heading">
+                  <h3 id="deck-types-heading"><Layers size={18} aria-hidden="true" style={{ color: 'var(--accent-blue)' }} />{t('deck.supertypeBreakdown')}</h3>
+                  {supertypeData.length ? (
+                    <ul className="deck-distribution">
+                      {supertypeData.map(entry => (
+                        <li key={entry.name} style={{ '--distribution-color': DECK_DISTRIBUTION_COLORS[entry.name] || 'var(--accent-blue)' }}>
+                          <span>{entry.name}</span>
+                          <strong>{entry.value}</strong>
+                          <span className="deck-distribution-track" aria-hidden="true">
+                            <span style={{ width: `${entry.value / totalDeckCardsCount * 100}%` }} />
+                          </span>
+                        </li>
                       ))}
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
-                {/* Bar Chart: Energy & Types Distribution */}
-                {energyData.length > 0 && (
-                  <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <BarChart2 size={14} style={{ color: 'var(--accent-yellow)' }} /> {t(deckGame === 'mtg' ? 'deck.colorLandDist' : 'dash.typeDistribution')}
+                    </ul>
+                  ) : <p>{t('shared.noCards')}</p>}
+                </section>
+                {activeDeck.inventory_type === 'collection' && (
+                  <section className="deck-overview-section" aria-labelledby="deck-containers-heading">
+                    <h3 id="deck-containers-heading">
+                      <MapPin size={18} aria-hidden="true" style={{ color: 'var(--accent-yellow)' }} />{t('deck.containersNeeded')}
                     </h3>
-                    <div style={{ width: '100%', height: '220px' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={energyData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
-                          <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={10} tickLine={false} />
-                          <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} />
-                          <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.8)', border: '1px solid var(--border-glass)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-strong)' }} />
-                          <Bar dataKey="value" fill="var(--accent-yellow)" radius={[4, 4, 0, 0]}>
-                            {energyData.map((entry, idx) => {
-                              const colorMap = {
-                                'White': '#fef08a', 'Blue': '#3b82f6', 'Black': '#475569', 'Red': '#ef4444', 'Green': '#10b981', 'Colorless': '#cbd5e1',
-                                'Land (Plains)': '#fef08a', 'Land (Island)': '#60a5fa', 'Land (Swamp)': '#475569', 'Land (Mountain)': '#f87171', 'Land (Forest)': '#4ade80', 'Land (Nonbasic)': '#d97706',
-                                'Grass': '#4ade80', 'Fire': '#f87171', 'Water': '#60a5fa', 'Lightning': '#facc15', 'Psychic': '#c084fc', 'Fighting': '#f97316', 'Darkness': '#475569', 'Metal': '#94a3b8', 'Dragon': '#a855f7', 'Fairy': '#f472b6'
-                              };
-                              return <Cell key={`cell-${idx}`} fill={colorMap[entry.name] || 'var(--accent-yellow)'} />;
-                            })}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                )}
-                {/* Deck Health & Summary Status */}
-                <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {totalDeckCardsCount === targetDeckCardsCount ? (
-                      <CheckCircle size={15} style={{ color: 'var(--type-grass)' }} />
+                    {hasUnsavedChanges ? (
+                      <p style={{ color: 'var(--text-secondary)' }}>{t('deck.saveFirst')}</p>
+                    ) : deckLocationsError ? (
+                      <div role="alert">
+                        <p>{t('aiDeck.errContainers')}</p>
+                        <button className="btn btn-secondary" disabled={editorBusy} onClick={() => loadDeckDetails(activeDeck.id)}>{t('loc.retry')}</button>
+                      </div>
                     ) : (
-                      <AlertTriangle size={15} style={{ color: 'var(--accent-yellow)' }} />
+                      <>
+                        {neededContainers.length > 0 ? (
+                          <ul className="deck-overview-rows">
+                            {neededContainers.map(container => (
+                              <li key={container.id ?? 'unassigned'}>
+                                <span>{container.id === null ? t('bulk.unassignedPile') : container.name}</span>
+                                <strong>{t('admin.userCards', { count: container.quantity })}</strong>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p style={{ color: 'var(--text-secondary)' }}>{t(activeDeck.cards.length ? 'deck.sourcesEmpty' : 'shared.noCards')}</p>
+                        )}
+                        {unavailableCopies > 0 && <p style={{ marginTop: '0.75rem', color: 'var(--accent-yellow)', fontSize: '0.85rem' }}>{t('deck.unavailableCopies', { count: unavailableCopies })}</p>}
+                      </>
                     )}
-                    {t('deck.healthTitle')}
-                  </h3>
+                  </section>
+                )}
+                </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.8rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                      <span>{t('deck.targetDeckSize')}</span>
-                      <strong style={{ color: totalDeckCardsCount === targetDeckCardsCount ? 'var(--type-grass)' : 'var(--text-strong)' }}>{totalDeckCardsCount}/{targetDeckCardsCount} {t('deck.cardCapacity')}</strong>
+              <div className="deck-overview-column">
+                <section className="deck-overview-section" aria-labelledby="deck-colors-heading">
+                  <h3 id="deck-colors-heading"><BarChart2 size={18} aria-hidden="true" style={{ color: 'var(--accent-red)' }} />{t('deck.colorLandDist')}</h3>
+                  {colorData.length ? (
+                    <ul className="deck-distribution">
+                      {colorData.map(entry => (
+                        <li key={entry.name} style={{ '--distribution-color': DECK_DISTRIBUTION_COLORS[entry.name] || 'var(--accent-yellow)' }}>
+                          <span>{entry.name}</span>
+                          <strong>{entry.value}</strong>
+                          <span className="deck-distribution-track" aria-hidden="true">
+                            <span style={{ width: `${entry.value / totalDeckCardsCount * 100}%` }} />
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p>{t('shared.noCards')}</p>}
+                </section>
+                <section className="deck-overview-section" aria-labelledby="deck-health-heading">
+                  <h3 id="deck-health-heading"><PackageCheck size={18} aria-hidden="true" style={{ color: 'var(--accent-green)' }} />{t('deck.healthTitle')}</h3>
+                  <dl className="deck-overview-rows">
+                    <div>
+                      <dt>{t('deck.targetDeckSize')}</dt>
+                      <dd className="deck-overview-capacity" style={{ color: totalDeckCardsCount === targetDeckCardsCount ? 'var(--accent-green)' : 'var(--accent-yellow)' }}>
+                        {totalDeckCardsCount === targetDeckCardsCount
+                          ? <CheckCircle size={16} aria-hidden="true" />
+                          : <AlertTriangle size={16} aria-hidden="true" />}
+                        {totalDeckCardsCount}/{targetDeckCardsCount}
+                      </dd>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                      <span>{t('deck.uniqueCards')}</span>
-                      <strong style={{ color: 'var(--text-strong)' }}>{activeDeck.cards.length} {deckGame === 'mtg' ? t('deck.titlesCount', { count: activeDeck.cards.length }) : t('deck.speciesCount', { count: activeDeck.cards.length })}</strong>
+                    <div>
+                      <dt>{t('deck.uniqueCards')}</dt>
+                      <dd>{t('deck.titlesCount', { count: activeDeck.cards.length })}</dd>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                      <span>{t(deckGame === 'mtg' ? 'deck.basicLands' : 'deck.basicEnergy')}</span>
-                      <strong style={{ color: 'var(--accent-yellow)' }}>
-                        {activeDeck.cards.filter(c => isBasicEnergyOrLand(c, deckGame)).reduce((s, c) => s + c.quantity, 0)} {deckGame === 'mtg' ? t('deck.basicLandsCount', { count: activeDeck.cards.filter(c => isBasicEnergyOrLand(c, deckGame)).reduce((s, c) => s + c.quantity, 0) }) : t('deck.basicEnergyCount', { count: activeDeck.cards.filter(c => isBasicEnergyOrLand(c, deckGame)).reduce((s, c) => s + c.quantity, 0) })}
-                      </strong>
-                    </div>
-                  </div>
+                    {deckGame === 'mtg' && (
+                      <div>
+                        <dt>{t('deck.basicLands')}</dt>
+                        <dd>{t('deck.basicLandsCount', { count: activeDeck.cards.filter(c => isBasicLand(c, deckGame)).reduce((s, c) => s + c.quantity, 0) })}</dd>
+                      </div>
+                    )}
+                  </dl>
                 {activeDeck.game === 'mtg' && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.75rem' }}>
+                  <div className="deck-overview-record">
                     {['win', 'loss'].map(result => {
                       const count = activeDeck[result === 'win' ? 'wins' : 'losses'] ?? 0;
                       return (
-                        <div key={result} role="group" aria-label={t(result === 'win' ? 'deck.wins' : 'deck.losses')} aria-busy={savingRecord} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                        <div key={result} role="group" aria-label={t(result === 'win' ? 'deck.wins' : 'deck.losses')} aria-busy={savingRecord}>
                           <span aria-live="polite" style={{ fontVariantNumeric: 'tabular-nums' }}>
                             {t(result === 'win' ? 'deck.wins' : 'deck.losses')}: <strong>{count}</strong>
                           </span>
@@ -1838,8 +1947,52 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     })}
                   </div>
                 )}
-                </div>
-                </div>
+                  <div className="deck-sleeved-field" aria-busy={savingSleeved}>
+                    <label htmlFor="deck-sleeved">{t('deck.sleeved')}</label>
+                    <select
+                      id="deck-sleeved"
+                      className="input-control"
+                      value={activeDeck.sleeved ?? 0}
+                      disabled={editorBusy}
+                      aria-describedby={sleevedError ? 'deck-sleeved-error' : undefined}
+                      onChange={event => handleSleevedChange(Number(event.target.value))}
+                    >
+                      <option value={0}>{t('deck.sleevedNone')}</option>
+                      <option value={1}>{t('deck.sleevedOne')}</option>
+                      <option value={2}>{t('deck.sleevedDouble')}</option>
+                      <option value={3}>{t('deck.sleevedTriple')}</option>
+                    </select>
+                    {savingSleeved && <p role="status">{t('deck.saving')}</p>}
+                    {sleevedError && <p id="deck-sleeved-error" className="deck-source-error" role="alert">{t('deck.errSleeved')}</p>}
+                  </div>
+                </section>
+              </div>
+            </div>
+          <section className="glass-panel" aria-labelledby="deck-description-heading">
+            <h3 id="deck-description-heading" style={{ marginBottom: '0.75rem' }}>{t('deck.description')}</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              {activeDeck.description || '—'}
+            </p>
+          </section>
+          <section className="glass-panel" aria-labelledby="deck-notes-heading">
+            <h3 id="deck-notes-heading" style={{ marginBottom: '0.75rem' }}>
+              <label htmlFor="deck-notes">{t('nav.notes')}</label>
+            </h3>
+            <textarea
+              id="deck-notes"
+              className="input-control"
+              rows={6}
+              style={{ display: 'block', width: '100%', fontSize: '16px', resize: 'vertical' }}
+              value={activeDeck.notes || ''}
+              disabled={editorBusy || !!deckDraft}
+              onChange={(event) => setActiveDeck(deck => ({ ...deck, notes: event.target.value }))}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
+              <button className="btn btn-secondary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
+            </div>
+          </section>
+            </div>
+              <div className="deck-card-previews">
                 {commanderCard && (
                   <button
                     type="button"
@@ -1851,33 +2004,33 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     <CardImage card={commanderCard} style={{ display: 'block', width: '100%', aspectRatio: '0.718', objectFit: 'contain', borderRadius: '7px' }} />
                   </button>
                 )}
-          </div>
-
-          {/* Checked out info banner */}
-          {!!activeDeck.checked_out && (
-            <div style={{
-              background: 'rgba(234,179,8,0.06)',
-              border: '1px solid rgba(234,179,8,0.25)',
-              borderRadius: 'var(--radius-md)',
-              padding: '0.85rem 1.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              fontSize: '0.85rem',
-              color: '#eab308'
-            }}>
-              <span style={{ fontSize: '1.25rem' }}>🎮</span>
-              <div>
-                <strong>{t('deck.checkedOutBanner')}</strong>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  {t('deck.checkedOutHint')}
-                </div>
+                {/commander|edh|brawl/i.test(activeDeck.format || '') && (
+                  <div className="deck-commander-field">
+                    <label htmlFor="deck-commander">{t('deck.commander')}</label>
+                    <select id="deck-commander" className="input-control" value={activeDeck.commander_card_id || ''} disabled={editorBusy} onChange={e => handleCommanderChange(e.target.value)}>
+                      <option value="">{t('deck.noCommander')}</option>
+                      {commanderChoices.map(card => (
+                        <option key={card.id} value={card.id}>
+                          {displayName(card)}{card.set_name ? ` · ${card.set_name}` : ''}{card.number ? ` #${card.number}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {activeDeck.game === 'mtg' && <DeckCardBack
+                  key={activeDeck.id}
+                  deck={activeDeck}
+                  disabled={editorBusy}
+                  onBusy={setSavingCardBack}
+                  onSaved={(deckId, back) => {
+                    setActiveDeck(deck => deck?.id === deckId ? { ...deck, ...back } : deck);
+                    setDecks(current => current.map(deck => deck.id === deckId ? { ...deck, ...back } : deck));
+                  }}
+                />}
               </div>
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem', alignItems: 'start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1.5rem', alignItems: 'start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
               
               {/* Deck Card List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
@@ -1887,14 +2040,15 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', margin: 0 }}>{t('deck.addCardsTitle')}</h3>
                   </div>
-                  <form onSubmit={handleSearchCards} style={{ display: 'flex', gap: '0.5rem' }}>
+                  <form onSubmit={handleSearchCards} className="deck-search-form">
                     <input
                       type="text"
+                      aria-label={t('deck.searchPlaceholder')}
                       className="input-control"
                       placeholder={t('deck.searchPlaceholder')}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{ flex: 1 }}
+                      style={{ flex: 1, minWidth: 0 }}
                     />
                     <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }} title={t('shared.search')}>
                       <Search size={16} />
@@ -1914,7 +2068,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           const qtyInDeck = existingInDeck ? existingInDeck.quantity : 0;
                           const ownedQty = card.owned_qty || 0;
                           const isAtMaxOwned = qtyInDeck >= ownedQty;
-                          const isAtRuleMax = !isBasicEnergyOrLand(card, deckGame) && deckCountByName(activeDeck?.cards, card.name) >= 4;
+                          const isAtRuleMax = !isBasicLand(card, deckGame) && deckCountByName(activeDeck?.cards, card.name) >= 4;
                           const disabledAdd = editorBusy || isAtMaxOwned || isAtRuleMax;
 
                           return (
@@ -1943,16 +2097,18 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
                 {/* Deck Cards Header & Display Mode Toggle */}
                 <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <h3 style={{ fontSize: '1rem', color: 'var(--text-strong)', borderLeft: '3px solid var(--accent-red)', paddingLeft: '0.5rem', margin: 0 }}>
                       Deck Cards ({totalDeckCardsCount} / {targetDeckCardsCount})
                     </h3>
+                    <div className="deck-display-controls">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                       <button
                         type="button"
                         className={`btn ${cardDisplayMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
                         style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                         onClick={() => setCardDisplayMode('list')}
+                        aria-pressed={cardDisplayMode === 'list'}
                       >
                         <List size={12} /> List
                       </button>
@@ -1961,22 +2117,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                         className={`btn ${cardDisplayMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`}
                         style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                         onClick={() => setCardDisplayMode('grid')}
+                        aria-pressed={cardDisplayMode === 'grid'}
                       >
                         <LayoutGrid size={12} /> Grid
                       </button>
                     </div>
-                    <select
-                      className="select-control"
-                      value={deckCardSortBy}
-                      onChange={(e) => setDeckCardSortBy(e.target.value)}
-                      aria-label={t('collection.sortBy')}
-                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', height: 'auto' }}
-                    >
-                      <option value="type">{t('deck.sortByType')}</option>
-                      <option value="location">{t('collection.fLocation')}</option>
-                      <option value="pulled">{t('deck.pulledStatus')}</option>
-                    </select>
-                    {cardDisplayMode === 'grid' && (
                       <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                         <button
                           type="button"
@@ -2001,7 +2146,18 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           <Plus size={13} />
                         </button>
                       </div>
-                    )}
+                    <select
+                      className="select-control"
+                      value={deckCardSortBy}
+                      onChange={(e) => setDeckCardSortBy(e.target.value)}
+                      aria-label={t('collection.sortBy')}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', height: 'auto' }}
+                    >
+                      <option value="type">{t('deck.sortByType')}</option>
+                      {activeDeck.inventory_type === 'collection' && <option value="location">{t('collection.fLocation')}</option>}
+                      {activeDeck.inventory_type === 'collection' && <option value="pulled">{t('deck.pulledStatus')}</option>}
+                    </select>
+                    </div>
                   </div>
                   
                   {activeDeck.cards.length === 0 ? (
@@ -2020,13 +2176,13 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
                           {/* 1. COMPACT LIST VIEW */}
                           {cardDisplayMode === 'list' && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <div className="deck-card-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', zoom: deckCardScale, '--deck-card-scale': deckCardScale }}>
                               {list.map(card => (
-                                <div key={card.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', background: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? 'rgba(127,29,29,0.16)' : 'rgba(255,255,255,0.01)', borderRadius: 'var(--radius-sm)', border: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? '1px solid var(--accent-red)' : '1px solid var(--border-glass)', gap: '0.6rem' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', minWidth: 0, flex: 1 }} onClick={() => setPreviewCard(card)}>
-                                    <CardImage card={card} src={card.image_url?.replace(/^(https:\/\/cards\.scryfall\.io)\/normal\//, '$1/small/')} loading="lazy" style={{ width: '32px', height: '44px', objectFit: 'cover', borderRadius: '2px', flexShrink: 0 }} />
+                                <div key={card.id} className="deck-card-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', background: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? 'rgba(127,29,29,0.16)' : 'rgba(255,255,255,0.01)', borderRadius: 'var(--radius-sm)', border: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? '1px solid var(--accent-red)' : '1px solid var(--border-glass)', gap: '0.6rem' }}>
+                                  <button type="button" aria-label={`${t('deck.previewArt')}: ${displayName(card)}`} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', minWidth: 0, flex: '1 1 14rem', padding: 0, border: 0, background: 'transparent', textAlign: 'left' }} onClick={() => setPreviewCard(card)}>
+                                    <CardImage card={card} src={card.image_url?.replace(/^(https:\/\/cards\.scryfall\.io)\/normal\//, '$1/small/')} loading="lazy" style={{ width: 56 * deckListImageScale, height: 78 * deckListImageScale, objectFit: 'cover', borderRadius: '2px', flexShrink: 0 }} />
                                     <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                                      {activeDeck.commander_card_id === card.id && <div style={{ background: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '2px 6px', fontSize: '0.7rem', fontWeight: 800 }}>{t('deck.commander')}</div>}
+                                      {activeDeck.commander_card_id === card.id && <div className="deck-commander-tag" style={{ backgroundColor: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '2px 6px', fontSize: '0.7rem', fontWeight: 800 }}>{t('deck.commander')}</div>}
                                       <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(card)}</div>
                                       <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.set_name} • #{card.number}</div>
                                       {deckCardLocations[card.id]?.length > 0 && (
@@ -2035,28 +2191,27 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                                         </div>
                                       )}
                                     </div>
-                                  </div>
+                                  </button>
 
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+                                  <div className="deck-card-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
                                     {card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) && (
                                       <span style={{ color: 'var(--accent-red)', fontSize: '0.7rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }} title={card.locked_decks || t('deck.unavailableCopies', { count: card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0)) })}>
                                         <AlertTriangle size={13} /> {card.locked_decks ? t('deck.unavailableCopiesInDecks', { count: card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0)), decks: card.locked_decks }) : t('deck.unavailableCopies', { count: card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0)) })}
                                       </span>
                                     )}
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', color: card.checked_out ? 'var(--type-grass)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 600 }}>
+                                    {activeDeck.inventory_type === 'collection' && (
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', color: card.checked_out ? 'var(--accent-green)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 600 }}>
                                       <input type="checkbox" role="switch" className="deck-card-toggle" checked={!!card.checked_out} disabled={editorBusy} onChange={(e) => handlePulledChange(card.id, e.target.checked)} />
                                       {t('deck.pulled')}
                                     </label>
-                                    {/commander|edh|brawl/i.test(activeDeck.format || '') && <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', cursor: 'pointer' }}>
-                                      <input type="checkbox" role="switch" className="deck-card-toggle" checked={activeDeck.commander_card_id === card.id} disabled={editorBusy} onChange={e => handleCommanderChange(e.target.checked ? card.id : null)} />
-                                      {t('deck.commander')}
-                                    </label>}
+                                    )}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
                                       <button
                                         className={`btn ${card.quantity === 1 ? 'btn-danger' : 'btn-secondary'} btn-icon-only`}
                                         style={{ width: '22px', height: '22px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                         disabled={editorBusy}
                                         onClick={() => handleUpdateCardQty(card.id, card.quantity - 1)}
+                                        aria-label={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')}
                                         title={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')}
                                       >
                                         {card.quantity === 1 ? <Trash2 size={11} /> : '-'}
@@ -2065,8 +2220,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                                       <button
                                         className="btn btn-secondary btn-icon-only"
                                         style={{ width: '22px', height: '22px', padding: 0 }}
-                                        disabled={editorBusy || card.quantity >= (card.owned_qty || 0) || (!isBasicEnergyOrLand(card, deckGame) && deckCountByName(activeDeck.cards, card.name) >= 4)}
+                                        disabled={editorBusy || card.quantity >= (card.owned_qty || 0) || (!isBasicLand(card, deckGame) && deckCountByName(activeDeck.cards, card.name) >= 4)}
                                         onClick={() => handleUpdateCardQty(card.id, card.quantity + 1)}
+                                        aria-label={t('deck.increaseQty')}
                                       >
                                         +
                                       </button>
@@ -2079,12 +2235,12 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
                           {/* 2. VISUAL CARD GRID VIEW */}
                           {cardDisplayMode === 'grid' && (
-                            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${110 * deckCardScale}px, 1fr))`, gap: '0.75rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${110 * deckCardScale}px), 1fr))`, gap: '0.75rem' }}>
                               {list.map(card => (
                                 <div key={card.id} style={{ position: 'relative', borderRadius: '6px', overflow: 'hidden', border: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', background: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? 'rgba(127,29,29,0.16)' : 'rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', transition: 'transform 0.15s' }}>
-                                  <div style={{ position: 'relative', width: '100%', aspectRatio: 0.718, cursor: 'pointer' }} onClick={() => setPreviewCard(card)}>
+                                  <button type="button" aria-label={`${t('deck.previewArt')}: ${displayName(card)}`} style={{ position: 'relative', width: '100%', aspectRatio: 0.718, cursor: 'pointer', padding: 0, border: 0, background: 'transparent' }} onClick={() => setPreviewCard(card)}>
                                     <CardImage card={card} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    {activeDeck.commander_card_id === card.id && <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center', background: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '4px', fontSize: '0.75rem', fontWeight: 800 }}>{t('deck.commander')}</div>}
+                                    {activeDeck.commander_card_id === card.id && <div className="deck-commander-tag" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center', backgroundColor: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '4px', fontSize: '0.75rem', fontWeight: 800 }}>{t('deck.commander')}</div>}
                                     <span style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.85)', color: 'var(--accent-yellow)', fontSize: '0.75rem', fontWeight: 800, padding: '1px 6px', borderRadius: '10px', border: '1px solid var(--accent-yellow)' }}>
                                       x{card.quantity}
                                     </span>
@@ -2093,26 +2249,24 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                                         <AlertTriangle size={10} /> {card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0))}
                                       </span>
                                     )}
-                                  </div>
+                                  </button>
                                   {deckCardLocations[card.id]?.length > 0 && (
                                     <div title={formatCardLocations(deckCardLocations[card.id])} style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 5px 0', fontSize: '0.65rem', color: 'var(--text-secondary)', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                                       <MapPin size={10} /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatCardLocations(deckCardLocations[card.id])}</span>
                                     </div>
                                   )}
                                   <div style={{ padding: '4px', display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', color: card.checked_out ? 'var(--type-grass)' : 'var(--text-secondary)', fontSize: '0.65rem', fontWeight: 600 }}>
+                                    {activeDeck.inventory_type === 'collection' && (
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', color: card.checked_out ? 'var(--accent-green)' : 'var(--text-secondary)', fontSize: '0.65rem', fontWeight: 600 }}>
                                       <input type="checkbox" role="switch" className="deck-card-toggle" checked={!!card.checked_out} disabled={editorBusy} onChange={(e) => handlePulledChange(card.id, e.target.checked)} />
                                       {t('deck.pulled')}
                                     </label>
-                                    {/commander|edh|brawl/i.test(activeDeck.format || '') && <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', cursor: 'pointer' }}>
-                                      <input type="checkbox" role="switch" className="deck-card-toggle" checked={activeDeck.commander_card_id === card.id} disabled={editorBusy} onChange={e => handleCommanderChange(e.target.checked ? card.id : null)} />
-                                      {t('deck.commander')}
-                                    </label>}
+                                    )}
                                     <div style={{ display: 'flex', gap: '2px' }}>
-                                      <button className={`btn ${card.quantity === 1 ? 'btn-danger' : 'btn-secondary'} btn-icon-only`} style={{ width: '20px', height: '20px', fontSize: '0.7rem', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} disabled={editorBusy} onClick={() => handleUpdateCardQty(card.id, card.quantity - 1)} title={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')}>
+                                      <button aria-label={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')} className={`btn ${card.quantity === 1 ? 'btn-danger' : 'btn-secondary'} btn-icon-only`} style={{ width: '20px', height: '20px', fontSize: '0.7rem', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} disabled={editorBusy} onClick={() => handleUpdateCardQty(card.id, card.quantity - 1)} title={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')}>
                                         {card.quantity === 1 ? <Trash2 size={10} /> : '-'}
                                       </button>
-                                      <button className="btn btn-secondary btn-icon-only" style={{ width: '20px', height: '20px', fontSize: '0.7rem', padding: 0 }} disabled={editorBusy || card.quantity >= (card.owned_qty || 0) || (!isBasicEnergyOrLand(card, deckGame) && deckCountByName(activeDeck.cards, card.name) >= 4)} onClick={() => handleUpdateCardQty(card.id, card.quantity + 1)}>+</button>
+                                      <button aria-label={t('deck.increaseQty')} className="btn btn-secondary btn-icon-only" style={{ width: '20px', height: '20px', fontSize: '0.7rem', padding: 0 }} disabled={editorBusy || card.quantity >= (card.owned_qty || 0) || (!isBasicLand(card, deckGame) && deckCountByName(activeDeck.cards, card.name) >= 4)} onClick={() => handleUpdateCardQty(card.id, card.quantity + 1)}>+</button>
                                     </div>
                                   </div>
                                 </div>
@@ -2132,11 +2286,11 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
                 
 
-                {/* Bar Chart: Mana / Energy Cost Curve */}
+                {/* Bar Chart: Mana Cost Curve */}
                 {manaCurveData.some(d => d.count > 0) && (
                   <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <BarChart2 size={14} style={{ color: '#3b82f6' }} /> Energy / Mana Cost Curve
+                      <BarChart2 size={14} style={{ color: 'var(--accent-blue)' }} /> Mana Cost Curve
                     </h3>
                     <div style={{ width: '100%', height: '180px' }}>
                       <ResponsiveContainer width="100%" height="100%">
@@ -2144,7 +2298,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           <XAxis dataKey="cost" stroke="var(--text-muted)" fontSize={10} tickLine={false} />
                           <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} />
                           <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.8)', border: '1px solid var(--border-glass)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-strong)' }} />
-                          <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="count" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -2160,15 +2314,27 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
       {/* --- POPUPS & MODALS --- */}
 
+      {showDeckContainerModal && activeDeck && (
+        <DeckContainerModal
+          deck={activeDeck}
+          onClose={() => setShowDeckContainerModal(false)}
+          onCreated={async () => {
+            const refreshed = await loadDeckDetails(activeDeck.id);
+            await fetchDecks();
+            return refreshed;
+          }}
+        />
+      )}
+
       {/* A. Create Deck Modal */}
       {showCreateModal && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-          <div className="glass-panel" style={{ maxWidth: '760px', width: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '1.75rem', position: 'relative', border: '1px solid rgba(255,255,255,0.15)' }}>
-            <button className="btn btn-secondary btn-icon-only" onClick={() => setShowCreateModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', borderRadius: '50%' }}>
+        <Modal onClose={() => { if (!creatingDeck) closeCreateModal(); }} aria-labelledby="deck-create-title">
+          <div className="glass-panel deck-create-panel">
+            <button className="btn btn-secondary btn-icon-only" disabled={creatingDeck} aria-label={t('common.close')} onClick={closeCreateModal} style={{ position: 'absolute', top: '1rem', right: '1rem', borderRadius: '50%' }}>
               <X size={16} />
             </button>
 
-            <h3 style={{ fontSize: '1.25rem', color: 'var(--text-strong)', fontWeight: 800, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h3 id="deck-create-title" style={{ fontSize: '1.25rem', color: 'var(--text-strong)', fontWeight: 800, marginBottom: '0.25rem', paddingRight: '2.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <FolderPlus size={20} style={{ color: 'var(--accent-yellow)' }} />
               {t('deck.createTitle')}
             </h3>
@@ -2176,39 +2342,45 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
               {t('deck.createSubtitle')}
             </p>
 
-            <form onSubmit={handleCreateDeck} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', maxHeight: '80vh', overflowY: 'auto', paddingRight: '0.25rem' }}>
+            <form onSubmit={handleCreateDeck} className="deck-create-form">
+              <fieldset disabled={creatingDeck} style={{ display: 'contents' }}>
+              <div className="deck-create-body">
               
               <div className="form-group">
                 <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.4rem', display: 'block' }}>{t('deck.inventoryType')}</label>
                 <div className="sub-nav-tabs" style={{ margin: 0 }}>
                   <button type="button" className={`sub-nav-tab ${newDeckInventoryType === 'collection' ? 'active' : ''}`} onClick={() => setNewDeckInventoryType('collection')}>{t('deck.physical')}</button>
                   <button type="button" className={`sub-nav-tab ${newDeckInventoryType === 'arena' ? 'active' : ''}`} onClick={() => setNewDeckInventoryType('arena')}>{t('deck.arena')}</button>
+                  <button type="button" className={`sub-nav-tab ${newDeckInventoryType === 'graveyard' ? 'active' : ''}`} onClick={() => setNewDeckInventoryType('graveyard')}>{t('collection.graveyard')}</button>
                 </div>
+                {newDeckInventoryType === 'graveyard' && <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>{t('deck.graveyardCreateHint')}</p>}
               </div>
               {/* Format & Target Size Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
+              <div className="deck-format-fields">
                 <div className="form-group">
-                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.format')}</label>
+                  <label htmlFor="new-deck-format" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.format')}</label>
                   <select
+                    id="new-deck-format"
                     className="input-control"
                     value={newDeckFormat}
                     onChange={(e) => {
                       const selectedFmt = e.target.value;
                       setNewDeckFormat(selectedFmt);
                       if (selectedFmt.includes('Commander')) setNewDeckTargetSize(100);
-                      else if (selectedFmt.includes('Standard') || selectedFmt.includes('Expanded') || selectedFmt.includes('GLC') || selectedFmt.includes('Modern') || selectedFmt.includes('Pioneer') || selectedFmt.includes('Core')) setNewDeckTargetSize(60);
+                      else if (selectedFmt.includes('Standard') || selectedFmt.includes('Modern') || selectedFmt.includes('Pioneer')) setNewDeckTargetSize(60);
                     }}
                     style={{ fontSize: '0.85rem' }}
                   >
-                    {(newDeckGame === 'pokemon' ? POKEMON_FORMATS : (newDeckGame === 'lorcana' ? LORCANA_FORMATS : MTG_FORMATS)).map(fmt => (
+                    {MTG_FORMATS.map(fmt => (
                       <option key={fmt} value={fmt} style={{ background: '#1e293b', color: '#fff' }}>{fmt}</option>
                     ))}
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.targetSize')}</label>
+                  <label htmlFor="new-deck-size" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.targetSize')}</label>
                   <input
+                    id="new-deck-size"
                     type="number"
                     min="1"
                     max="300"
@@ -2222,15 +2394,16 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
               {/* Deck Name */}
               <div className="form-group">
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.deckName')}</label>
+                <label htmlFor="new-deck-name" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.deckName')}</label>
                 <input 
+                  id="new-deck-name"
                   type="text" 
                   className="input-control" 
                   placeholder={t('deck.namePlaceholder')} 
                   value={newDeckName} 
                   onChange={(e) => setNewDeckName(e.target.value)}
                   required 
-                  autoFocus
+                  pattern=".*\S.*"
                 />
               </div>
 
@@ -2244,6 +2417,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                       <button
                         key={cat}
                         type="button"
+                        aria-pressed={isSelected}
                         onClick={() => setNewDeckCategory(cat)}
                         style={{
                           fontSize: '0.75rem',
@@ -2271,20 +2445,23 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   {DECK_ACCENT_COLORS.map(c => {
                     const isSelected = newDeckAccentColor === c.hex;
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={c.hex}
+                        aria-label={c.name}
+                        aria-pressed={isSelected}
                         onClick={() => setNewDeckAccentColor(c.hex)}
                         title={c.name}
                         style={{
-                          width: '26px',
-                          height: '26px',
+                          width: '36px',
+                          height: '36px',
                           borderRadius: '50%',
                           backgroundColor: c.hex,
                           cursor: 'pointer',
                           border: isSelected ? '2px solid #ffffff' : '2px solid transparent',
                           boxShadow: isSelected ? `0 0 10px ${c.hex}` : 'none',
                           transform: isSelected ? 'scale(1.15)' : 'scale(1)',
-                          transition: 'all 0.15s'
+                          transition: 'transform 0.15s'
                         }}
                       />
                     );
@@ -2294,8 +2471,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
               {/* Description (Optional) */}
               <div className="form-group">
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.descriptionOptional')}</label>
+                <label htmlFor="new-deck-description" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.descriptionOptional')}</label>
                 <textarea
+                  id="new-deck-description"
                   className="input-control"
                   style={{ minHeight: '65px', resize: 'vertical', fontSize: '0.85rem' }}
                   placeholder={t('deck.notesPlaceholder')}
@@ -2322,9 +2500,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                       onChoose={(deck) => {
                         setNewDeckPreconFile(deck.fileName);
                         setNewDeckName(deck.name);
-                        setNewDeckGame('mtg');
-                        setNewDeckFormat('Commander / EDH');
-                        setNewDeckTargetSize(100);
+                        const preset = preconFormat(deck.type);
+                        setNewDeckFormat(preset.format);
+                        setNewDeckTargetSize(preset.targetSize);
                         setNewDeckImportText('');
                         setShowImportDecklistArea(false);
                         setShowPreconPicker(false);
@@ -2332,6 +2510,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                     />
                   </div>
                 )}
+                {newDeckPreconFile && <p role="status" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{t('mtgDeck.selectedHint')}</p>}
               </div>
 
               {/* Quick Decklist Importer Toggle */}
@@ -2351,6 +2530,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                   <div style={{ marginTop: '0.5rem' }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <select
+                        aria-label={t('deck.format')}
                         className="select-control"
                         value={newDeckImportFormat}
                         onChange={(e) => {
@@ -2358,7 +2538,6 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           setNewDeckImportFormat(format);
                           setNewDeckPreconFile('');
                           if (format === 'manabox') {
-                            setNewDeckGame('mtg');
                             setNewDeckFormat('Commander / EDH');
                             setNewDeckTargetSize(100);
                           }
@@ -2376,6 +2555,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                       )}
                     </div>
                     <textarea
+                      aria-label={t('deck.showQuickImport')}
                       className="input-control"
                       style={{ width: '100%', boxSizing: 'border-box', minHeight: '90px', resize: 'vertical', fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre' }}
                       placeholder={t('deck.pasteDecklistPlaceholder')}
@@ -2392,80 +2572,57 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowCreateModal(false)}>{t('common.cancel')}</button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 2, fontWeight: 700 }}>{t('deck.createDeck')}</button>
               </div>
+              {createDeckError && <p role="alert" className="deck-source-error" style={{ margin: '0.75rem 0' }}>{createDeckError}</p>}
+              <div className="deck-create-footer">
+                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={closeCreateModal}>{t('common.cancel')}</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 2, fontWeight: 700 }}>{t(creatingDeck ? 'deck.saving' : 'deck.createDeck')}</button>
+              </div>
+              </fieldset>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* B. Draw Hand Simulator Modal */}
       {showSimulator && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-          <div className="glass-panel" style={{ maxWidth: '1000px', width: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', position: 'relative' }}>
-            <button className="btn btn-secondary btn-icon-only" onClick={() => setShowSimulator(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', borderRadius: '50%' }}>
+        <Modal onClose={() => setShowSimulator(false)} aria-labelledby="deck-simulator-title">
+          <div className="glass-panel deck-simulator-panel">
+            <button className="btn btn-secondary btn-icon-only" aria-label={t('common.close')} onClick={() => setShowSimulator(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', borderRadius: '50%' }}>
               <X size={16} />
             </button>
 
-            <div>
-              <h3 style={{ fontSize: '1.25rem', color: 'var(--text-strong)', margin: 0 }}>{t('deck.handSimulator')}</h3>
+            <div style={{ paddingRight: '2.5rem' }}>
+              <h3 id="deck-simulator-title" style={{ fontSize: '1.25rem', color: 'var(--text-strong)', margin: 0 }}>{t('deck.handSimulator')}</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '0.2rem' }}>
                 {t('deck.mulliganCountText', { mulligans: mulliganCount, handSize: hand.length })}
               </p>
             </div>
 
             {/* Hand Area */}
-            <div style={{ 
-              background: 'rgba(0,0,0,0.4)', 
-              minHeight: '220px', 
-              borderRadius: 'var(--radius-md)', 
-              border: '1px solid var(--border-glass)', 
-              display: 'flex', 
-              flexWrap: 'wrap', 
-              justifyContent: 'center', 
-              alignItems: 'center', 
-              gap: '1rem', 
-              padding: '1.5rem' 
-            }}>
+            <div className="deck-simulator-hand">
               {hand.length === 0 ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t('deck.noCardsDrawn')}</div>
               ) : (
                 hand.map((card, idx) => (
-                  <div key={idx} style={{ 
-                    width: '130px', 
+                  <button type="button" aria-label={displayName(card)} key={idx} style={{
+                    width: '130px', maxWidth: '100%', padding: 0, flexShrink: 0,
                     aspectRatio: 0.718, 
                     borderRadius: '8px', 
                     overflow: 'hidden', 
                     boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
-                    animation: 'draw-card-anim 0.3s ease-out forwards',
                     border: '1px solid var(--border-glass)',
                     position: 'relative',
                     cursor: 'pointer'
                   }} onClick={() => setPreviewCard(card)}>
                     <CardImage card={card} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </div>
+                  </button>
                 ))
               )}
             </div>
 
-            {/* Prize Cards Area (Pokémon decks) */}
-            {prizeCards.length > 0 && (
-              <div>
-                <h4 style={{ fontSize: '0.85rem', color: 'var(--accent-yellow)', margin: '0 0 0.5rem 0' }}>{t('deck.prizeCardsPokemon')}</h4>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {prizeCards.map((pCard, pIdx) => (
-                    <div key={pIdx} style={{ width: '70px', height: '98px', borderRadius: '4px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', border: '1px dashed var(--accent-yellow)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: 'var(--accent-yellow)', fontWeight: 700 }}>
-                      {t('deck.prizeSlot', { n: pIdx + 1 })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Control buttons */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <div className="deck-simulator-actions">
               <button className="btn btn-secondary" onClick={startSimulator} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {t('deck.reshuffle')}
               </button>
@@ -2488,17 +2645,13 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             </div>
 
             <style>{`
-              @keyframes draw-card-anim {
-                from { transform: translateY(30px) scale(0.85); opacity: 0; }
-                to { transform: translateY(0) scale(1); opacity: 1; }
-              }
               @keyframes shimmer-gold {
                 0% { background-position: 0% center; }
                 100% { background-position: 200% center; }
               }
             `}</style>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* C. Export Modal */}
@@ -2513,15 +2666,14 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             <select
               className="input-control"
               style={{ width: '100%', marginBottom: '1rem', fontSize: '0.85rem' }}
-              value={effectiveExportFormat}
+              value={exportFormat}
               onChange={e => setExportFormat(e.target.value)}
             >
-              <option value="ptcgl">{t('deck.formatPtcgl')}</option>
               <option value="mtga">{t('deck.formatMtga')}</option>
               <option value="plain">{t('deck.formatPlain')}</option>
               <option value="buylist">{t('deck.formatBuylist')}</option>
             </select>
-            {effectiveExportFormat === 'buylist' && (
+            {exportFormat === 'buylist' && (
               <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '-0.5rem', marginBottom: '1rem' }}>
                 {t('deck.buylistHint')}
               </p>
@@ -2535,7 +2687,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowExportModal(false)}>{t('common.close')}</button>
               <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleCopyExportText}>{t('deck.copyClipboard')}</button>
-              {effectiveExportFormat === 'buylist' && (
+              {exportFormat === 'buylist' && (
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleOpenMassEntry}>{t('deck.copyOpenTcg')}</button>
               )}
             </div>
@@ -2556,7 +2708,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
             <textarea
               className="input-control"
               style={{ width: '100%', minHeight: '120px', maxHeight: '180px', fontFamily: 'monospace', fontSize: '0.8rem', resize: 'vertical' }}
-              placeholder={`4 Pikachu\n2 Ultra Ball\n1 Boss's Orders`}
+              placeholder={'4 Llanowar Elves\n2 Lightning Bolt\n20 Forest'}
               value={importText}
               onChange={e => { setImportText(e.target.value); setImportComparison(null); }}
             />
@@ -2572,7 +2724,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                   <span>{t('deck.availabilityBreakdown')}</span>
                   <span style={{ color: 'var(--accent-yellow)', fontWeight: 700 }}>
-                    {t('deck.fullyOwnedSpecies', { owned: importComparison.filter(i => i.status === 'full').length, total: importComparison.length })}
+                    {t('deck.fullyOwnedCards', { owned: importComparison.filter(i => i.status === 'full').length, total: importComparison.length })}
                   </span>
                 </div>
                 <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
@@ -2587,7 +2739,7 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
                           fontWeight: 700,
                           fontSize: '0.65rem',
                           background: item.status === 'full' ? 'rgba(74, 222, 128, 0.15)' : item.status === 'partial' ? 'rgba(234, 179, 8, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                          color: item.status === 'full' ? 'var(--type-grass)' : item.status === 'partial' ? 'var(--accent-yellow)' : 'var(--accent-red)',
+                          color: item.status === 'full' ? 'var(--accent-green)' : item.status === 'partial' ? 'var(--accent-yellow)' : 'var(--accent-red)',
                           border: item.status === 'full' ? '1px solid rgba(74, 222, 128, 0.3)' : item.status === 'partial' ? '1px solid rgba(234, 179, 8, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)'
                         }}>
                           {item.status === 'full' ? `Owned (${item.ownedQty})` : item.status === 'partial' ? `Partial (${item.ownedQty}/${item.requestedQty})` : `Missing (0)`}
@@ -2637,21 +2789,66 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
 
       {/* E. High-Res Card Art Preview Popover */}
       {previewCard && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setPreviewCard(null)}>
-          <div className="glass-panel" style={{ maxWidth: '340px', padding: '1rem', position: 'relative', textAlign: 'center', animation: 'draw-card-anim 0.25s ease-out forwards' }} onClick={e => e.stopPropagation()}>
-            <button className="btn btn-secondary btn-icon-only" onClick={() => setPreviewCard(null)} style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', borderRadius: '50%', zIndex: 10 }}>
+        <Modal onClose={() => setPreviewCard(null)} aria-labelledby="deck-preview-title">
+          <div className="glass-panel" style={{ width: '340px', maxWidth: '100%', maxHeight: 'calc(100dvh - 2rem)', overflowY: 'auto', padding: '1rem', position: 'relative', textAlign: 'center' }}>
+            <button className="btn btn-secondary btn-icon-only" aria-label={t('common.close')} onClick={() => setPreviewCard(null)} style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', borderRadius: '50%', zIndex: 10 }}>
               <X size={16} />
             </button>
             <CardImage
               card={previewCard}
               style={{ width: '100%', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }}
             />
-            <h4 style={{ color: 'var(--text-strong)', margin: '0.75rem 0 0.25rem 0', fontSize: '1rem' }}>{displayName(previewCard)}</h4>
+            <h4 id="deck-preview-title" style={{ color: 'var(--text-strong)', margin: '0.75rem 0 0.25rem 0', fontSize: '1rem' }}>{displayName(previewCard)}</h4>
             <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.75rem' }}>
               {previewCard.set_name} • #{previewCard.number} ({previewCard.rarity || 'Common'})
             </p>
+            {previewDeckCard && (
+              <div className="deck-source-field">
+                <label htmlFor="deck-card-source">{t('deck.sourceLocation')}</label>
+                <select
+                  id="deck-card-source"
+                  className="input-control"
+                  value={selectedSourceId ?? ''}
+                  disabled={editorBusy || savingRecord || searching || !!deckDraft || !!activeDeck.checked_out || !sourcesReady}
+                  aria-describedby="deck-card-source-hint deck-card-source-status"
+                  aria-invalid={selectedSourceUnavailable && !activeDeck.checked_out ? true : undefined}
+                  onChange={event => handleSourceChange(event.target.value)}
+                >
+                  <option value="">{t('deck.sourceAutomatic')}</option>
+                  {selectedSourceId !== null && !selectedSource && (
+                    <option value={selectedSourceId} disabled>
+                      {t('deck.sourceEntry', { id: selectedSourceId })}
+                      {sourcesReady ? ` · ${t('deck.sourceUnavailable')}` : ''}
+                    </option>
+                  )}
+                  {sourcesReady && cardSources.sources.map(source => (
+                    <option key={source.entry_id} value={source.entry_id} disabled={source.available < previewDeckCard.quantity}>
+                      {sourceLabel(source)}
+                    </option>
+                  ))}
+                </select>
+                <p id="deck-card-source-hint">{t('deck.sourceHint', { count: previewDeckCard.quantity })}</p>
+                <div id="deck-card-source-status" role="status">
+                  {savingDeck && <p>{t('deck.saving')}</p>}
+                  {saveDeckError && <p className="deck-source-error">{saveDeckError} {t('deck.saveRetryHint')}</p>}
+                  {!!activeDeck.checked_out && <p>{t('deck.sourceCheckedOut')}</p>}
+                  {!sourcesReady && !sourcesError && <p>{t('deck.sourcesLoading')}</p>}
+                  {sourcesError && (
+                    <>
+                      <p className="deck-source-error">{t('deck.errSources')} {cardSources.error !== t('deck.errSources') ? cardSources.error : ''}</p>
+                      <button type="button" className="btn btn-secondary" onClick={() => setSourceRetry(value => value + 1)}>{t('loc.retry')}</button>
+                    </>
+                  )}
+                  {sourcesReady && !activeDeck.checked_out && selectedSourceUnavailable && (
+                    <p className="deck-source-error">{t('deck.sourceInsufficient', { count: previewDeckCard.quantity })}</p>
+                  )}
+                  {sourcesReady && cardSources.sources.length === 0 && <p>{t('deck.sourcesEmpty')}</p>}
+                </div>
+                <p>{t('deck.sourceSaveHint')}</p>
+              </div>
+            )}
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Checkout Locator Modal */}

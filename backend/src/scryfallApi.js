@@ -10,12 +10,11 @@ const scryfallBulk = require('./scryfallBulk');
 
 // Scryfall needs no API key but asks callers to identify themselves and accept
 // JSON. See https://scryfall.com/docs/api. IDs from Scryfall are UUIDs / set-num
-// slugs; we prefix them with "mtg-" so they never collide with Pokémon TCG ids
-// in the shared card_cache table and the game is derivable from the id.
+// slugs; prefix them with "mtg-" to keep provider namespaces distinct.
 const client = axios.create({
   baseURL: 'https://api.scryfall.com',
   timeout: 6000,
-  headers: { 'User-Agent': 'Bindarr/1.0', 'Accept': 'application/json' }
+  headers: { 'User-Agent': 'Manafolio/1.0', 'Accept': 'application/json' }
 });
 
 // Search, per-set fetches and the background price sweep all hit Scryfall and
@@ -172,9 +171,7 @@ function langSearch(q, lang) {
   return { q: `${q} lang:${code}`, params: '&include_multilingual=true' };
 }
 
-// Maps a raw Scryfall card onto the card_cache shape the rest of the app (and
-// the Pokémon path) already speaks. Double-faced cards carry their art/type on
-// card_faces[0] instead of the top level, so fall back to the front face.
+// Normalize Scryfall cards, using the front face when metadata lives on card_faces.
 function normalizeCard(raw, lang) {
   const face = (!raw.image_uris && Array.isArray(raw.card_faces) && raw.card_faces.length)
     ? raw.card_faces[0]
@@ -227,7 +224,6 @@ function normalizeCard(raw, lang) {
     price_trend: usd != null ? usd : (usdFoil != null ? usdFoil : 0),
     price_normal: usd,
     price_holofoil: usdFoil,
-    price_reverse_holofoil: null,
     price_avg1: null,
     price_avg7: null,
     price_avg30: null,
@@ -452,21 +448,19 @@ async function fetchWindow(q, lang, offset, limit, order) {
 // Public entry point. Returns { cards, total } — `total` is how many matches
 // exist upstream in all (null when the answer came from cache, which has no
 // such count). Wrapping keeps the many early returns in the body unchanged.
-// Same options object as tcgApi/tcgdexApi — see the note there.
 async function searchCards({
   name = '', number = '', set = '', scope = 'database', userId = null,
-  lang = null, allPrints = false, page = 1, limit = 60,
+  lang = null, allPrints = false, page = 1, limit = 60, listType = 'collection',
 } = {}) {
   const meta = { total: null };
-  const cards = await runSearch(meta, name, number, set, scope, userId, lang, allPrints, page, limit);
+  const cards = await runSearch(meta, name, number, set, scope, userId, lang, allPrints, page, limit, listType);
   return { cards, total: meta.total };
 }
 
-// Search MTG cards: local card_cache first (game='mtg'), then Scryfall. Mirrors
-// the Pokémon searchCards contract so the route can dispatch on `game` alone.
+// Search MTG cards: local card_cache first (game='mtg'), then Scryfall.
 // `page` is 1-based over `limit`-sized pages; the caller keeps asking for the
 // next page while a full page comes back.
-async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', scope = 'database', userId = null, lang = null, allPrints = false, page = 1, limit = 60) {
+async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', scope = 'database', userId = null, lang = null, allPrints = false, page = 1, limit = 60, listType = 'collection') {
   const offset = (page - 1) * limit;
   const cleanName = (nameQuery || '').trim();
   const cleanNumber = (numberQuery || '').trim().replace(/^#/, '').split('/')[0].trim();
@@ -505,7 +499,7 @@ async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', 
   if (scope === 'collection') {
     if (!userId) return [];
     const { sql, params } = cardSearchSql.collectionQuery('mtg', {
-      userId, name: cleanName, number: cleanNumber, setList, limit, offset,
+      userId, name: cleanName, number: cleanNumber, setList, limit, offset, listType,
     });
     return (await db.all(sql, params)).map(parseCardRow);
   }
@@ -647,10 +641,7 @@ async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', 
   }
 }
 
-// Fetch a set's cards from Scryfall (dev seed helper). Mirrors
-// tcgApi.getCardsBySet: one request, normalized + cached like any lookup, so
-// the seed route gets a varied MTG pool (all colors/rarities). Takes the first
-// page (~175 cards) — plenty for test data, so pagination is skipped.
+// Fetch and cache a varied MTG seed pool from the first page of a set.
 async function getCardsBySet(setCode) {
   try {
     console.log(`Querying Scryfall for full set: ${setCode}`);
@@ -664,10 +655,7 @@ async function getCardsBySet(setCode) {
   }
 }
 
-// Fetch MTG sets from Scryfall and cache them in the shared `sets` table
-// (game='mtg'). Set ids are prefixed "mtg-" so a Scryfall set code can never
-// collide with a Pokémon set id on the primary key. Skips if already populated
-// unless force=true. Matches tcgApi.fetchAndCacheSets so server.js can call both.
+// Cache Scryfall sets under game-prefixed IDs. Force refreshes an existing catalog.
 async function fetchAndCacheSets(force = false) {
   try {
     const existing = await db.get(`SELECT COUNT(*) as count FROM sets WHERE game = 'mtg'`);
@@ -680,11 +668,11 @@ async function fetchAndCacheSets(force = false) {
     const sets = (resp.data && resp.data.data) || [];
     for (const s of sets) {
       await db.run(
-        `INSERT OR REPLACE INTO sets (id, name, series, printed_total, total, release_date, ptcgo_code, symbol_url, logo_url, game)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'mtg')`,
+        `INSERT OR REPLACE INTO sets (id, name, series, printed_total, total, release_date, symbol_url, logo_url, game)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'mtg')`,
         [
           `mtg-${s.code}`, s.name, s.set_type || '', s.card_count || 0, s.card_count || 0,
-          s.released_at || '', s.code || '', s.icon_svg_uri || '', s.icon_svg_uri || ''
+          s.released_at || '', s.icon_svg_uri || '', s.icon_svg_uri || ''
         ]
       );
     }
@@ -694,9 +682,7 @@ async function fetchAndCacheSets(force = false) {
   }
 }
 
-// Refresh prices for every owned/decked MTG card from Scryfall and record price
-// history. The Pokémon updater (tcgApi) skips these, so this is their only
-// periodic refresh path.
+// Refresh owned/decked MTG prices from Scryfall and record price history.
 // `force` bypasses the once-a-day gate (used by the scheduled daily run, which
 // is already on the right cadence by construction).
 async function updateCollectionPrices(force = false) {
@@ -773,11 +759,20 @@ async function getPrintingInLang(setCode, number, lang) {
 async function getCardById(cardId) {
   const rawId = cardId.startsWith('mtg-') ? cardId.slice(4) : cardId;
   const cached = await db.get(`SELECT * FROM card_cache WHERE id = ?`, [cardId]);
+  if (cached && cached.game !== 'mtg') {
+    throw Object.assign(new Error('Unsupported card ID or game'), { status: 400 });
+  }
   if (cached) return parseCardRow(cached);
   try {
-    const resp = await scryGet(`/cards/${rawId}`);
-    if (resp.data) {
-      const norm = normalizeCard(resp.data);
+    // Reuse the downloaded snapshot before spending a rate-limited request.
+    let raw;
+    if (await scryfallBulk.storedMetadata()) {
+      const { pairs } = await scryfallBulk.resolveRows([{ id: rawId }]);
+      raw = pairs[0]?.raw;
+    }
+    raw ||= (await scryGet(`/cards/${rawId}`)).data;
+    if (raw) {
+      const norm = normalizeCard(raw);
       await cacheCards([norm]);
       return norm;
     }
@@ -846,6 +841,5 @@ async function getRelatedTokens(cardIds) {
   });
 }
 
-// `client` and `fetchWindow` are exported for tests (stub the axios adapter),
-// mirroring how tcgApi exposes tcgClient.
+// Export the client and fetchWindow for adapter-based tests.
 module.exports = { searchCards, normalizeCard, cacheCards, getCardsBySet, fetchAndCacheSets, updateCollectionPrices, getCardById, getRelatedTokens, getPrintingInLang, scryGetRetried, bulkFetchByIdentifier, client, fetchWindow };

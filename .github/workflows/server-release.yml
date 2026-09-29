@@ -25,15 +25,15 @@ jobs:
         include:
           - os: windows-latest
             target: windows-x64
-            exe: bindarr-server.exe
+            exe: manafolio-server.exe
             archive: zip
           - os: ubuntu-latest
             target: linux-x64
-            exe: bindarr-server
+            exe: manafolio-server
             archive: tar
           - os: macos-latest
             target: macos-arm64
-            exe: bindarr-server
+            exe: manafolio-server
             archive: tar
     runs-on: ${{ matrix.os }}
     defaults:
@@ -66,7 +66,7 @@ jobs:
       # existing signature before injection and re-sign (ad-hoc) after.
       - name: Assemble binary + release tree
         run: |
-          ROOT=build/bindarr-server
+          ROOT=build/manafolio-server
           mkdir -p "$ROOT/app/backend" "$ROOT/app/frontend"
           EXE="$ROOT/${{ matrix.exe }}"
           node -e "require('fs').copyFileSync(process.execPath, process.argv[1])" "$EXE"
@@ -99,7 +99,7 @@ jobs:
       # package that database and break the archive step on a locked file.
       - name: Smoke test the packaged binary
         run: |
-          cp -r build/bindarr-server build/smoketest
+          cp -r build/manafolio-server build/smoketest
           cd build/smoketest
           ./${{ matrix.exe }} > boot.log 2>&1 &
           SRV=$!
@@ -126,14 +126,14 @@ jobs:
 
       - name: Write README
         run: |
-          ROOT=build/bindarr-server
+          ROOT=build/manafolio-server
           if [ "${{ runner.os }}" = "Windows" ]; then
-            RUN='Run: double-click bindarr-server.exe'
+            RUN='Run: double-click manafolio-server.exe'
           else
-            RUN='Run: ./bindarr-server (chmod +x first if needed)'
+            RUN='Run: ./manafolio-server (chmod +x first if needed)'
           fi
           cat > "$ROOT/README.txt" <<EOF
-          Bindarr self-hosted server (${{ matrix.target }}).
+          Manafolio self-hosted server (${{ matrix.target }}).
 
           $RUN
           Then open http://localhost:3001
@@ -147,18 +147,18 @@ jobs:
       # original layout server.js expects.
       - name: Package
         run: |
-          NAME="Bindarr-Server-${{ matrix.target }}"
+          NAME="Manafolio-Server-${{ matrix.target }}"
           if [ "${{ matrix.archive }}" = "zip" ]; then
-            ( cd build/bindarr-server && 7z a "$GITHUB_WORKSPACE/$NAME.zip" ./* >/dev/null )
+            ( cd build/manafolio-server && 7z a "$GITHUB_WORKSPACE/$NAME.zip" ./* >/dev/null )
             echo "ASSET=$NAME.zip" >> "$GITHUB_ENV"
           else
-            tar czf "$NAME.tar.gz" -C build/bindarr-server .
+            tar czf "$NAME.tar.gz" -C build/manafolio-server .
             echo "ASSET=$NAME.tar.gz" >> "$GITHUB_ENV"
           fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: bindarr-server-${{ matrix.target }}
+          name: manafolio-server-${{ matrix.target }}
           path: ${{ env.ASSET }}
 
       - name: Attach to release

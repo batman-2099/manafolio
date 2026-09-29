@@ -24,12 +24,12 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
     try {
       const response = await fetch(`/api/mtg-decks?q=${encodeURIComponent(q)}`);
       const body = await response.json().catch(() => []);
-      if (!response.ok) return showToast?.(body.error || t('mtgDeck.errSearch'));
+      if (!response.ok) return showToast?.(body.error || t('mtgDeck.errSearch'), 'error');
       setSearched(true);
       setDecks(body);
     } catch (error) {
       console.error(error);
-      showToast?.(t('mtgDeck.errSearch'));
+      showToast?.(t('mtgDeck.errSearch'), 'error');
     } finally {
       setLoading(false);
     }
@@ -45,12 +45,12 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
         body: JSON.stringify({ create_container: containerSelections[deck.fileName] ?? true, create_deck: deckSelections[deck.fileName] ?? true }),
       });
       const body = await response.json().catch(() => null);
-      if (!response.ok) return showToast?.(body?.error || t('mtgDeck.errAdd'));
-      showToast?.(t('mtgDeck.added', { count: body.added, name: deck.name }));
+      if (!response.ok) return showToast?.(body?.error || t('mtgDeck.errAdd'), 'error');
+      showToast?.(t('mtgDeck.added', { count: body.added, name: deck.name }), 'success');
       onAddSuccess?.();
     } catch (error) {
       console.error(error);
-      showToast?.(t('mtgDeck.errAdd'));
+      showToast?.(t('mtgDeck.errAdd'), 'error');
     } finally {
       setAdding(null);
     }
@@ -62,11 +62,11 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
     try {
       const response = await fetch(`/api/mtg-decks/${encodeURIComponent(deck.fileName)}`);
       const body = await response.json().catch(() => null);
-      if (!response.ok) return showToast?.(body?.error || t('mtgDeck.errDetails'));
+      if (!response.ok) return showToast?.(body?.error || t('mtgDeck.errDetails'), 'error');
       setDetails({ ...body, fileName: deck.fileName });
     } catch (error) {
       console.error(error);
-      showToast?.(t('mtgDeck.errDetails'));
+      showToast?.(t('mtgDeck.errDetails'), 'error');
     } finally {
       setDetailsLoading(null);
     }
@@ -78,7 +78,7 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
         <BookOpen size={20} style={{ color: 'var(--accent-yellow)' }} />
         <h2 style={{ fontSize: '1.15rem', margin: 0, color: 'var(--text-strong)' }}>{t('mtgDeck.title')}</h2>
       </div>
-      <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5, marginBottom: '1rem' }}>{t('mtgDeck.hint')}</p>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5, marginBottom: '1rem' }}>{t(onChoose ? 'mtgDeck.chooseHint' : 'mtgDeck.hint')}</p>
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
         <input
           type="search"
@@ -114,7 +114,7 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
                       <List size={15} /> {detailsLoading === deck.fileName ? t('common.loading') : detail ? t('mtgDeck.hideDetails') : t('mtgDeck.details')}
                     </button>
                     <button type="button" className="btn btn-primary" disabled={adding === deck.fileName} onClick={() => onChoose ? onChoose(deck) : addDeck(deck)} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
-                      <Plus size={15} /> {adding === deck.fileName ? t('mtgDeck.adding') : t('mtgDeck.add')}
+                      <Plus size={15} /> {onChoose ? t('mtgDeck.choose') : adding === deck.fileName ? t('mtgDeck.adding') : t('mtgDeck.add')}
                     </button>
                   </div>
                 </div>

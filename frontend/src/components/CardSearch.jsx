@@ -5,23 +5,16 @@ import { priceText } from '../utils/formatPrice';
 import { resolveCardPrice } from '../utils/resolveCardPrice';
 import CardEntryFields from './CardEntryFields';
 import CardImageZoom from './CardImageZoom';
-import { translateJapaneseName, POKEMON_EN_TO_JP, getCardDisplayName } from '../utils/langHelper';
+import { getCardDisplayName } from '../utils/langHelper';
 import { useMultiSelect } from '../utils/useMultiSelect';
-import { CONDITIONS, PRINTINGS } from '../utils/cardOptions';
+import { CONDITIONS, getPrintings } from '../utils/cardOptions';
 import { langName, isEnglish, displayName, translatedName, setReference, setCode, getLanguagesForGame } from '../utils/languages';
 import { defaultGame, gameLabel } from '../utils/games';
 import CardImage from './CardImage';
 import { useT } from '../utils/i18n';
 import { readProgressStream } from '../utils/importStream';
+import { downloadBlob } from '../utils/downloadBlob';
 
-// Search failures worth explaining in-page rather than only as a toast. `keyHint`
-// marks the ones a user API key actually fixes; an upstream 5xx does not. Title
-// and body are looked up as searchErr.<code>.title / .body.
-const SEARCH_ERRORS = {
-  'invalid-key': { keyHint: true },
-  'rate-limit': { keyHint: true },
-  upstream: { keyHint: false },
-};
 const CSV_FIELDS = [
   ['name', 'csvMapping.name', ['name', 'card name', 'card']],
   ['quantity', 'csvMapping.quantity', ['quantity', 'count', 'qty']],
@@ -85,17 +78,17 @@ function ImportLog({ entries }) {
 }
 
 
-function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
+function CardSearch({ onAddSuccess, showToast }) {
   const { t } = useT();
   const [query, setQuery] = useState('');
   const [numberQuery, setNumberQuery] = useState('');
   const [setCodeQuery, setSetCodeQuery] = useState('');
   const game = defaultGame();
-  // Which language's printings to search. Magic comes from Scryfall in every
-  // language; non-English Pokémon comes from TCGdex (pokemontcg.io is English-only).
+  // Which language's printings to search.
   const [searchLang, setSearchLang] = useState('en');
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(false);
+  const searchPending = useRef(false);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
 
@@ -116,7 +109,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
   } = useMultiSelect({ showToast });
   const [bulkAdding, setBulkAdding] = useState(false);
 
-  // Set-code autocomplete, sourced from the sets already cached in the DB.
+  // Set suggestions, sourced from the sets already cached in the DB.
   const [knownSets, setKnownSets] = useState([]);
   const [setsOpen, setSetsOpen] = useState(false);
 
@@ -177,11 +170,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
     fetchLocations();
   }, []);
 
-  // Set codes for the autocomplete. The sets table already holds every set for
-  // both games, so nobody has to know that "ltr" means Tales of Middle-earth.
-  // MTG ids are stored prefixed ("mtg-ltr"); the search wants the bare code.
-  // `lang` matters here: Japan gets Pokémon sets the West never sees, so the set
-  // list is per-language (the route reads it from TCGdex for those).
+  // Set codes for autocomplete; search expects codes without the game prefix.
   useEffect(() => {
     let cancelled = false;
     setKnownSets([]);
@@ -218,6 +207,8 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
 
   // pageNum > 1 appends to the existing results instead of replacing them.
   const runSearch = async (pageNum, size = pageSize) => {
+    if (searchPending.current) return;
+    searchPending.current = true;
     const append = pageNum > 1;
     if (append) setLoadingMore(true); else setLoading(true);
     setSearchError(null);
@@ -231,19 +222,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
     }
     try {
       const params = new URLSearchParams();
-      // Support typing Japanese names in English search or English names in Japanese search
-      let finalQuery = query || '';
-      if (query && game === 'pokemon') {
-        const isJa = searchLang === 'ja' || searchLang === 'Japanese';
-        if (isJa) {
-          const jpMapped = POKEMON_EN_TO_JP[query.trim()];
-          if (jpMapped) finalQuery = jpMapped;
-        } else if (isEnglish(searchLang)) {
-          const enMapped = translateJapaneseName(query);
-          if (enMapped) finalQuery = enMapped;
-        }
-      }
-      if (finalQuery) params.append('name', finalQuery);
+      if (query) params.append('name', query);
       if (numberQuery) params.append('number', numberQuery);
       if (setCodeQuery) params.append('set', setCodeQuery);
       params.append('scope', 'internet');
@@ -271,19 +250,18 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
         if (!append && data.length === 1 && !selectMode) openQuickAdd(data[0]);
       } else {
         const errData = await response.json().catch(() => ({}));
-        if (response.status === 403 || errData.error === 'Invalid API Key') {
-          setSearchError('invalid-key');
-        } else if (response.status === 429 || errData.error === 'Rate limit exceeded') {
+        if (response.status === 429 || errData.error === 'Rate limit exceeded') {
           setSearchError('rate-limit');
         } else if (response.status === 503) {
           setSearchError('upstream');
         }
-        showToast(errData.error || t('search.errRequest'));
+        showToast(errData.error || t('search.errRequest'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('search.errApi'));
+      showToast(t('search.errApi'), 'error');
     } finally {
+      searchPending.current = false;
       setLoading(false);
       setLoadingMore(false);
     }
@@ -369,7 +347,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
 
   const handleBulkAdd = async () => {
     const ids = filteredAndSortedCards.filter(c => selectedIds.has(c.id)).map(c => c.id);
-    if (ids.length === 0) { showToast(t('search.errNoneSelected')); return; }
+    if (ids.length === 0) { showToast(t('search.errNoneSelected'), 'error'); return; }
     setBulkAdding(true);
     try {
       const response = await fetch('/api/collection/bulk-add', {
@@ -382,12 +360,13 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
           printing,
           language,
           purchase_price: parseFloat(purchasePrice) || 0,
+          list_type: addToArena ? 'arena' : 'collection',
           game
         })
       });
       const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        showToast(data.message || t('search.addedCards', { count: ids.length }));
+        showToast(data.message || t('search.addedCards', { count: ids.length }), 'success');
         // Reflect the new owned counts without re-running the search.
         const added = parseInt(quantity, 10) || 1;
         setCards(prev => prev.map(c => (selectedIds.has(c.id)
@@ -396,11 +375,11 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
         exitSelectMode();
         onAddSuccess();
       } else {
-        showToast(data.error || t('search.errBulkAdd'));
+        showToast(data.error || t('search.errBulkAdd'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('search.errAddCards'));
+      showToast(t('search.errAddCards'), 'error');
     } finally {
       setBulkAdding(false);
     }
@@ -436,7 +415,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
   const handleRapidAdd = async () => {
     const number = rapidNumber.trim();
     if (!number || rapidBusy) return;
-    if (!setCodeQuery.trim()) { showToast(t('search.errNoSetCode')); return; }
+    if (!setCodeQuery.trim()) { showToast(t('search.errNoSetCode'), 'error'); return; }
     setRapidBusy(true);
     try {
       const params = new URLSearchParams({
@@ -445,7 +424,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
       const res = await fetch(`/api/search?${params.toString()}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        showToast(err.error || t('search.errLookup'));
+        showToast(err.error || t('search.errLookup'), 'error');
         return;
       }
       const matches = await res.json();
@@ -454,12 +433,12 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
 
       if (!hit) {
         if (matches.length === 0) {
-          showToast(t('search.errNoSuchNumber', { number, set: setCodeQuery.toUpperCase() }));
+          showToast(t('search.errNoSuchNumber', { number, set: setCodeQuery.toUpperCase() }), 'error');
         } else {
           // Ambiguous: show them and let the user pick, keeping the number typed.
           setCards(matches);
           setSearching(true);
-          showToast(t('search.pickPrinting', { count: matches.length, number }));
+          showToast(t('search.pickPrinting', { count: matches.length, number }), 'status');
         }
         return;
       }
@@ -476,7 +455,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
       onAddSuccess();
     } catch (err) {
       console.error(err);
-      showToast(err.message || t('search.errAddCardGeneric'));
+      showToast(err.message || t('search.errAddCardGeneric'), 'error');
     } finally {
       setRapidBusy(false);
       // Focus never leaves the field, so the next number can just be typed.
@@ -487,16 +466,16 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
   const undoRapidAdd = async (entry) => {
     try {
       const res = await fetch(`/api/collection/${entry.entryId}`, { method: 'DELETE' });
-      if (!res.ok) { showToast(t('search.errUndo')); return; }
+      if (!res.ok) { showToast(t('search.errUndo'), 'error'); return; }
       setRapidLog(prev => prev.filter(e => e.entryId !== entry.entryId));
       setCards(prev => prev.map(c => (c.id === entry.card.id
         ? { ...c, owned_qty: Math.max(0, (c.owned_qty || 0) - entry.qty) }
         : c)));
-      showToast(t('search.removed', { name: displayName(entry.card) }));
+      showToast(t('search.removed', { name: displayName(entry.card) }), 'success');
       onAddSuccess();
     } catch (err) {
       console.error(err);
-      showToast(t('search.errUndoGeneric'));
+      showToast(t('search.errUndoGeneric'), 'error');
     }
   };
 
@@ -525,13 +504,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
     // The card itself knows which printing it is, so the copy is recorded in that
     // language rather than defaulting to English and needing a manual correction.
     setLanguage(card.language || langName(searchLang));
-    // Guess printing based on rarity
-    const rarity = (card.rarity || '').toLowerCase();
-    if (rarity.includes('holo') || rarity.includes('secret') || rarity.includes('ultra') || rarity.includes('shining')) {
-      setPrinting('Holofoil');
-    } else {
-      setPrinting('Normal');
-    }
+    setPrinting('Normal');
 
 
     setIsDrawerOpen(true);
@@ -579,7 +552,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
       });
 
       if (response.ok) {
-        showToast(t('search.addedToCollection', { name: displayName(selectedCard) }));
+        showToast(t('search.addedToCollection', { name: displayName(selectedCard) }), 'success');
         
         // Trigger confetti for rare/valuable cards!
         const rarity = (selectedCard.rarity || '').toLowerCase();
@@ -598,11 +571,11 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
         // A rejected cert number (already in the collection) explains itself; the
         // generic message would send the user back to re-type a correct number.
         const body = await response.json().catch(() => null);
-        showToast(body?.error || t('search.errAddDb'));
+        showToast(body?.error || t('search.errAddDb'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('search.errSave'));
+      showToast(t('search.errSave'), 'error');
     }
   };
 
@@ -639,7 +612,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
           setManaBoxPreview(preview);
         }
       } catch (error) {
-        if (!controller.signal.aborted) showToast(error.message || t('settings.importFailed', { error: '' }));
+        if (!controller.signal.aborted) showToast(error.message || t('settings.importFailed', { error: '' }), 'error');
       } finally {
         if (!controller.signal.aborted) setImportingText(false);
         if (importRequest.current === controller) importRequest.current = null;
@@ -648,7 +621,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
     };
     reader.onerror = () => {
       if (!controller.signal.aborted) {
-        showToast(t('settings.errReadFile'));
+        showToast(t('settings.errReadFile'), 'error');
         setImportingText(false);
       }
       if (importRequest.current === controller) importRequest.current = null;
@@ -678,7 +651,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
         errors: response.ok ? summary.errors || [] : [summary.error || t('settings.importFailed', { error: '' })]
       }));
     } catch (error) {
-      if (!controller.signal.aborted) showToast(error.message || t('settings.importFailed', { error: '' }));
+      if (!controller.signal.aborted) showToast(error.message || t('settings.importFailed', { error: '' }), 'error');
     } finally {
       if (!controller.signal.aborted) setImportingText(false);
       if (importRequest.current === controller) importRequest.current = null;
@@ -692,11 +665,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
         : '';
       return `${item.quantity} ${item.name}${printing}`;
     }).join('\n');
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
-    link.download = `${importSummary.filename.replace(/\.[^.]+$/, '')}-failed.txt`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    downloadBlob(new Blob([text], { type: 'text/plain' }), `${importSummary.filename.replace(/\.[^.]+$/, '')}-failed.txt`);
   };
 
   const commitImport = async (format, preview) => {
@@ -739,7 +708,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
 
   // Helper to determine location type layout guidance
   return (
-    <div>
+    <div className="card-search">
       {/* Search Header Panel */}
       <div className="glass-panel" style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -748,12 +717,13 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
         <form onSubmit={handleSearch} style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.cardName')}</label>
+              <label className="control-label" htmlFor="search-card-name">{t('search.cardName')}</label>
               <div style={{ position: 'relative' }}>
                 <input
+                  id="search-card-name"
                   type="text"
                   className="input-control"
-                  placeholder={t(game === 'mtg' ? 'search.namePlaceholderMtg' : 'search.namePlaceholderPokemon')}
+                  placeholder={t('search.namePlaceholderMtg')}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   style={{ width: '100%', paddingLeft: '2.5rem' }}
@@ -765,11 +735,12 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
 
           {/* auto-fit rather than a fixed 2 columns: language made this row three
               fields wide, and they have to stay usable on a phone. */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
+          <div className="search-filter-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               {/* The language of the cards being searched for, not the app's. */}
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.language')}</label>
+              <label className="control-label" htmlFor="search-language">{t('search.language')}</label>
               <select
+                id="search-language"
                 className="select-control"
                 value={searchLang}
                 onChange={(e) => {
@@ -778,8 +749,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
                   // The copy being added is almost always in the language just
                   // searched, so make that the entry default instead of English.
                   setLanguage(langName(code));
-                  // Set codes do not carry across languages (JP has sets the West
-                  // never got), so a stale code would search a set that is not there.
+                  // Clear the set scope when switching the printing language.
                   setSetCodeQuery('');
                 }}
               >
@@ -787,8 +757,9 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.cardNumber')}</label>
+              <label className="control-label" htmlFor="search-card-number">{t('search.cardNumber')}</label>
               <input
+                id="search-card-number"
                 type="text"
                 className="input-control"
                 placeholder={t('search.numberPlaceholder')}
@@ -796,18 +767,16 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
                 onChange={(e) => setNumberQuery(e.target.value)}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', position: 'relative' }}
+            <div className="search-sets-field" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', position: 'relative' }}
               onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setSetsOpen(false); }}
               onKeyDown={event => { if (event.key === 'Escape') setSetsOpen(false); }}>
-              <label htmlFor="search-set-codes" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.sets')}</label>
+              <label className="control-label" htmlFor="search-set-codes">{t('search.sets')}</label>
               <input
                 id="search-set-codes"
                 type="text"
                 className="input-control"
                 autoComplete="off"
-                aria-expanded={setsOpen}
-                aria-controls="known-set-codes"
-                placeholder={t(game === 'mtg' ? 'search.setsPlaceholderMtg' : 'search.setsPlaceholderPokemon')}
+                placeholder={t('search.setsPlaceholderMtg')}
                 value={setCodeQuery}
                 onFocus={() => setSetsOpen(true)}
                 onChange={event => { setSetCodeQuery(event.target.value); setSetsOpen(true); }}
@@ -821,7 +790,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
                 ))}
               </div>
               {setsOpen && (
-                <div id="known-set-codes" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: '260px', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)' }}>
+                <section id="known-set-codes" aria-label={t('search.setSuggestions')} style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: '260px', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)' }}>
                   {knownSets.filter(set => {
                     const term = setCodeQuery.split(/[\s,]+/).at(-1).toLowerCase();
                     return !term || set.code.toLowerCase().includes(term) || set.name.toLowerCase().includes(term);
@@ -836,19 +805,22 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
                       {set.name} ({set.code.toUpperCase()})
                     </button>
                   ))}
-                </div>
+                </section>
               )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-            <button type="submit" className="btn btn-primary" style={{ flex: '1 1 220px' }}>
-              <Search size={18} />
+          <div className="search-actions" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+            <button type="submit" className="btn btn-primary" disabled={loading || loadingMore} aria-busy={loading} style={{ flex: '1 1 220px' }}>
+              {loading
+                ? <span className="spinner" aria-hidden="true" style={{ width: 18, height: 18, margin: 0, borderWidth: 2, borderColor: 'currentColor', borderTopColor: 'transparent' }} />
+                : <Search size={18} aria-hidden="true" />}
               {t('search.submit')}
             </button>
             <button
               type="button"
               className={`btn ${rapidMode ? 'btn-primary' : 'btn-secondary'}`}
+              aria-pressed={rapidMode}
               onClick={() => {
                 const next = !rapidMode;
                 setRapidMode(next);
@@ -860,31 +832,34 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
               <Zap size={18} />
               {t(rapidMode ? 'search.rapidOn' : 'search.rapid')}
             </button>
-            <button type="button" className="btn btn-secondary" onClick={() => textImportInput.current?.click()} disabled={importingText} style={{ flex: '0 1 auto' }}>
-              <Download size={18} />
+          </div>
+          <span role="status" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap' }}>
+            {loading ? t('common.loading') : ''}
+          </span>
+        </form>
+        <div className="search-destination">
+          <label className="control-label" htmlFor="search-destination">{t('search.destination')}</label>
+          <select id="search-destination" className="select-control" aria-describedby="search-destination-hint" value={addToArena ? 'arena' : 'collection'} onChange={event => setAddToArena(event.target.value === 'arena')}>
+            <option value="collection">{t('nav.collection')}</option>
+            <option value="arena">{t('collection.arena')}</option>
+          </select>
+          <p id="search-destination-hint">{t('search.destinationHint')}</p>
+        </div>
+        <section className="search-import-actions" aria-labelledby="search-import-title">
+          <h3 id="search-import-title" className="section-heading">{t('search.importTitle')}</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => textImportInput.current?.click()} disabled={importingText}>
+              <Download size={18} aria-hidden="true" />
               {importingText ? t('settings.importing') : t('deck.chooseManaBoxFile')}
             </button>
             <input ref={textImportInput} type="file" accept=".txt,text/plain" onChange={event => handleImportFile(event, 'manabox')} style={{ display: 'none' }} />
-            <button type="button" className="btn btn-secondary" onClick={() => csvImportInput.current?.click()} disabled={importingText} style={{ flex: '0 1 auto' }}>
-              <Download size={18} />
+            <button type="button" className="btn btn-secondary" onClick={() => csvImportInput.current?.click()} disabled={importingText}>
+              <Download size={18} aria-hidden="true" />
               {importingText ? t('settings.importing') : t('search.chooseCsvFile')}
             </button>
             <input ref={csvImportInput} type="file" accept=".csv,text/csv" onChange={event => handleImportFile(event, 'internal')} style={{ display: 'none' }} />
-            <button
-              type="button"
-              role="switch"
-              aria-checked={addToArena}
-              className="btn btn-secondary"
-              style={addToArena ? { background: 'var(--type-grass)', borderColor: 'var(--type-grass)', color: 'var(--bg-primary)' } : undefined}
-              onClick={() => setAddToArena(current => !current)}
-            >
-              {t('search.addToArena')}
-              <span aria-hidden="true" style={{ width: 28, height: 16, borderRadius: 999, background: addToArena ? 'var(--text-on-accent)' : 'var(--text-muted)', position: 'relative', flexShrink: 0 }}>
-                <span style={{ position: 'absolute', top: 2, left: addToArena ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: addToArena ? 'var(--type-grass)' : 'var(--bg-primary)', transition: 'left 0.2s' }} />
-              </span>
-            </button>
           </div>
-        </form>
+        </section>
       </div>
 
       {/* Rapid add: type a number, press Enter, next. */}
@@ -900,9 +875,12 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="search-entry-controls" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end', flexWrap: 'wrap' }}>
+            <div className="form-group" style={{ flex: '1 1 180px', margin: 0 }}>
+              <label className="control-label" htmlFor="rapid-card-number">{t('csvMapping.collectorNumber')}</label>
             <input
               ref={rapidInputRef}
+              id="rapid-card-number"
               type="text"
               inputMode="numeric"
               className="input-control"
@@ -914,15 +892,25 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
               disabled={!setCodeQuery}
               onChange={(e) => setRapidNumber(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRapidAdd(); } }}
-              style={{ flex: '1 1 180px', fontSize: '1.1rem', fontWeight: 700 }}
+              style={{ width: '100%', fontSize: '1.1rem', fontWeight: 700 }}
             />
-            <select className="select-control" value={condition} onChange={(e) => setCondition(e.target.value)} style={{ fontSize: '0.75rem', maxWidth: '150px' }}>
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="control-label" htmlFor="rapid-condition">{t('card.condition')}</label>
+            <select id="rapid-condition" className="select-control" value={condition} onChange={(e) => setCondition(e.target.value)}>
               {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <select className="select-control" value={printing} onChange={(e) => setPrinting(e.target.value)} style={{ fontSize: '0.75rem', maxWidth: '150px' }}>
-              {PRINTINGS.map(p => <option key={p} value={p}>{p}</option>)}
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="control-label" htmlFor="rapid-printing">{t('card.printing')}</label>
+            <select id="rapid-printing" className="select-control" value={printing} onChange={(e) => setPrinting(e.target.value)}>
+              {getPrintings().map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="control-label" htmlFor="rapid-quantity">{t('card.quantity')}</label>
             <input
+              id="rapid-quantity"
               type="number"
               min="1"
               className="input-control"
@@ -931,6 +919,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
               title={t('search.copiesPerEnter')}
               style={{ width: '80px', fontSize: '0.75rem' }}
             />
+            </div>
             {rapidBusy && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('search.adding')}</span>}
           </div>
 
@@ -963,49 +952,32 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
       )}
 
       {searchError && (
-        <div className="glass-panel" style={{ borderLeft: '4px solid var(--accent-red)', background: 'rgba(239, 68, 68, 0.08)', padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div role="alert" className="glass-panel" style={{ borderLeft: '4px solid var(--accent-red)', background: 'rgba(239, 68, 68, 0.08)', padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-red)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
             <ShieldAlert size={18} />
             {t(`searchErr.${searchError}.title`)}
           </h3>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
             {t(`searchErr.${searchError}.body`)}
-            {/* Scryfall needs no API key, so never point an MTG search at pokemontcg.io. */}
-            {SEARCH_ERRORS[searchError].keyHint && game === 'pokemon' && (
-              <> {t('searchErr.keyHint')} <a href="https://dev.pokemontcg.io/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-yellow)', textDecoration: 'underline' }}>pokemontcg.io</a></>
-            )}
           </p>
-          {setActiveTab && SEARCH_ERRORS[searchError].keyHint && game === 'pokemon' && (
-            <button 
-              type="button" 
-              className="btn btn-secondary" 
-              onClick={() => setActiveTab('settings')}
-              style={{ width: 'fit-content', padding: '0.35rem 0.75rem', fontSize: '0.75rem', marginTop: '0.25rem' }}
-            >
-              {t('searchErr.goToSettings')}
-            </button>
-          )}
         </div>
       )}
-
-      {/* Loading state */}
-      {loading && <div className="spinner"></div>}
 
       {/* Filters and Sorting Panel */}
       {!loading && cards.length > 0 && (
         <div className="glass-panel" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.filterType')}</label>
-              <select className="select-control" value={filterType} onChange={e => setFilterType(e.target.value)}>
+              <label className="control-label" htmlFor="search-filter-type">{t('search.filterType')}</label>
+              <select id="search-filter-type" className="select-control" value={filterType} onChange={e => setFilterType(e.target.value)}>
                 <option value="">{t('collection.allTypes')}</option>
                 {uniqueTypes.map(type => <option key={type} value={type}>{type}</option>)}
               </select>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.filterRarity')}</label>
-              <select className="select-control" value={filterRarity} onChange={e => setFilterRarity(e.target.value)}>
+              <label className="control-label" htmlFor="search-filter-rarity">{t('search.filterRarity')}</label>
+              <select id="search-filter-rarity" className="select-control" value={filterRarity} onChange={e => setFilterRarity(e.target.value)}>
                 <option value="">{t('collection.allRarities')}</option>
                 {uniqueRarities.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
@@ -1013,16 +985,16 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
 
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.sortBy')}</label>
-              <select className="select-control" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+              <label className="control-label" htmlFor="search-sort">{t('search.sortBy')}</label>
+              <select id="search-sort" className="select-control" value={sortBy} onChange={e => setSortBy(e.target.value)}>
                 {['relevance', 'name-asc', 'name-desc', 'price-asc', 'price-desc', 'number-asc', 'number-desc']
                   .map(key => <option key={key} value={key}>{t(`search.sort.${key}`)}</option>)}
               </select>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('search.cardsPerPage')}</label>
-              <select className="select-control" value={pageSize} onChange={e => changePageSize(parseInt(e.target.value, 10))}>
+              <label className="control-label" htmlFor="search-page-size">{t('search.cardsPerPage')}</label>
+              <select id="search-page-size" className="select-control" value={pageSize} onChange={e => changePageSize(parseInt(e.target.value, 10))}>
                 {[30, 60, 120, 250].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
             </div>
@@ -1054,13 +1026,22 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
           <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={() => setSelectedIds(new Set(filteredAndSortedCards.map(c => c.id)))}>{t('bulk.selectAll', { count: filteredAndSortedCards.length })}</button>
           <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={clearSelection}>{t('bulk.clear')}</button>
           <div style={{ width: '1px', height: '22px', background: 'var(--border-glass)' }} />
-          <select className="select-control" value={condition} onChange={(e) => setCondition(e.target.value)} style={{ fontSize: '0.72rem', maxWidth: '150px', padding: '0.3rem 0.4rem' }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="control-label" htmlFor="search-bulk-condition">{t('card.condition')}</label>
+          <select id="search-bulk-condition" className="select-control" value={condition} onChange={(e) => setCondition(e.target.value)}>
             {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          <select className="select-control" value={printing} onChange={(e) => setPrinting(e.target.value)} style={{ fontSize: '0.72rem', maxWidth: '150px', padding: '0.3rem 0.4rem' }}>
-            {PRINTINGS.map(p => <option key={p} value={p}>{p}</option>)}
+          </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="control-label" htmlFor="search-bulk-printing">{t('card.printing')}</label>
+          <select id="search-bulk-printing" className="select-control" value={printing} onChange={(e) => setPrinting(e.target.value)}>
+            {getPrintings().map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
+          </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="control-label" htmlFor="search-bulk-quantity">{t('card.quantity')}</label>
           <input
+            id="search-bulk-quantity"
             type="number"
             min="1"
             className="input-control"
@@ -1069,6 +1050,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
             title={t('search.copiesEachSelected')}
             style={{ fontSize: '0.72rem', width: '70px', padding: '0.3rem 0.4rem' }}
           />
+          </div>
           <button
             className="btn btn-primary"
             style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
@@ -1085,17 +1067,26 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
       {!loading && cards.length > 0 && filteredAndSortedCards.length > 0 && (
         <div className="card-grid">
           {filteredAndSortedCards.map((card) => {
-            const glowClass = (card.types && card.types[0]) ? `type-glow-${card.types[0].toLowerCase()}` : 'type-glow-normal';
             const isSelected = selectedIds.has(card.id);
             return (
               <div
                 key={card.id}
                 className="tcg-card"
                 style={{ cursor: 'pointer', touchAction: 'pan-y' }}
+                role="button"
+                tabIndex={0}
+                aria-label={`${t(selectMode ? 'collection.select' : 'search.quickAdd')}: ${displayName(card)}`}
+                aria-pressed={selectMode ? isSelected : undefined}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleCardClick(card, event);
+                  }
+                }}
                 onClick={(e) => handleCardClick(card, e)}
                 {...pressHandlers(card.id)}
               >
-                <div className={`tcg-card-inner ${glowClass}`} style={isSelected ? { outline: '3px solid var(--accent-red)', outlineOffset: '2px' } : undefined}>
+                <div className="tcg-card-inner" style={isSelected ? { outline: '3px solid var(--accent-red)', outlineOffset: '2px' } : undefined}>
                   {/* Same check bubble the collection uses for selection. */}
                   {selectMode && (
                     <div style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 20, width: '22px', height: '22px', borderRadius: '50%', background: isSelected ? 'var(--accent-red)' : 'rgba(0,0,0,0.6)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.8rem', fontWeight: 900 }}>{isSelected ? '✓' : ''}</div>
@@ -1180,7 +1171,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
               <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
                 <h3 style={{ color: 'var(--text-strong)', fontSize: '1.25rem', margin: 0, wordBreak: 'break-word' }}>{t('search.addCardTitle')}</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.25rem 0 0 0', wordBreak: 'break-word' }}>
-                  {getCardDisplayName(selectedCard.name, language, selectedCard.printed_name, selectedCard.game || game)}
+                  {getCardDisplayName(selectedCard.name, selectedCard.printed_name)}
                   {translatedName(selectedCard) && <span style={{ color: 'var(--text-muted)' }}> ({translatedName(selectedCard)})</span>}
                   {' '}({selectedCard.set_name}
                   {/* Code only where the set name isn't readable to an English speaker. */}
@@ -1188,14 +1179,14 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
                   {' • '}#{selectedCard.number})
                 </p>
               </div>
-              <button className="btn btn-secondary btn-icon-only" onClick={closeDrawer} style={{ borderRadius: '50%', flexShrink: 0 }}>
+              <button type="button" aria-label={t('common.close')} className="btn btn-secondary btn-icon-only" onClick={closeDrawer} style={{ borderRadius: '50%', flexShrink: 0 }}>
                 <X size={18} />
               </button>
             </div>
 
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: 'rgba(255, 255, 255, 0.02)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
               {/* Tap the art to enlarge, same as the collection inspector. */}
-              <div
+              <button type="button" className="ci-image-wrap" aria-label={t('inspector.zoomHint')} aria-haspopup="dialog"
                 onClick={() => setIsFullScreen(true)}
                 title={t('inspector.zoomHint')}
                 style={{ position: 'relative', flexShrink: 0, cursor: 'pointer', lineHeight: 0 }}
@@ -1210,7 +1201,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
                 }}>
                   <Maximize2 size={11} />
                 </div>
-              </div>
+              </button>
               <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('search.tcgMarketPrice', { printing })}</div>
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-yellow)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{priceText(resolveCardPrice(selectedCard, printing), selectedCard.price_currency)}</div>
@@ -1232,7 +1223,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
                 <div className="quick-add-footer-actions">
                   <button type="button" className="btn btn-secondary" onClick={closeDrawer}>{t('common.cancel')}</button>
                   <button type="submit" value="wishlist" className="btn btn-secondary">{t('search.addToWishlist')}</button>
-                  <button type="submit" value="collection" className="btn btn-primary">{t('search.addToCollection')}</button>
+                  <button type="submit" value="collection" className="btn btn-primary">{t(addToArena ? 'search.addToArena' : 'search.addToCollection')}</button>
                 </div>
               </div>
             </form>
@@ -1249,6 +1240,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
             <div>
               <h2 style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('manaboxPreview.title')}</h2>
               <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{manaBoxPreview.filename}</p>
+              <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)' }}>{t('csvPreview.destination', { destination: t(manaBoxPreview.listType === 'arena' ? 'collection.arena' : 'nav.collection') })}</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', fontSize: '0.8rem' }}>
               {[
@@ -1281,7 +1273,7 @@ function CardSearch({ onAddSuccess, showToast, setActiveTab }) {
             <div>
               <h2 style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('csvPreview.title')}</h2>
               <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{csvPreview.filename}</p>
-              <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{t('csvPreview.destination', { destination: t(csvPreview.listType === 'arena' ? 'collection.arena' : 'search.addToCollection') })}</p>
+              <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{t('csvPreview.destination', { destination: t(csvPreview.listType === 'arena' ? 'collection.arena' : 'nav.collection') })}</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.8rem' }}>
               {[

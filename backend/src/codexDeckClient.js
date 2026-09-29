@@ -89,7 +89,7 @@ async function createSession(key) {
   await privateDirectory(home);
   // A fresh runtime lives outside the application tree: no repository config or
   // AGENTS.md is discovered, and HOME never points at the server operator's home.
-  const runtime = await fs.mkdtemp(path.join(os.tmpdir(), 'bindarr-codex-'));
+  const runtime = await fs.mkdtemp(path.join(os.tmpdir(), 'manafolio-codex-'));
   await fs.chmod(runtime, 0o700);
   let child;
   try {
@@ -342,7 +342,7 @@ async function createSession(key) {
 
   session.ready = (async () => {
     await request('initialize', {
-      clientInfo: { name: 'bindarr_deck_builder', title: 'Bindarr deck builder', version: '1.0.0' },
+      clientInfo: { name: 'manafolio_deck_builder', title: 'Manafolio deck builder', version: '1.0.0' },
       capabilities: { experimentalApi: true },
     });
     send({ method: 'initialized', params: {} });

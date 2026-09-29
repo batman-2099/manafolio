@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const db = require('../db');
+const themes = require('../../../shared/themes.json');
 
 function verifyPassword(password, storedHash) {
   if (!storedHash) return false;
@@ -39,13 +40,11 @@ function sanitizeUser(user) {
   return {
     username: user.username,
     role: user.role,
-    theme: user.theme,
+    theme: themes.includes(user.theme) ? user.theme : 'dark',
     share_token: user.share_token,
     share_enabled: user.share_enabled,
     share_locations: user.share_locations,
-    tcg_api_key: user.tcg_api_key || '',
     psa_api_token: user.psa_api_token || '',
-    graded_price_api_key: user.graded_price_api_key || '',
     api_key: user.api_key || ''
   };
 }

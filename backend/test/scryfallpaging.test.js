@@ -8,7 +8,7 @@ const os = require('os');
 const path = require('path');
 
 // Point the db module at a throwaway file before scryfallApi pulls it in.
-process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-scrypaging-${process.pid}.db`);
+process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-scrypaging-${process.pid}.db`);
 const scryfallApi = require('../src/scryfallApi');
 
 const SCRY_PAGE = 175;

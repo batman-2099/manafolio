@@ -2,28 +2,24 @@
 // Run: `node test/deckrules.test.js`. Uses a fake db client so it never
 // touches a real database.
 const assert = require('assert');
-const { isBasicEnergyOrLand, validateDeckAddition } = require('../src/utils/deckRules');
+const { isBasicLand, validateDeckAddition } = require('../src/utils/deckRules');
 
 function testClassification() {
-  // Pokémon basic energy exempt; special energy is not.
-  assert.strictEqual(isBasicEnergyOrLand({ supertype: 'Energy', subtypes: '["Basic"]' }, 'pokemon'), true);
-  assert.strictEqual(isBasicEnergyOrLand({ supertype: 'Energy', subtypes: '["Special"]' }, 'pokemon'), false);
-  assert.strictEqual(isBasicEnergyOrLand({ supertype: 'Pokémon', subtypes: '[]' }, 'pokemon'), false);
   // MTG basic land exempt; nonbasic land is not.
-  assert.strictEqual(isBasicEnergyOrLand({ name: 'Forest', supertype: 'Land', subtypes: '["Basic","Forest"]' }, 'mtg'), true);
-  assert.strictEqual(isBasicEnergyOrLand({ name: 'Fabled Passage', supertype: 'Land', subtypes: '["Land"]' }, 'mtg'), false);
-  assert.strictEqual(isBasicEnergyOrLand({ name: 'Hallowed Fountain', supertype: 'Land', subtypes: '["Plains","Island"]' }, 'mtg'), false);
-  assert.strictEqual(isBasicEnergyOrLand({ name: 'Snow-Covered Forest', supertype: 'Land', subtypes: '[]' }, 'mtg'), true);
+  assert.strictEqual(isBasicLand({ name: 'Forest', supertype: 'Land', subtypes: '["Basic","Forest"]' }, 'mtg'), true);
+  assert.strictEqual(isBasicLand({ name: 'Fabled Passage', supertype: 'Land', subtypes: '["Land"]' }, 'mtg'), false);
+  assert.strictEqual(isBasicLand({ name: 'Hallowed Fountain', supertype: 'Land', subtypes: '["Plains","Island"]' }, 'mtg'), false);
+  assert.strictEqual(isBasicLand({ name: 'Snow-Covered Forest', supertype: 'Land', subtypes: '[]' }, 'mtg'), true);
 }
 
-// Fake db: one owned card (3 copies of a normal Pokémon), a deck already
+// Fake db: one owned card (3 copies of a creature), a deck already
 // holding 2 copies of that name under a different card_id.
 function makeFakeDb({ owned = 3, otherSameName = 2 } = {}) {
   return {
     async get(sql, params) {
-      if (/FROM card_cache WHERE id/.test(sql)) return { id: 'p1', name: 'Pikachu', supertype: 'Pokémon', subtypes: '[]', game: 'pokemon' };
+      if (/FROM card_cache WHERE id/.test(sql)) return { id: 'p1', name: 'Llanowar Elves', supertype: 'Creature', subtypes: '[]', game: 'mtg' };
       if (/AS owned/.test(sql)) return { owned };
-      if (/FROM decks WHERE id/.test(sql)) return { game: 'pokemon' };
+      if (/FROM decks WHERE id/.test(sql)) return { game: 'mtg' };
       if (/AS other/.test(sql)) return { other: otherSameName };
       return null;
     },

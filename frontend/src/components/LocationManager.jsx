@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay, MouseSensor, useSensor, useSensors, useDraggable, useDroppable, pointerWithin } from '@dnd-kit/core';
-import { Plus, Minus, Trash2, X, MoreVertical, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, Edit3, Download, Search, SlidersHorizontal, Layers } from 'lucide-react';
+import { Plus, Minus, Trash2, X, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, Edit3, Download, Search, SlidersHorizontal, Layers } from 'lucide-react';
 import { sortCardsByOrder } from '../utils/cardSort';
 import { getFoilOverlayClass, getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
 import { getCardRarityBorder, getRarityBadgeStyle, getRarityBadgeLabel } from '../utils/cardRarity';
 import CardInspectorModal from './CardInspectorModal';
 import AddToDeckSelect from './AddToDeckSelect';
 import { useMultiSelect } from '../utils/useMultiSelect';
-import { isBinderType as computeIsBinder, binderSpread, MTG_FORMATS } from '../utils/cardOptions';
+import { isBinderType as computeIsBinder, binderSpread, MTG_FORMATS, containerTypeKey } from '../utils/cardOptions';
 import { displayName } from '../utils/languages';
 import CompartmentView, { FocusedCardInfo, getSortCategories } from './CompartmentView';
 import { SortBuilder, FilterBuilder } from './SortFilterBuilder';
@@ -15,6 +15,12 @@ import CreateContainerModal from './CreateContainerModal';
 import CardImage from './CardImage';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
+import Modal from './Modal';
+
+const MANA_SYMBOLS = [
+  ['W', 'White', -475], ['U', 'Blue', -370], ['B', 'Black', -265],
+  ['R', 'Red', -160], ['G', 'Green', -55], ['C', 'Colorless', null],
+];
 
 const CONTAINER_LIST_SORTS = {
   'name-asc': [{ by: 'name', dir: 'asc' }, { by: 'number', dir: 'asc' }],
@@ -158,18 +164,26 @@ function ContainerImportReview({ report, onClose, onMove, movingItem, expanded, 
 }
 
 function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId, setSelectedLocationId, focusEntryId, inventoryType = 'collection', onInventoryTypeChange }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const isArchive = inventoryType === 'graveyard';
-  const [locations, setLocations] = useState([]);
+  const [locationData, setLocationData] = useState({ inventoryType: null, items: [] });
+  const [locationStatus, setLocationStatus] = useState({ inventoryType, loading: true, error: false });
+  const locationsRequest = useRef(0);
+  const inventoryRef = useRef(inventoryType);
+  inventoryRef.current = inventoryType;
+  const locationsReady = locationData.inventoryType === inventoryType;
+  const locations = useMemo(() => locationsReady ? locationData.items : [], [locationData, locationsReady]);
+  const locationsLoading = locationStatus.inventoryType !== inventoryType || locationStatus.loading;
+  const locationsError = locationStatus.inventoryType === inventoryType && locationStatus.error;
   const [activeLocationId, setActiveLocationId] = useState(null);
   const [compartments, setCompartments] = useState([]);
   const [allCards, setAllCards] = useState([]);
   const [loadedCardsKey, setLoadedCardsKey] = useState(null);
   const [cardsError, setCardsError] = useState(false);
   const cardsRequest = useRef(0);
+  const containerMenuButton = useRef(null);
   const cardsKey = `${inventoryType}:${statsTrigger}`;
   const cardsReady = loadedCardsKey === cardsKey;
-  const [loading, setLoading] = useState(true);
   const [setsList, setSetsList] = useState([]);
   const [showGallery, setShowGallery] = useState(true);
   const [gallerySearch, setGallerySearch] = useState('');
@@ -213,11 +227,18 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [transferringContainer, setTransferringContainer] = useState(false);
 
   const [capacityUpdatePending, setCapacityUpdatePending] = useState(null);
+  const cancelCapacityUpdate = () => {
+    const input = capacityUpdatePending?.returnFocus;
+    if (input) input.value = input.defaultValue;
+    setCapacityUpdatePending(null);
+  };
   const [showKebabMenu, setShowKebabMenu] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [sortDraft, setSortDraft] = useState([]);
   const [filterDraft, setFilterDraft] = useState([]);
   const [nameDraft, setNameDraft] = useState('');
+  const [typeDraft, setTypeDraft] = useState('');
+  const [sleevedDraft, setSleevedDraft] = useState(0);
   const [capacityDraft, setCapacityDraft] = useState('');
   const [countDraft, setCountDraft] = useState('');
   const [stackingDraft, setStackingDraft] = useState(false);
@@ -227,10 +248,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   // Binder "sorting renumbers pockets" heads-up: dismissible, and stays dismissed
   // across sessions so it doesn't permanently occupy screen space.
   const [binderTipDismissed, setBinderTipDismissed] = useState(
-    () => localStorage.getItem('bindarr_binder_tip_dismissed') === '1'
+    () => localStorage.getItem('manafolio_binder_tip_dismissed') === '1'
   );
   const dismissBinderTip = () => {
-    localStorage.setItem('bindarr_binder_tip_dismissed', '1');
+    localStorage.setItem('manafolio_binder_tip_dismissed', '1');
     setBinderTipDismissed(true);
   };
 
@@ -238,7 +259,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [rulesComp, setRulesComp] = useState(null);
   useBackGuard(!!rulesComp, () => setRulesComp(null));
   useBackGuard(showRulesModal, () => setShowRulesModal(false));
-  useBackGuard(!!capacityUpdatePending, () => setCapacityUpdatePending(null));
+  useBackGuard(!!capacityUpdatePending, cancelCapacityUpdate);
   useBackGuard(!!selectedLocationId, () => setSelectedLocationId && setSelectedLocationId(null));
   const [compRuleDraft, setCompRuleDraft] = useState([]);
 
@@ -254,7 +275,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [unsortedBulkLocation, setUnsortedBulkLocation] = useState('');
   const [showContainerFilters, setShowContainerFilters] = useState(false);
   const [containerFilters, setContainerFilters] = useState({ search: '', set: '', type: '', color: '', rarity: '', condition: '', printing: '', language: '', deckStatus: '' });
-  const [containerSortBy, setContainerSortBy] = useState('name-asc');
+  const [containerSortBy, setContainerSortBy] = useState('storage');
   const [stackContainerCards, setStackContainerCards] = useState(true);
   const [stackContainerByCondition, setStackContainerByCondition] = useState(false);
   const [stackContainerByPrinting, setStackContainerByPrinting] = useState(true);
@@ -351,8 +372,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         if (compIdx !== -1) setActivePageIndex(compIdx);
       } else {
         setActiveCompartmentId(rec.compartment_id);
-        const posIdx = Math.floor(rec.position / 1000) - 1;
-        setCoverflowActiveIndex(Math.max(0, posIdx));
       }
       
       let attempts = 0;
@@ -377,7 +396,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const focusNavRef = useRef(null); // focusEntryId already navigated to (run-once guard)
 
   const [activeCompartmentId, setActiveCompartmentId] = useState(null);
-  const [, setCoverflowActiveIndex] = useState(0); // value unused; setter drives filing-snap resets
 
   const handleTouchStart = (e) => {
     if (!e.changedTouches || !e.changedTouches[0]) return;
@@ -413,7 +431,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     setActivePageIndex(0);
     setBinderActiveEntryId(null);
     if (!filingReadOnly) setFilingQueue([]);
-    setCoverflowActiveIndex(0);
     storage.exitSelectMode();
     setMoveMode(false);
     setPickedEntryId(null);
@@ -432,21 +449,30 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   }, [compartments, activeCompartmentId]);
 
   useEffect(() => {
-    setCoverflowActiveIndex(0);
-  }, [activeCompartmentId]);
-
-  useEffect(() => {
     if (activePageIndex >= compartments.length && compartments.length > 0) {
       setActivePageIndex(compartments.length - 1);
     }
   }, [compartments.length, activePageIndex]);
 
-  const fetchLocations = async () => {
+  const fetchLocations = useCallback(async () => {
+    if (inventoryRef.current !== inventoryType) return;
+    const request = ++locationsRequest.current;
+    setLocationStatus({ inventoryType, loading: true, error: false });
     try {
       const res = await fetch(`/api/locations?inventory_type=${inventoryType}`);
-      if (res.ok) setLocations(await res.json());
-    } catch (err) { console.error(err); }
-  };
+      if (!res.ok) throw new Error('Failed to load storage');
+      const items = await res.json();
+      if (request === locationsRequest.current && inventoryRef.current === inventoryType) {
+        setLocationData({ inventoryType, items });
+        setLocationStatus({ inventoryType, loading: false, error: false });
+      }
+    } catch (err) {
+      console.error(err);
+      if (request === locationsRequest.current && inventoryRef.current === inventoryType) {
+        setLocationStatus({ inventoryType, loading: false, error: true });
+      }
+    }
+  }, [inventoryType]);
 
   const fetchAllCards = useCallback(async () => {
     const request = ++cardsRequest.current;
@@ -488,12 +514,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   };
 
   useEffect(() => {
-    (async () => {
-      await fetchLocations();
-      setLoading(false);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statsTrigger, inventoryType]);
+    const requests = locationsRequest;
+    fetchLocations();
+    return () => { requests.current++; };
+  }, [statsTrigger, fetchLocations]);
 
   useEffect(() => {
     if (needsCards && !cardsReady) fetchAllCards();
@@ -638,17 +662,17 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(t('loc.containerCreated'));
+        showToast(t('loc.containerCreated'), 'success');
         setShowCreate(false);
         await fetchLocations();
         setActiveLocationId(data.id);
         onUpdate();
       } else {
-        showToast(data.error || 'Failed to create container.');
+        showToast(data.error || 'Failed to create container.', 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('loc.errCreate'));
+      showToast(t('loc.errCreate'), 'error');
     }
   };
 
@@ -667,7 +691,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || t('loc.errCreateDeck'));
       setContainerDeckDraft(null);
-      showToast(t('deck.created'));
+      showToast(t('deck.created'), 'success');
       onUpdate?.();
     } catch (error) {
       setContainerDeckError(error.message || t('loc.errCreateDeck'));
@@ -696,13 +720,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         setContainerImportReport(data);
       }
       if (!response.ok) throw new Error(data.error || t('loc.errCreate'));
-      showToast(data.message);
+      showToast(data.message, 'success');
       setActiveLocationId(data.id);
       await refreshAll();
       onUpdate();
     } catch (error) {
       console.error(error);
-      showToast(error.message);
+      showToast(error.message, 'error');
     } finally {
       containerImportBusy.current = false;
       setImportingContainer(false);
@@ -738,7 +762,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       onUpdate();
     } catch (error) {
       console.error(error);
-      showToast(error.message || t('loc.errMove'));
+      showToast(error.message || t('loc.errMove'), 'error');
     } finally {
       containerImportMoveBusy.current = false;
       setContainerImportMovingItem(null);
@@ -759,12 +783,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || t('loc.errTransferContainer'));
-      showToast(t(isArchive ? 'loc.containerRestored' : 'loc.containerArchived', { name: selectedLoc.name }));
+      showToast(t(isArchive ? 'loc.containerRestored' : 'loc.containerArchived', { name: selectedLoc.name }), 'success');
       onUpdate?.();
       onInventoryTypeChange?.(targetInventory);
     } catch (error) {
       console.error(error);
-      showToast(error.message || t('loc.errTransferContainer'));
+      showToast(error.message || t('loc.errTransferContainer'), 'error');
     } finally {
       containerTransferBusy.current = false;
       setTransferringContainer(false);
@@ -773,31 +797,31 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
   const handleDeleteLocation = async (locId, name) => {
     if (selectedLoc && selectedLoc.id === locId && selectedLoc.locked) {
-      showToast(t('loc.lockedDelete'));
+      showToast(t('loc.lockedDelete'), 'error');
       return;
     }
     if (!window.confirm(t('loc.confirmDeleteContainer', { name }))) return;
     try {
       const res = await fetch(`/api/locations/${locId}`, { method: 'DELETE' });
       if (res.ok) {
-        showToast(t('loc.containerDeleted', { name }));
+        showToast(t('loc.containerDeleted', { name }), 'success');
         if (activeLocationId === locId) setActiveLocationId(null);
         await refreshAll();
         onUpdate();
       } else {
-        showToast(t('loc.errDelete'));
+        showToast(t('loc.errDelete'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('loc.errDeleteGeneric'));
+      showToast(t('loc.errDeleteGeneric'), 'error');
     }
   };
 
   const handleUpdateLocationFields = async (fields) => {
-    if (!selectedLoc) return;
+    if (!selectedLoc) return false;
     if (selectedLoc.locked && !('locked' in fields)) {
-      showToast(t('loc.lockedSettings'));
-      return;
+      showToast(t('loc.lockedSettings'), 'error');
+      return false;
     }
     try {
       const res = await fetch(`/api/locations/${selectedLoc.id}`, {
@@ -807,60 +831,62 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
-        showToast(data.evicted ? `Container updated. ${data.evicted} card${data.evicted === 1 ? '' : 's'} moved to Unsorted.` : 'Container updated.');
+        showToast(data.evicted ? `Container updated. ${data.evicted} card${data.evicted === 1 ? '' : 's'} moved to Unsorted.` : 'Container updated.', 'success');
         await refreshAll();
         onUpdate();
+        return true;
       } else {
         const data = await res.json().catch(() => ({}));
-        showToast(data.error || 'Failed to update container.');
+        showToast(data.error || 'Failed to update container.', 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('loc.errUpdateContainer'));
+      showToast(t('loc.errUpdateContainer'), 'error');
     }
+    return false;
   };
 
   const handleAddCompartment = async () => {
     if (!selectedLoc) return;
     if (selectedLoc.locked) {
-      showToast(t('loc.lockedAdd'));
+      showToast(t('loc.lockedAdd'), 'error');
       return;
     }
     try {
       const res = await fetch(`/api/locations/${selectedLoc.id}/compartments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
       if (res.ok) { 
         const created = await res.json();
-        showToast(t(isBinderType ? 'loc.pageAdded' : 'loc.rowAdded')); 
+        showToast(t(isBinderType ? 'loc.pageAdded' : 'loc.rowAdded'), 'success');
         await Promise.all([fetchCompartments(selectedLoc.id), fetchLocations()]);
         if (created && created.id) {
           setActiveCompartmentId(created.id);
           if (created.idx) setActivePageIndex(created.idx - 1);
         }
       }
-      else showToast(t('loc.errAddCompartment'));
-    } catch (err) { console.error(err); showToast(t('loc.errAddCompartmentGeneric')); }
+      else showToast(t('loc.errAddCompartment'), 'error');
+    } catch (err) { console.error(err); showToast(t('loc.errAddCompartmentGeneric'), 'error'); }
   };
 
   const handleRemoveCompartment = async (compartmentId) => {
     if (!selectedLoc) return;
     if (selectedLoc.locked) {
-      showToast(t('loc.lockedRemove'));
+      showToast(t('loc.lockedRemove'), 'error');
       return;
     }
     if (!window.confirm(t('loc.confirmRemoveCompartment'))) return;
     try {
       const res = await fetch(`/api/compartments/${compartmentId}`, { method: 'DELETE' });
       const data = await res.json();
-      if (res.ok) { showToast(t('loc.compartmentRemoved')); await Promise.all([fetchCompartments(activeLocationId), fetchLocations()]); }
-      else showToast(data.error || 'Failed to remove compartment.');
-    } catch (err) { console.error(err); showToast(t('loc.errRemoveCompartment')); }
+      if (res.ok) { showToast(t('loc.compartmentRemoved'), 'success'); await Promise.all([fetchCompartments(activeLocationId), fetchLocations()]); }
+      else showToast(data.error || 'Failed to remove compartment.', 'error');
+    } catch (err) { console.error(err); showToast(t('loc.errRemoveCompartment'), 'error'); }
   };
 
   // Lock/unlock a row/page: filing skips locked ones (existing cards stay).
   // Uses the working /locations/:id/compartments/:comp_id route.
   const handleToggleCompartmentLock = async (compartmentId, locked) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedRowLocks'));
+      showToast(t('loc.lockedRowLocks'), 'error');
       return;
     }
     if (!activeLocationId) return;
@@ -868,12 +894,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       const res = await fetch(`/api/locations/${activeLocationId}/compartments/${compartmentId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locked })
       });
-      if (res.ok) { showToast(t(locked ? 'loc.rowLocked' : 'loc.rowUnlocked')); await fetchCompartments(activeLocationId); }
-      else showToast(t('loc.errLock'));
-    } catch (err) { console.error(err); showToast(t('loc.errLockGeneric')); }
+      if (res.ok) { showToast(t(locked ? 'loc.rowLocked' : 'loc.rowUnlocked'), 'success'); await fetchCompartments(activeLocationId); }
+      else showToast(t('loc.errLock'), 'error');
+    } catch (err) { console.error(err); showToast(t('loc.errLockGeneric'), 'error'); }
   };
 
-  // Lock/unlock a whole container: filing (and overflow) skip it entirely.
+  // Lock/unlock a whole container: automatic filing skips it entirely.
   const handleToggleContainerLock = async () => {
     if (!selectedLoc) return;
     const next = !selectedLoc.locked;
@@ -881,41 +907,42 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       const res = await fetch(`/api/locations/${selectedLoc.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ locked: next })
       });
-      if (res.ok) { showToast(next ? `"${selectedLoc.name}" locked — filing will skip it.` : `"${selectedLoc.name}" unlocked.`); await fetchLocations(); }
-      else showToast(t('loc.errLock'));
-    } catch (err) { console.error(err); showToast(t('loc.errLockGeneric')); }
+      if (res.ok) { showToast(next ? `"${selectedLoc.name}" locked — filing will skip it.` : `"${selectedLoc.name}" unlocked.`, 'success'); await fetchLocations(); }
+      else showToast(t('loc.errLock'), 'error');
+    } catch (err) { console.error(err); showToast(t('loc.errLockGeneric'), 'error'); }
   };
 
   const handleRenameCompartment = async (compartmentId, label) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedRename'));
+      showToast(t('loc.lockedRename'), 'error');
       return;
     }
     try {
       await fetch(`/api/compartments/${compartmentId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label }) });
       await fetchCompartments(activeLocationId);
-    } catch (err) { console.error(err); showToast(t('loc.errRename')); }
+    } catch (err) { console.error(err); showToast(t('loc.errRename'), 'error'); }
   };
 
-  const handleSetCapacity = async (compartmentId, capacity, forceUpdateAll = false) => {
+  const handleSetCapacity = async (compartmentId, capacity, forceUpdateAll = false, returnFocus = null) => {
+    if (returnFocus && capacityUpdatePending) return;
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedCapacity'));
+      showToast(t('loc.lockedCapacity'), 'error');
       return;
     }
     if (compartments.length > 1 && !forceUpdateAll && !capacityUpdatePending) {
-      setCapacityUpdatePending({ id: compartmentId, capacity });
+      setCapacityUpdatePending({ id: compartmentId, capacity, returnFocus });
       return;
     }
     const updateAll = forceUpdateAll || false;
     try {
       await fetch(`/api/compartments/${compartmentId}${updateAll ? '?updateAll=true' : ''}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capacity }) });
       await fetchCompartments(activeLocationId);
-    } catch (err) { console.error(err); showToast(t('loc.errResize')); }
+    } catch (err) { console.error(err); showToast(t('loc.errResize'), 'error'); }
   };
 
   const handleMoveCard = async (entryId, compartmentId) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedMove'));
+      showToast(t('loc.lockedMove'), 'error');
       return;
     }
     try {
@@ -923,19 +950,19 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ compartment_id: compartmentId })
       });
-      if (res.ok) { showToast(t('loc.cardMoved')); await refreshAll(); }
+      if (res.ok) { showToast(t('loc.cardMoved'), 'success'); await refreshAll(); }
       else {
         const errData = await res.json().catch(()=>({}));
-        showToast(errData.error || 'Failed to move card.');
+        showToast(errData.error || 'Failed to move card.', 'error');
       }
-    } catch (err) { console.error(err); showToast(t('loc.errMove')); }
+    } catch (err) { console.error(err); showToast(t('loc.errMove'), 'error'); }
   };
 
   // --- Manual tap-to-place (Arrange) ---
   // Pick/unpick a card to move. Tapping the picked card again cancels.
   const handlePickCard = (entryId) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedArrange'));
+      showToast(t('loc.lockedArrange'), 'error');
       return;
     }
     setPickedEntryId(prev => (prev === entryId ? null : entryId));
@@ -947,7 +974,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   // explicitly, because its id is known before setPickedEntryId would land.
   const handlePlaceSlot = async (compartmentId, slotNumber, occupantEntryId, entryId = pickedEntryId) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedArrange'));
+      showToast(t('loc.lockedArrange'), 'error');
       return;
     }
     if (!entryId || occupantEntryId === entryId) { setPickedEntryId(null); return; }
@@ -961,13 +988,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        showToast(body.swap_with ? 'Cards swapped.' : (data.placement?.label ? `Placed → ${data.placement.label}` : 'Card placed.'));
+        showToast(body.swap_with ? 'Cards swapped.' : (data.placement?.label ? `Placed → ${data.placement.label}` : 'Card placed.'), 'success');
         setPickedEntryId(null);
         await refreshAll(); onUpdate();
       } else {
-        showToast(data.error === 'COMPARTMENT_FULL' ? 'That page/row is full.' : (data.error || 'Failed to place card.'));
+        showToast(data.error || t('loc.errPlace'), 'error');
       }
-    } catch (err) { console.error(err); showToast(t('loc.errPlace')); }
+    } catch (err) { console.error(err); showToast(t('loc.errPlace'), 'error'); }
   };
 
   // --- Drag-and-drop filing ---
@@ -987,7 +1014,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   // and one set of rules whichever way it is triggered.
   const unfileCard = async (entryId) => {
     if (selectedLoc?.locked) {
-      showToast(t('loc.lockedArrange'));
+      showToast(t('loc.lockedArrange'), 'error');
       return;
     }
     try {
@@ -998,13 +1025,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        showToast(body?.error || t('loc.errPlace'));
+        showToast(body?.error || t('loc.errPlace'), 'error');
         return;
       }
-      showToast(t('loc.movedToUnsorted'));
+      showToast(t('loc.movedToUnsorted'), 'success');
       setPickedEntryId(null);
       await refreshAll(); onUpdate();
-    } catch (err) { console.error(err); showToast(t('loc.errPlace')); }
+    } catch (err) { console.error(err); showToast(t('loc.errPlace'), 'error'); }
   };
 
   const handleDragEnd = ({ active, over }) => {
@@ -1018,19 +1045,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     const pocket = over.data?.current;
     if (!pocket) return;
     handlePlaceSlot(pocket.compartmentId, pocket.slot, pocket.occupantEntryId, active.id);
-  };
-
-  const handleDeleteCard = async (entryId) => {
-    if (selectedLoc?.locked) {
-      showToast(t('loc.lockedDeleteCards'));
-      return;
-    }
-    if (!window.confirm(t('loc.confirmRemoveCard'))) return;
-    try {
-      const res = await fetch(`/api/collection/${entryId}`, { method: 'DELETE' });
-      if (res.ok) { showToast(t('loc.cardRemoved')); await refreshAll(); onUpdate(); }
-      else showToast(t('loc.errRemoveCard'));
-    } catch (err) { console.error(err); showToast(t('loc.errRemoveCardGeneric')); }
   };
 
   // Cards physically in the open container (any compartment).
@@ -1087,6 +1101,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   }, [containerListCards, stackContainerCards, stackContainerByCondition, stackContainerByPrinting]);
 
   const displayContainerListCards = storage.selectMode ? containerListCards : processedContainerListCards;
+  const selectableContainerCards = containerViewMode === 'list' ? containerListCards : cardsInActiveLocation;
 
   const containerListSections = useMemo(() => {
     const field = CONTAINER_LIST_SORTS[containerSortBy]?.[0]?.by;
@@ -1123,37 +1138,14 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
-        showToast(data.evicted ? `Row rules updated. ${data.evicted} card${data.evicted === 1 ? '' : 's'} moved to Unsorted.` : 'Row rules updated.');
+        showToast(data.evicted ? `Row rules updated. ${data.evicted} card${data.evicted === 1 ? '' : 's'} moved to Unsorted.` : 'Row rules updated.', 'success');
         setRulesComp(null);
         await refreshAll();
         onUpdate();
       } else {
-        showToast(t('loc.errRowRules'));
+        showToast(t('loc.errRowRules'), 'error');
       }
-    } catch (err) { console.error(err); showToast(t('loc.errRowRulesGeneric')); }
-  };
-
-  const offerContainerExpansion = async (cardsToFit) => {
-    if (!selectedLoc || selectedLoc.locked) return false;
-    const capacity = Math.max(1, compartments.at(-1)?.capacity || (isBinderType ? 9 : 400));
-    const compartmentsToAdd = Math.ceil(cardsToFit / capacity);
-    const unit = isBinderType ? t('loc.pageLower') : t('loc.rowLower');
-    if (!window.confirm(t('loc.confirmExpandToFit', { name: selectedLoc.name, count: compartmentsToAdd, unit, cards: cardsToFit }))) {
-      return false;
-    }
-
-    try {
-      for (let i = 0; i < compartmentsToAdd; i++) {
-        const response = await fetch(`/api/locations/${selectedLoc.id}/compartments`, { method: 'POST' });
-        if (!response.ok) throw new Error('Failed to add compartment');
-      }
-      await Promise.all([fetchCompartments(selectedLoc.id), fetchLocations()]);
-      return true;
-    } catch (error) {
-      console.error(error);
-      showToast(t('loc.errExpandToFit'));
-      return false;
-    }
+    } catch (err) { console.error(err); showToast(t('loc.errRowRulesGeneric'), 'error'); }
   };
 
   const handleApplyAll = async () => {
@@ -1161,47 +1153,33 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     const target = locations.find(l => l.id === activeLocationId);
     if (!window.confirm(t('loc.confirmAutoFile', { count: unsortedCards.length, name: target?.name }))) return;
     try {
-      const recommendationRes = await fetch(`/api/locations/${activeLocationId}/recommend-batch`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entry_ids: unsortedCards.map(c => c.entry_id) })
-      });
-      if (recommendationRes.ok) {
-        const recommendations = await recommendationRes.json();
-        const fullCount = recommendations.filter(item => item.full).length;
-        if (fullCount > 0) await offerContainerExpansion(fullCount);
-      }
       const res = await fetch(`/api/locations/${activeLocationId}/apply-all`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entry_ids: unsortedCards.map(c => c.entry_id) })
       });
       const data = await res.json();
-      if (res.ok) { showToast(data.message); await refreshAll(); onUpdate(); }
-      else showToast(data.error || 'Failed to file batch.');
-    } catch (err) { console.error(err); showToast(t('loc.errFileBatch')); }
+      if (res.ok) { showToast(data.message, 'success'); await refreshAll(); onUpdate(); }
+      else showToast(data.error || 'Failed to file batch.', 'error');
+    } catch (err) { console.error(err); showToast(t('loc.errFileBatch'), 'error'); }
   };
 
   const startFilingMode = async () => {
     if (unsortedCards.length === 0 || !activeLocationId) return;
     const target = locations.find(l => l.id === activeLocationId);
     try {
-      // Scope the walkthrough to the open container only — file just the cards
-      // that fit its rules and capacity; the rest stay in the Unsorted queue.
+      // Scope the walkthrough to cards accepted by this container's rules.
       const res = await fetch(`/api/locations/${activeLocationId}/recommend-batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entry_ids: unsortedCards.map(c => c.entry_id) })
       });
-      if (!res.ok) { showToast(t('loc.errFilingMode')); return; }
+      if (!res.ok) { showToast(t('loc.errFilingMode'), 'error'); return; }
       const data = await res.json();
       const placeable = data.filter(d => d.recommended);
-      const fullCount = data.filter(d => d.full).length;
-      if (fullCount > 0 && await offerContainerExpansion(fullCount)) {
-        return startFilingMode();
-      }
       const noRoom = data.filter(d => !d.recommended);
 
       if (placeable.length === 0) {
-        showToast(t('loc.filingNoFit', { name: target?.name, count: noRoom.length }));
+        showToast(t('loc.filingNoFit', { name: target?.name, count: noRoom.length }), 'status');
         return;
       }
 
@@ -1211,9 +1189,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       setMoveMode(false);
       setPickedEntryId(null);
       if (noRoom.length > 0) {
-        showToast(t('loc.filingStarted', { count: placeable.length, name: target?.name, left: noRoom.length }));
+        showToast(t('loc.filingStarted', { count: placeable.length, name: target?.name, left: noRoom.length }), 'status');
       }
-    } catch (err) { console.error(err); showToast(t('loc.errFilingModeGeneric')); }
+    } catch (err) { console.error(err); showToast(t('loc.errFilingModeGeneric'), 'error'); }
   };
 
   // Advance the walkthrough one card; end it when past the last card.
@@ -1221,7 +1199,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     if (filingIndex < filingQueue.length - 1) {
       setFilingIndex(filingIndex + 1);
     } else {
-      showToast(t(filingReadOnly ? 'loc.resortComplete' : 'loc.filingComplete'));
+      showToast(t(filingReadOnly ? 'loc.resortComplete' : 'loc.filingComplete'), 'success');
       setFilingMode(false);
       setFilingReadOnly(false);
       onUpdate();
@@ -1268,9 +1246,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         await refreshAll();
         advanceFiling();
       } else {
-        showToast(t('loc.errFileCard'));
+        showToast(t('loc.errFileCard'), 'error');
       }
-    } catch (err) { console.error(err); showToast(t('loc.errFileCardGeneric')); }
+    } catch (err) { console.error(err); showToast(t('loc.errFileCardGeneric'), 'error'); }
   };
 
   const startResort = async (skipConfirm = false) => {
@@ -1281,17 +1259,17 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       if (res.ok) {
         const data = await res.json();
         await refreshAll();
-        if (!Array.isArray(data) || data.length === 0) { showToast(t('loc.nothingToResort')); return; }
+        if (!Array.isArray(data) || data.length === 0) { showToast(t('loc.nothingToResort'), 'status'); return; }
         setFilingQueue(data);
         setFilingIndex(0);
         setFilingReadOnly(true);
         setFilingMode(true);
         setActiveLocationId(selectedLoc.id);
-        showToast(t('loc.resorted'));
+        showToast(t('loc.resorted'), 'success');
       } else {
-        showToast(t('loc.errResort'));
+        showToast(t('loc.errResort'), 'error');
       }
-    } catch (err) { console.error(err); showToast(t('loc.errResortGeneric')); }
+    } catch (err) { console.error(err); showToast(t('loc.errResortGeneric'), 'error'); }
   };
 
   // Save the Container Settings modal: rename, sort/filter rules, and a
@@ -1307,11 +1285,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       rule_type: filterDraft.length > 0 ? 'compound' : 'any',
       rule_config: filterDraft.length > 0 ? JSON.stringify({ rules: filterDraft }) : null,
       allow_stacking: stackingDraft,
+      sleeved: sleevedDraft,
+      type: typeDraft,
     };
     const trimmedName = (nameDraft || '').trim();
     if (trimmedName && trimmedName !== selectedLoc.name) fields.name = trimmedName;
 
-    await handleUpdateLocationFields(fields);
+    if (!await handleUpdateLocationFields(fields)) return;
 
     const capNum = parseInt(capacityDraft, 10);
     if (capNum > 0 && compartments[0] && capNum !== compartments[0].capacity) {
@@ -1369,7 +1349,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       await fetchLocations();
       setCoverLocation(null);
     } catch (error) {
-      showToast(error.message);
+      showToast(error.message, 'error');
     } finally {
       setSavingCover(false);
     }
@@ -1385,7 +1365,18 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     onExpandedChange={setContainerImportExpanded}
   />;
 
-  if (loading || (needsCards && !cardsReady && !cardsError)) return <><div className="spinner" role="status" aria-label={t('common.loading')} />{importReview}</>;
+  const locationsFeedback = locationsError ? (
+    <div className={`read-state read-state-error${locationsReady ? '' : ' read-state-initial'}`}>
+      <p role="alert">{t('loc.errLoadLocations')}</p>
+      {locationsReady && <p>{t('common.staleData')}</p>}
+      <button type="button" className="btn btn-secondary" onClick={fetchLocations}>{t('loc.retry')}</button>
+    </div>
+  ) : locationsLoading ? (
+    <p className={`read-state${locationsReady ? '' : ' read-state-initial'}`} role="status">{t(locationsReady ? 'common.refreshing' : 'common.loading')}</p>
+  ) : null;
+
+  if (!showGallery && !locationsReady) return <section>{locationsFeedback}{importReview}</section>;
+  if (needsCards && !cardsReady && !cardsError) return <><div className="spinner" role="status" aria-label={t('common.loading')} />{importReview}</>;
   if (needsCards && !cardsReady && cardsError) return (
     <section>
       <p role="alert">{t('loc.errLoadCards')}</p>
@@ -1405,8 +1396,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     <div className="sub-nav-tabs" role="group" aria-label={t('loc.inventory')} style={{ margin: 0 }}>
       {[['collection', t('dash.physical')], ['graveyard', t('collection.graveyard')]].map(([value, label]) => (
         <button key={value} type="button" className={`sub-nav-tab ${inventoryType === value ? 'active' : ''}`}
-          aria-pressed={inventoryType === value} onClick={() => onInventoryTypeChange?.(value)}
-          style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem' }}>
+          aria-pressed={inventoryType === value} onClick={() => onInventoryTypeChange?.(value)}>
           {label}
         </button>
       ))}
@@ -1415,22 +1405,40 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
   if (showGallery) return (
     <section>
-      <header style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-        <h2 style={{ margin: 0 }}>{t('nav.storage')}</h2>
+      <header className="page-heading" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <h2 className="page-title">{t('nav.storage')}</h2>
+        <button type="button" className="btn btn-primary" onClick={() => setShowCreate(true)}>
+          <Plus size={16} aria-hidden="true" /> {t('loc.createContainer')}
+        </button>
+      </header>
+      <div className="view-toolbar">
         {inventorySelector}
         <input className="input-control" aria-label={t('shared.search')} placeholder={t('loc.searchPlaceholder')} value={gallerySearch} onChange={e => setGallerySearch(e.target.value)} style={{ flex: '1 1 200px' }} />
+        {gallerySearch && <button type="button" className="btn btn-secondary" onClick={() => setGallerySearch('')}>{t('loc.clearSearch')}</button>}
         <select className="select-control" aria-label={t('collection.sortBy')} value={gallerySort} onChange={e => setGallerySort(e.target.value)} style={{ width: 'auto' }}>
           <option value="name-asc">{t('collection.sort.name-asc')}</option>
           <option value="qty-desc">{t('collection.sort.qty-desc')}</option>
         </select>
-        <span style={{ color: 'var(--text-secondary)' }}>{galleryLocations.length} / {locations.length}</span>
-      </header>
+        {locationsReady && <span style={{ color: 'var(--text-secondary)' }}>{galleryLocations.length} / {locations.length}</span>}
+      </div>
       {isArchive && <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>{t('loc.graveyardStorageHint')}</p>}
+      {locationsFeedback}
+      {locationsReady && !locationsLoading && !locationsError && galleryLocations.length === 0 && (
+        <div className="read-state read-state-initial">
+          <h3>{t(locations.length ? 'loc.noMatchingLocations' : 'loc.noLocations')}</h3>
+          {locations.length ? (
+            <button type="button" className="btn btn-secondary" onClick={() => setGallerySearch('')}>{t('loc.clearSearch')}</button>
+          ) : (
+            <>
+              <p>{t('loc.noLocationsHint')}</p>
+              <button type="button" className="btn btn-primary" onClick={() => setShowCreate(true)}>
+                <Plus size={16} aria-hidden="true" /> {t('loc.createContainer')}
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: '1.25rem' }}>
-        <button className="glass-panel" onClick={() => setShowCreate(true)} style={{ minHeight: '190px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', color: 'var(--accent-yellow)', cursor: 'pointer' }}>
-          <Plus size={64} />
-          <strong>{t('loc.createContainer')}</strong>
-        </button>
         {galleryLocations.map(location => (
           <div key={location.id} className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
           <button onClick={() => setActiveLocationId(location.id)} style={{ width: '100%', padding: 0, border: 0, background: 'transparent', textAlign: 'left', color: 'var(--text-strong)', cursor: 'pointer' }}>
@@ -1439,15 +1447,38 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 ? <CardImage card={location.cover} src={location.cover.image_url.replace(/^(https:\/\/cards\.scryfall\.io\/)(?:small|normal|large|png)\/([^?]+)(.*)$/, (_, host, path, query) => `${host}art_crop/${path.replace(/\.png$/, '.jpg')}${query}`)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : <Layers size={56} style={{ color: 'var(--text-muted)' }} />}
             </div>
-            <div style={{ padding: '0.75rem 1rem' }}>
-              <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>{!!location.locked && <Lock size={14} />}{location.name}</strong>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{location.type} · {location.total_cards || 0} {t('collection.cardUnit', { count: location.total_cards || 0 })}</span>
+            <div style={{ padding: '0.75rem 1rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '0.75rem' }}>
+              <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflowWrap: 'anywhere' }}>{!!location.locked && <Lock size={14} />}{location.name}</strong>
+              <span style={{ gridColumn: 1, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{location.type}</span>
+              {!!location.mana_symbols?.length && (
+                <span style={{ gridColumn: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem', marginTop: '0.5rem' }}>
+                  {MANA_SYMBOLS.filter(([symbol]) => location.mana_symbols.includes(symbol)).map(([symbol, name, x]) => (
+                    <span key={symbol} title={t(`dash.color.${name}`)} style={{ display: 'inline-flex' }}>
+                      <svg role="img" aria-label={t(`dash.color.${name}`)} focusable="false" width="20" height="20" viewBox={`${x === null ? 0 : x - 50} 0 100 100`}>
+                        {symbol === 'C' ? <>
+                          <circle cx="50" cy="50" r="50" fill="#CAC5C0" />
+                          <path fill="#0D0F0F" fillRule="evenodd" d="M50 10 90 50 50 90 10 50Z M50 30 30 50 50 70 70 50Z" />
+                        </> : <image href={`${import.meta.env.BASE_URL}mana.svg`} x="-945" y="-210.002" width="1045" height="730.002" />}
+                      </svg>
+                    </span>
+                  ))}
+                </span>
+              )}
+              <span className="storage-card-quantity" style={{ gridColumn: 2, gridRow: '1 / 4', alignSelf: 'center', textAlign: 'right', minWidth: '3.75rem' }}>
+                <strong style={{ display: 'block', fontSize: '2rem', fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{location.total_cards || 0}</strong>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', lineHeight: 1.3 }}>{t('collection.cardUnit', { count: location.total_cards || 0 })}</span>
+              </span>
+              {location.total_cards > location.total_capacity && (
+                <span className="storage-capacity-warning" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+                  {t('loc.overLimit', { used: location.total_cards.toLocaleString(locale), capacity: location.total_capacity.toLocaleString(locale) })}
+                </span>
+              )}
             </div>
           </button>
           </div>
         ))}
       </div>
-      <footer style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+      <footer style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.5rem' }}>
         <button className="btn btn-secondary" onClick={() => setShowGallery(false)}>{t('bulk.unassignedPile')}</button>
         {!isArchive && <>
         <button type="button" className="btn btn-secondary" disabled={importingContainer} aria-busy={importingContainer} onClick={() => containerImportInput.current?.click()}><Download size={16} /> {t(importingContainer ? 'loc.importingContainer' : 'loc.importContainer')}</button>
@@ -1482,7 +1513,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         >
           <form onSubmit={handleCreateContainerDeck} aria-busy={creatingContainerDeck}>
             <h2 id="container-deck-title" style={{ marginTop: 0 }}>{t('deck.createDeck')}</h2>
-            <p id="container-deck-hint" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.5 }}>{t('loc.createDeckHint')}</p>
+            <p id="container-deck-hint" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.5 }}>{t(isArchive ? 'loc.createGraveyardDeckHint' : 'loc.createDeckHint')}</p>
             <div className="form-group">
               <label htmlFor="container-deck-name">{t('deck.deckName')}</label>
               <input id="container-deck-name" className="input-control" required maxLength={120} autoFocus disabled={creatingContainerDeck} value={containerDeckDraft.name} onChange={event => setContainerDeckDraft(draft => ({ ...draft, name: event.target.value }))} />
@@ -1502,8 +1533,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         </dialog>
       )}
       {coverLocation && (
-        <dialog ref={element => { if (element && !element.open) element.showModal(); }} onCancel={() => setCoverLocation(null)} aria-label={t('loc.chooseCover')} style={{ margin: 'auto', width: 'min(700px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
-          <h3>{t('loc.chooseCover')} — {coverLocation.name}</h3>
+        <Modal onClose={() => setCoverLocation(null)} aria-labelledby="container-cover-title">
+        <div style={{ width: 'min(700px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
+          <h3 id="container-cover-title">{t('loc.chooseCover')} — {coverLocation.name}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '0.75rem' }}>
             {coverChoices.map(card => <button key={card.card_id} className="btn btn-secondary" disabled={savingCover} onClick={() => saveCover(card.card_id)} style={{ display: 'flex', flexDirection: 'column', padding: '0.4rem' }}>
               <CardImage card={card} style={{ width: '100%', borderRadius: '4px' }} />
@@ -1514,7 +1546,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             <button className="btn btn-secondary" disabled={savingCover} onClick={() => saveCover(null)}>{t('loc.automaticCover')}</button>
             <button className="btn btn-secondary" disabled={savingCover} onClick={() => setCoverLocation(null)}>{t('common.close')}</button>
           </div>
-        </dialog>
+        </div>
+        </Modal>
       )}
       {draggingCard && (
         <DragOverlay dropAnimation={null}>
@@ -1535,9 +1568,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       )}
 
       {rulesComp && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setRulesComp(null)}>
+        <Modal onClose={() => setRulesComp(null)} aria-labelledby="compartment-rules-title">
           <div className="glass-panel" style={{ width: '480px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-secondary)' }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: 0 }}>{rulesComp.display_label}: Accepts</h3>
+            <h3 id="compartment-rules-title" style={{ margin: 0 }}>{rulesComp.display_label}: {t('compartment.accepts')}</h3>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0 }}>
               Rules controlling which cards may be filed into this {isBinderType ? 'page' : 'row'}. No rules = accepts anything the container allows.
             </p>
@@ -1547,28 +1580,29 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               <button className="btn btn-primary" onClick={saveCompartmentRules}>{t('loc.saveRules')}</button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {capacityUpdatePending && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
-            <h3 style={{ margin: 0 }}>{t('loc.syncCapacity')}</h3>
+        <Modal onClose={cancelCapacityUpdate} returnFocus={capacityUpdatePending.returnFocus} aria-labelledby="capacity-sync-title">
+          <div className="glass-panel" style={{ width: '400px', maxWidth: '100%', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
+            <h3 id="capacity-sync-title" style={{ margin: 0 }}>{t('loc.syncCapacity')}</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
               Do you want to apply the capacity <strong>{capacityUpdatePending.capacity}</strong> to ALL compartments in this container, or just this specific one?
             </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+              <button className="btn btn-secondary" onClick={cancelCapacityUpdate}>{t('common.cancel')}</button>
               <button className="btn btn-secondary" onClick={() => { handleSetCapacity(capacityUpdatePending.id, capacityUpdatePending.capacity, false); setCapacityUpdatePending(null); }}>{t('loc.justThisOne')}</button>
               <button className="btn btn-primary" onClick={() => { handleSetCapacity(capacityUpdatePending.id, capacityUpdatePending.capacity, true); setCapacityUpdatePending(null); }}>{t('loc.applyToAll')}</button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {showRulesModal && selectedLoc && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+        <Modal onClose={() => setShowRulesModal(false)} aria-labelledby="container-settings-title">
           <div className="glass-panel" style={{ width: '400px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
-            <h3 style={{ margin: 0 }}>{t('loc.containerSettings')}</h3>
+            <h3 id="container-settings-title" style={{ margin: 0 }}>{t('loc.containerSettings')}</h3>
             <button className="btn btn-secondary" onClick={() => setCoverLocation(selectedLoc)}>{t('loc.chooseCover')}</button>
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
@@ -1582,7 +1616,27 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               />
             </label>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="form-group">
+              <label htmlFor="container-type">{t('container.step.type')}</label>
+              <select id="container-type" className="input-control" value={typeDraft} onChange={event => setTypeDraft(event.target.value)}>
+                {!containerTypeKey(typeDraft) && <option value={typeDraft}>{typeDraft}</option>}
+                {['Binder', 'Toploader Binder', 'Box', 'Toploader Box', 'Graded Slab Box', 'Display Shelf / Stand', 'Deck Box', 'Tin / Case', 'Other'].map(type => (
+                  <option key={type} value={type}>{t(`container.type.${containerTypeKey(type)}`)}</option>
+                ))}
+              </select>
+            </div>
+
+            <label htmlFor="container-sleeved" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              {t('deck.sleeved')}
+              <select id="container-sleeved" className="input-control" value={sleevedDraft} onChange={(e) => setSleevedDraft(Number(e.target.value))}>
+                <option value={0}>{t('deck.sleevedNone')}</option>
+                <option value={1}>{t('deck.sleevedOne')}</option>
+                <option value={2}>{t('deck.sleevedDouble')}</option>
+                <option value={3}>{t('deck.sleevedTriple')}</option>
+              </select>
+            </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem' }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
                 {t(isBinderType ? 'loc.numberOfPages' : 'loc.numberOfRows')}
                 <input
@@ -1597,7 +1651,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               </label>
 
               <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                Cards per {isBinderType ? 'page' : 'row'}
+                {t(`container.${isBinderType ? 'page' : 'row'}.perLabel`)}
                 <input
                   type="number"
                   min="1"
@@ -1638,6 +1692,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               <span style={{ color: 'var(--text-muted)' }}>{t(selectedLoc.allow_stacking ? 'loc.slotsUsedLabel' : 'loc.cardsStoredLabel')}</span>
               <strong style={{ fontSize: '0.9rem', color: 'var(--text-strong)' }}>{selectedLoc.total_cards || 0} / {selectedLoc.total_capacity || 0}</strong>
             </div>
+            {selectedLoc.total_cards > selectedLoc.total_capacity && (
+              <span className="storage-capacity-warning">{t('loc.overLimit', { used: selectedLoc.total_cards.toLocaleString(locale), capacity: selectedLoc.total_capacity.toLocaleString(locale) })}</span>
+            )}
 
             <div style={{ background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #d97706', padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
               <strong>{t('loc.reorganizeWarningTitle')}</strong>
@@ -1645,7 +1702,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 <li>{t('loc.ruleNoteResort', { containerType: isBinderType ? t('loc.binderLower') : t('loc.boxLower') })}</li>
                 <li>{t('loc.ruleNoteFilter')}</li>
                 <li>{t('loc.ruleNoteCustom')}</li>
-                <li>{t('loc.ruleNoteShrink', { unitType: isBinderType ? t('loc.pageLower') : t('loc.rowLower') })}</li>
+                <li>{t('loc.ruleNoteShrink', { compartment: isBinderType ? t('loc.pageLower') : t('loc.rowLower') })}</li>
               </ul>
             </div>
 
@@ -1655,25 +1712,27 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             <SortBuilder value={sortDraft} onChange={setSortDraft} />
             <FilterBuilder value={filterDraft} onChange={setFilterDraft} setsList={setsList} fieldOptions={filterFieldOptions} />
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
               <button className="btn btn-secondary" onClick={() => setShowRulesModal(false)}>{t('common.cancel')}</button>
               <button className="btn btn-primary" onClick={saveContainerSettings}>{t('admin.saveSettings')}</button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
 
       {/* Selected location detail. During mobile filing the binder stays visible
           (the recommended slot blinks in it); the compact filing bar is pinned
           at the bottom of the screen. */}
-      <div className="glass-panel" style={{ padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', minWidth: 0 }}>
+      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto' }}>
+        {locationsFeedback}
+        <div className="view-toolbar storage-workspace-toolbar" style={{ justifyContent: 'space-between' }}>
+          <div className="storage-workspace-identity" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', minWidth: 0 }}>
             <button className="btn btn-secondary" onClick={() => { storage.exitSelectMode(); setActiveLocationId(null); setShowGallery(true); }} title={t('nav.storage')} aria-label={t('nav.storage')}><LayoutGrid size={16} /></button>
             {inventorySelector}
             <select
               className="select-control"
+              aria-label={t('loc.selectContainer')}
               value={activeLocationId || ''}
               onChange={(e) => setActiveLocationId(parseInt(e.target.value, 10))}
               style={{ fontSize: '1rem', fontWeight: 'bold', padding: '0.3rem', width: 'auto', minWidth: '150px', maxWidth: '100%' }}
@@ -1681,34 +1740,72 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               <option value="" disabled>{t('loc.selectContainer')}</option>
               {locations.slice().sort((a, b) => a.name.localeCompare(b.name)).map(loc => <option key={loc.id} value={loc.id}>{loc.locked ? '🔒 ' : ''}{loc.name} ({loc.type})</option>)}
             </select>
-            <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => setShowCreate(s => !s)} style={{ width: '28px', height: '28px', padding: 0 }} title={t('loc.createContainer')}>
-              <Plus size={14} />
-            </button>
-            {!isArchive && <>
-            <button type="button" className="btn btn-secondary btn-icon-only" disabled={importingContainer} aria-busy={importingContainer} aria-label={t(importingContainer ? 'loc.importingContainer' : 'loc.importContainer')} onClick={() => containerImportInput.current?.click()} style={{ width: '28px', height: '28px', padding: 0 }} title={t(importingContainer ? 'loc.importingContainer' : 'loc.importContainer')}>
-              {importingContainer ? <span className="spinner" style={{ width: '14px', height: '14px', margin: 0 }} /> : <Download size={14} />}
-            </button>
-            <input ref={containerImportInput} type="file" accept=".txt,text/plain" disabled={importingContainer} onChange={handleContainerImportFile} style={{ display: 'none' }} />
-            </>}
+            {selectedLoc && <span className="storage-sleeve-summary" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              {t('deck.sleeved')}: {t(['deck.sleevedNone', 'deck.sleevedOne', 'deck.sleevedDouble', 'deck.sleevedTriple'][selectedLoc.sleeved ?? 0])}
+            </span>}
+            {!isArchive && <input ref={containerImportInput} type="file" accept=".txt,text/plain" disabled={importingContainer} onChange={handleContainerImportFile} style={{ display: 'none' }} />}
             {selectedLoc && !!selectedLoc.locked && (
               <button type="button" onClick={handleToggleContainerLock} title={t('loc.lockedBadgeHint')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.62rem', fontWeight: 800, padding: '0.15rem 0.45rem', borderRadius: '999px', cursor: 'pointer', background: 'rgba(255,193,7,0.15)', border: '1px solid var(--accent-yellow)', color: 'var(--accent-yellow)' }}>
                 <Lock size={11} /> Locked
               </button>
             )}
+            {containerViewMode === 'layout' && isBinderType && compartments.length > 0 && (
+              <div className="storage-page-nav" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={activePageIndex <= 0}
+                  onClick={() => setActivePageIndex(prev => {
+                    if (isMobile) return Math.max(0, prev - 1);
+                    const { spread } = binderSpread(prev);
+                    return spread <= 1 ? 0 : (spread - 1) * 2 - 1;
+                  })}
+                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                >
+                  {t('loc.prev')}
+                </button>
+                <select
+                  className="select-control"
+                  aria-label={t('container.page.label')}
+                  value={activePageIndex}
+                  onChange={(e) => {
+                    if (e.target.value === '__add_new__') {
+                      handleAddCompartment();
+                    } else {
+                      setActivePageIndex(parseInt(e.target.value, 10));
+                    }
+                  }}
+                  style={{ fontSize: '0.75rem', padding: '0.15rem 0.35rem', fontWeight: 600 }}
+                >
+                  {compartments.map((c, idx) => (
+                    <option key={c.id} value={idx}>
+                      {c.display_label || t('loc.pageName', { number: idx + 1 })} ({idx + 1}/{compartments.length}){c.count > c.capacity ? ` · ${t('loc.overLimit', { used: c.count.toLocaleString(locale), capacity: c.capacity.toLocaleString(locale) })}` : ''}
+                    </option>
+                  ))}
+                  <option value="__add_new__" disabled={!!selectedLoc.locked}>+ {t('loc.addPage')}</option>
+                </select>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={isMobile
+                    ? activePageIndex >= compartments.length - 1
+                    : binderSpread(activePageIndex).spread * 2 + 1 >= compartments.length}
+                  onClick={() => setActivePageIndex(prev => {
+                    // Next spread's left page — the opening spread has none, so
+                    // stepping off page 1 lands on page 2.
+                    const next = isMobile ? prev + 1 : binderSpread(prev).spread * 2 + 1;
+                    return next < compartments.length ? next : prev;
+                  })}
+                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                >
+                  {t('loc.next')}
+                </button>
+              </div>
+            )}
           </div>
           
-          {selectedLoc && (
-            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-            {!isArchive && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => { setContainerDeckError(''); setContainerDeckDraft({ location_id: selectedLoc.id, name: selectedLoc.name, format: 'Casual' }); }}
-              style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem' }}
-            >
-              <Layers size={14} aria-hidden="true" /> {t('deck.createDeck')}
-            </button>
-            )}
+            <div className="storage-workspace-actions" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+            {selectedLoc && <>
             {!filingMode && !moveMode && (
               <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                 <button
@@ -1718,7 +1815,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   style={{ borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.35rem', width: '28px', height: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                   title={t('loc.gridView')}
                 >
-                  <LayoutGrid size={13} />
+                  <List size={13} />
                 </button>
                 <button
                   type="button"
@@ -1727,7 +1824,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   style={{ borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.35rem', width: '28px', height: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                   title={t('loc.detailView')}
                 >
-                  <List size={13} />
+                  <LayoutGrid size={13} />
                 </button>
               </div>
             )}
@@ -1781,29 +1878,33 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 {t(moveMode ? 'loc.doneArranging' : 'loc.arrange')}
               </button>
             )}
-            <div className="kebab-menu">
-              <button className="kebab-menu-button" onClick={() => setShowKebabMenu(s => !s)}>
-                <MoreVertical size={16} color="var(--text-secondary)" />
+            </>}
+            <div className="kebab-menu" style={{ marginLeft: 'auto' }} onKeyDown={event => {
+              if (event.key === 'Escape') {
+                event.stopPropagation();
+                setShowKebabMenu(false);
+                containerMenuButton.current?.focus();
+              }
+            }} onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setShowKebabMenu(false);
+            }}>
+              <button ref={containerMenuButton} type="button" className="btn btn-secondary" aria-expanded={showKebabMenu} onClick={() => setShowKebabMenu(s => !s)}>
+                {t('nav.more')}
               </button>
               {showKebabMenu && (
                 <div className="kebab-dropdown">
-                  <button className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => { setShowKebabMenu(false); handleAddCompartment(); }}>
-                    <Plus size={14} /> {t(isBinderType ? 'loc.addPage' : 'loc.addCompartment')}
+                  <button type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setShowCreate(true); }}>
+                    <Plus size={14} aria-hidden="true" /> {t('loc.createContainer')}
                   </button>
-                  <button className="kebab-item" 
-                          disabled={!!selectedLoc.locked || compartments.length <= 1 || (cardsByCompartment.get(compartments[compartments.length-1]?.id) || []).length > 0} 
-                          onClick={() => { setShowKebabMenu(false); handleRemoveCompartment(compartments[compartments.length-1].id); }}
-                          title={t(selectedLoc.locked ? 'loc.containerLockedShort' : 'loc.removeLastHint')}
-                  >
-                    <Trash2 size={14} /> {t(isBinderType ? 'loc.removeLastPage' : 'loc.removeLastCompartment')}
+                  {!isArchive && <button type="button" className="kebab-item" disabled={importingContainer} aria-busy={importingContainer} onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); containerImportInput.current?.click(); }}>
+                    <Download size={14} aria-hidden="true" /> {t(importingContainer ? 'loc.importingContainer' : 'loc.importContainer')}
+                  </button>}
+                  {selectedLoc && <>
+                  <button type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setContainerDeckError(''); setContainerDeckDraft({ location_id: selectedLoc.id, name: selectedLoc.name, format: 'Casual' }); }}>
+                    <Layers size={14} aria-hidden="true" /> {t('deck.createDeck')}
                   </button>
-                  <button className="kebab-item" onClick={() => { setShowKebabMenu(false); startResort(); }} disabled={!!selectedLoc.locked || (selectedLoc.total_cards || 0) === 0}>
-                    <RefreshCw size={14} /> Re-sort Container
-                  </button>
-                  <button className="kebab-item" onClick={() => { setShowKebabMenu(false); handleToggleContainerLock(); }} title={t('loc.lockKebabHint')}>
-                    <Lock size={14} /> {t(selectedLoc.locked ? 'loc.unlockContainer' : 'loc.lockContainer')}
-                  </button>
-                  <button className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => {
+                  <button type="button" className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => {
+                    containerMenuButton.current?.focus();
                     setShowKebabMenu(false);
                     let sDraft = [];
                     if (selectedLoc.sort_order && selectedLoc.sort_order.startsWith('[')) {
@@ -1833,6 +1934,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     setFilterDraft(fDraft);
 
                     setNameDraft(selectedLoc.name || '');
+                    setTypeDraft(selectedLoc.type);
+                    setSleevedDraft(selectedLoc.sleeved ?? 0);
                     setStackingDraft(!!selectedLoc.allow_stacking);
                     setCountDraft(String(compartments.length));
                     const caps = compartments.map(c => c.capacity);
@@ -1841,7 +1944,23 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
                     setShowRulesModal(true);
                   }}>
-                    <Settings size={14} /> Container Settings
+                    <Settings size={16} aria-hidden="true" /> {t('loc.containerSettings')}
+                  </button>
+                  <button className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => { setShowKebabMenu(false); handleAddCompartment(); }}>
+                    <Plus size={14} /> {t(isBinderType ? 'loc.addPage' : 'loc.addCompartment')}
+                  </button>
+                  <button className="kebab-item" 
+                          disabled={!!selectedLoc.locked || compartments.length <= 1 || (cardsByCompartment.get(compartments[compartments.length-1]?.id) || []).length > 0} 
+                          onClick={() => { setShowKebabMenu(false); handleRemoveCompartment(compartments[compartments.length-1].id); }}
+                          title={t(selectedLoc.locked ? 'loc.containerLockedShort' : 'loc.removeLastHint')}
+                  >
+                    <Trash2 size={14} /> {t(isBinderType ? 'loc.removeLastPage' : 'loc.removeLastCompartment')}
+                  </button>
+                  <button className="kebab-item" onClick={() => { setShowKebabMenu(false); startResort(); }} disabled={!!selectedLoc.locked || (selectedLoc.total_cards || 0) === 0}>
+                    <RefreshCw size={14} /> Re-sort Container
+                  </button>
+                  <button className="kebab-item" onClick={() => { setShowKebabMenu(false); handleToggleContainerLock(); }} title={t('loc.lockKebabHint')}>
+                    <Lock size={14} /> {t(selectedLoc.locked ? 'loc.unlockContainer' : 'loc.lockContainer')}
                   </button>
                   <button className="kebab-item" disabled={containerTransferLocked || transferringContainer} aria-busy={transferringContainer}
                     title={containerTransferLocked ? t('loc.lockedTransferContainer') : undefined}
@@ -1851,17 +1970,17 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   <button className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => { setShowKebabMenu(false); handleDeleteLocation(selectedLoc.id, selectedLoc.name); }} style={{ color: 'var(--accent-red)' }}>
                     <Trash2 size={14} /> Delete Container
                   </button>
+                  </>}
                 </div>
               )}
             </div>
             </div>
-          )}
         </div>
 
         {storage.selectMode && (
           <div className="glass-panel" style={{ padding: '0.6rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', background: 'rgba(255,71,71,0.08)' }}>
             <span style={{ fontWeight: 800, color: 'var(--text-strong)', fontSize: '0.8rem' }}>{storage.selectedIds.size} selected</span>
-            <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set(cardsInActiveLocation.map(c => c.entry_id)))}>Select all ({cardsInActiveLocation.length})</button>
+            <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set(selectableContainerCards.map(c => c.entry_id)))}>Select all ({selectableContainerCards.length})</button>
             <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set())}>{t('bulk.clear')}</button>
             <div style={{ width: '1px', height: '20px', background: 'var(--border-glass)' }} />
             {!isArchive && (
@@ -1963,67 +2082,15 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               </div>
             )}
 
-            {containerViewMode === 'layout' && isBinderType && compartments.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', margin: '0.2rem 0', background: 'rgba(0,0,0,0.1)', padding: '0.4rem', borderRadius: 'var(--radius-sm)' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={activePageIndex <= 0}
-                  onClick={() => setActivePageIndex(prev => {
-                    if (isMobile) return Math.max(0, prev - 1);
-                    const { spread } = binderSpread(prev);
-                    return spread <= 1 ? 0 : (spread - 1) * 2 - 1;
-                  })}
-                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                >
-                  {t('loc.prev')}
-                </button>
-                <select
-                  className="select-control"
-                  value={activePageIndex}
-                  onChange={(e) => {
-                    if (e.target.value === '__add_new__') {
-                      handleAddCompartment();
-                    } else {
-                      setActivePageIndex(parseInt(e.target.value, 10));
-                    }
-                  }}
-                  style={{ fontSize: '0.75rem', padding: '0.15rem 0.35rem', fontWeight: 600 }}
-                >
-                  {compartments.map((c, idx) => (
-                    <option key={c.id} value={idx}>
-                      {c.display_label || t('loc.pageName', { number: idx + 1 })} ({idx + 1}/{compartments.length})
-                    </option>
-                  ))}
-                  <option value="__add_new__" disabled={!!selectedLoc.locked}>+ {t('loc.addPage')}</option>
-                </select>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={isMobile
-                    ? activePageIndex >= compartments.length - 1
-                    : binderSpread(activePageIndex).spread * 2 + 1 >= compartments.length}
-                  onClick={() => setActivePageIndex(prev => {
-                    // Next spread's left page — the opening spread has none, so
-                    // stepping off page 1 lands on page 2.
-                    const next = isMobile ? prev + 1 : binderSpread(prev).spread * 2 + 1;
-                    return next < compartments.length ? next : prev;
-                  })}
-                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                >
-                  {t('loc.next')}
-                </button>
-              </div>
-            )}
 
             {containerViewMode === 'list' && (
-              <div className="glass-panel" style={{ padding: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="view-toolbar">
                   <div style={{ position: 'relative', flex: 1 }}>
                     <Search size={14} style={{ position: 'absolute', left: '0.55rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                    <input className="input-control" value={containerFilters.search} onChange={(e) => setContainerFilters(filters => ({ ...filters, search: e.target.value }))} placeholder={t('collection.searchPlaceholder')} style={{ width: '100%', padding: '0.35rem 0.5rem 0.35rem 2rem', fontSize: '0.75rem' }} />
+                    <input className="input-control" aria-label={t('shared.search')} value={containerFilters.search} onChange={(e) => setContainerFilters(filters => ({ ...filters, search: e.target.value }))} placeholder={t('collection.searchPlaceholder')} style={{ width: '100%', paddingLeft: '2rem' }} />
                   </div>
-                  <button className={`btn ${showContainerFilters ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setShowContainerFilters(show => !show)} style={{ padding: '0.35rem 0.6rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <button className={`btn ${showContainerFilters ? 'btn-primary' : 'btn-secondary'}`} aria-expanded={showContainerFilters} onClick={() => setShowContainerFilters(show => !show)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                     <SlidersHorizontal size={13} /> {t('collection.filters')}
                   </button>
                   <select className="select-control" value={containerSortBy} onChange={(e) => setContainerSortBy(e.target.value)} style={{ maxWidth: '150px', fontSize: '0.72rem', padding: '0.35rem 0.5rem' }} aria-label={t('collection.sortBy')}>
@@ -2060,12 +2127,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       ['printing', t('collection.allPrintings'), containerFilterOptions.printings],
                       ['language', t('collection.allLanguages'), containerFilterOptions.languages]
                     ].map(([key, label, options]) => (
-                      <select key={key} className="select-control" value={containerFilters[key]} onChange={(e) => setContainerFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
+                      <select key={key} className="select-control" aria-label={label} value={containerFilters[key]} onChange={(e) => setContainerFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
                         <option value="">{label}</option>
                         {options.map(option => <option key={option} value={option}>{option}</option>)}
                       </select>
                     ))}
-                    <select className="select-control" value={containerFilters.deckStatus} onChange={(e) => setContainerFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
+                    <select className="select-control" aria-label={t('loc.allDeckStatuses')} value={containerFilters.deckStatus} onChange={(e) => setContainerFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
                       <option value="">{t('loc.allDeckStatuses')}</option>
                       <option value="inPlay">{t('loc.inPlay')}</option>
                       <option value="notInPlay">{t('loc.notInPlay')}</option>
@@ -2080,7 +2147,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 {containerListSections.map(section => (
                   <section key={section.label || 'storage'}>
                     {section.label && <h3 style={{ margin: '0 0 0.4rem', color: 'var(--text-strong)', fontSize: '0.85rem' }}>{section.label}</h3>}
-                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${84 * containerCardScale}px, 1fr))`, gap: '0.45rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${110 * containerCardScale}px), 1fr))`, gap: '0.75rem' }}>
                       {section.cards.map(card => {
                   const selected = storage.selectedIds.has(card.entry_id);
                   return (
@@ -2129,12 +2196,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   canRemove: i === compartments.length - 1 && compartments.length > 1 && (cardsByCompartment.get(c.id) || []).length === 0,
                   moveTargets: compartments,
                   onRename: (label) => handleRenameCompartment(c.id, label),
-                  onSetCapacity: (cap) => handleSetCapacity(c.id, cap),
+                  onSetCapacity: (cap, input) => handleSetCapacity(c.id, cap, false, input),
                   onRemove: () => handleRemoveCompartment(c.id),
                   onToggleLock: () => handleToggleCompartmentLock(c.id, !c.locked),
                   containerLocked: !!selectedLoc.locked,
                   onCardClick: setInspectorCard,
-                  onDeleteCard: handleDeleteCard,
                   onMoveCard: handleMoveCard,
                   recommendedSpot: currentRecSpot && currentRecSpot.compartment_id === c.id ? {
                     index: Math.floor(currentRecSpot.position / 1000) - 1,
@@ -2238,11 +2304,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <div key={activeComp.id} className="row-flash" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(0,0,0,0.1)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <button className="btn btn-secondary btn-icon-only" disabled={activeCompIdx <= 0} onClick={() => setActiveCompartmentId(compartments[activeCompIdx - 1]?.id)} style={{ width: '24px', height: '24px', padding: 0 }}>
+                        <button className="btn btn-secondary btn-icon-only" aria-label={t('loc.prev')} disabled={activeCompIdx <= 0} onClick={() => setActiveCompartmentId(compartments[activeCompIdx - 1]?.id)} style={{ width: '24px', height: '24px', padding: 0 }}>
                           &larr;
                         </button>
                         <select
                           className="select-control"
+                          aria-label={t('container.row.label')}
                           value={activeComp.id}
                           onChange={(e) => {
                             if (e.target.value === '__add_new__') {
@@ -2253,13 +2320,16 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                           }}
                           style={{ fontSize: '0.8rem', padding: '0.2rem 0.4rem' }}
                         >
-                          {compartments.map(c => <option key={c.id} value={c.id}>{c.display_label}</option>)}
+                          {compartments.map(c => <option key={c.id} value={c.id}>{c.display_label}{c.count > c.capacity ? ` · ${t('loc.overLimit', { used: c.count.toLocaleString(locale), capacity: c.capacity.toLocaleString(locale) })}` : ''}</option>)}
                           <option value="__add_new__" disabled={!!selectedLoc.locked}>+ {t('loc.addRow')}</option>
                         </select>
-                        <button className="btn btn-secondary btn-icon-only" disabled={activeCompIdx >= compartments.length - 1} onClick={() => setActiveCompartmentId(compartments[activeCompIdx + 1]?.id)} style={{ width: '24px', height: '24px', padding: 0 }}>
+                        <button className="btn btn-secondary btn-icon-only" aria-label={t('common.next')} disabled={activeCompIdx >= compartments.length - 1} onClick={() => setActiveCompartmentId(compartments[activeCompIdx + 1]?.id)} style={{ width: '24px', height: '24px', padding: 0 }}>
                           &rarr;
                         </button>
                       </div>
+                      {activeComp.count > activeComp.capacity && (
+                        <span className="storage-capacity-warning">{t('loc.overLimit', { used: activeComp.count.toLocaleString(locale), capacity: activeComp.capacity.toLocaleString(locale) })}</span>
+                      )}
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <button
@@ -2297,20 +2367,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     </div>
                     
                     <CompartmentView 
-                      hideHeader={true}
                       compartment={activeComp}
                       cards={cardsByCompartment.get(activeComp.id) || []}
                       locationType={selectedLoc.type}
                       sortOrder={selectedLoc.sort_order}
                       setsList={setsList}
                       moveTargets={compartments}
-                      onRename={(label) => handleRenameCompartment(activeComp.id, label)}
-                      onSetCapacity={(cap) => handleSetCapacity(activeComp.id, cap)}
-                      onRemove={() => handleRemoveCompartment(activeComp.id)}
-                      onToggleLock={() => handleToggleCompartmentLock(activeComp.id, !activeComp.locked)}
-                      containerLocked={!!selectedLoc.locked}
                       onCardClick={setInspectorCard}
-                      onDeleteCard={handleDeleteCard}
                       onMoveCard={handleMoveCard}
                       recommendedSpot={currentRecSpot && currentRecSpot.compartment_id === activeComp.id ? {
                         index: Math.floor(currentRecSpot.position / 1000) - 1,
@@ -2321,12 +2384,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       } : null}
                       focusEntryId={focusEntryId}
                       targetActiveIndex={currentRecSpot && currentRecSpot.compartment_id === activeComp.id ? Math.floor(currentRecSpot.position / 1000) - 1 : null}
-                      canRemove={compartments.length > 1 && (cardsByCompartment.get(activeComp.id) || []).length === 0}
                       selectMode={storage.selectMode}
                       selectedIds={storage.selectedIds}
                       onCardLongPress={storage.arm}
                       onCardToggle={storage.toggleSelect}
-                      onEditRules={openCompartmentRules}
                       placementMode={moveMode}
                       pickedEntryId={pickedEntryId}
                       onPickCard={handlePickCard}
@@ -2341,7 +2402,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       </div>
 
       {/* Unsorted queue */}
-      <div className="glass-panel location-unsorted-col" style={{ padding: '0.75rem', display: isStacked && filingMode ? 'none' : 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <div className="view-section location-unsorted-col" style={{ minWidth: 0, display: isStacked && filingMode ? 'none' : 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         {filingMode ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', height: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2375,10 +2436,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     return (
                       <div style={{ background: 'rgba(255, 71, 71, 0.15)', border: '1px solid #ff4747', borderRadius: 'var(--radius-sm)', padding: '0.75rem', width: '100%', textAlign: 'center' }}>
                         <strong style={{ fontSize: '0.9rem', color: 'var(--text-strong)' }}>
-                          {filingQueue[filingIndex].rejected ? t('loc.rejectedRule') : t('loc.containerFull')}
+                          {t('loc.noEligibleCompartment')}
                         </strong>
                         <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                          {t(filingQueue[filingIndex].rejected ? 'loc.skipRejected' : 'loc.skipNoRoom')}
+                          {t('loc.skipRejected')}
                         </div>
                       </div>
                     );
@@ -2519,15 +2580,15 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '0.4rem' }}>
+            <div className="storage-queue-filters" style={{ display: 'flex', gap: '0.4rem' }}>
               <input
-                className="input-control" placeholder={t('loc.searchPlaceholder')} value={unsortedFilters.search}
+                className="input-control" aria-label={t('shared.search')} placeholder={t('loc.searchPlaceholder')} value={unsortedFilters.search}
                 onChange={(e) => setUnsortedFilters(filters => ({ ...filters, search: e.target.value }))} style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem', flex: 1, minWidth: 0 }}
               />
               <button className={`btn ${showUnsortedFilters ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setShowUnsortedFilters(show => !show)} style={{ padding: '0.3rem 0.5rem', display: 'inline-flex', alignItems: 'center' }} title={t('collection.filters')}>
                 <SlidersHorizontal size={13} />
               </button>
-              <select className="select-control" value={unsortedSort} onChange={(e) => setUnsortedSort(e.target.value)} style={{ fontSize: '0.7rem', padding: '0.3rem 0.5rem', maxWidth: '150px' }}>
+              <select className="select-control" aria-label={t('collection.sortBy')} value={unsortedSort} onChange={(e) => setUnsortedSort(e.target.value)} style={{ fontSize: '0.7rem', padding: '0.3rem 0.5rem', maxWidth: '150px' }}>
                 <option value="scanned-desc">{t('collection.sort.scanned-desc')}</option>
                 <option value="scanned-asc">{t('collection.sort.scanned-asc')}</option>
                 <option value="name-asc">{t('loc.sortAZ')}</option>
@@ -2546,12 +2607,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   ['printing', t('collection.allPrintings'), unsortedFilterOptions.printings],
                   ['language', t('collection.allLanguages'), unsortedFilterOptions.languages]
                 ].map(([key, label, options]) => (
-                  <select key={key} className="select-control" value={unsortedFilters[key]} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
+                  <select key={key} className="select-control" aria-label={label} value={unsortedFilters[key]} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
                     <option value="">{label}</option>
                     {options.map(option => <option key={option} value={option}>{option}</option>)}
                   </select>
                 ))}
-                <select className="select-control" value={unsortedFilters.deckStatus} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
+                <select className="select-control" aria-label={t('loc.allDeckStatuses')} value={unsortedFilters.deckStatus} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
                   <option value="">{t('loc.allDeckStatuses')}</option>
                   <option value="inPlay">{t('loc.inPlay')}</option>
                   <option value="notInPlay">{t('loc.notInPlay')}</option>
@@ -2587,8 +2648,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
             {/* Drop a filed card here to take it back out of the container. */}
             <UnsortedDropZone enabled={dndEnabled}>
-            {unsortedViewMode === 'grid' ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.6rem', marginTop: '0.25rem' }}>
+            {/* ponytail: share card actions; keep each view's presentation inline. */}
+            <div style={unsortedViewMode === 'grid'
+              ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.6rem', marginTop: '0.25rem' }
+              : { display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.25rem' }}>
                 {unsortedCards.map(card => {
                   const picked = moveMode && pickedEntryId === card.entry_id;
                   const isSelected = unsortedSelectMode && unsortedSelectedIds.has(card.entry_id);
@@ -2607,7 +2670,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       className={card.entry_id === focusEntryId ? 'focus-flash' : ''}
                       {...unsortedPressHandlers(card.entry_id)}
                       onClick={() => activateUnsortedCard(card)}
-                      style={{
+                      style={unsortedViewMode === 'grid' ? {
                         display: 'flex',
                         flexDirection: 'column',
                         background: isHighlighted ? 'rgba(255, 71, 71, 0.12)' : 'rgba(255, 255, 255, 0.03)',
@@ -2618,8 +2681,22 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         cursor: 'pointer',
                         userSelect: 'none',
                         transition: 'all 0.15s ease-in-out'
+                      } : {
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.72rem',
+                        padding: '0.4rem',
+                        background: isHighlighted ? 'rgba(255,71,71,0.18)' : 'rgba(255, 255, 255, 0.02)',
+                        border: isHighlighted ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)',
+                        borderRadius: 'var(--radius-sm)',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        transition: 'all 0.15s ease-in-out'
                       }}
                     >
+                      {unsortedViewMode === 'grid' ? (
+                        <>
                       {/* Card Thumbnail Box */}
                       <div
                         style={{
@@ -2697,44 +2774,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                           {card.price_trend > 0 && <span style={{ color: 'var(--accent-yellow)', fontWeight: 600, flexShrink: 0 }}>${card.price_trend.toFixed(2)}</span>}
                         </div>
                       </div>
-                    </DraggableCard>
-                  );
-                })}
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.25rem' }}>
-                {unsortedCards.map(card => {
-                  const picked = moveMode && pickedEntryId === card.entry_id;
-                  const isSelected = unsortedSelectMode && unsortedSelectedIds.has(card.entry_id);
-                  const isHighlighted = picked || isSelected;
-                  const rarityBorder = getCardRarityBorder(card.rarity);
-                  const foilClass = getFoilOverlayClass(card.printing);
-                  const printingBadgeLabel = getPrintingBadgeLabel(card.printing);
-
-                  return (
-                    <DraggableCard
-                      enabled={dndEnabled}
-                      entryId={card.entry_id}
-                      card={card}
-                      key={card.entry_id}
-                      id={`card-${card.entry_id}`}
-                      className={card.entry_id === focusEntryId ? 'focus-flash' : ''}
-                      {...unsortedPressHandlers(card.entry_id)}
-                      onClick={() => activateUnsortedCard(card)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.72rem',
-                        padding: '0.4rem',
-                        background: isHighlighted ? 'rgba(255,71,71,0.18)' : 'rgba(255, 255, 255, 0.02)',
-                        border: isHighlighted ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)',
-                        borderRadius: 'var(--radius-sm)',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                        transition: 'all 0.15s ease-in-out'
-                      }}
-                    >
+                        </>
+                      ) : (
+                        <>
                       <div
                         style={{ position: 'relative', width: '42px', flexShrink: 0, overflow: 'hidden', borderRadius: '4px', ...rarityBorder }}
                       >
@@ -2771,11 +2813,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                           ${card.price_trend.toFixed(2)}
                         </span>
                       )}
+                        </>
+                      )}
                     </DraggableCard>
                   );
                 })}
               </div>
-            )}
 
             {unsortedCards.length === 0 && <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.5rem' }}>{t('loc.nothingUnsorted')}</p>}
             </UnsortedDropZone>
@@ -2788,7 +2831,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           carries Locate / Placed / Skip. Replaces the full desktop guide so the
           container and the guide share one screen. */}
       {isStacked && filingMode && filingQueue[filingIndex] && (
-        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'calc(6rem + max(env(safe-area-inset-bottom, 0px), var(--sab, 0px)))', zIndex: 90, padding: '0 0.6rem' }}>
+        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))', zIndex: 90, padding: '0 0.6rem' }}>
           <div className="glass-panel" style={{ padding: '0.7rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'var(--bg-secondary)', boxShadow: '0 -6px 20px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, whiteSpace: 'nowrap' }}>

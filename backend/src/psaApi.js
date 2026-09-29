@@ -25,7 +25,7 @@ const API_BASE_URL = 'https://api.psacard.com/publicapi';
 const client = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
-  headers: { 'User-Agent': 'Bindarr/1.0', Accept: 'application/json' },
+  headers: { 'User-Agent': 'Manafolio/1.0', Accept: 'application/json' },
 });
 
 // PSA meters the public API per token and does not publish the ceiling as a
@@ -109,12 +109,8 @@ function normalizeCert(payload, certNumber) {
 
 // PSA's card name, turned into something the card search can actually match.
 //
-// PSA writes labels in its own shorthand: 'CHARIZARD-HOLO', 'PIKACHU VMAX (SECRET)',
-// 'BLASTOISE-HOLO 1ST EDITION'. The hyphen joins the name to a finish, the suffix
-// words describe the printing, and none of it appears in a card's actual name — so
-// searching the label verbatim finds nothing. Take the leading name only and let
-// the caller's search do the rest.
-const LABEL_NOISE = /\b(HOLO|REVERSE|FOIL|1ST\s*EDITION|SHADOWLESS|SECRET|FULL\s*ART|ALT\s*ART|PROMO|RAINBOW|GOLD)\b/gi;
+// Remove grading-label finish annotations before searching for the card.
+const LABEL_NOISE = /\b(HOLO|FOIL|FULL\s*ART|ALT\s*ART|PROMO)\b/gi;
 function searchableName(subject) {
   return String(subject || '')
     .split('-')[0]

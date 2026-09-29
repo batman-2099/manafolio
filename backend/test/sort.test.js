@@ -9,7 +9,7 @@ const assert = require('assert');
 
 // Point the db module at a throwaway file BEFORE requiring it (db.js reads
 // DB_PATH at import time).
-const tmpDb = path.join(os.tmpdir(), `bindarr-test-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-test-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 // initDb only seeds the 'admin' user when this is set — the wizard creates the
 // owner account otherwise, and these tests want a user id 1 to exist.
@@ -73,7 +73,7 @@ async function insertCard(id, name) {
   await db.run(
     `INSERT OR REPLACE INTO card_cache (id, name, supertype, subtypes, types, rarity, set_id, set_name, number, image_url, price_trend)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, name, 'Pokémon', '[]', '[]', 'Common', 's1', 'Set One', '1', '', 1]
+    [id, name, 'Creature', '[]', '[]', 'Common', 's1', 'Set One', '1', '', 1]
   );
 }
 
@@ -124,7 +124,7 @@ async function main() {
     `A1: a card sorting into a full page must spill to the next page with room (got compartment ${rec.compartment_id}, expected ${page2.lastID})`
   );
 
-  // General invariant: never recommend a compartment that is already full.
+  // Prefer an available compartment while this container still has one.
   const cnt = await db.get(`SELECT COUNT(*) as n FROM collection WHERE compartment_id = ? AND user_id = ?`, [rec.compartment_id, userId]);
   const comp = await db.get(`SELECT capacity FROM compartments WHERE id = ?`, [rec.compartment_id]);
   assert(cnt.n < comp.capacity, `recommended compartment is already full (${cnt.n}/${comp.capacity})`);

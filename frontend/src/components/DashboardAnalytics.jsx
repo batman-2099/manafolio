@@ -1,19 +1,37 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useT } from '../utils/i18n';
+import { useScrollReveal } from '../utils/useScrollReveal';
 
 const cellStyle = { padding: '0.65rem', borderBottom: '1px solid var(--border-glass)', textAlign: 'left' };
 const tableStyle = { width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' };
 const noteStyle = { color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.5, margin: '0.75rem 0' };
 
+export function ChartDataTable({ titleId, title, category, rows, series, format, categoryKey = 'name', formatCategory = value => value }) {
+  const { t, locale } = useT();
+  return (
+    <details className="dashboard-data" style={{ marginTop: '0.75rem' }}>
+      <summary aria-describedby={titleId}>{t('dash.viewData')}</summary>
+      <div role="region" aria-labelledby={titleId} tabIndex={0} style={{ overflowX: 'auto' }}>
+        <table style={tableStyle}>
+          <caption style={noteStyle}>{title}</caption>
+          <thead><tr><th scope="col" style={{ ...cellStyle, overflowWrap: 'normal' }}>{category}</th>{series.map(item => <th key={item.key} scope="col" style={{ ...cellStyle, overflowWrap: 'normal' }}>{item.label}</th>)}</tr></thead>
+          <tbody>{rows.map(row => <tr key={row.month || row[categoryKey]}><th scope="row" style={cellStyle}>{formatCategory(row[categoryKey])}</th>{series.map(item => <td key={item.key} style={{ ...cellStyle, whiteSpace: 'nowrap' }}>{format ? format(row[item.key]) : row[item.key].toLocaleString(locale)}</td>)}</tr>)}</tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
 export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
   const { t, locale } = useT();
+  const revealRef = useScrollReveal();
   const isArchive = inventory === 'graveyard';
   const number = (value) => value.toLocaleString(locale);
   const distributionSeries = isArchive ? [
-    { key: 'owned', label: t('dash.archivedCopies'), color: '#8b5cf6' },
+    { key: 'owned', label: t('dash.archivedCopies'), color: '#a78bfa' },
   ] : [
-    { key: 'owned', label: t('dash.ownedCopies'), color: 'var(--accent-blue)' },
-    { key: 'decks', label: t('dash.savedDeckSlots'), color: 'var(--accent-yellow)' },
+    { key: 'owned', label: t('dash.ownedCopies'), color: '#60a5fa' },
+    { key: 'decks', label: t('dash.savedDeckSlots'), color: '#fbbf24' },
   ];
   const charts = [
     {
@@ -21,10 +39,10 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
       rows: analytics?.growth?.map(row => ({ ...row, name: new Date(`${row.month}-01T00:00:00Z`).toLocaleDateString(locale, { month: 'short', year: '2-digit', timeZone: 'UTC' }) })),
       category: t('dash.month'), empty: t(isArchive ? 'dash.noArchiveGrowth' : 'dash.noGrowth'), stacked: true,
       series: isArchive ? [
-        { key: 'graveyard', label: t('dash.archivedCopies'), color: '#8b5cf6' },
+        { key: 'graveyard', label: t('dash.archivedCopies'), color: '#a78bfa' },
       ] : [
-        { key: 'physical', label: t('dash.physical'), color: 'var(--accent-blue)' },
-        { key: 'arena', label: t('dash.arena'), color: 'var(--accent-yellow)' },
+        { key: 'physical', label: t('dash.physical'), color: '#60a5fa' },
+        { key: 'arena', label: t('dash.arena'), color: '#fbbf24' },
       ],
     },
     {
@@ -39,12 +57,37 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
     },
   ];
   const decks = analytics?.deckPerformance;
+  const allUnavailable = charts.every(chart => !chart.rows) && (isArchive || !decks);
+
+  if (allUnavailable) {
+    return (
+      <div>
+        <p style={noteStyle}>{t('dash.analyticsUnavailable')}</p>
+        <details className="dashboard-methodology">
+          <summary>{t('dash.methodology')}</summary>
+          <div className="dashboard-analytics-grid">
+            {charts.map(chart => (
+              <section key={chart.key} aria-labelledby={`analytics-${chart.key}`}>
+                <h3 id={`analytics-${chart.key}`} className="section-heading">{chart.title}</h3>
+                <p style={noteStyle}>{chart.note}</p>
+              </section>
+            ))}
+            {!isArchive && <section aria-labelledby="analytics-decks">
+              <h3 id="analytics-decks" className="section-heading">{t('dash.deckPerformance')}</h3>
+              <p style={noteStyle}>{t('dash.deckPerformanceNote')}</p>
+            </section>}
+          </div>
+          {!isArchive && <p style={noteStyle}>{t('dash.deckSlotsNote')}</p>}
+        </details>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: 'grid', gap: '1.5rem', margin: '1.5rem 0', minWidth: 0 }}>
+    <div ref={revealRef} className="dashboard-analytics-grid">
       {charts.map(chart => (
-        <section key={chart.key} className="glass-panel" aria-labelledby={`analytics-${chart.key}`} style={{ minWidth: 0 }}>
-          <h3 id={`analytics-${chart.key}`} className="chart-title">{chart.title}</h3>
+        <section key={chart.key} className="dashboard-subsection view-section" aria-labelledby={`analytics-${chart.key}`}>
+          <h3 id={`analytics-${chart.key}`} className="section-heading">{chart.title}</h3>
           <p style={noteStyle}>{chart.note}</p>
           {chart.key !== 'growth' && !isArchive && <p style={noteStyle}>{t('dash.deckSlotsNote')}</p>}
           {!chart.rows ? <p style={noteStyle}>{t('dash.analyticsUnavailable')}</p> : (
@@ -71,22 +114,13 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
                   </ResponsiveContainer>
                 </div>
               )}
-              <details style={{ marginTop: '0.75rem' }}>
-                <summary style={{ cursor: 'pointer', color: 'var(--text-primary)' }}>{t('dash.viewData')}</summary>
-                <div role="region" aria-label={chart.title} tabIndex={0} style={{ overflowX: 'auto' }}>
-                  <table style={tableStyle}>
-                    <caption style={noteStyle}>{chart.title}</caption>
-                    <thead><tr><th scope="col" style={cellStyle}>{chart.category}</th>{chart.series.map(series => <th key={series.key} scope="col" style={cellStyle}>{series.label}</th>)}</tr></thead>
-                    <tbody>{chart.rows.map(row => <tr key={row.month || row.name}><th scope="row" style={cellStyle}>{row.name}</th>{chart.series.map(series => <td key={series.key} style={cellStyle}>{number(row[series.key])}</td>)}</tr>)}</tbody>
-                  </table>
-                </div>
-              </details>
+              <ChartDataTable titleId={`analytics-${chart.key}`} title={chart.title} category={chart.category} rows={chart.rows} series={chart.series} />
             </>
           )}
         </section>
       ))}
-      {!isArchive && <section className="glass-panel" aria-labelledby="analytics-decks" style={{ minWidth: 0 }}>
-        <h3 id="analytics-decks" className="chart-title">{t('dash.deckPerformance')}</h3>
+      {!isArchive && <section className="dashboard-subsection view-section" aria-labelledby="analytics-decks">
+        <h3 id="analytics-decks" className="section-heading">{t('dash.deckPerformance')}</h3>
         <p style={noteStyle}>{t('dash.deckPerformanceNote')}</p>
         {decks?.length > 0 && <p style={noteStyle}>{t('dash.lowSampleNote')}</p>}
         {!decks ? <p style={noteStyle}>{t('dash.analyticsUnavailable')}</p> : decks.length === 0 ? <p style={noteStyle}>{t('dash.noDeckPerformance')}</p> : (

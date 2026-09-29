@@ -49,19 +49,19 @@ function testStateTokens() {
 
 function testExtractUserIdentity() {
   // 1. Standard preferred_username
-  const id1 = oidc.extractUserIdentity({ sub: 'sub-101', preferred_username: 'AshKetchum' });
+  const id1 = oidc.extractUserIdentity({ sub: 'sub-101', preferred_username: 'CardCollector' });
   assert.strictEqual(id1.sub, 'sub-101');
-  assert.strictEqual(id1.username, 'ashketchum');
+  assert.strictEqual(id1.username, 'cardcollector');
 
   // 2. Email fallback
-  const id2 = oidc.extractUserIdentity({ sub: 'sub-102', email: 'Misty.Waterflower@cerulean.gym' });
+  const id2 = oidc.extractUserIdentity({ sub: 'sub-102', email: 'Alex.Smith@example.org' });
   assert.strictEqual(id2.sub, 'sub-102');
-  assert.strictEqual(id2.username, 'misty-waterflower');
+  assert.strictEqual(id2.username, 'alex-smith');
 
   // 3. Username with special characters sanitized
-  const id3 = oidc.extractUserIdentity({ sub: 'sub-103', name: 'Brock #1 Rock-Trainer!' });
+  const id3 = oidc.extractUserIdentity({ sub: 'sub-103', name: 'Alex #1 Card-Collector!' });
   assert.strictEqual(id3.sub, 'sub-103');
-  assert.strictEqual(id3.username, 'brock-1-rock-trainer');
+  assert.strictEqual(id3.username, 'alex-1-card-collector');
 
   // 4. Short username padded
   const id4 = oidc.extractUserIdentity({ sub: 'sub-104', preferred_username: 'a' });
@@ -93,7 +93,7 @@ function testIssuerTransport() {
 function testIdTokenValidation() {
   const { validateIdTokenClaims } = oidc;
   const ISS = 'https://auth.example.com';
-  const CID = 'bindarr';
+  const CID = 'manafolio';
   const NONCE = 'nonce-abc';
   const ok = () => ({
     iss: ISS,
@@ -179,12 +179,12 @@ async function testMockOidcFlow() {
 
         const mockIdTokenPayload = {
           iss: `http://${req.headers.host}`,
-          aud: 'bindarr-test-client',
+          aud: 'manafolio-test-client',
           exp: Math.floor(Date.now() / 1000) + 3600,
           nonce: currentNonce,
           sub: 'auth-user-999',
-          preferred_username: 'RedChampion',
-          email: 'red@kanto.org'
+          preferred_username: 'DraftChampion',
+          email: 'champion@example.org'
         };
         const mockIdToken = `eyJhbGciOiJub25lIn0.${Buffer.from(JSON.stringify(mockIdTokenPayload)).toString('base64url')}.sig`;
 
@@ -209,7 +209,7 @@ async function testMockOidcFlow() {
 
   process.env.OIDC_ENABLED = 'true';
   process.env.OIDC_ISSUER_URL = mockIssuer;
-  process.env.OIDC_CLIENT_ID = 'bindarr-test-client';
+  process.env.OIDC_CLIENT_ID = 'manafolio-test-client';
   process.env.OIDC_CLIENT_SECRET = 'secret123';
   oidc._resetDiscoveryCache();
 
@@ -218,7 +218,7 @@ async function testMockOidcFlow() {
     const authUrl = await oidc.buildAuthorizationUrl();
     const parsedAuth = new URL(authUrl);
     assert.strictEqual(parsedAuth.pathname, '/auth');
-    assert.strictEqual(parsedAuth.searchParams.get('client_id'), 'bindarr-test-client');
+    assert.strictEqual(parsedAuth.searchParams.get('client_id'), 'manafolio-test-client');
     assert.strictEqual(parsedAuth.searchParams.get('response_type'), 'code');
     assert.strictEqual(parsedAuth.searchParams.get('code_challenge_method'), 'S256');
 
@@ -237,7 +237,7 @@ async function testMockOidcFlow() {
     assert.strictEqual(authCodeReceived, 'test-auth-code-xyz', 'token endpoint must receive authorization code');
     assert(codeVerifierReceived, 'token endpoint must receive PKCE code_verifier');
     assert.strictEqual(exchangeResult.extracted.sub, 'auth-user-999');
-    assert.strictEqual(exchangeResult.extracted.username, 'redchampion');
+    assert.strictEqual(exchangeResult.extracted.username, 'draftchampion');
 
     console.log('PASS: Mock OIDC authorization URL and code exchange');
   } finally {

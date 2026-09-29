@@ -1,96 +1,87 @@
-# Repository Guidelines
+# Manafolio contributor guide
 
-## Project Overview
+## Product scope
 
-Bindarr is a self-hosted, multi-user collection manager for Pokémon, Magic: The Gathering, and Disney Lorcana cards. It provides search, collection/storage/deck management, pricing, imports/exports, sharing, and optional camera scanning. The product is a React/Vite SPA backed by Express and one SQLite database; Docker packages both.
+Manafolio is a self-hosted, multi-user Magic: The Gathering collection, storage, and deck manager. Physical and Arena inventories are separate; Wishlist plans acquisitions and Graveyard retains archived records without supplying owned totals or Physical/Arena decks. Graveyard deck definitions can use archived cards but cannot reserve or check out copies. The React/Vite frontend and Express backend share one SQLite collection database. Docker packages the web application for desktop and phone browsers.
 
-## Architecture & Data Flow
+Only Magic provider integrations are supported. Preserve existing records and their game identities when changing shared code; removing an integration must not delete or relabel stored collections.
 
-- `frontend/src/main.jsx` boots native setup, i18n, then `App.jsx`. `App.jsx` owns session/tab/toast state, installs auth-aware fetch behavior, lazy-loads views, and handles public share routes.
-- UI components call relative `/api` endpoints. In Capacitor, `frontend/src/apiBase.js` rewrites those calls to the configured server; Vite proxies `/api`, `/models`, and `/ort` to port 3001 in development.
-- `backend/src/server.js` is the composition root: middleware, route mounting, startup initialization/jobs, API/static serving, and optional TLS listener. Route order is security-sensitive: public auth/shared/card-art paths precede the authenticated `/api` gate.
-- `backend/src/routes/*.js` own HTTP/domain operations. Routes use `req.user.id` to scope records. Central decisions belong in existing utilities, especially `utils/pokemonProvider.js` for Pokémon source selection and `utils/cardApi.js` for card-ID provider dispatch.
-- `backend/src/db.js` owns the shared SQLite connection, schema initialization/migrations, Promise SQL helpers (`run`, `get`, `all`), and `withTransaction`. SQLite uses WAL; preserve its startup migration and transaction model.
-- Provider clients normalize external cards into the cached card shape before collection operations. Scan requests flow through `routes/collection.js` to `cvScan.js`, which matches images against catalog assets built by `catalog.js`.
-- Production builds `frontend/dist`; Express serves it after API routes. `/app/database` persists SQLite, backups, TLS material, models, and scan catalogs.
+Read [README.md](README.md) for installation and user workflows, [PROJECT.md](PROJECT.md) for architecture, and [PRIVACY.md](PRIVACY.md) for data handling.
 
-## Key Directories
+## Entry points and ownership
 
-- `backend/src/` — Express service, database, provider clients, scan/catalog/backup logic.
-- `backend/src/routes/` — feature routers; mount/access order is defined in `backend/src/server.js`.
-- `backend/src/middleware/` — authentication, authorization, and rate limits.
-- `backend/src/utils/` — shared policy/domain helpers. Reuse these instead of duplicating provider, language, price, placement, or TLS logic.
-- `backend/test/` — standalone unit assertions; `backend/test/e2e/` boots real server processes with temporary SQLite state.
-- `frontend/src/` — React app, components, utilities, global CSS, and locales.
-- `frontend/src/locales/` — BCP-47 JSON dictionaries; loaded dynamically by `utils/i18n.jsx`.
-- `frontend/scripts/` — frontend build/locale helpers. `frontend/android/` and `frontend/ios/` are Capacitor native shells.
-- `shared/` — runtime JSON tables/assets consumed by backend; not an npm workspace package.
-- `backend/scripts/` — operator maintenance tasks, not normal development hooks.
+| Area | Location and responsibility |
+| --- | --- |
+| Frontend startup | `frontend/src/main.jsx`: localization, application mount, and styles. |
+| Session and navigation | `frontend/src/App.jsx`: auth-aware fetch, session/tab/toast state, lazy views, and public shares. |
+| Backend composition | `backend/src/server.js`: middleware, route mounts, startup jobs, static files, and optional TLS. |
+| Domain endpoints | `backend/src/routes/`: HTTP validation and account-scoped collection, storage, deck, import, and settings operations. |
+| Persistence | `backend/src/db.js`: schema/migrations, shared connection, Promise SQL helpers, and transactions. |
+| Shared policies | `backend/src/utils/`: provider selection, languages, prices, placement, TLS, and related domain rules. |
+| Scanning | `backend/src/cvScan.js` and `backend/src/catalog.js`: matching and stateful catalogs; frontend camera components manage capture. |
+| Appearance | `frontend/src/index.css`: shared tokens and themes; `frontend/src/arcane.css`: default dark Arcane Blue design. |
+| Localization | `frontend/src/utils/i18n.jsx` and `frontend/src/locales/`: translation context and BCP-47 dictionaries. |
+| Shared assets | `shared/`: runtime JSON and image-processing code; not an npm workspace. |
 
-## Development Commands
+Production serves `frontend/dist` through Express after API routes. Docker persists databases, backups, TLS material, models, and catalogs under `/app/database`. Maintenance utilities live in `backend/scripts/`; they are not ordinary startup hooks.
+
+## Local commands
+
+Use npm. Root, backend, and frontend have separate manifests and lockfiles; this is not an npm workspace.
 
 ```sh
-npm run install:all                 # install root, backend, and frontend packages
-npm run dev                         # backend nodemon + HTTPS Vite dev server
-npm run dev:backend                 # backend only
-npm run dev:frontend                # frontend only
-npm run build:frontend              # build frontend/dist
-npm test                            # backend unit/e2e, then frontend utilities/locales
-npm start                           # production backend start
-
-cd backend && npm run test:e2e      # E2E only
-cd frontend && npm run lint         # required ESLint gate; warnings fail
-cd frontend && npm run check:locales
-cd frontend && npm run preview
-
-docker compose up -d                # source-built container deployment
+npm run install:all
+npm run dev
+npm run dev:backend
+npm run dev:frontend
+npm run build:frontend
+npm test
+npm start
 ```
 
-Use `npm ci` in each package scope for reproducible CI/container installs. Backend changes need a process restart when running `node src/server.js`; only the backend `dev` script reloads automatically.
+Run package-specific commands from the corresponding directory, or use npm's prefix option:
 
-## Code Conventions & Common Patterns
+```sh
+npm run test:e2e --prefix backend
+npm run lint --prefix frontend
+npm run check:locales --prefix frontend
+npm run preview --prefix frontend
+docker compose up -d --build
+```
 
-- **Modules:** backend is CommonJS (`require`, `module.exports`); frontend is ESM/JSX (`import`, `export`). Keep the boundary intact.
-- **Names:** camelCase for values/functions, PascalCase for React components, snake_case for SQLite/API fields. Use lower-case game values: `pokemon`, `mtg`, `lorcana`.
-- **Backend routes:** create `express.Router()`, validate early, use parameterized SQL (`?` with values), wrap async work in `try/catch`, log operational context, and return client-safe `{ error: '...' }` responses. Use `db.run/get/all`; do not use raw callback sqlite calls.
-- **Auth:** preserve central auth/mount placement. Authenticated mutations must be user-scoped with `req.user.id`; do not rely on client-provided user IDs.
-- **Providers:** normalize and cache through the existing provider modules. For Pokémon search/set work use `pokemonProvider.apiFor(lang)`; for an existing card ID use `cardApi`. Do not add feature-local language/ID-prefix branching.
-- **Async/error handling:** non-critical startup warmups/background jobs may intentionally use fallbacks; mutations, auth, and ownership checks must fail explicitly. Do not turn deliberate non-blocking work into request-path blocking.
-- **React/state:** function components and hooks are standard. Keep request/listener cleanups in `useEffect`; local loading/error state stays with the component. Use `const { t } = useT()` and stable translation keys rather than literal UI text.
-- **Styling:** reuse tokens/classes from `frontend/src/index.css` (`--bg-*`, `--text-*`, `--surface-*`, `--accent-*`, `btn`) rather than hard-coded colors. Respect `data-theme`.
-- **Formatting:** match the touched file’s style. No formatter or TypeScript/typecheck command is configured. Frontend ESLint is strict because its script uses `--max-warnings 0`.
-- **Domain invariants:** card behavior is game-scoped; thread new card fields through both Pokémon and Scryfall normalization. Storage ordering is `position = slot * 1000`, not an array index.
+Use `npm ci` separately in each package for reproducible installs. Development serves HTTPS at `https://localhost:5173`, with the backend at `http://localhost:3001`; Vite proxies `/api`, `/models`, and `/ort`. Both services are needed for ordinary development. A running `node src/server.js` needs a restart after backend edits; the backend development script watches for changes.
 
-## Important Files
+Follow the Node versions in Docker and CI when reproducing builds. Native dependencies such as `sqlite3`, `sharp`, and `onnxruntime-node` must be installed for the target platform; the production image uses Debian/glibc, not Alpine.
 
-- `package.json` — root command orchestration.
-- `backend/src/server.js` — backend entry, route composition, lifecycle scheduling, static SPA serving.
-- `backend/src/db.js` — schema/migrations, SQLite access, transactions.
-- `backend/src/routes/collection.js` — search, scan matching, collection and price operations.
-- `backend/src/routes/storage.js` — physical storage/location rules.
-- `backend/src/middleware/auth.js` — bearer/API-key auth, roles, rate limits.
-- `frontend/src/App.jsx` — frontend composition/session/fetch behavior.
-- `frontend/src/utils/i18n.jsx` — translation context and locale loading.
-- `frontend/vite.config.js` — HTTPS dev server, proxy, build behavior.
-- `.env.example` — canonical runtime configuration.
-- `Dockerfile`, `docker-compose.yml`, `entrypoint.sh` — production build, persistence, privilege model.
-- `PROJECT.md` — architecture and operational reference; `README.md` — setup/operator reference.
+## Implementation rules
 
-## Runtime/Tooling Preferences
+- **Module boundaries:** backend uses CommonJS; frontend uses ESM/JSX. Match each file's formatting. No formatter or TypeScript check is configured.
+- **Naming:** camelCase values/functions, PascalCase React components, snake_case database/API fields. Persist game values in lower case.
+- **Routes:** validate at the HTTP boundary, use parameterized SQL and `db.run/get/all`, catch asynchronous failures with operational logging, and return safe `{ error: '...' }` responses. Do not add raw callback-based SQLite operations.
+- **Authorization:** account mutations use `req.user.id`, not client-supplied ownership. Preserve mount order: public auth/share/art paths must not accidentally pass through or bypass the wrong authenticated gate.
+- **Transactions:** preserve WAL, migrations, and `withTransaction`. Collection, placement, reservations, and deck changes that form one operation must not leave partial state.
+- **Providers:** normalize/cache through the existing Scryfall client. Reuse `cardApi` for supported stored card IDs; reject unsupported provider identities rather than guessing conversions or relabeling records.
+- **Errors:** auth, ownership, and mutations fail explicitly. Noncritical warmups may remain nonblocking; do not move their downloads onto request paths.
+- **React:** use function components and hooks; clean up requests/listeners in effects. Keep local loading/error state with its view. Use `useT()` and stable keys rather than literal UI copy.
+- **Styles:** reuse existing tokens and classes. Scope Arcane Blue to the dark theme; retain other account themes, readable contrast, keyboard focus, and responsive controls. Keep the brand logo stationary.
+- **Inventory:** Physical reservations must not consume Arena copies. Wishlist and Graveyard do not supply owned inventory. Respect existing archive/restore, missing-copy, and checkout rules rather than treating every stored card as available.
+- **Placement:** storage positions use `slot * 1000`, not an array index. Preserve existing filing, locking, capacity, and transaction conventions.
 
-- Use **npm**, with separate root, `backend/`, and `frontend/` manifests/lockfiles; this is not an npm workspace.
-- Local documented floor: Node 18+ and npm 9+. Use **Node 20** for server/container/CI parity; Node 22 is used only by mobile/demo release workflows.
-- Frontend: React/Vite, ESM, JSX, HTTPS on `https://localhost:5173`. Backend: Node/Express/CommonJS on `http://localhost:3001` by default.
-- Native dependencies (`sqlite3`, `sharp`, `onnxruntime-node`) are platform-sensitive. Install/rebuild in the target environment; Docker production uses Debian/glibc, not Alpine.
-- Configure runtime through `.env.example`. Preserve `DB_PATH`, TLS, CORS, `PUBLIC_BASE_URL`, `TRUST_PROXY`, bootstrap auth, and provider-key semantics. Do not commit `.env`, database/WAL files, build output, models, catalogs, or generated native assets.
-- Scan models/catalogs are stateful downloads outside the image. A missing catalog must retain the documented `503 notBuilt` behavior; do not guess a match.
+## Runtime data and secrets
 
-## Testing & QA
+`.env.example` is the configuration reference. Preserve `DB_PATH`, TLS, CORS, `PUBLIC_BASE_URL`, `TRUST_PROXY`, bootstrap authentication, and supported credential semantics. Namespace changes require the documented offline migration; startup does not rename previous database files. Very old `sub_location_1` schemas take a destructive migration path: retain explicit operator warnings and offline-backup guidance.
 
-- `npm test` runs `backend/test/run.js`, `backend/test/e2e/run.js`, then `frontend` utility tests and locale validation.
-- Backend tests are plain Node/assert scripts, not Jest/Vitest. Unit suites live in `backend/test/*.test.js`; E2E suites in `backend/test/e2e/*.test.js` run serially against real Express processes.
-- Set `DB_PATH` **before** importing DB-dependent backend modules. Use a per-PID temporary SQLite path and clean its `.db`, `-wal`, and `-shm` files. Prefer real temporary SQLite state over DB mocks.
-- Keep provider tests deterministic/offline with checked-in fixtures and existing Axios interception. `backend/test/live/*.live.js` requires credentials and may consume provider credits; it is intentionally outside normal test discovery.
-- Frontend utility tests live beside utilities as `frontend/src/utils/*.test.js`, using built-in `node:test`/`node:assert`. Match the surrounding test style; do not add a test framework.
-- Locale changes require `cd frontend && npm run check:locales`. Preserve English keys/order, placeholders, and required plural categories; add translations under `frontend/src/locales/<BCP-47>.json`.
-- CI hard-gates backend tests, frontend lint, and locale validation. There is no coverage threshold or configured coverage tool.
+Never commit real environment files, credentials, collection exports, SQLite/WAL files, build output, or downloaded models/catalogs. Screenshots and demos must use clearly identified sample data. Production must not inherit demo sessions or fixtures.
+
+Scan assets are persistent downloads outside the image. A missing catalog must retain the `503 notBuilt` behavior; do not invent matches. Follow the existing capture/OCR safety gates rather than weakening automatic-add checks to improve apparent success rates.
+
+## Verification
+
+- Root `npm test` runs backend unit and E2E checks, then frontend utilities and locale validation.
+- Backend assertions use Node/assert, not Jest/Vitest. Unit files live under `backend/test/`; `backend/test/e2e/` runs real Express processes serially.
+- Set `DB_PATH` before importing database-dependent modules. Use a temporary database isolated by process and clean its database, WAL, and SHM files. Prefer real SQLite over mocked persistence.
+- Provider checks remain deterministic/offline through checked-in fixtures and existing Axios interception.
+- Frontend utility checks use `node:test` and `node:assert` alongside utilities. Do not add a testing framework.
+- Frontend lint treats warnings as failures. Locale changes must pass `npm run check:locales --prefix frontend`; preserve English key order, placeholders, and language-specific plural forms.
+- Exercise changed flows in the actual app as well as focused automated checks. For visual work, inspect desktop/mobile layouts and affected account themes.
+- CI gates backend checks, frontend lint, and locale validation. No coverage threshold or coverage tool is configured.

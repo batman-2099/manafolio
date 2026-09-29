@@ -3,13 +3,14 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Ba
 import { Search, Trophy, Compass, Library, ShieldAlert, Sparkles, X, MapPin, SlidersHorizontal } from 'lucide-react';
 import Logo from './Logo';
 import { priceText } from '../utils/formatPrice';
-import { PRINTINGS } from '../utils/cardOptions';
+import { getPrintings } from '../utils/cardOptions';
 import { getFoilOverlayClass, getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
 import { useBackGuard } from '../utils/useBackGuard';
-import { sortCardsByOrder } from '../utils/cardSort';
+import { COLLECTION_SORT_CRITERIA, sortCardsByOrder } from '../utils/cardSort';
 import { displayName } from '../utils/languages';
 import CardImage from './CardImage';
 import { useT } from '../utils/i18n';
+import themes from '../../../shared/themes.json';
 
 const COLORS = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
@@ -17,28 +18,9 @@ const COLORS = [
 ];
 
 const TYPE_COLORS = {
-  'Grass': '#4ade80', 'Fire': '#f87171', 'Water': '#60a5fa', 'Lightning': '#facc15',
-  'Psychic': '#c084fc', 'Fighting': '#f97316', 'Darkness': '#475569', 'Metal': '#94a3b8',
-  'Dragon': '#a855f7', 'Fairy': '#f472b6', 'Colorless': '#cbd5e1',
+  'Colorless': '#cbd5e1',
   'White': '#fef08a', 'Blue': '#3b82f6', 'Black': '#334155', 'Red': '#ef4444',
   'Green': '#10b981', 'Land': '#d97706'
-};
-
-// Same Sort By options as the owner's collection view (CollectionList), minus
-// the owner-only 'favorite'/'added' notions. 'qty-desc' isn't a card-order
-// scheme so it's handled separately below.
-const SORT_CRITERIA = {
-  'added-newest': [{ by: 'added_at', dir: 'desc' }, { by: 'entry_id', dir: 'desc' }],
-  'name-asc': [{ by: 'name', dir: 'asc' }],
-  'name-desc': [{ by: 'name', dir: 'desc' }],
-  'price-desc': [{ by: 'price', dir: 'desc' }],
-  'price-asc': [{ by: 'price', dir: 'asc' }],
-  'set-asc': [{ by: 'set', dir: 'asc' }, { by: 'number', dir: 'asc' }],
-  'number-asc': [{ by: 'number', dir: 'asc' }, { by: 'name', dir: 'asc' }],
-  'rarity-desc': [{ by: 'rarity', dir: 'desc' }, { by: 'name', dir: 'asc' }],
-  'rarity-asc': [{ by: 'rarity', dir: 'asc' }, { by: 'name', dir: 'asc' }],
-  'type-asc': [{ by: 'type', dir: 'asc' }, { by: 'name', dir: 'asc' }],
-  'language-asc': [{ by: 'language', dir: 'asc' }, { by: 'name', dir: 'asc' }],
 };
 
 function typeColor(name, i) {
@@ -69,13 +51,6 @@ function SharedCollection({ shareToken }) {
 
   const [activeCard, setActiveCard] = useState(null);
   useBackGuard(!!activeCard, () => setActiveCard(null));
-
-  useEffect(() => {
-    const urlTheme = new URLSearchParams(window.location.search).get('theme');
-    if (urlTheme) {
-      document.documentElement.setAttribute('data-theme', urlTheme);
-    }
-  }, []);
 
   useEffect(() => {
     const fetchSharedData = async () => {
@@ -124,7 +99,7 @@ function SharedCollection({ shareToken }) {
       return matchesSearch && matchesRarity && matchesPrinting && matchesType;
     });
     if (sortBy === 'qty-desc') return result.sort((a, b) => (b.quantity || 0) - (a.quantity || 0));
-    return sortCardsByOrder(result, SORT_CRITERIA[sortBy] || SORT_CRITERIA['added-newest']);
+    return sortCardsByOrder(result, COLLECTION_SORT_CRITERIA[sortBy] || COLLECTION_SORT_CRITERIA['added-newest']);
   }, [collection, searchFilter, rarityFilter, printingFilter, typeFilter, sortBy]);
 
   // Group duplicate cards if stack option is active (default true)
@@ -166,7 +141,7 @@ function SharedCollection({ shareToken }) {
             backgroundColor: 'var(--accent-red)', color: 'var(--text-strong)',
             textDecoration: 'none', fontWeight: 700, borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-accent)'
           }}>
-            {t('shared.goToBindarr')}
+            {t('shared.goToManafolio')}
           </a>
         </div>
       </div>
@@ -182,7 +157,7 @@ function SharedCollection({ shareToken }) {
   const handleTabChange = (type) => {
     setListType(type);
     const themeParam = new URLSearchParams(window.location.search).get('theme');
-    const qTheme = themeParam ? `&theme=${encodeURIComponent(themeParam)}` : '';
+    const qTheme = themes.includes(themeParam) && themeParam !== 'dark' ? `&theme=${encodeURIComponent(themeParam)}` : '';
     const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?list=${type}${qTheme}`;
     window.history.pushState({ path: newUrl }, '', newUrl);
   };
@@ -222,8 +197,8 @@ function SharedCollection({ shareToken }) {
       {/* Header */}
       <header className="app-header" style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-glass)' }}>
         <div className="logo-section">
+          <h1 className="logo-text">Manafolio</h1>
           <div className="logo-icon"><Logo /></div>
-          <h1 className="logo-text">Bind<span>arr</span></h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
           <Sparkles size={14} style={{ color: 'var(--accent-yellow)' }} />
@@ -359,7 +334,7 @@ function SharedCollection({ shareToken }) {
                 <label>{t('card.printing')}</label>
                 <select className="select-control" value={printingFilter} onChange={(e) => setPrintingFilter(e.target.value)}>
                   <option value="">{t('collection.allPrintings')}</option>
-                  {PRINTINGS.map(p => <option key={p} value={p}>{p}</option>)}
+                  {getPrintings().map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
               </div>
             </div>
@@ -399,11 +374,9 @@ function SharedCollection({ shareToken }) {
       ) : (
         <div className="card-grid">
           {processedCollection.map(card => {
-            const rarity = (card.rarity || '').toLowerCase();
-            const isUltra = rarity.includes('rare') || rarity.includes('secret') || rarity.includes('promo') || rarity.includes('ultra');
             return (
-              <div key={card.entry_id} className="tcg-card tilt-card-wrapper" onClick={() => setActiveCard(card)}>
-                <div className={`tcg-card-inner ${isUltra ? 'rarity-glow-ultra' : ''}`}>
+              <div key={card.entry_id} className="tcg-card" onClick={() => setActiveCard(card)}>
+                <div className="tcg-card-inner">
                   <CardImage card={card} className="tcg-card-image" loading="lazy" />
                   {getFoilOverlayClass(card.printing) && (
                     <div className={getFoilOverlayClass(card.printing)} style={{ borderRadius: 'var(--radius-sm)' }} />

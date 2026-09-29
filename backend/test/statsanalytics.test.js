@@ -3,7 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bindarr-stats-analytics-'));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'manafolio-stats-analytics-'));
 process.env.DB_PATH = path.join(tmpDir, 'test.db');
 process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 const db = require('../src/db');
@@ -48,7 +48,7 @@ async function main() {
       ['land', 'Island', null, 0, '["Land"]', '["Island"]', 'mtg'],
       ['high', 'Expensive Spell', '["R"]', 9, '["Sorcery"]', '[]', 'mtg'],
       ['archived', 'Archived Enchantment', '["B"]', 5, '["Enchantment"]', '[]', 'mtg'],
-      ['legacy', 'Legacy Card', '["White"]', 2, '[]', '[]', 'pokemon']
+      ['legacy', 'Legacy Card', '["White"]', 2, '[]', '[]', 'unsupported']
     ]) {
       await db.run('INSERT INTO card_cache (id, name, color_identity, cmc, types, subtypes, game) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, name, identity, cmc, types, subtypes, game]);
     }
@@ -83,7 +83,7 @@ async function main() {
     for (const [name, user, inventory, wins, losses, game = 'mtg'] of [
       ['Physical', owner, 'collection', 3, 1], ['Shared slots', owner, 'collection', 0, 0],
       ['Arena', owner, 'arena', 0, 2], ['Other user', other, 'collection', 99, 1],
-      ['Legacy', owner, 'collection', 99, 1, 'pokemon'], ['Empty deck', empty, 'collection', 0, 0]
+      ['Legacy', owner, 'collection', 99, 1, 'unsupported'], ['Empty deck', empty, 'collection', 0, 0]
     ]) {
       decks[name] = (await db.run('INSERT INTO decks (name, user_id, inventory_type, wins, losses, game) VALUES (?, ?, ?, ?, ?, ?)', [name, user, inventory, wins, losses, game])).lastID;
     }

@@ -12,34 +12,19 @@ function parseSqliteUtc(str) {
 
 function resolveCardPrice(card) {
   if (!card) return 0;
-  // A value set on the copy wins over every provider price. It is either what the
-  // owner typed or what a graded-price provider returned for this exact slab, and
-  // both know something card_cache cannot: a PSA 10 is worth a multiple of the raw
-  // price, and the raw price is all the card APIs quote. Only rows selected with
-  // collection.market_value carry it, so a bare card_cache row is unaffected.
+  // A manual value on an owned copy overrides the raw provider price.
   if (card.market_value > 0) return card.market_value;
   if (card.printing === 'Holofoil' && card.price_holofoil !== null && card.price_holofoil > 0) {
     return card.price_holofoil;
   }
-  if (card.printing === 'Reverse Holofoil' && card.price_reverse_holofoil !== null && card.price_reverse_holofoil > 0) {
-    return card.price_reverse_holofoil;
-  }
   if (card.printing === 'Normal' && card.price_normal !== null && card.price_normal > 0) {
     return card.price_normal;
-  }
-  // '1st Edition' has been a legal printing since v1.0 but had no price of its own,
-  // so it fell through to price_trend — the UNLIMITED price. On a Base Set Charizard
-  // that understates the card by thousands. Only TCGCSV fills this column, so the
-  // fallthrough below still covers every row nothing has priced that way.
-  if (card.printing === '1st Edition' && card.price_1st_edition !== null && card.price_1st_edition > 0) {
-    return card.price_1st_edition;
   }
   return card.price_trend || 0;
 }
 
 // Hydrate a raw card_cache row: its array columns are stored as JSON strings,
-// so parse them back to arrays. Missing columns (e.g. color_identity on a
-// Pokémon row) become []. Returns a shallow copy; the raw row is untouched.
+// so parse them back to arrays. Missing columns become []; the raw row is untouched.
 function parseCardRow(row) {
   if (!row) return row;
   return {
@@ -62,13 +47,6 @@ async function rebalanceCompartmentPositions(db, compartmentId, userId) {
   }
 }
 
-const isVintageSet = (setId) => {
-  const id = (setId || '').toLowerCase();
-  return id.startsWith('base') || id.startsWith('gym') || id.startsWith('neo') ||
-         id.startsWith('lc') || id.startsWith('ecard') || id.startsWith('ex') ||
-         id.startsWith('pop') || id.startsWith('promo1') || id.startsWith('si') ||
-         id.startsWith('xy12') || id.startsWith('cel25');
-};
 
 // Record a price point, but only when it actually moved. The price sweep runs
 // on every boot and nodemon reboots on every code edit, so the unguarded insert
@@ -106,39 +84,14 @@ async function recordPrice(cardId, price) {
 // Scryfall: "We only update prices for cards once per day. Fetching card data
 // more frequently than 24 hours will not yield new prices."
 // (https://scryfall.com/docs/api/rate-limits). Sweeping more often than daily
-// is pure load for zero new data, so both providers gate on this.
+// is pure load for zero new data.
 const PRICE_SWEEP_INTERVAL_MS = 1000 * 60 * 60 * 24;
-// tcgdex gets its own clock: it serves the non-English Pokémon cards that
-// pokemontcg.io has no rows for, so the two sweep different cards and letting
-// either one mark the other's gate would silently skip a whole language.
-// Every provider that sweeps needs an entry here, and an unknown key is treated as
-// "do not sweep" — so a provider added to server.js but forgotten here goes quiet
-// instead of loud: shouldSweepPrices returns false, the boot catch-up skips, and
-// markPricesSwept no-ops. That is exactly what happened to tcgcsv on first run.
+// The supported provider's persisted sweep clock.
 const SWEEP_COLUMN = {
   mtg: 'mtg_prices_swept_at',
-  pokemon: 'pokemon_prices_swept_at',
-  tcgdex: 'tcgdex_prices_swept_at',
-  pokemontcgapi: 'pokemontcgapi_prices_swept_at',
-  tcgcsv: 'tcgcsv_prices_swept_at',
-  // Lorcana was the next one to go quiet exactly as the paragraph above
-  // predicts. lorcastApi has asked for 'lorcana' since it was written and
-  // db.js has had the column since then too, but this map never got the key --
-  // so shouldSweepPrices('lorcana') answered false forever, markPricesSwept
-  // no-opped, and lorcana_prices_swept_at has never once been written on any
-  // install. It was invisible because the daily interval passed force: true and
-  // skipped the gate, which is exactly why that argument is gone now.
-  lorcana: 'lorcana_prices_swept_at',
 };
 
 // How often the automatic sweep is allowed to run, as configured. 0 turns it off.
-//
-// Every provider here is free except one, and that one is metered: the optional
-// pokemontcgapi.com provider charges credits per card refreshed, so a daily
-// sweep of a 5,000-card collection is a recurring bill rather than a recurring
-// courtesy. Someone who checks their collection value monthly should be able to
-// say so and pay a thirtieth as much.
-//
 // Unreadable or missing settings fall back to daily, which is what every install
 // did before this existed.
 const DEFAULT_PRICE_REFRESH_DAYS = 1;
@@ -156,12 +109,7 @@ async function priceRefreshDays() {
 
 // Has this game's price sweep gone stale enough to be worth running again?
 //
-// This is now the ONLY thing deciding when an automatic sweep runs. server.js
-// used to pass force: true from its daily timer, on the reasoning that the timer
-// was itself the right cadence — which meant this function's answer was ignored
-// in the only case that mattered, and that a provider missing from SWEEP_COLUMN
-// (tcgcsv once, lorcana until today) looked fine because the forced path never
-// asked. The timer now ticks hourly and unforced, and this decides.
+// The timer ticks hourly and this persisted gate decides when a sweep is due.
 //
 // Hourly rather than daily on purpose: with a daily tick and a daily interval,
 // any drift at all leaves "23h 59m elapsed" at the moment of the tick, which
@@ -203,6 +151,5 @@ module.exports = {
   resolveCardPrice,
   parseCardRow,
   rebalanceCompartmentPositions,
-  isVintageSet,
   recordPrice
 };

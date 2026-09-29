@@ -6,7 +6,7 @@ const os = require('os');
 const crypto = require('crypto');
 const assert = require('assert');
 
-const tmpDb = path.join(os.tmpdir(), `bindarr-auth-test-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-auth-test-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 // initDb only seeds the 'admin' user when this is set — the wizard creates the
 // owner account otherwise, and these tests want a user id 1 to exist.
@@ -52,7 +52,7 @@ async function testCollectionIsolation() {
   await db.run(
     `INSERT OR REPLACE INTO card_cache (id, name, supertype, subtypes, types, rarity, set_id, set_name, number, image_url, price_trend)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['card-x', 'Pikachu', 'Pokémon', '[]', '[]', 'Common', 's1', 'Set One', '1', '', 5]
+    ['card-x', 'Llanowar Elves', 'Creature', '[]', '[]', 'Common', 's1', 'Set One', '1', '', 5]
   );
 
   // Alice owns 3 copies, Bob owns 1.

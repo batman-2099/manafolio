@@ -8,13 +8,18 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 // — the app couldn't state what build it was, which is exactly what you need
 // when filing a bug. The release workflow bumps this file, so it's the truth.
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+const themes = JSON.parse(readFileSync(new URL('../shared/themes.json', import.meta.url), 'utf8'))
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  // Demo build is served from https://<user>.github.io/bindarr/, so assets need
-  // that sub-path prefix. Every other build (web/mobile) stays root-relative.
-  base: process.env.VITE_DEMO ? '/bindarr/' : '/',
-  plugins: [react(), basicSsl()],
+  // Pages supplies its deployment path; local demo and web/mobile builds use /.
+  base: process.env.VITE_DEMO ? (process.env.VITE_BASE_PATH || '/') : '/',
+  plugins: [react(), basicSsl(), {
+    name: 'theme-bootstrap',
+    transformIndexHtml(html) {
+      return html.replace('__THEME_KEYS__', JSON.stringify(themes))
+    },
+  }],
   // Matches how the app already reads build-time config (VITE_DEMO), so this
   // needs no new global and no eslint exception.
   define: {

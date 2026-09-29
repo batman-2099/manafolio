@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { User, Lock, ArrowRight, Eye, EyeOff, Server, Shield } from 'lucide-react';
-import { isNative, getServerUrl, setServerUrl } from '../apiBase';
+import { useState, useEffect, useRef } from 'react';
+import { User, Lock, ArrowRight, Eye, EyeOff, Shield, ShieldAlert } from 'lucide-react';
 import { useT } from '../utils/i18n';
 import Logo from './Logo';
 
@@ -11,11 +10,11 @@ const OWNER_USERNAME = 'admin';
 function Login({ onLoginSuccess }) {
   const { t } = useT();
   const [isRegister, setIsRegister] = useState(false);
-  // Native app connects to the user's own self-hosted instance; web is same-origin.
-  const [server, setServer] = useState(getServerUrl());
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [mismatchSubmitted, setMismatchSubmitted] = useState(false);
+  const confirmPasswordRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(() => {
     try {
@@ -41,12 +40,8 @@ function Login({ onLoginSuccess }) {
   const [oidcProviderName, setOidcProviderName] = useState('Single Sign-On');
 
   useEffect(() => {
-    if (isNative && !server) return; // wait until user sets their server URL
     let cancelled = false, tries = 0;
-    // Cold start on native: the WebView renders before the CapacitorHttp bridge /
-    // network is ready, so this fetch can fail and the Sign Up button would stay
-    // hidden forever. Retry on failure (a real 200 {registrationEnabled:false}
-    // stops immediately) and refetch on resume so the button self-heals.
+    // Retry transient network failures and refetch when the browser tab resumes.
     const load = () => {
       fetch('/api/auth/config')
         .then(res => res.ok ? res.json() : Promise.reject(new Error('config unreachable')))
@@ -63,17 +58,16 @@ function Login({ onLoginSuccess }) {
         })
         .catch(() => { if (!cancelled && tries++ < 5) setTimeout(load, 1500); });
     };
-    // Debounce so a freshly-typed server address is checked once it settles,
-    // not against every half-typed URL keystroke.
-    const debounce = setTimeout(load, server ? 400 : 0);
+    load();
     const onVis = () => { if (document.visibilityState === 'visible') { tries = 0; load(); } };
     document.addEventListener('visibilitychange', onVis);
-    return () => { cancelled = true; clearTimeout(debounce); document.removeEventListener('visibilitychange', onVis); };
-  }, [server]);
+    return () => { cancelled = true; document.removeEventListener('visibilitychange', onVis); };
+  }, []);
 
   // Creating an account (first-run owner, or self-registration) asks for the
   // password twice and validates it; signing in does neither.
   const creating = isRegister || setupRequired;
+  const passwordMismatch = creating && mismatchSubmitted && password !== confirmPassword;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,11 +77,6 @@ function Login({ onLoginSuccess }) {
     // who left "show password" on would otherwise submit a plain text field and
     // never get the save prompt — so the reveal always closes on submit.
     setShowPassword(false);
-
-    if (isNative && !server) {
-      setError(t('login.errServerFirst'));
-      return;
-    }
 
     setLoading(true);
 
@@ -103,7 +92,8 @@ function Login({ onLoginSuccess }) {
         return;
       }
       if (password !== confirmPassword) {
-        setError(t('login.errPasswordMismatch'));
+        setMismatchSubmitted(true);
+        confirmPasswordRef.current?.focus();
         setLoading(false);
         return;
       }
@@ -135,43 +125,33 @@ function Login({ onLoginSuccess }) {
   };
 
   return (
-    <div style={{
+    <main style={{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: '100vh',
+      minHeight: '100dvh',
       boxSizing: 'border-box',
-      padding: 'calc(1rem + max(env(safe-area-inset-top, 0px), var(--sat, 0px))) 1rem calc(1rem + max(env(safe-area-inset-bottom, 0px), var(--sab, 0px))) 1rem'
+      padding: 'calc(1rem + env(safe-area-inset-top, 0px)) 1rem calc(1rem + env(safe-area-inset-bottom, 0px)) 1rem'
     }}>
-      <div className="glass-panel" style={{
-        maxWidth: '420px',
-        width: '100%',
-        padding: '2.5rem 2rem',
-        boxShadow: 'var(--shadow-glow), var(--shadow-accent)',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid rgba(255, 71, 71, 0.2)'
-      }}>
-        {/* Logo/Icon */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ width: '84px', height: '84px', margin: '0 auto 1rem auto', filter: 'drop-shadow(0 0 12px var(--accent-red-glow))' }}>
-            <Logo />
+      <div className="login-form" style={{ maxWidth: '420px', width: '100%' }}>
+        <header style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            <div style={{ width: '48px', height: '48px', flexShrink: 0 }}><Logo /></div>
+            <span style={{ fontSize: '1.25rem', fontWeight: 700 }} translate="no">Manafolio</span>
+            <span className="app-version">v{import.meta.env.VITE_APP_VERSION}</span>
           </div>
-          <h2 style={{ fontSize: '1.8rem', color: 'var(--text-strong)', fontWeight: 800 }}>
-            Bind<span style={{ color: 'var(--accent-red)' }}>arr</span>
-          </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+          <h1 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem' }}>
+            {t(setupRequired ? 'login.setupSubmit' : isRegister ? 'login.register' : 'login.signIn')}
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
             {t(setupRequired ? 'login.setupTagline' : isRegister ? 'login.taglineRegister' : 'login.taglineLogin')}
           </p>
-        </div>
+        </header>
 
         {setupRequired && (
           <div style={{
-            padding: '0.75rem 1rem',
             marginBottom: '1.5rem',
-            borderLeft: '3px solid var(--accent-red)',
-            background: 'rgba(255,255,255,0.03)',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '0.8rem',
+            fontSize: '0.9375rem',
             color: 'var(--text-secondary)',
             lineHeight: 1.5
           }}>
@@ -180,12 +160,11 @@ function Login({ onLoginSuccess }) {
         )}
 
         {error && (
-          <div className="glass-panel" style={{
+          <div role="alert" style={{
             padding: '0.75rem 1rem',
-            borderLeft: '3px solid var(--accent-red)',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            color: '#f87171',
-            fontSize: '0.85rem',
+            border: '1px solid var(--accent-red)',
+            color: 'var(--accent-red)',
+            fontSize: '0.875rem',
             marginBottom: '1.5rem',
             borderRadius: 'var(--radius-sm)'
           }}>
@@ -196,8 +175,8 @@ function Login({ onLoginSuccess }) {
         {oidcEnabled && !setupRequired && !isRegister && (
           <div style={{ marginBottom: '1.25rem' }}>
             <a
-              href={(isNative && server ? server.replace(/\/+$/, '') : '') + '/api/auth/oidc/login'}
-              className="btn"
+              href="/api/auth/oidc/login"
+              className="btn btn-secondary"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -206,14 +185,10 @@ function Login({ onLoginSuccess }) {
                 padding: '0.75rem 1rem',
                 width: '100%',
                 boxSizing: 'border-box',
-                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: 'var(--text-strong)',
                 fontSize: '0.95rem',
                 fontWeight: 600,
                 borderRadius: 'var(--radius-sm)',
                 textDecoration: 'none',
-                transition: 'all 0.2s ease',
                 cursor: 'pointer'
               }}
             >
@@ -222,47 +197,26 @@ function Login({ onLoginSuccess }) {
             </a>
 
             <div style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0 0.25rem 0', gap: '0.75rem' }}>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }} />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-glass)' }} />
+              <span style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>
                 {t('login.orDivider')}
               </span>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }} />
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-glass)' }} />
             </div>
           </div>
         )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {isNative && (
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label htmlFor="login-server" style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('login.serverUrl')}</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  id="login-server"
-                  type="url"
-                  inputMode="url"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  className="input-control"
-                  style={{ width: '100%', paddingLeft: '2.5rem' }}
-                  placeholder="https://your-server.example.com"
-                  value={server}
-                  onChange={(e) => { setServer(e.target.value); setServerUrl(e.target.value); }}
-                  required
-                  disabled={loading}
-                />
-                <Server size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              </div>
-            </div>
-          )}
-
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label htmlFor="login-username" style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('login.username')}</label>
+            <label htmlFor="login-username">{t('login.username')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 id="login-username"
                 type="text"
                 name="username"
                 autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
                 className="input-control"
                 style={{ width: '100%', paddingLeft: '2.5rem' }}
                 placeholder={t('login.usernamePlaceholder')}
@@ -279,7 +233,7 @@ function Login({ onLoginSuccess }) {
           </div>
 
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label htmlFor="login-password" style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('login.password')}</label>
+            <label htmlFor="login-password">{t('login.password')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 id="login-password"
@@ -299,18 +253,21 @@ function Login({ onLoginSuccess }) {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={t(showPassword ? 'login.hidePassword' : 'login.showPassword')}
+                aria-pressed={showPassword}
                 style={{
                   position: 'absolute',
-                  right: '0.75rem',
+                  right: 0,
                   top: '50%',
                   transform: 'translateY(-50%)',
                   background: 'none',
                   border: 'none',
                   color: 'var(--text-muted)',
                   cursor: 'pointer',
-                  padding: '8px',
+                  minWidth: '44px',
+                  minHeight: '44px',
                   display: 'flex',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -320,15 +277,18 @@ function Login({ onLoginSuccess }) {
 
           {creating && (
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label htmlFor="login-confirm-password" style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('login.confirmPassword')}</label>
+              <label htmlFor="login-confirm-password">{t('login.confirmPassword')}</label>
               <div style={{ position: 'relative' }}>
                 <input
                   id="login-confirm-password"
+                  ref={confirmPasswordRef}
+                  aria-invalid={passwordMismatch || undefined}
+                  aria-describedby={passwordMismatch ? 'login-confirm-error' : undefined}
                   type={showPassword ? 'text' : 'password'}
                   name="confirm-password"
                   autoComplete="new-password"
                   className="input-control"
-                  style={{ width: '100%', paddingLeft: '2.5rem' }}
+                  style={{ width: '100%', paddingLeft: '2.5rem', borderColor: passwordMismatch ? 'var(--accent-red)' : undefined }}
                   placeholder={t('login.confirmPasswordPlaceholder')}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -337,6 +297,12 @@ function Login({ onLoginSuccess }) {
                 />
                 <Lock size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               </div>
+              {passwordMismatch && (
+                <p id="login-confirm-error" role="alert" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-red)', fontSize: '0.875rem', margin: '0.5rem 0 0' }}>
+                  <ShieldAlert size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+                  {t('login.errPasswordMismatch')}
+                </p>
+              )}
             </div>
           )}
 
@@ -350,19 +316,14 @@ function Login({ onLoginSuccess }) {
               justifyContent: 'center',
               gap: '0.5rem',
               fontSize: '1rem',
-              fontWeight: 700,
-              boxShadow: 'var(--shadow-accent)'
+              fontWeight: 700
             }}
             disabled={loading}
           >
-            {loading ? (
-              <div className="spinner" style={{ width: '16px', height: '16px', margin: 0, borderWidth: '2px' }}></div>
-            ) : (
-              <>
-                <span>{t(setupRequired ? 'login.setupSubmit' : isRegister ? 'login.register' : 'login.login')}</span>
-                <ArrowRight size={16} />
-              </>
-            )}
+            <span>{t(setupRequired ? 'login.setupSubmit' : isRegister ? 'login.register' : 'login.login')}</span>
+            {loading
+              ? <span className="spinner" aria-hidden="true" style={{ width: '16px', height: '16px', margin: 0, borderWidth: '2px' }} />
+              : <ArrowRight size={16} aria-hidden="true" />}
           </button>
         </form>
 
@@ -392,7 +353,7 @@ function Login({ onLoginSuccess }) {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
 

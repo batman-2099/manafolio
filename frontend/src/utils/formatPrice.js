@@ -20,7 +20,7 @@ export const SYMBOLS = {
 
 export const getCurrency = () => {
   try {
-    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('bindarr_currency') : null;
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('manafolio_currency') : null;
     return (stored && SYMBOLS[stored]) ? stored : DEFAULT_CURRENCY;
   } catch {
     return DEFAULT_CURRENCY;
@@ -30,10 +30,10 @@ export const getCurrency = () => {
 export const setCurrency = (code) => {
   const next = SYMBOLS[code] ? code : DEFAULT_CURRENCY;
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('bindarr_currency', next);
+    localStorage.setItem('manafolio_currency', next);
   }
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('bindarr_currency_change', { detail: next }));
+    window.dispatchEvent(new CustomEvent('manafolio_currency_change', { detail: next }));
   }
 };
 

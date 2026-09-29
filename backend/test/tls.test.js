@@ -8,7 +8,7 @@ const { X509Certificate } = require('crypto');
 const { loadOrCreateCert } = require('../src/utils/tls');
 
 (async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bindarr-tls-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'manafolio-tls-'));
 
   const first = await loadOrCreateCert(dir);
   assert.ok(first.selfSigned, 'generated cert is self-signed');

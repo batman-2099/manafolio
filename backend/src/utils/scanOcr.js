@@ -5,10 +5,7 @@ const MIN_CONFIDENCE = 70;
 const MAX_OUTPUT = 256 * 1024;
 let active = 0;
 
-// Only footer identities: never correct OCR characters into a plausible catalog ID.
-function parsePrintingTsv(tsv, { setCodes = [] } = {}) {
-  const known = new Set(setCodes.filter(code => typeof code === 'string' && /^[a-z0-9]{2,6}$/i.test(code))
-    .map(code => code.toLowerCase()));
+function tsvLines(tsv) {
   const lines = new Map();
   for (const row of String(tsv).split('\n')) {
     const cells = row.trimEnd().split('\t');
@@ -19,9 +16,28 @@ function parsePrintingTsv(tsv, { setCodes = [] } = {}) {
     if (!lines.has(key)) lines.set(key, []);
     lines.get(key).push({ text: cells[11].trim(), confidence });
   }
+  return [...lines.values()];
+}
+
+function parseNameTsv(tsv) {
+  const lines = tsvLines(tsv).filter(words => words.some(word => /\p{L}/u.test(word.text)))
+    .map(words => ({ text: words.map(word => word.text).join(' '),
+      confidence: Math.min(...words.map(word => word.confidence)) / 100 }));
+  if (!lines.length) return { status: 'unreadable' };
+  const confident = lines.filter(line => line.confidence >= MIN_CONFIDENCE / 100);
+  const reading = confident.length === 1 ? confident[0]
+    : lines.reduce((best, line) => line.confidence > best.confidence ? line : best);
+  if (confident.length !== 1) return { status: 'unreadable', ...reading };
+  return { status: 'read', ...reading };
+}
+
+// Only footer identities: never correct OCR characters into a plausible catalog ID.
+function parsePrintingTsv(tsv, { setCodes = [] } = {}) {
+  const known = new Set(setCodes.filter(code => typeof code === 'string' && /^[a-z0-9]{2,6}$/i.test(code))
+    .map(code => code.toLowerCase()));
   const sets = new Map();
   const numbers = new Map();
-  for (const words of lines.values()) {
+  for (const words of tsvLines(tsv)) {
     const text = words.map(word => word.text).join(' ');
     // A language marker prevents artist names and copyright text becoming set codes.
     const set = /^([a-z0-9]{2,6})\s+(?:[^a-z0-9\s]{1,3}\s*)?(?:EN|DE|FR|IT|ES|PT|JA|JP|KO|KR|RU|CS|CT|ZHS|ZHT)\b/i.exec(text);
@@ -67,13 +83,13 @@ function recognize(image) {
       failure ||= error;
       child.kill('SIGKILL');
     };
-    const timer = setTimeout(() => stop(new Error('Footer OCR timed out')), 5000);
+    const timer = setTimeout(() => stop(new Error('Card OCR timed out')), 5000);
     child.on('error', error => { failure = error; });
     child.stdin.on('error', error => stop(error));
     for (const [stream, chunks] of [[child.stdout, output], [child.stderr, errors]]) {
       stream.on('data', chunk => {
         bytes += chunk.length;
-        if (bytes > MAX_OUTPUT) stop(new Error('Footer OCR exceeded output limit'));
+        if (bytes > MAX_OUTPUT) stop(new Error('Card OCR exceeded output limit'));
         else chunks.push(chunk);
       });
       stream.on('error', error => stop(error));
@@ -81,17 +97,17 @@ function recognize(image) {
     child.on('close', code => {
       clearTimeout(timer);
       if (failure) reject(failure);
-      else if (code !== 0) reject(new Error(`Footer OCR exited ${code}: ${Buffer.concat(errors).toString('utf8').slice(0, 500)}`));
+      else if (code !== 0) reject(new Error(`Card OCR exited ${code}: ${Buffer.concat(errors).toString('utf8').slice(0, 500)}`));
       else resolve(Buffer.concat(output).toString('utf8'));
     });
     child.stdin.end(image);
   });
 }
 
-async function readPrinting(rectifiedImageBuffer, { setCodes = [] } = {}) {
+async function readCardText(rectifiedImageBuffer) {
   // Bound work before decoding/spawning; busy callers get an explicit retryable error.
   if (!Buffer.isBuffer(rectifiedImageBuffer) || !rectifiedImageBuffer.length
-      || rectifiedImageBuffer.length > 8 * 1024 * 1024 || !Array.isArray(setCodes) || active >= 2) {
+      || rectifiedImageBuffer.length > 8 * 1024 * 1024 || active >= 2) {
     return { status: 'error' };
   }
   active++;
@@ -101,13 +117,22 @@ async function readPrinting(rectifiedImageBuffer, { setCodes = [] } = {}) {
     if (!width || !height || width < 128 || height < 128 || width > 2048 || height > 2048 || pages > 1) {
       return { status: 'error' };
     }
-    // ponytail: footer-only OCR avoids full-card text; no card-name recognition needed.
     const top = Math.floor(height * 0.84);
-    const footer = await image.extract({ left: 0, top, width: Math.ceil(width * 0.75), height: height - top })
+    const footer = await image.clone().extract({ left: 0, top, width: Math.ceil(width * 0.75), height: height - top })
       .flatten({ background: '#fff' }).grayscale().resize({ width: 1344 }).normalise().sharpen()
       .extend({ top: 16, bottom: 16, left: 16, right: 16, background: '#fff' })
       .timeout({ seconds: 3 }).png().toBuffer();
-    return parsePrintingTsv(await recognize(footer), { setCodes });
+    // ponytail: two bounded crops, not full-card OCR; unusual title layouts need manual review.
+    // Restore portrait glyph proportions instead of OCRing horizontally stretched text.
+    const title = await image.clone().extract({
+      left: Math.floor(width * 0.075), top: Math.floor(height * 0.04),
+      width: Math.floor(width * 0.725), height: Math.floor(height * 0.085),
+    }).flatten({ background: '#fff' }).grayscale().resize({ width: 896, height: 147, fit: 'fill' })
+      .extend({ top: 16, bottom: 16, left: 16, right: 16, background: '#fff' })
+      .timeout({ seconds: 3 }).png().toBuffer();
+    // Sequential subprocesses preserve the two-job limit. Parse after metadata arrives.
+    const tsv = await recognize(footer);
+    return { tsv, nameTsv: await recognize(title) };
   } catch (error) {
     if (error.code === 'ENOENT') return { status: 'unavailable' };
     console.warn('[scanOcr]', error.message);
@@ -117,4 +142,4 @@ async function readPrinting(rectifiedImageBuffer, { setCodes = [] } = {}) {
   }
 }
 
-module.exports = { readPrinting, parsePrintingTsv };
+module.exports = { readCardText, parsePrintingTsv, parseNameTsv };

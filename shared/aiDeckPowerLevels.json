@@ -1,0 +1,7 @@
+[
+  { "level": 1, "name": "Exhibition", "description": "Theme/fun first", "pace": "Very casual, usually 9+ turns" },
+  { "level": 2, "name": "Core", "description": "Normal casual Commander", "pace": "Straightforward, usually 8+ turns" },
+  { "level": 3, "name": "Upgraded", "description": "Strong casual", "pace": "Optimized synergy, usually 6+ turns" },
+  { "level": 4, "name": "Optimized", "description": "Very high power", "pace": "Fast, efficient, potentially ~turn 4" },
+  { "level": 5, "name": "cEDH", "description": "Competitive Commander", "pace": "Fully optimized; can end any turns" }
+]

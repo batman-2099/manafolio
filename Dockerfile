@@ -1,5 +1,5 @@
 # =========================================
-# Bindarr Dockerfile
+# Manafolio Dockerfile
 # Stage 1: Build Frontend Assets
 # =========================================
 FROM node:20-alpine AS frontend-builder
@@ -13,6 +13,8 @@ RUN npm ci
 COPY frontend/ ./
 # Shared JSON tables imported via ../../../shared/*.json (resolves to /app/shared)
 COPY shared/ /app/shared/
+# The in-app guide is bundled from its Markdown source.
+COPY docs/USER_GUIDE.md /app/docs/USER_GUIDE.md
 # Build production bundles
 RUN npm run build
 
@@ -43,11 +45,11 @@ ENV PORT=3001
 # unless SSL_CERT_PATH/SSL_KEY_PATH point at a real one. Set HTTPS_PORT="" to
 # serve plain HTTP only.
 ENV HTTPS_PORT=3443
-ENV DB_PATH=/app/database/bindarr.db
+ENV DB_PATH=/app/database/manafolio.db
 # Scan models and catalogs live on the persisted volume, both so a build has a
 # writable target under the non-root `node` user and so an image update does not
 # discard them. The two ONNX models are NOT in the image — they are AGPL-3.0 while
-# Bindarr is MIT, so the operator fetches them into this directory deliberately:
+# Manafolio is MIT, so the operator fetches them into this directory deliberately:
 #   docker exec <container> node scripts/fetch-models.mjs
 ENV CV_MODEL_DIR=/app/database/models
 
@@ -76,10 +78,7 @@ RUN npm rebuild sqlite3 --build-from-source
 # Copy backend source files
 COPY backend/src/ ./src/
 
-# Nothing here is on a runtime path — the whole index build lives in src/ — but
-# these are the operator's escape hatches inside a running container:
-# eval-global-index.mjs measures what the index actually identifies, and
-# cardSources.js is what it resolves reference images through.
+# Operator maintenance tools; runtime catalog building lives in src/.
 COPY backend/scripts/ ./scripts/
 
 # Shared JSON tables required at runtime by backend/src/utils/compartmentSort.js

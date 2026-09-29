@@ -19,7 +19,7 @@ const assert = require('assert');
 const os = require('os');
 const path = require('path');
 
-process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-slab-${process.pid}.db`);
+process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-slab-${process.pid}.db`);
 // initDb only seeds the 'admin' user when this is set — the wizard creates the
 // owner account otherwise, and these tests want a user id 1 to exist.
 process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
@@ -27,18 +27,16 @@ process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 const db = require('../src/db');
 const psaApi = require('../src/psaApi');
 
-// A PSA cert response in the documented shape. Charizard because it is the card
-// people actually own graded, and the label really does read 'CHARIZARD-HOLO' —
-// which is the string searchableName has to survive.
-const CHARIZARD = {
+// Synthetic Magic certificate in PSA's documented response shape.
+const CERTIFICATE = {
   PSACert: {
     CertNumber: '82613901',
-    Year: '1999',
-    Brand: 'POKEMON GAME',
-    Subject: 'CHARIZARD-HOLO',
+    Year: '1993',
+    Brand: 'MAGIC THE GATHERING',
+    Subject: 'BLACK LOTUS',
     Category: 'TCG CARDS',
-    CardNumber: '4',
-    VarietyPedigree: '1ST EDITION',
+    CardNumber: '232',
+    VarietyPedigree: 'ALPHA',
     CardGrade: 'MINT 9',
     TotalPopulation: 1234,
     PopulationHigher: 567,
@@ -67,30 +65,28 @@ const CHARIZARD = {
   assert.strictEqual(psaApi.normalizeCertNumber('abc'), '');
 
   // --- 3. PSA's label shorthand becomes something searchable ------------------
-  // Searching 'CHARIZARD-HOLO' finds nothing; the card is named 'Charizard'.
-  assert.strictEqual(psaApi.searchableName('CHARIZARD-HOLO'), 'CHARIZARD');
-  assert.strictEqual(psaApi.searchableName('PIKACHU VMAX (SECRET)'), 'PIKACHU VMAX');
-  assert.strictEqual(psaApi.searchableName('BLASTOISE 1ST EDITION'), 'BLASTOISE');
+  assert.strictEqual(psaApi.searchableName('LIGHTNING BOLT-FOIL'), 'LIGHTNING BOLT');
+  assert.strictEqual(psaApi.searchableName('BLACK LOTUS (ALPHA)'), 'BLACK LOTUS');
 
   // --- 4. normalizeCert reads the documented shape ----------------------------
-  const norm = psaApi.normalizeCert(CHARIZARD, '82613901');
+  const norm = psaApi.normalizeCert(CERTIFICATE, '82613901');
   assert.strictEqual(norm.grader, 'PSA');
   assert.strictEqual(norm.grade, 9);
   assert.strictEqual(norm.grade_label, 'MINT 9');
-  assert.strictEqual(norm.subject, 'CHARIZARD-HOLO');
-  assert.strictEqual(norm.card_number, '4');
+  assert.strictEqual(norm.subject, 'BLACK LOTUS');
+  assert.strictEqual(norm.card_number, '232');
   assert.strictEqual(norm.population, 1234);
   // Casing is read tolerantly, because PSA's has moved before and a cert costs a
   // request — a renamed field must not silently blank every stored cert.
-  const camel = psaApi.normalizeCert({ psaCert: { certNumber: '1', cardGrade: 'GEM MT 10', subject: 'MEW' } }, '1');
+  const camel = psaApi.normalizeCert({ psaCert: { certNumber: '1', cardGrade: 'GEM MT 10', subject: 'SOL RING' } }, '1');
   assert.strictEqual(camel.grade, 10, 'camelCase response still parses');
-  assert.strictEqual(camel.subject, 'MEW');
+  assert.strictEqual(camel.subject, 'SOL RING');
 
   // --- 5. A cached cert resolves with NO token --------------------------------
   // The whole reason psa_cert has no staleness check. If this regresses, the app
   // starts demanding a token to display grades it already knows.
   await db.run(`INSERT OR REPLACE INTO psa_cert (cert_number, payload) VALUES (?, ?)`,
-    ['82613901', JSON.stringify(CHARIZARD)]);
+    ['82613901', JSON.stringify(CERTIFICATE)]);
   const cached = await psaApi.lookupCert('8261 3901', ''); // no token, spaced input
   assert.strictEqual(cached.cached, true, 'must come from cache');
   assert.strictEqual(cached.grade, 9);
@@ -125,7 +121,7 @@ const CHARIZARD = {
 
     // A good response IS cached, and the second call spends no request.
     let calls = 0;
-    psaApi.client.get = async () => { calls++; return { data: CHARIZARD }; };
+    psaApi.client.get = async () => { calls++; return { data: CERTIFICATE }; };
     await db.run(`DELETE FROM psa_cert WHERE cert_number = '82613901'`);
     const fresh = await psaApi.lookupCert('82613901', 'tok');
     assert.strictEqual(fresh.cached, false);
@@ -145,7 +141,7 @@ const CHARIZARD = {
   assert.strictEqual(cols.find(x => x.name === 'grade').type, 'REAL', 'grade must be REAL for half grades');
 
   const user = await db.get(`SELECT id FROM users LIMIT 1`);
-  await db.run(`INSERT OR REPLACE INTO card_cache (id, name, game) VALUES ('test-slab-card', 'Charizard', 'pokemon')`);
+  await db.run(`INSERT OR REPLACE INTO card_cache (id, name, game) VALUES ('test-slab-card', 'Black Lotus', 'mtg')`);
   const add = (grader, grade, cert) => db.run(
     `INSERT INTO collection (card_id, user_id, quantity, grader, grade, cert_number) VALUES ('test-slab-card', ?, 1, ?, ?, ?)`,
     [user.id, grader, grade, cert]
@@ -173,20 +169,38 @@ const CHARIZARD = {
   await db.run(`DELETE FROM collection WHERE card_id = 'test-slab-card'`);
   await db.run(`DELETE FROM card_cache WHERE id = 'test-slab-card'`);
 
-  // --- 8. The cert route is mounted where the client calls it ----------------
-  // This router is mounted at '/api', NOT at '/api/collection', so every route in
-  // it spells its own full path. Declaring '/cert/:certNumber' put the endpoint at
-  // /api/cert/... while the client asked for /api/collection/cert/... — and the
-  // symptom was a 401, not a 404, because the auth middleware runs before routing
-  // and answers first for any unmatched path under /api. Nothing short of a real
-  // request revealed it, so the mounted path is asserted directly.
-  const routes = require('../src/routes/collection').stack
-    .filter(l => l.route)
-    .map(l => l.route.path);
-  assert.ok(
-    routes.includes('/collection/cert/:certNumber'),
-    `cert route must be at /collection/cert/:certNumber, found: ${routes.filter(p => p.includes('cert'))}`
-  );
+  // Exercise the mounted cert endpoint, including provider dispatch and rejection.
+  const express = require('express');
+  const scryfall = require('../src/scryfallApi');
+  const originalSearch = scryfall.searchCards;
+  scryfall.searchCards = async ({ name, number }) => {
+    assert.strictEqual(name, 'BLACK LOTUS');
+    assert.strictEqual(number, '232');
+    return { cards: [{ id: 'mtg-cert-match', name: 'Black Lotus', game: 'mtg' }] };
+  };
+  for (const [number, brand, subject] of [
+    ['66666666', 'UNSUPPORTED GAME', 'Unsupported Card'],
+  ]) {
+    await db.run('INSERT INTO psa_cert (cert_number, payload) VALUES (?, ?)',
+      [number, JSON.stringify({ PSACert: { ...CERTIFICATE.PSACert, CertNumber: number, Brand: brand, Subject: subject, CardNumber: '1' } })]);
+  }
+  const app = express();
+  app.use((req, _res, next) => { req.user = { id: user.id }; next(); });
+  app.use('/api', require('../src/routes/collection'));
+  const server = app.listen(0);
+  const base = `http://127.0.0.1:${server.address().port}/api/collection/cert`;
+  try {
+    const response = await fetch(`${base}/82613901`);
+    assert.strictEqual(response.status, 200);
+    const body = await response.json();
+    assert.strictEqual(body.game, 'mtg');
+    assert.strictEqual(body.cert.grade, 9);
+    assert.strictEqual(body.candidates[0].id, 'mtg-cert-match');
+    assert.strictEqual((await fetch(`${base}/66666666`)).status, 400);
+  } finally {
+    scryfall.searchCards = originalSearch;
+    await new Promise(resolve => server.close(resolve));
+  }
 
   console.log('slabgrading self-check passed');
   process.exit(0);

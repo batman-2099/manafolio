@@ -2,12 +2,29 @@ import { getRarityRank } from './cardRarity';
 import cardOrder from '../../../shared/cardOrder.json';
 import sortSchemes from '../../../shared/sortSchemes.json';
 
+// Collection sort choices shared by owner and public views; quantity stays local.
+export const COLLECTION_SORT_CRITERIA = {
+  'added-newest': [{ by: 'added_at', dir: 'desc' }, { by: 'entry_id', dir: 'desc' }],
+  'name-asc': [{ by: 'name', dir: 'asc' }],
+  'name-desc': [{ by: 'name', dir: 'desc' }],
+  'price-desc': [{ by: 'price', dir: 'desc' }],
+  'price-asc': [{ by: 'price', dir: 'asc' }],
+  'set-asc': [{ by: 'set', dir: 'asc' }, { by: 'number', dir: 'asc' }],
+  'set-oldest': [{ by: 'set', dir: 'asc' }, { by: 'number', dir: 'asc' }],
+  'set-newest': [{ by: 'set', dir: 'desc' }, { by: 'number', dir: 'asc' }],
+  'number-asc': [{ by: 'number', dir: 'asc' }, { by: 'name', dir: 'asc' }],
+  'rarity-desc': [{ by: 'rarity', dir: 'desc' }, { by: 'name', dir: 'asc' }],
+  'rarity-asc': [{ by: 'rarity', dir: 'asc' }, { by: 'name', dir: 'asc' }],
+  'type-asc': [{ by: 'type', dir: 'asc' }, { by: 'name', dir: 'asc' }],
+  'language-asc': [{ by: 'language', dir: 'asc' }, { by: 'name', dir: 'asc' }],
+};
+
 // Shared comparator logic for ordering collection cards. Previously copy-pasted
 // across autoSortContainerCards, findNextRecommendedSlot, the sorting assistant
 // queue, and the unsorted list view in LocationManager.jsx.
 // Category orderings come from shared/cardOrder.json so display order matches
 // the backend filing engine (compartmentSort.js) exactly.
-export const POKEMON_TYPE_ORDER = cardOrder.pokemonType;
+export const TYPE_ORDER = cardOrder.type;
 
 // Mirrors typeCategory in the backend: multi-color MTG cards bucket together.
 export function typeCategory(types) {
@@ -95,8 +112,8 @@ export function sortCardsByOrder(cards, sortOrder, foilSorting, setsList = []) {
           break;
         }
         case 'type': {
-          const orderA = POKEMON_TYPE_ORDER[typeCategory(a.types)] || 50;
-          const orderB = POKEMON_TYPE_ORDER[typeCategory(b.types)] || 50;
+          const orderA = TYPE_ORDER[typeCategory(a.types)] || 50;
+          const orderB = TYPE_ORDER[typeCategory(b.types)] || 50;
           cmp = orderA - orderB;
           break;
         }

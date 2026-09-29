@@ -87,7 +87,7 @@ function fakeServer() {
 }
 
 async function main() {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bindarr-codex-test-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'manafolio-codex-test-'));
   const dbModule = require.resolve('../src/db');
   const previousDb = require.cache[dbModule];
   require.cache[dbModule] = { id: dbModule, filename: dbModule, loaded: true, exports: { dbPath: path.join(dir, 'test.db') } };

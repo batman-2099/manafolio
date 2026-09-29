@@ -5,7 +5,7 @@ const path = require('node:path');
 const express = require('express');
 const compression = require('compression');
 
-const tmpDb = path.join(os.tmpdir(), `bindarr-import-progress-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-import-progress-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 process.env.DEFAULT_ADMIN_PASSWORD = 'import-progress-test';
 process.env.SCRYFALL_GAP_SCALE = '0';

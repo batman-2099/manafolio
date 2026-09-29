@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Trash2, Edit2, LayoutGrid, List, SlidersHorizontal, X, MousePointerClick, Download } from 'lucide-react';
-import { getCardDisplayName, translateJapaneseName } from '../utils/langHelper';
+import { Search, Trash2, Edit2, LayoutGrid, List, SlidersHorizontal, X, MousePointerClick, Download, ChevronDown } from 'lucide-react';
+import { getCardDisplayName } from '../utils/langHelper';
 import { priceText } from '../utils/formatPrice';
-import { CONDITIONS, PRINTINGS, GRADERS } from '../utils/cardOptions';
+import { CONDITIONS, getPrintings, GRADERS } from '../utils/cardOptions';
 import { getPrintingBadgeLabel, getPrintingBadgeStyle, getFoilOverlayClass } from '../utils/cardPrinting';
 import { getCardRarityBorder, getRarityBadgeLabel, getRarityBadgeStyle } from '../utils/cardRarity';
-import { sortCardsByOrder } from '../utils/cardSort';
+import { COLLECTION_SORT_CRITERIA, sortCardsByOrder } from '../utils/cardSort';
 import { buildCollectionExport } from '../utils/collectionExport';
+import { downloadBlob } from '../utils/downloadBlob';
 import { useMultiSelect } from '../utils/useMultiSelect';
 import { defaultGameFilter, isGameEnabled } from '../utils/games';
 import { useT } from '../utils/i18n';
@@ -15,34 +16,23 @@ import AddToDeckSelect from './AddToDeckSelect';
 import PackPriceSplitter from './PackPriceSplitter';
 import CardImage from './CardImage';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import Modal from './Modal';
 
-const labelStyle = { fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' };
+const labelStyle = { fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-secondary)' };
 const PAGE_SIZE = 60;
+const EMPTY_COLLECTION = [];
 
-// Maps each Sort By option to sortCardsByOrder criteria so ordering matches the
-// storage engine (set = chronological via setsList, type = POKEMON_TYPE_ORDER).
-// 'qty-desc' isn't a card-order scheme, handled separately.
 const SORT_CRITERIA = {
-  'added-newest': [{ by: 'added_at', dir: 'desc' }, { by: 'entry_id', dir: 'desc' }],
+  ...COLLECTION_SORT_CRITERIA,
   'added-oldest': [{ by: 'added_at', dir: 'asc' }],
-  'name-asc': [{ by: 'name', dir: 'asc' }],
-  'name-desc': [{ by: 'name', dir: 'desc' }],
-  'price-desc': [{ by: 'price', dir: 'desc' }],
-  'price-asc': [{ by: 'price', dir: 'asc' }],
-  'set-asc': [{ by: 'set', dir: 'asc' }, { by: 'number', dir: 'asc' }],
-  'number-asc': [{ by: 'number', dir: 'asc' }, { by: 'name', dir: 'asc' }],
-  'rarity-desc': [{ by: 'rarity', dir: 'desc' }, { by: 'name', dir: 'asc' }],
-  'rarity-asc': [{ by: 'rarity', dir: 'asc' }, { by: 'name', dir: 'asc' }],
-  'type-asc': [{ by: 'type', dir: 'asc' }, { by: 'name', dir: 'asc' }],
-  'language-asc': [{ by: 'language', dir: 'asc' }, { by: 'name', dir: 'asc' }],
   'favorite-first': [{ by: 'favorite', dir: 'desc' }, { by: 'added_at', dir: 'desc' }],
 };
 
 // Small labelled field wrapper to keep the filter grid uniform.
-function Field({ label, children }) {
+function Field({ label, id, children }) {
   return (
     <div className="form-group" style={{ marginBottom: 0 }}>
-      <label style={labelStyle}>{label}</label>
+      <label htmlFor={id} style={labelStyle}>{label}</label>
       {children}
     </div>
   );
@@ -50,10 +40,10 @@ function Field({ label, children }) {
 
 function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter, setSelectedCardFilter, onNavigate, setSelectedLocationId, setFocusEntryId }) {
   const { t } = useT();
-  const [collection, setCollection] = useState([]);
+  const [collectionState, setCollectionState] = useState(null);
+  const [collectionRefresh, setCollectionRefresh] = useState(0);
   const [locations, setLocations] = useState([]);
   const [setsList, setSetsList] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (selectedCardFilter) {
@@ -75,8 +65,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
   // Search & Filter state
   const [searchFilter, setSearchFilter] = useState('');
-  // '' | 'pokemon' | 'mtg'. Falls back to a visible game if the Settings default
-  // has since been hidden.
+  // Falls back to a visible game if the Settings default has since been hidden.
   const [gameFilter, setGameFilter] = useState(() => (isGameEnabled(localStorage.getItem('default_game')) ? localStorage.getItem('default_game') : defaultGameFilter()));
   const [locationFilter, setLocationFilter] = useState([]);
   const [rarityFilter, setRarityFilter] = useState([]);
@@ -95,6 +84,12 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [notCheckedOutOnly, setNotCheckedOutOnly] = useState(false);
 
+  const collectionScope = `${subTab}:${tradeOnly}`;
+  const hasCollection = collectionState?.scope === collectionScope && collectionState.data !== null;
+  const collection = hasCollection ? collectionState.data : EMPTY_COLLECTION;
+  const loading = collectionState?.scope !== collectionScope || collectionState.loading;
+  const error = collectionState?.scope === collectionScope && collectionState.error;
+
   // Stacking state (default to stacked)
   const [stackCards, setStackCards] = useState(true);
   const [stackByCondition, setStackByCondition] = useState(false);
@@ -104,7 +99,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   const {
     selectMode, setSelectMode, selectedIds, setSelectedIds, toggleSelect, selectAt, clearSelection, exitSelectMode,
     bulkMoveTarget, setBulkMoveTarget, pressHandlers, longPressFired, runBulk,
-  } = useMultiSelect({ showToast, onChanged: () => { onUpdate(); fetchCollection(); } });
+  } = useMultiSelect({ showToast, onChanged: onUpdate });
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -113,32 +108,28 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   }, [subTab, setSelectedIds, setBulkMoveTarget]);
 
   useEffect(() => {
-    fetchCollection();
-    fetchSets();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statsTrigger, subTab, tradeOnly]);
-
-  const fetchCollection = async () => {
-    try {
-      setLoading(true);
-      let url = '/api/collection?list_type=collection';
-      if (subTab === 'wishlist' || subTab === 'arena' || subTab === 'graveyard') url = `/api/collection?list_type=${subTab}`;
-      if (tradeOnly) {
-        url += '&is_trade=1';
-      }
-
-      const response = await fetch(url);
-      if (response.ok) {
+    const controller = new AbortController();
+    setCollectionState(previous => ({ scope: collectionScope, data: previous?.scope === collectionScope ? previous.data : null, loading: true, error: false }));
+    const load = async () => {
+      try {
+        const listType = subTab === 'unsorted' ? 'collection' : subTab;
+        const params = new URLSearchParams({ list_type: listType });
+        if (tradeOnly) params.set('is_trade', '1');
+        const response = await fetch(`/api/collection?${params}`, { signal: controller.signal });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
-        setCollection(data);
+        if (!controller.signal.aborted) setCollectionState({ scope: collectionScope, data, loading: false, error: false });
+      } catch {
+        if (!controller.signal.aborted) setCollectionState(previous => ({ ...previous, loading: false, error: true }));
       }
-    } catch (err) {
-      console.error(err);
-      showToast(t('collection.errLoad'));
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    load();
+    return () => controller.abort();
+  }, [statsTrigger, collectionRefresh, subTab, tradeOnly, collectionScope]);
+
+  useEffect(() => {
+    fetchSets();
+  }, [statsTrigger]);
 
   useEffect(() => {
     let cancelled = false;
@@ -170,14 +161,14 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       });
 
       if (response.ok) {
-        showToast(t('collection.cardRemoved', { name: cardName }));
+        showToast(t('collection.cardRemoved', { name: cardName }), 'success');
         onUpdate();
       } else {
-        showToast(t('collection.errDelete'));
+        showToast(t('collection.errDelete'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast(t('common.errBackend'));
+      showToast(t('common.errBackend'), 'error');
     }
   };
 
@@ -235,14 +226,14 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
   const activeFilterCount =
     [locationFilter, rarityFilter, conditionFilter, graderFilter, printingFilter,
-    setFilter, typeFilter, cmcFilter, languageFilter]
+    setFilter, typeFilter, colorFilter, cmcFilter, languageFilter]
       .filter(v => v.length > 0).length
-    + (gameFilter !== '' ? 1 : 0)
     + (minPriceFilter !== '' ? 1 : 0)
     + (maxPriceFilter !== '' ? 1 : 0)
     + (tradeOnly ? 1 : 0)
     + (favoriteOnly ? 1 : 0)
     + (notCheckedOutOnly ? 1 : 0);
+  const hasUserFilters = activeFilterCount > 0 || searchFilter !== '';
 
   const clearAllFilters = () => {
     setSearchFilter('');
@@ -257,20 +248,17 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
   // Filter + sort
   const filteredCollection = useMemo(() => {
-    const translatedSearch = searchFilter ? (translateJapaneseName(searchFilter) || searchFilter).toLowerCase() : '';
-    // The raw query is matched against the localized name as well as the
-    // translated one: a Japanese Magic card is stored under its English `name`,
-    // so typing 稲妻 only finds it via printed_name.
+    // Search both the English name and the localized printed name.
     const rawSearch = searchFilter.toLowerCase();
     const result = collection.filter(item => {
-      const matchesSearch = item.name.toLowerCase().includes(translatedSearch) ||
+      const matchesSearch = item.name.toLowerCase().includes(rawSearch) ||
                             (item.printed_name || '').toLowerCase().includes(rawSearch) ||
-                            (item.set_name || '').toLowerCase().includes(translatedSearch) ||
+                            (item.set_name || '').toLowerCase().includes(rawSearch) ||
                             (item.number || '').includes(searchFilter);
       const matchesLocation = locationFilter.length === 0 ? true :
                               locationFilter.some(f => f === 'unassigned' ? !item.location_id : item.location_id == f);
       // Hidden games remain stored but are excluded from this view and its exports.
-      const itemGame = item.game || 'mtg';
+      const itemGame = item.game;
       const matchesGame = gameFilter === '' ? isGameEnabled(itemGame) : itemGame === gameFilter;
       const matchesRarity = rarityFilter.length === 0 ? true : rarityFilter.includes(item.rarity);
       const matchesCondition = conditionFilter.length === 0 ? true : conditionFilter.includes(item.condition);
@@ -339,13 +327,9 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   }, [displayCards, subTab, tradeOnly]);
 
   const exportView = (format) => {
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([buildCollectionExport(displayCards, format)], {
+    downloadBlob(new Blob([buildCollectionExport(displayCards, format)], {
       type: format === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
-    }));
-    link.download = `bindarr-${subTab}-view.${format}`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    }), `manafolio-${subTab}-view.${format}`);
   };
 
   const totalValue = useMemo(
@@ -353,12 +337,12 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
     [displayCards]
   );
 
-  const paginationControls = !loading && displayCards.length > 0 && (
+  const paginationControls = hasCollection && pageCount > 1 && (
     <nav aria-label={t('collection.pagination')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '0.75rem', margin: '1rem 0' }}>
       <button type="button" className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} style={{ minHeight: '44px' }}>
         {t('collection.previousPage')}
       </button>
-      <span style={{ fontSize: '0.8rem', textAlign: 'center' }}>
+      <span style={{ fontSize: '0.875rem', textAlign: 'center' }}>
         {t('collection.pageCount', { page: currentPage, count: pageCount })}
         <br />
         {t('collection.pageRange', { start: (currentPage - 1) * PAGE_SIZE + 1, end: Math.min(currentPage * PAGE_SIZE, displayCards.length), count: displayCards.length })}
@@ -371,105 +355,34 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
   return (
     <div>
-      {/* Header: sub-tabs + selection hint + view toggle */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button
-            className={`btn ${subTab === 'collection' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setSubTab('collection')}
-            style={{ fontSize: '0.85rem', padding: '0.45rem 1.25rem', borderRadius: 'var(--radius-sm)' }}
-          >
-            {t('nav.collection')}
+      <div className="collection-inventory-picker form-group">
+        <label htmlFor="collection-inventory">{t('collection.inventory')}</label>
+        <select id="collection-inventory" className="select-control" value={subTab} onChange={event => setSubTab(event.target.value)}>
+          <option value="collection">{t('nav.collection')}</option>
+          <option value="arena">{t('collection.arena')}</option>
+          <option value="graveyard">{t('collection.graveyard')}</option>
+          <option value="unsorted">{t('bulk.unassignedPile')}</option>
+          <option value="wishlist">{t('collection.wishlist')}</option>
+        </select>
+      </div>
+      <div className="sub-nav-tabs collection-inventory-nav" style={{ marginBottom: '0.75rem' }}>
+        {[['collection', 'nav.collection'], ['arena', 'collection.arena'], ['graveyard', 'collection.graveyard'], ['unsorted', 'bulk.unassignedPile'], ['wishlist', 'collection.wishlist']].map(([value, label]) => (
+          <button key={value} className={`sub-nav-tab ${subTab === value ? 'active' : ''}`} aria-pressed={subTab === value} onClick={() => setSubTab(value)}>
+            {t(label)}
           </button>
-          <button
-            className={`btn ${subTab === 'arena' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setSubTab('arena')}
-            style={{ fontSize: '0.85rem', padding: '0.45rem 1.25rem', borderRadius: 'var(--radius-sm)' }}
-          >
-            {t('collection.arena')}
-          </button>
-          <button
-            className={`btn ${subTab === 'graveyard' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setSubTab('graveyard')}
-            style={{ fontSize: '0.85rem', padding: '0.45rem 1.25rem', borderRadius: 'var(--radius-sm)' }}
-          >
-            {t('collection.graveyard')}
-          </button>
-          <button
-            className={`btn ${subTab === 'unsorted' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setSubTab('unsorted')}
-            style={{ fontSize: '0.85rem', padding: '0.45rem 1.25rem', borderRadius: 'var(--radius-sm)' }}
-          >
-            {t('bulk.unassignedPile')}
-          </button>
-          <button
-            className={`btn ${subTab === 'wishlist' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setSubTab('wishlist')}
-            style={{ fontSize: '0.85rem', padding: '0.45rem 1.25rem', borderRadius: 'var(--radius-sm)' }}
-          >
-            {t('collection.wishlist')}
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {subTab === 'graveyard' && (
-            <button className="btn btn-secondary" onClick={() => {
-              setSelectedLocationId?.(null);
-              setFocusEntryId?.(null);
-              onNavigate?.('storage', 'graveyard');
-            }} style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem' }}>
-              {t('loc.graveyardContainers')}
-            </button>
-          )}
-          {/* Multi-select toggle (long-press cards is the primary path) */}
-          <button
-            className={`btn ${selectMode ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
-            style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-            title={t('collection.selectHint')}
-          >
-            <MousePointerClick size={14} />
-            {t(selectMode ? 'bulk.done' : 'collection.select')}
-          </button>
-          <button className="btn btn-secondary" disabled={loading || !displayCards.length} onClick={() => exportView('csv')} style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <Download size={14} />
-            {t('collection.exportViewCsv')}
-          </button>
-          <button className="btn btn-secondary" disabled={loading || !displayCards.length} onClick={() => exportView('txt')} style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <Download size={14} />
-            {t('collection.exportViewTxt')}
-          </button>
-
-          {/* View Toggle */}
-          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
-            <button
-              className={`btn btn-icon-only ${viewMode === 'gallery' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setViewMode('gallery')}
-              style={{ borderRadius: 'var(--radius-sm)', padding: '0.4rem 0.5rem', width: '32px', height: '32px' }}
-              title={t('collection.galleryView')}
-            >
-              <LayoutGrid size={14} />
-            </button>
-            <button
-              className={`btn btn-icon-only ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setViewMode('list')}
-              style={{ borderRadius: 'var(--radius-sm)', padding: '0.4rem 0.5rem', width: '32px', height: '32px' }}
-              title={t('collection.listView')}
-            >
-              <List size={14} />
-            </button>
-          </div>
-        </div>
+        ))}
       </div>
 
+
       {/* Filter Panel */}
-      <div className="glass-panel" style={{ position: 'relative', zIndex: 40, overflow: 'visible', marginBottom: '1.5rem', padding: '1rem 1.25rem' }}>
+      <div className="collection-filters" style={{ position: 'relative', zIndex: 40, overflow: 'visible', marginBottom: '0.75rem' }}>
         {/* Always-visible top bar: search + sort + filters toggle */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2.5fr) minmax(150px, 1fr) auto', gap: '0.75rem', alignItems: 'flex-end' }}>
-          <Field label={t('collection.searchLabel')}>
+        <div className="collection-filter-toolbar">
+          <Field label={t('collection.searchLabel')} id="collection-search">
             <div style={{ position: 'relative' }}>
               <input
-                type="text"
+                id="collection-search"
+                type="search"
                 className="input-control"
                 placeholder={t('collection.searchPlaceholder')}
                 value={searchFilter}
@@ -480,9 +393,9 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
             </div>
           </Field>
 
-          <Field label={t('collection.sortBy')}>
-            <select className="select-control" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-              {['added-newest', 'added-oldest', 'name-asc', 'name-desc', 'price-desc', 'price-asc', 'qty-desc', 'set-asc', 'number-asc', 'type-asc', 'rarity-desc', 'rarity-asc', 'language-asc', 'favorite-first']
+          <Field label={t('collection.sortBy')} id="collection-sort">
+            <select id="collection-sort" className="select-control" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              {['added-newest', 'added-oldest', 'name-asc', 'name-desc', 'price-desc', 'price-asc', 'qty-desc', 'set-newest', 'set-oldest', 'number-asc', 'type-asc', 'rarity-desc', 'rarity-asc', 'language-asc', 'favorite-first']
                 .map(key => <option key={key} value={key}>{t(`collection.sort.${key}`)}</option>)}
             </select>
           </Field>
@@ -490,12 +403,15 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
           <button
             className={`btn ${showFilters ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setShowFilters(s => !s)}
-            style={{ padding: '0.5rem 0.9rem', height: '40px', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
+            aria-expanded={showFilters}
+            aria-controls="collection-filter-options"
+            aria-haspopup="dialog"
+            style={{ padding: '0.5rem 0.9rem', minHeight: '44px', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
           >
             <SlidersHorizontal size={15} />
             {t('collection.filters')}
             {activeFilterCount > 0 && (
-              <span style={{ background: 'var(--accent-red)', color: 'var(--text-strong)', fontSize: '0.65rem', fontWeight: 900, borderRadius: '999px', padding: '1px 7px', minWidth: '18px', textAlign: 'center' }}>
+              <span style={{ fontSize: '0.875rem', fontWeight: 700 }}>
                 {activeFilterCount}
               </span>
             )}
@@ -503,9 +419,15 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
         </div>
 
         {showFilters && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-glass)' }}>
+          <Modal onClose={() => setShowFilters(false)} aria-labelledby="collection-filter-title">
+          <div id="collection-filter-options" className="glass-panel collection-filter-panel">
+            <header className="collection-filter-heading">
+              <h2 id="collection-filter-title">{t('collection.filters')}</h2>
+              <button type="button" className="btn btn-secondary btn-icon-only" aria-label={t('common.close')} onClick={() => setShowFilters(false)}><X size={18} /></button>
+            </header>
+            <div className="collection-filter-body">
             {/* Selector filters grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
+            <div className="collection-filter-grid">
               <Field label={t('collection.fLocation')}>
                 <MultiSelectDropdown
                   label={t('collection.fLocation')}
@@ -576,7 +498,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                   allLabel={t('collection.allPrintings')}
                   value={printingFilter}
                   onChange={setPrintingFilter}
-                  options={PRINTINGS.map(p => ({value: p, label: p}))}
+                  options={getPrintings()}
                 />
               </Field>
 
@@ -618,12 +540,12 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                 />
               </Field>
 
-              <Field label={t('collection.fMinPrice')}>
-                <input type="number" className="input-control" placeholder={t('collection.minPricePlaceholder')} value={minPriceFilter} onChange={(e) => setMinPriceFilter(e.target.value)} />
+              <Field label={t('collection.fMinPrice')} id="collection-min-price">
+                <input id="collection-min-price" type="number" className="input-control" placeholder={t('collection.minPricePlaceholder')} value={minPriceFilter} onChange={(e) => setMinPriceFilter(e.target.value)} />
               </Field>
 
-              <Field label={t('collection.fMaxPrice')}>
-                <input type="number" className="input-control" placeholder={t('collection.maxPricePlaceholder')} value={maxPriceFilter} onChange={(e) => setMaxPriceFilter(e.target.value)} />
+              <Field label={t('collection.fMaxPrice')} id="collection-max-price">
+                <input id="collection-max-price" type="number" className="input-control" placeholder={t('collection.maxPricePlaceholder')} value={maxPriceFilter} onChange={(e) => setMaxPriceFilter(e.target.value)} />
               </Field>
             </div>
 
@@ -677,21 +599,108 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                 </div>
               )}
 
-              {activeFilterCount > 0 && (
-                <button className="btn btn-secondary" onClick={clearAllFilters} style={{ marginLeft: 'auto', fontSize: '0.72rem', padding: '0.3rem 0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <X size={13} /> {t('collection.clearFilters')}
-                </button>
-              )}
             </div>
+            </div>
+            <footer className="collection-filter-footer">
+              <button type="button" className="btn btn-secondary" disabled={!hasUserFilters} onClick={clearAllFilters}>{t('collection.clearFilters')}</button>
+              <button type="button" className="btn btn-primary" onClick={() => setShowFilters(false)}>{t('bulk.done')}</button>
+            </footer>
           </div>
+          </Modal>
         )}
       </div>
 
+        <div className="collection-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+          {subTab === 'graveyard' && (
+            <button className="btn btn-secondary" onClick={() => {
+              setSelectedLocationId?.(null);
+              setFocusEntryId?.(null);
+              onNavigate?.('storage', 'graveyard');
+            }} style={{ fontSize: '0.875rem', padding: '0.4rem 0.75rem' }}>
+              {t('loc.graveyardContainers')}
+            </button>
+          )}
+          {/* Multi-select toggle (long-press cards is the primary path) */}
+          <button
+            className={`btn ${selectMode ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+            aria-pressed={selectMode}
+            style={{ fontSize: '0.875rem', padding: '0.4rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+            title={t('collection.selectHint')}
+          >
+            <MousePointerClick size={14} />
+            {t(selectMode ? 'bulk.done' : 'collection.select')}
+          </button>
+          <details className="collection-export" onKeyDown={(event) => {
+            if (event.key === 'Escape' && event.currentTarget.open) {
+              event.preventDefault();
+              event.stopPropagation();
+              event.currentTarget.open = false;
+              event.currentTarget.querySelector('summary').focus();
+            }
+          }} onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+          }}>
+            <summary className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.4rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Download size={14} aria-hidden="true" />
+              {t('collection.exportView')}
+              <ChevronDown size={14} aria-hidden="true" />
+            </summary>
+            <div className="collection-export-options">
+              {['csv', 'txt'].map(format => (
+                <button key={format} type="button" className="btn btn-secondary" disabled={loading || !displayCards.length} onClick={(event) => {
+                  exportView(format);
+                  const disclosure = event.currentTarget.closest('details');
+                  disclosure.open = false;
+                  disclosure.querySelector('summary').focus();
+                }}>
+                  {t(format === 'csv' ? 'collection.exportViewCsv' : 'collection.exportViewTxt')}
+                </button>
+              ))}
+            </div>
+          </details>
+
+          {/* View Toggle */}
+          <div style={{ display: 'flex', gap: '0.25rem', marginLeft: 'auto' }}>
+            <button
+              className={`btn btn-icon-only ${viewMode === 'gallery' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setViewMode('gallery')}
+              style={{ minWidth: '44px', minHeight: '44px', padding: '0.5rem' }}
+              aria-label={t('collection.galleryView')}
+              aria-pressed={viewMode === 'gallery'}
+              title={t('collection.galleryView')}
+            >
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              className={`btn btn-icon-only ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setViewMode('list')}
+              style={{ minWidth: '44px', minHeight: '44px', padding: '0.5rem' }}
+              aria-label={t('collection.listView')}
+              aria-pressed={viewMode === 'list'}
+              title={t('collection.listView')}
+            >
+              <List size={14} />
+            </button>
+          </div>
+        </div>
       {/* Result summary bar */}
-      {!loading && !selectMode && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', fontSize: '0.78rem', color: 'var(--text-secondary)', flexWrap: 'wrap', gap: '0.5rem' }}>
+      {hasCollection && !selectMode && (
+        <div role="status" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', fontSize: '0.9375rem', color: 'var(--text-secondary)', flexWrap: 'wrap', gap: '0.5rem' }}>
           <span><strong style={{ color: 'var(--text-strong)' }}>{displayCards.length}</strong> {t('collection.cardUnit', { count: displayCards.length })}</span>
-          <span>{t('collection.totalValue')} <strong style={{ color: 'var(--accent-yellow)' }}>{priceText(totalValue)}</strong></span>
+          <span>{t('collection.totalValue')} <strong style={{ color: 'var(--text-strong)' }}>{priceText(totalValue)}</strong></span>
+        </div>
+      )}
+
+      {error ? (
+        <div className="read-state read-state-error">
+          <p role="alert">{t('collection.errLoad')}{hasCollection && <> {t('common.staleData')}</>}</p>
+          <button type="button" className="btn btn-secondary" onClick={() => setCollectionRefresh(value => value + 1)}>{t('dash.retry')}</button>
+        </div>
+      ) : loading && (
+        <div className={`read-state${hasCollection ? '' : ' read-state-initial'}`} role="status">
+          <div className="spinner" aria-hidden="true"></div>
+          <p>{t(hasCollection ? 'common.refreshing' : 'common.loading')}</p>
         </div>
       )}
 
@@ -728,13 +737,13 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
           </select>
           <select className="select-control" value="" disabled={!selectedIds.size} onChange={(e) => { if (e.target.value) runBulk('printing', e.target.value); e.target.value = ''; }} style={{ fontSize: '0.72rem', maxWidth: '150px', padding: '0.3rem 0.4rem' }}>
             <option value="">{t('bulk.setPrinting')}</option>
-            {PRINTINGS.map(p => <option key={p} value={p}>{p}</option>)}
+            {getPrintings().map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
           <div style={{ width: '1px', height: '22px', background: 'var(--border-glass)' }} />
           <PackPriceSplitter
             entryIds={Array.from(selectedIds)}
             showToast={showToast}
-            onApplied={() => { clearSelection(); onUpdate(); fetchCollection(); }}
+            onApplied={() => { clearSelection(); onUpdate(); }}
           />
               <select className="select-control" value={bulkMoveTarget} onChange={(e) => setBulkMoveTarget(e.target.value)} style={{ fontSize: '0.72rem', maxWidth: '170px', padding: '0.3rem 0.4rem' }}>
                 <option value="">{t('bulk.moveToContainer')}</option>
@@ -756,13 +765,17 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
         </div>
       )}
 
-      {paginationControls}
 
-      {loading ? (
-        <div className="spinner"></div>
-      ) : displayCards.length === 0 ? (
-        <div className="glass-panel" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem 1.5rem' }}>
-          <p>{t('collection.noMatches')} {t(activeFilterCount > 0 ? 'collection.noMatchesFiltered' : 'collection.noMatchesEmpty')}</p>
+      {!hasCollection ? null : displayCards.length === 0 ? (
+        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem 0' }}>
+          <p>{t(hasUserFilters ? 'collection.noMatches' : 'collection.emptyInventory')}</p>
+          {hasUserFilters ? (
+            <button type="button" className="btn btn-secondary" onClick={clearAllFilters}>{t('collection.clearFilters')}</button>
+          ) : subTab === 'graveyard' || subTab === 'unsorted' ? (
+            <button type="button" className="btn btn-secondary" onClick={() => setSubTab('collection')}>{t('nav.collection')}</button>
+          ) : (
+            <button type="button" className="btn btn-primary" onClick={() => onNavigate('add-cards')}>{t('nav.addCards')}</button>
+          )}
         </div>
       ) : viewMode === 'gallery' ? (
         /* Visual Cards Grid Gallery View */
@@ -772,117 +785,55 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
             const selected = selectedIds.has(item.entry_id);
 
             return (
-              <div
+              <button
+                type="button"
                 key={item.entry_id}
-                className="tcg-card tilt-card-wrapper"
+                className="tcg-card"
                 style={{ cursor: 'pointer', touchAction: 'pan-y' }}
+                aria-label={getCardDisplayName(item.name, item.printed_name)}
+                aria-pressed={selectMode ? selected : undefined}
+                aria-haspopup={selectMode ? undefined : 'dialog'}
                 onClick={(e) => activateCard(item, e)}
                 {...pressHandlers(item.entry_id)}
               >
-                <div className="tcg-card-inner" style={{ ...rarityStyle, ...(selected ? { outline: '3px solid var(--accent-red)', outlineOffset: '2px' } : {}) }}>
+                <span className="tcg-card-inner" style={{ ...rarityStyle, ...(selected ? { outline: '3px solid var(--accent-red)', outlineOffset: '2px' } : {}) }}>
                   {selectMode && (
-                    <div style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 20, width: '22px', height: '22px', borderRadius: '50%', background: selected ? 'var(--accent-red)' : 'rgba(0,0,0,0.6)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.8rem', fontWeight: 900 }}>{selected ? '✓' : ''}</div>
+                    <span aria-hidden="true" style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 20, width: '22px', height: '22px', borderRadius: '50%', background: selected ? 'var(--accent-red)' : 'rgba(0,0,0,0.6)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.8rem', fontWeight: 900 }}>{selected ? '✓' : ''}</span>
                   )}
                   <CardImage card={item} className="tcg-card-image" loading="lazy" draggable={false} />
                   {getFoilOverlayClass(item.printing) && (
-                    <div className={getFoilOverlayClass(item.printing)} style={{ borderRadius: 'var(--radius-sm)' }} />
+                    <span aria-hidden="true" className={`${getFoilOverlayClass(item.printing)} collection-foil-overlay`} style={{ borderRadius: 'var(--radius-sm)' }} />
                   )}
                   {item.quantity > 1 && (
-                    <div className="tcg-card-quantity-tag">x{item.quantity}</div>
+                    <span className="tcg-card-quantity-tag">x{item.quantity}</span>
                   )}
 
-                  {/* Rarity badge (shared tier system, matches Storage view) */}
-                  <span style={{
-                    position: 'absolute',
-                    top: '6px',
-                    left: '6px',
-                    fontSize: '0.55rem',
-                    fontWeight: 900,
-                    padding: '2px 4px',
-                    borderRadius: '3px',
-                    zIndex: 10,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.5)',
-                    ...getRarityBadgeStyle(item.rarity)
-                  }}>
-                    {getRarityBadgeLabel(item.rarity)}
-                  </span>
-
-                  {/* Overlay Tags */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '6px',
-                    left: '6px',
-                    right: '6px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: '4px',
-                    pointerEvents: 'none'
-                  }}>
-                    {/* One badge in this slot, not two: a slab's grade replaces the
-                        condition rather than sitting beside it, because they answer
-                        the same question and the grader's answer is the one that
-                        counts. Coloured, because 'PSA 10' in the same grey as 'NM'
-                        would bury the distinction that matters most in a grid. */}
-                    {item.grader && item.grader !== 'Raw' ? (
-                      <span style={{
-                        fontSize: '0.6rem',
-                        fontWeight: 800,
-                        padding: '2px 5px',
-                        borderRadius: '3px',
-                        background: 'rgba(250, 204, 21, 0.9)',
-                        color: '#1a1a1a',
-                        border: '1px solid rgba(255, 255, 255, 0.25)',
-                        textTransform: 'uppercase'
-                      }}>
-                        {item.grader}{item.grade != null ? ` ${item.grade}` : ''}
-                      </span>
-                    ) : (
-                      <span style={{
-                        fontSize: '0.6rem',
-                        fontWeight: 800,
-                        padding: '2px 5px',
-                        borderRadius: '3px',
-                        background: 'rgba(0, 0, 0, 0.75)',
-                        color: 'var(--text-strong)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        textTransform: 'uppercase'
-                      }}>
-                        {item.condition === 'Near Mint' ? 'NM' :
-                         item.condition === 'Lightly Played' ? 'LP' :
-                         item.condition === 'Moderately Played' ? 'MP' :
-                         item.condition === 'Heavily Played' ? 'HP' : 'DMG'}
-                      </span>
-                    )}
-                    {item.printing !== 'Normal' && (
-                      <span style={{
-                        fontSize: '0.6rem',
-                        fontWeight: 800,
-                        padding: '2px 5px',
-                        borderRadius: '3px',
-                        ...getPrintingBadgeStyle(item.printing),
-                        border: '1px solid rgba(255, 255, 255, 0.2)'
-                      }}>
-                        {getPrintingBadgeLabel(item.printing)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="tcg-card-info">
-                  <div className="tcg-card-name">{getCardDisplayName(item.name, item.language, item.printed_name)}</div>
-                  <div className="tcg-card-meta">
-                    <span style={{ fontSize: '0.7rem' }}>{item.set_name} • #{item.number}</span>
+                </span>
+                <span className="tcg-card-info">
+                  <span className="tcg-card-name">{getCardDisplayName(item.name, item.printed_name)}</span>
+                  <span className="tcg-card-meta">
+                    <span>{item.set_name} • #{item.number}</span>
                     <span className="tcg-card-price">{priceText(item.price_trend, item.price_currency)}</span>
-                  </div>
-                </div>
-              </div>
+                  </span>
+                  <span style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>
+                    <span className="collection-card-tag" style={getRarityBadgeStyle(item.rarity)}>{getRarityBadgeLabel(item.rarity)}</span>
+                    <span>
+                      {item.grader && item.grader !== 'Raw'
+                        ? `${item.grader}${item.grade != null ? ` ${item.grade}` : ''}`
+                        : item.condition}
+                    </span>
+                    {item.printing !== 'Normal' && (
+                      <span className="collection-card-tag collection-card-tag--foil" style={{ ...getPrintingBadgeStyle(item.printing), backgroundImage: 'var(--foil-tag-sheen)' }}>{getPrintingBadgeLabel(item.printing)}</span>
+                    )}
+                  </span>
+                </span>
+              </button>
             );
           })}
         </div>
       ) : (
         /* Traditional List Table View */
-        <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ overflow: 'hidden' }}>
           <div style={{ overflowY: 'auto' }}>
             <table className="collection-table" style={{ minWidth: 0 }}>
               <thead>
@@ -902,38 +853,44 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                           <input
                             type="checkbox"
                             checked={selected}
+                            aria-label={getCardDisplayName(item.name, item.printed_name)}
                             onChange={() => toggleSelect(item.entry_id)}
                             style={{ width: '18px', height: '18px', flexShrink: 0, cursor: 'pointer' }}
                           />
                         )}
-                        <div
+                        <button
+                          type="button"
+                          className="collection-card-trigger"
+                          aria-label={getCardDisplayName(item.name, item.printed_name)}
+                          aria-pressed={selectMode ? selected : undefined}
+                          aria-haspopup={selectMode ? undefined : 'dialog'}
                           onClick={(e) => activateCard(item, e)}
                           {...pressHandlers(item.entry_id)}
-                          style={{ position: 'relative', width: '36px', height: '50px', flexShrink: 0, overflow: 'hidden', borderRadius: '4px', cursor: 'pointer', touchAction: 'pan-y', ...getCardRarityBorder(item.rarity) }}
+                          style={{ position: 'relative', width: '56px', height: '78px', flexShrink: 0, overflow: 'hidden', borderRadius: '4px', cursor: 'pointer', touchAction: 'pan-y', ...getCardRarityBorder(item.rarity) }}
                         >
                           <CardImage card={item} className="collection-row-thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} draggable={false} />
                           {getFoilOverlayClass(item.printing) && (
-                            <div className={getFoilOverlayClass(item.printing)} style={{ borderRadius: '4px' }} />
+                            <span aria-hidden="true" className={`${getFoilOverlayClass(item.printing)} collection-foil-overlay`} style={{ borderRadius: '4px' }} />
                           )}
-                        </div>
+                        </button>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div onClick={(e) => activateCard(item, e)} {...pressHandlers(item.entry_id)} style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{getCardDisplayName(item.name, item.language, item.printed_name)}</div>
-                          <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <button type="button" className="collection-card-trigger" aria-pressed={selectMode ? selected : undefined} aria-haspopup={selectMode ? undefined : 'dialog'} onClick={(e) => activateCard(item, e)} {...pressHandlers(item.entry_id)} style={{ display: 'block', maxWidth: '100%', fontWeight: 700, color: 'var(--text-strong)', fontSize: '1rem', textAlign: 'left', cursor: 'pointer' }}>{getCardDisplayName(item.name, item.printed_name)}</button>
+                          <div style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem' }}>
                             <span>{item.set_name} • #{item.number}</span>
-                            <span style={{ fontSize: '0.55rem', fontWeight: 800, padding: '1px 3px', borderRadius: '3px', flexShrink: 0, ...getRarityBadgeStyle(item.rarity) }}>
+                            <span style={{ fontSize: '0.875rem', fontWeight: 600, ...getRarityBadgeStyle(item.rarity) }}>
                               {getRarityBadgeLabel(item.rarity)}
                             </span>
                           </div>
-                          <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                          <div style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>
                             {item.printing} • {item.condition}
                           </div>
                           {!selectMode && (
                             <div style={{ display: 'flex', gap: '0.35rem', marginTop: '2px' }}>
-                              <button className="btn btn-secondary btn-icon-only" style={{ width: '18px', height: '18px', padding: 0, borderRadius: '3px' }} onClick={() => openEdit(item)} title={t('common.edit')}>
-                                <Edit2 size={9} />
+                              <button className="btn btn-secondary btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => openEdit(item)} title={t('common.edit')} aria-label={t('common.edit')}>
+                                <Edit2 size={16} />
                               </button>
-                              <button className="btn btn-danger btn-icon-only" style={{ width: '18px', height: '18px', padding: 0, borderRadius: '3px' }} onClick={() => handleDelete(item.entry_id, getCardDisplayName(item.name, item.language, item.printed_name))} title={t('common.delete')}>
-                                <Trash2 size={9} />
+                              <button className="btn btn-danger btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => handleDelete(item.entry_id, getCardDisplayName(item.name, item.printed_name))} title={t('common.delete')} aria-label={t('common.delete')}>
+                                <Trash2 size={16} />
                               </button>
                             </div>
                           )}
@@ -944,7 +901,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                       {item.quantity > 1 && (
                         <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: '0.85rem' }}>x{item.quantity}</div>
                       )}
-                      <div style={{ fontSize: '0.7rem', color: 'var(--accent-yellow)', fontWeight: 600 }}>{priceText(item.price_trend, item.price_currency)}</div>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--text-strong)', fontWeight: 600 }}>{priceText(item.price_trend, item.price_currency)}</div>
                     </td>
                   </tr>
                   );

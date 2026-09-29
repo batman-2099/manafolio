@@ -9,7 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const assert = require('assert');
 
-const tmpDb = path.join(os.tmpdir(), `bindarr-bootstrap-test-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-bootstrap-test-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 // Deliberately unset: this is the wizard path, where initDb leaves users empty.
 delete process.env.DEFAULT_ADMIN_PASSWORD;

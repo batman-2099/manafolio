@@ -16,11 +16,6 @@ function SharedContainer({ shareToken, containerId }) {
   const [pageIndex, setPageIndex] = useState(0);
 
   useEffect(() => {
-    const urlTheme = new URLSearchParams(window.location.search).get('theme');
-    if (urlTheme) document.documentElement.setAttribute('data-theme', urlTheme);
-  }, []);
-
-  useEffect(() => {
     const fetchContainer = async () => {
       try {
         setLoading(true);
@@ -70,7 +65,7 @@ function SharedContainer({ shareToken, containerId }) {
             backgroundColor: 'var(--accent-red)', color: 'var(--text-strong)',
             textDecoration: 'none', fontWeight: 700, borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-accent)'
           }}>
-            {t('shared.goToBindarr')}
+            {t('shared.goToManafolio')}
           </a>
         </div>
       </div>

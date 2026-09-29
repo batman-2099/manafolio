@@ -1,15 +1,7 @@
 // Runnable checks for marketplace deep links.
 //
-// The bug this exists to prevent regressing: the app served SEARCH urls dressed
-// up as links to the card. Two independent causes, both measured against the real
-// cache (106,163 MTG rows, 12,967 Pokémon rows) before this was written:
-//
-//   1. Scryfall's `purchase_uris.tcgplayer` is an affiliate redirect wrapping
-//      EITHER a product page or a name search. 6,109 of 106,163 rows got a
-//      search, and nothing in the URL's outer shape says which you have.
-//   2. TCGdex supplies no TCGplayer link at all, so all 12,967 Pokémon rows fell
-//      through to a name search built from the card's name — which returns zero
-//      results for a Japanese printing, since TCGplayer indexes English.
+// Search URLs must never masquerade as product links. Scryfall affiliate URLs
+// can wrap either kind, and a missing product ID must not become a name search.
 //
 // The fix is to key on TCGplayer's product id instead of a URL: an id exists only
 // when the card is genuinely listed. This checks the id wins, and that the
@@ -21,9 +13,9 @@ const assert = require('assert');
 const os = require('os');
 const path = require('path');
 
-process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-mplinks-${process.pid}.db`);
+process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-mplinks-${process.pid}.db`);
 
-// Real values, copied out of backend/database/bindarr.db — a hand-written URL
+// Real values, copied out of backend/database/manafolio.db — a hand-written URL
 // would only prove the test agrees with itself.
 const AFFILIATE_PRODUCT =
   'https://partner.tcgplayer.com/c/4931599/1830156/21018?subId1=api&u=https%3A%2F%2Fwww.tcgplayer.com%2Fproduct%2F706216%3Fpage%3D1';
@@ -52,7 +44,7 @@ const AFFILIATE_SEARCH =
   // so `searchable()` refused, so the button was hidden. The id does not care what
   // alphabet the name is in.
   assert.strictEqual(
-    links.tcgplayerUrl({ name: 'ヒトカゲ', tcgplayer_product_id: 517483 }),
+    links.tcgplayerUrl({ name: '稲妻', tcgplayer_product_id: 517483 }),
     'https://www.tcgplayer.com/product/517483',
     'a Japanese printing with a product id must still link'
   );
@@ -73,58 +65,40 @@ const AFFILIATE_SEARCH =
   );
 
   // --- 3b. No name search dressed up as the card ----------------------------
-  // This was the reported bug: every Pokémon card and 6,109 MTG printings got a
-  // search behind a "view this card" label.
   assert.strictEqual(
-    links.tcgplayerUrl({ name: 'Charizard', game: 'pokemon' }),
+    links.tcgplayerUrl({ name: 'Lightning Bolt', game: 'mtg' }),
     null,
     'no id and no product URL must mean no link at all'
   );
   // The search is still available — as its own function, for the caller to label as
   // a search. Same card, different question.
   assert.ok(
-    /\/search\//.test(links.searchUrl({ name: 'Charizard', game: 'pokemon' })),
+    /\/search\//.test(links.searchUrl({ name: 'Lightning Bolt', game: 'mtg' })),
     'searchUrl still offers a search'
   );
   // But not for a name an English-indexing marketplace cannot match.
-  assert.strictEqual(links.searchUrl({ name: 'ヒトカゲ', game: 'pokemon' }), null,
+  assert.strictEqual(links.searchUrl({ name: '稲妻', game: 'mtg' }), null,
     'a localized-only name cannot be searched, so no search action either');
 
   // --- 3c. Cardmarket requires a product id --------------------------------
   // Cardmarket has no API and blocks automated requests, so an id is the only
   // evidence a URL points anywhere real.
   assert.strictEqual(
-    links.cardmarketUrl({ name: 'Charizard', cardmarket_url: 'https://www.cardmarket.com/en/Pokemon/Products?idProduct=665247' }),
-    'https://www.cardmarket.com/en/Pokemon/Products?idProduct=665247'
+    links.cardmarketUrl({ name: 'Lightning Bolt', cardmarket_url: 'https://www.cardmarket.com/en/Magic/Products?idProduct=665247' }),
+    'https://www.cardmarket.com/en/Magic/Products?idProduct=665247'
   );
   assert.strictEqual(
-    links.cardmarketUrl({ name: 'Charizard', cardmarket_url: 'https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=Charizard' }),
+    links.cardmarketUrl({ name: 'Lightning Bolt', cardmarket_url: 'https://www.cardmarket.com/en/Magic/Products/Search?searchString=Lightning+Bolt' }),
     null,
     'a Cardmarket search URL must not be served as the card'
   );
-  assert.strictEqual(links.cardmarketUrl({ name: 'Charizard' }), null);
+  assert.strictEqual(links.cardmarketUrl({ name: 'Lightning Bolt' }), null);
 
   // --- 3d. priceSource reads the row, it does not infer --------------------
-  // The old version deduced "Cardmarket EUR" from the card being a non-English
-  // Pokémon printing. TCGCSV now prices Japanese cards in TCGplayer USD, so that
-  // inference would name the wrong marketplace AND the wrong currency for exactly
-  // the cards it existed to label.
-  assert.deepStrictEqual(
-    links.priceSource({ game: 'pokemon', language: 'Japanese', price_trend: 12, price_source: 'tcgdex', price_currency: 'EUR' }),
-    { name: 'Cardmarket', currency: 'EUR' },
-    'a Cardmarket-priced row is labelled as such'
-  );
   assert.strictEqual(
-    links.priceSource({ game: 'pokemon', language: 'Japanese', price_trend: 12, price_source: 'tcgcsv', price_currency: 'USD' }),
+    links.priceSource({ game: 'mtg', language: 'Japanese', price_trend: 12, price_source: 'scryfall', price_currency: 'USD' }),
     null,
     'a TCGplayer USD row needs no label — USD is the display currency'
-  );
-  // A price borrowed from the English printing (TCGplayer has no German catalogue)
-  // must say so — the currency is right, the card is not.
-  assert.deepStrictEqual(
-    links.priceSource({ game: 'pokemon', language: 'German', price_trend: 4, price_source: 'tcgcsv-en', price_currency: 'USD' }),
-    { name: 'TCGplayer (English printing)', currency: 'USD' },
-    'a proxy price is labelled even though it is in the display currency'
   );
   // Scryfall quotes two marketplaces; EUR is Cardmarket's number, which is what a
   // non-English Magic printing usually has instead of a TCGplayer one.
@@ -135,7 +109,7 @@ const AFFILIATE_SEARCH =
   );
   // No price means no source. Labelling a $0.00 asserts a source that never answered.
   assert.strictEqual(
-    links.priceSource({ game: 'pokemon', language: 'Japanese', price_trend: 0, price_source: 'tcgdex', price_currency: 'EUR' }),
+    links.priceSource({ game: 'mtg', language: 'Japanese', price_trend: 0, price_source: 'scryfall', price_currency: 'EUR' }),
     null,
     'an unpriced row must not name a source'
   );
@@ -145,7 +119,7 @@ const AFFILIATE_SEARCH =
   // /product/0 is a 404, so a falsy id must never build a link.
   for (const pid of [0, null, undefined, '']) {
     assert.strictEqual(
-      links.tcgplayerUrl({ name: 'ヒトカゲ', tcgplayer_product_id: pid }),
+      links.tcgplayerUrl({ name: '稲妻', tcgplayer_product_id: pid }),
       null,
       `product id ${JSON.stringify(pid)} must not produce a link`
     );

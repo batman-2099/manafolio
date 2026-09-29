@@ -1,5 +1,6 @@
 const rateLimit = require('express-rate-limit');
 const db = require('../db');
+const themes = require('../../../shared/themes.json');
 
 async function authenticateToken(req, res, next) {
   let token = null;
@@ -14,7 +15,7 @@ async function authenticateToken(req, res, next) {
 
   try {
     const columns = `u.username, u.role, u.theme, u.share_token, u.share_enabled, u.share_locations,
-                     u.tcg_api_key, u.psa_api_token, u.graded_price_api_key, u.api_key, u.oidc_sub`;
+                     u.psa_api_token, u.api_key, u.oidc_sub`;
     let session = await db.get(`
       SELECT s.user_id, ${columns}
       FROM sessions s
@@ -44,13 +45,11 @@ async function authenticateToken(req, res, next) {
       id: session.user_id,
       username: session.username,
       role: session.role,
-      theme: session.theme,
+      theme: themes.includes(session.theme) ? session.theme : 'dark',
       share_token: session.share_token,
       share_enabled: session.share_enabled,
       share_locations: session.share_locations,
-      tcg_api_key: session.tcg_api_key || '',
       psa_api_token: session.psa_api_token || '',
-      graded_price_api_key: session.graded_price_api_key || '',
       api_key: session.api_key || '',
       oidc_sub: session.oidc_sub || null,
       via_api_key: viaApiKey
@@ -86,7 +85,7 @@ const authLimiter = rateLimit({
   message: { error: 'Too many attempts. Please try again later.' }
 });
 
-// The card search proxies to the external Pokémon TCG API. Bulk scanning fires
+// Card search proxies to external card providers. Bulk scanning fires
 // one search per card, so the ceiling is generous — it exists to stop a logged-
 // in client from hammering the upstream API, not to throttle normal use.
 const searchLimiter = rateLimit({

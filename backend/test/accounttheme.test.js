@@ -5,7 +5,7 @@ const os = require('os');
 const path = require('path');
 const express = require('express');
 
-const tmpDb = path.join(os.tmpdir(), `bindarr-accounttheme-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-accounttheme-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 process.env.ALLOW_REGISTRATION = 'true';
 delete process.env.DEFAULT_ADMIN_PASSWORD;
@@ -55,10 +55,13 @@ async function main() {
   assert.deepStrictEqual(await request('PATCH', '/theme', aliceToken, { theme: 'jenny', user_id: bobId }),
     { status: 200, body: { theme: 'jenny' } });
   assert.strictEqual((await request('GET', '/me', bobToken)).body.user.theme, 'dark', 'client IDs cannot target another account');
-  assert.deepStrictEqual(await request('PATCH', '/theme', bobToken, { theme: 'light' }),
-    { status: 200, body: { theme: 'light' } });
+  for (const theme of ['dark', 'jenny', 'mana-white', 'mana-blue', 'mana-black', 'mana-red', 'mana-green', 'mana-colorless']) {
+    assert.deepStrictEqual(await request('PATCH', '/theme', bobToken, { theme }),
+      { status: 200, body: { theme } });
+    assert.strictEqual((await request('GET', '/me', bobToken)).body.user.theme, theme);
+  }
 
-  for (const theme of ['unknown', null, ['dark'], undefined]) {
+  for (const theme of ['light', 'mtg', 'lcars', 'unknown', null, ['dark'], undefined]) {
     assert.strictEqual((await request('PATCH', '/theme', aliceToken, { theme })).status, 400);
   }
   assert.strictEqual((await request('GET', '/me', aliceToken)).body.user.theme, 'jenny', 'invalid saves leave the preference unchanged');
@@ -66,7 +69,7 @@ async function main() {
   assert.strictEqual((await request('PATCH', '/theme', key, { theme: 'dark' })).status, 403);
   const apiProfile = await request('GET', '/me', key);
   assert.strictEqual(apiProfile.body.user.theme, 'jenny');
-  assert(!Object.hasOwn(apiProfile.body.user, 'tcg_api_key'), 'theme serialization must preserve API-key secret filtering');
+  assert(!Object.hasOwn(apiProfile.body.user, 'psa_api_token'), 'theme serialization must preserve API-key secret filtering');
   const settings = await request('PUT', '/settings', aliceToken, { share_enabled: true });
   assert.strictEqual(settings.body.user.theme, 'jenny', 'unrelated settings saves retain the theme in their user response');
   assert(!Object.hasOwn(settings.body.user, 'password_hash'));
@@ -76,7 +79,19 @@ async function main() {
   assert.strictEqual(reloaded.body.user.theme, 'jenny', 'a new login restores the account preference');
   await db.initDb();
   assert.strictEqual((await request('GET', '/me', reloaded.body.token)).body.user.theme, 'jenny', 'startup migration preserves saved themes');
-  assert.strictEqual((await request('GET', '/me', bobToken)).body.user.theme, 'light', 'another account keeps its own preference');
+  assert.strictEqual((await request('GET', '/me', bobToken)).body.user.theme, 'mana-colorless', 'another account keeps its own preference');
+
+  await db.run(`INSERT INTO card_cache (id, name, game) VALUES ('mtg-theme-sample', 'Theme migration sample', 'mtg')`);
+  await db.run(`INSERT INTO collection (card_id, user_id, game, list_type, quantity) VALUES ('mtg-theme-sample', ?, 'mtg', 'arena', 3)`, [bobId]);
+  await db.run(`UPDATE users SET theme = 'mtg' WHERE id = ?`, [bobId]);
+  assert.strictEqual((await request('GET', '/me', bobToken)).body.user.theme, 'dark', 'profile serialization rejects retired saved themes');
+  const legacyLogin = await request('POST', '/login', null, { username: 'bob', password: 'bob-password' });
+  assert.strictEqual(legacyLogin.body.user.theme, 'dark', 'login serialization rejects retired saved themes');
+  await db.initDb();
+  assert.strictEqual((await db.get(`SELECT theme FROM users WHERE id = ?`, [bobId])).theme, 'dark', 'startup replaces retired preferences');
+  assert.strictEqual((await request('GET', '/me', reloaded.body.token)).body.user.theme, 'jenny', 'retired-theme migration leaves valid preferences alone');
+  assert.deepStrictEqual(await db.get(`SELECT c.game, c.list_type, c.quantity, cc.game AS cache_game FROM collection c JOIN card_cache cc ON cc.id = c.card_id WHERE c.user_id = ?`, [bobId]),
+    { game: 'mtg', list_type: 'arena', quantity: 3, cache_game: 'mtg' }, 'theme migration must not relabel games or change inventory');
   console.log('PASS: theme migration, account isolation, invalid saves, and authenticated reload');
 }
 

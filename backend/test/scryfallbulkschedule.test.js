@@ -6,7 +6,7 @@ const express = require('express');
 const sqlite3 = require('sqlite3');
 
 async function main() {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bindarr-bulk-schedule-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'manafolio-bulk-schedule-'));
   process.env.DB_PATH = path.join(dir, 'user.db');
   process.env.DEFAULT_ADMIN_PASSWORD = 'bulk-schedule-test';
   const db = require('../src/db');

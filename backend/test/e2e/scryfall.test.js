@@ -7,7 +7,7 @@ const { spawn } = require('child_process');
 const net = require('net');
 
 // Isolated temp DB and unique port
-const tmpDb = path.join(os.tmpdir(), `bindarr-scryfall-test-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-scryfall-test-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 
 let currentPort = 3030;

@@ -1,13 +1,12 @@
 // Run a catalog build from the command line.
 //
 // The same job the Admin → Scan catalogs button runs, for when a full build is
-// better started from a terminal: a first Pokemon or MTG build downloads tens of
+// better started from a terminal: a first MTG build downloads tens of
 // thousands of card images and takes hours, and a browser tab is a poor place to
 // keep that alive.
 //
 // Usage, from backend/:
-//   node scripts/build-catalog.mjs --game pokemon
-//   node scripts/build-catalog.mjs --game pokemon --lang Japanese
+//   node scripts/build-catalog.mjs --game mtg
 //   node scripts/build-catalog.mjs --game mtg --skip-cache   # embed what is cached
 import { createRequire } from 'node:module';
 
@@ -16,7 +15,8 @@ const db = require('../src/db');
 const catalog = require('../src/catalog');
 
 const arg = (f, d) => { const i = process.argv.indexOf(f); return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
-const game = arg('--game', 'pokemon');
+const game = arg('--game', 'mtg');
+if (game !== 'mtg') throw new Error('Unsupported game');
 const lang = arg('--lang', 'English');
 const skipCache = process.argv.includes('--skip-cache');
 

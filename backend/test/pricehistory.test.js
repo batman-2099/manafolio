@@ -6,7 +6,7 @@ const assert = require('assert');
 const os = require('os');
 const path = require('path');
 
-process.env.DB_PATH = path.join(os.tmpdir(), `bindarr-pricehist-${process.pid}.db`);
+process.env.DB_PATH = path.join(os.tmpdir(), `manafolio-pricehist-${process.pid}.db`);
 const db = require('../src/db');
 const { recordPrice, shouldSweepPrices, markPricesSwept } = require('../src/utils/priceHelpers');
 
@@ -46,16 +46,12 @@ async function main() {
   // Scryfall only moves prices once a day, so sweeping more often is pure load.
   // The boot sweep used to re-run on every restart; under nodemon that meant a
   // full sweep per code edit.
-  for (const game of ['mtg', 'pokemon']) {
-    assert.strictEqual(await shouldSweepPrices(game), true, `${game}: a never-swept DB should sweep`);
-    await markPricesSwept(game);
-    assert.strictEqual(await shouldSweepPrices(game), false, `${game}: must not re-sweep right after sweeping`);
-  }
+  assert.strictEqual(await shouldSweepPrices('mtg'), true, 'a never-swept DB should sweep');
+  await markPricesSwept('mtg');
+  assert.strictEqual(await shouldSweepPrices('mtg'), false, 'must not re-sweep right after sweeping');
 
-  // The two games are tracked independently — one sweeping must not silence the other.
   await db.run(`UPDATE app_settings SET mtg_prices_swept_at = datetime('now', '-25 hours') WHERE id = 1`);
   assert.strictEqual(await shouldSweepPrices('mtg'), true, 'over 24h old should sweep again');
-  assert.strictEqual(await shouldSweepPrices('pokemon'), false, 'the other game stays gated');
 
   // Just under a day is still too soon.
   await db.run(`UPDATE app_settings SET mtg_prices_swept_at = datetime('now', '-23 hours') WHERE id = 1`);

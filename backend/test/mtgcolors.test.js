@@ -3,7 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const tmpDb = path.join(os.tmpdir(), `bindarr-mtg-colors-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-mtg-colors-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 
 const db = require('../src/db');

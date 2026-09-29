@@ -13,7 +13,7 @@
 const assert = require('assert');
 
 process.env.DB_PATH = require('path').join(
-  require('os').tmpdir(), `bindarr-scoped-${process.pid}.db`
+  require('os').tmpdir(), `manafolio-scoped-${process.pid}.db`
 );
 
 const { keptFromPrev } = require('../src/catalog');

@@ -3,7 +3,9 @@ const { rateLimit } = require('express-rate-limit');
 const db = require('../db');
 const codex = require('../codexDeckClient');
 const ollama = require('../ollamaDeckClient');
+const hosted = require('../hostedDeckClient');
 const { validateDeckAddition } = require('../utils/deckRules');
+const { validateDeckSource } = require('../utils/collectionHelpers');
 const {
   FORMATS, REVIEW_WARNING, fail, inventoryType, containerIds, sourceDeckId, sourceDeck, preferencesRequest, suggestionRequest, suggestionResponse, draftRequest,
   inventory, cardRules, filterInventory, validateDraft, modelRequest,
@@ -50,8 +52,8 @@ router.use((req, res, next) => {
 });
 
 function client(provider) {
-  if (!['chatgpt', 'ollama'].includes(provider)) fail('Choose ChatGPT or Ollama as the AI provider.');
-  return provider === 'ollama' ? ollama : codex;
+  if (!['chatgpt', 'ollama', 'gemini', 'openrouter'].includes(provider)) fail('Choose ChatGPT, Ollama, Gemini or OpenRouter as the AI provider.');
+  return provider === 'chatgpt' ? codex : provider === 'ollama' ? ollama : hosted[provider];
 }
 
 async function selectedProvider(req) {
@@ -74,6 +76,14 @@ router.post('/account/login', sessionOnly, loginLimit, endpoint(async (req, res)
 }));
 router.delete('/account', sessionOnly, endpoint(async (req, res) => {
   await codex.logout(req.user.id);
+  res.json({ ok: true });
+}));
+router.put('/credentials', sessionOnly, loginLimit, endpoint(async (req, res) => {
+  await hosted.saveCredentials(req.user.id, req.body);
+  res.json({ ok: true });
+}));
+router.delete('/credentials', sessionOnly, endpoint(async (req, res) => {
+  await hosted.deleteCredentials(req.user.id, req.query.provider);
   res.json({ ok: true });
 }));
 router.get('/models', sessionOnly, endpoint(async (req, res) => {
@@ -204,33 +214,39 @@ const saveDeck = endpoint(async (req, res) => {
   try {
     const id = await db.withTransaction(async () => {
       const source = await sourceDeck(req.user.id, draft.source_deck_id, draft);
+      let notes = draft.strategy;
       if (replacementId !== undefined) {
-        const current = await db.get('SELECT checked_out FROM decks WHERE id = ? AND user_id = ?', [replacementId, req.user.id]);
+        const current = await db.get('SELECT checked_out, notes FROM decks WHERE id = ? AND user_id = ?', [replacementId, req.user.id]);
         if (current.checked_out) fail('Return this deck before replacing it with an AI draft. You can still save it as a new deck.', 409);
+        const existingNotes = current.notes || '';
+        notes = !draft.strategy || existingNotes.endsWith(draft.strategy)
+          ? existingNotes : existingNotes ? `${existingNotes}\n\n${draft.strategy}` : draft.strategy;
       }
       const selected = new Set(draft.cards.map(card => card.card_id));
       const cards = await cardRules((await inventory(req.user.id, draft.inventory_type, { ...draft, sourceDeck: source })).filter(card => selected.has(card.id)));
       validateDraft(draft, cards);
       let deckId = replacementId;
-      let pulled;
+      let saved;
       if (replacementId !== undefined) {
-        pulled = new Map((await db.all('SELECT card_id, checked_out FROM deck_cards WHERE deck_id = ?', [deckId]))
-          .map(card => [card.card_id, card.checked_out]));
-        await db.run('UPDATE decks SET name = ?, description = ?, commander_card_id = ? WHERE id = ?',
-          [draft.name, draft.description, draft.commander_card_id, deckId]);
+        saved = new Map((await db.all('SELECT card_id, checked_out, source_entry_id FROM deck_cards WHERE deck_id = ?', [deckId]))
+          .map(card => [card.card_id, card]));
+        await db.run('UPDATE decks SET name = ?, description = ?, commander_card_id = ?, notes = ? WHERE id = ?',
+          [draft.name, draft.description, draft.commander_card_id, notes, deckId]);
         await db.run('DELETE FROM deck_cards WHERE deck_id = ?', [deckId]);
       } else {
         const created = await db.run(`INSERT INTO decks
-          (user_id, name, description, game, inventory_type, format, target_size, commander_card_id)
-          VALUES (?, ?, ?, 'mtg', ?, ?, ?, ?)`,
-        [req.user.id, draft.name, draft.description, draft.inventory_type, draft.format, draft.target_size, draft.commander_card_id]);
+          (user_id, name, description, notes, game, inventory_type, format, target_size, commander_card_id)
+          VALUES (?, ?, ?, ?, 'mtg', ?, ?, ?, ?)`,
+        [req.user.id, draft.name, draft.description, notes, draft.inventory_type, draft.format, draft.target_size, draft.commander_card_id]);
         deckId = created.lastID;
       }
       for (const card of draft.cards) {
         const check = await validateDeckAddition({ deckId, userId: req.user.id, cardId: card.card_id, newQty: card.quantity });
         if (!check.ok) fail(check.error);
-        await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out) VALUES (?, ?, ?, ?)',
-          [deckId, card.card_id, card.quantity, pulled?.get(card.card_id) || 0]);
+        const sourceEntryId = saved?.get(card.card_id)?.source_entry_id ?? null;
+        await validateDeckSource(req.user.id, deckId, card.card_id, card.quantity, sourceEntryId);
+        await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out, source_entry_id) VALUES (?, ?, ?, ?, ?)',
+          [deckId, card.card_id, card.quantity, saved?.get(card.card_id)?.checked_out || 0, sourceEntryId]);
       }
       return deckId;
     });

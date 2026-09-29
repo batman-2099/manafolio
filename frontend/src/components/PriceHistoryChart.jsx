@@ -3,13 +3,8 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { priceText } from '../utils/formatPrice';
 import { useT } from '../utils/i18n';
 
-// Selectable chart windows. Default is 1 Year so price movement is visible; a
-// 30-day window is usually too short to show meaningful change.
-// Only two windows, because only two can be filled. 30 days comes from
-// Cardmarket's real rolling averages (Pokémon); "All" is whatever Bindarr has
-// recorded itself. No card API sells back-history — Scryfall returns current
-// prices only — so 1Y/5Y buttons could never show anything the 30-day one
-// didn't already.
+// The chart shows the last 30 days or all prices recorded by this installation.
+// Scryfall returns current prices, not historical backfills.
 const RANGE_KEYS = ['30d', 'all'];
 
 // Shared, properly-proportioned price-history chart. Fetches its own data for a
@@ -128,7 +123,7 @@ export default function PriceHistoryChart({
       </div>
 
       {/* Say where the line came from. Cardmarket's rolling averages are real
-          market data pulled per request; everything else is what Bindarr has
+          market data pulled per request; everything else is what Manafolio has
           watched happen since it was installed. */}
       {!loading && !insufficientHistory && (coverage.marketCount > 0 || coverage.recordedCount > 0) && (
         <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginBottom: '6px', lineHeight: 1.35 }}>

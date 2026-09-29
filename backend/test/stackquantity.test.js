@@ -5,7 +5,7 @@ const assert = require('assert');
 const { setStackQuantity } = require('../src/utils/collectionHelpers');
 
 const USER = 7;
-const base = { user_id: USER, card_id: 'c-A', quantity: 1, condition: 'Near Mint', printing: 'Normal', language: 'English', purchase_price: 2, location_id: 5, compartment_id: 9, position: 4000, is_trade: 0, favorite: 0, list_type: 'collection', game: 'pokemon' };
+const base = { user_id: USER, card_id: 'c-A', quantity: 1, condition: 'Near Mint', printing: 'Normal', language: 'English', purchase_price: 2, location_id: 5, compartment_id: 9, position: 4000, is_trade: 0, favorite: 0, list_type: 'collection', game: 'mtg' };
 
 // Fake db covering the three statements setStackQuantity issues.
 function makeFakeDb(rows) {

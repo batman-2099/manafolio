@@ -35,16 +35,6 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, initialMode = 'search
             <Search size={18} />
             <span>{t('addCards.search')}</span>
           </button>
-          {/* A slab is a third way in, not a variant of the other two: the camera
-              cannot read a cert number through the plastic, and searching by name
-              cannot tell you the grade. The number on the label does both. */}
-          <button
-            className={`sub-nav-tab ${mode === 'slab' ? 'active' : ''}`}
-            onClick={() => setMode('slab')}
-          >
-            <Award size={18} />
-            <span>{t('addCards.slab')}</span>
-          </button>
           <button
             className={`sub-nav-tab ${mode === 'deck' ? 'active' : ''}`}
             onClick={() => setMode('deck')}
@@ -58,14 +48,20 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, initialMode = 'search
           >
             <Camera size={18} />
             <span>{t('addCards.scan')}</span>
-            <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '0.1rem 0.3rem', borderRadius: 'var(--radius-sm)', border: '1px solid currentColor', color: 'var(--accent-yellow)' }}>{t('addCards.beta')}</span>
+          </button>
+          <button
+            className={`sub-nav-tab ${mode === 'slab' ? 'active' : ''}`}
+            onClick={() => setMode('slab')}
+          >
+            <Award size={18} />
+            <span>{t('addCards.slab')}</span>
           </button>
         </div>
       </div>
 
       <div>
         {mode === 'scan' && <CameraScanner onAddSuccess={onAddSuccess} showToast={showToast} setActiveTab={setActiveTab} />}
-        {mode === 'search' && <CardSearch onAddSuccess={onAddSuccess} showToast={showToast} setActiveTab={setActiveTab} />}
+        {mode === 'search' && <CardSearch onAddSuccess={onAddSuccess} showToast={showToast} />}
         {mode === 'slab' && <SlabLookup onAddSuccess={onAddSuccess} showToast={showToast} />}
         {mode === 'deck' && <MtgDeckImport onAddSuccess={onAddSuccess} showToast={showToast} />}
       </div>

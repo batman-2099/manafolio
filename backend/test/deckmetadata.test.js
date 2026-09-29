@@ -3,7 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const tmpDb = path.join(os.tmpdir(), `bindarr-deck-metadata-${process.pid}.db`);
+const tmpDb = path.join(os.tmpdir(), `manafolio-deck-metadata-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 

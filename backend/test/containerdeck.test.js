@@ -3,7 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bindarr-container-deck-'));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'manafolio-container-deck-'));
 process.env.DB_PATH = path.join(tmpDir, 'test.db');
 process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 
@@ -39,7 +39,7 @@ async function testContainerDeck() {
     const empty = (await db.run("INSERT INTO locations (name, type, user_id) VALUES ('No physical cards', 'Box', 1)")).lastID;
     for (const [id, name, game] of [
       ['printing-a', 'Same card', 'mtg'], ['printing-b', 'Same card', 'mtg'],
-      ['printing-c', 'Another card', 'mtg'], ['legacy-card', 'Legacy card', 'pokemon']
+      ['printing-c', 'Another card', 'mtg'], ['legacy-card', 'Legacy card', 'unsupported']
     ]) {
       await db.run('INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)', [id, name, game]);
     }
@@ -62,7 +62,7 @@ async function testContainerDeck() {
     await add('printing-a', 30, { list: 'wishlist' });
     await add('printing-a', 50, { user: 2 });
     await add('printing-a', 100, { location: foreign });
-    await add('printing-a', 200, { game: 'pokemon' });
+    await add('printing-a', 200, { game: 'unsupported' });
     await add('legacy-card', 300);
     await add('printing-a', 5, { location: empty, list: 'arena' });
     await add('printing-b', 5, { location: empty, list: 'wishlist' });
