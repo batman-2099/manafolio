@@ -402,14 +402,13 @@ router.get('/stats/history', async (req, res) => {
 
     const now = Date.now();
     const periods = {
-      '7d': [7, 1, { weekday: 'short' }],
-      '30d': [30, 1, { month: 'short', day: 'numeric' }],
-      '1y': [12, 30, { month: 'short', year: '2-digit' }],
-      '5y': [20, 91, { month: 'short', year: 'numeric' }],
+      '7d': [7, 1],
+      '30d': [30, 1],
+      '1y': [12, 30],
+      '5y': [20, 91],
     };
-    const [count, stepDays, dateOptions] = periods[Object.hasOwn(periods, period) ? period : '30d'];
+    const [count, stepDays] = periods[Object.hasOwn(periods, period) ? period : '30d'];
     const step = stepDays * 24 * 60 * 60 * 1000;
-    const formatLabel = d => d.toLocaleDateString(undefined, dateOptions);
 
     const historyData = [];
     for (let i = count - 1; i >= 0; i--) {
@@ -425,7 +424,7 @@ router.get('/stats/history', async (req, res) => {
       });
 
       historyData.push({
-        date: formatLabel(targetDate),
+        date: targetDate.toISOString().slice(0, 10),
         value: parseFloat(totalValue.toFixed(2))
       });
     }

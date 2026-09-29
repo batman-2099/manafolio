@@ -56,7 +56,7 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
       category: t('dash.manaValue'), empty: t(isArchive ? 'dash.noArchiveDistribution' : 'dash.noDistribution'), series: distributionSeries,
     },
   ];
-  const decks = analytics?.deckPerformance;
+  const decks = analytics?.deckPerformance?.filter(deck => deck.wins > 0 || deck.losses > 0);
   const allUnavailable = charts.every(chart => !chart.rows) && (isArchive || !decks);
 
   if (allUnavailable) {
@@ -123,7 +123,7 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
         <h3 id="analytics-decks" className="section-heading">{t('dash.deckPerformance')}</h3>
         <p style={noteStyle}>{t('dash.deckPerformanceNote')}</p>
         {decks?.length > 0 && <p style={noteStyle}>{t('dash.lowSampleNote')}</p>}
-        {!decks ? <p style={noteStyle}>{t('dash.analyticsUnavailable')}</p> : decks.length === 0 ? <p style={noteStyle}>{t('dash.noDeckPerformance')}</p> : (
+        {!decks ? <p style={noteStyle}>{t('dash.analyticsUnavailable')}</p> : decks.length === 0 ? <p style={noteStyle}>{t('dash.noGames')}</p> : (
           <div role="region" aria-label={t('dash.deckPerformance')} tabIndex={0} style={{ overflowX: 'auto' }}>
             <table style={tableStyle}>
               <thead><tr>{['deck.deckName', 'deck.inventoryType', 'deck.wins', 'deck.losses', 'dash.games', 'dash.winRate'].map(key => <th key={key} scope="col" style={cellStyle}>{t(key)}</th>)}</tr></thead>

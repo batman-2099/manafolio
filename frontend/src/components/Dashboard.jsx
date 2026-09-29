@@ -217,8 +217,6 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
   const cardNote = inventoryFilter === 'collection'
     ? (summary.unsortedCount > 0 ? t('dash.unsortedCount', { count: summary.unsortedCount }) : t('dash.physicalCards'))
     : inventoryFilter === 'arena' ? t('collection.arena') : t('dash.uniqueCount', { count: summary.uniqueCards });
-  const roi = summary.roi || { abs: 0, pct: null };
-  const isPositive = (roi.abs || 0) >= 0;
   // Only Cardmarket's 7/30-day averages provide real price comparisons.
   const change = timePeriod === '7d' ? summary.change7d
     : timePeriod === '30d' ? summary.change30d
@@ -247,21 +245,6 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
             <dt>{t(isArchive ? 'dash.archivedValue' : 'dash.netWorth')}</dt>
             <dd className="dashboard-summary-value">{currencySymbol()}{money(summary.totalValue)}</dd>
             <dd className="dashboard-summary-note">{t('dash.avgPerCard', { price: priceText(summary.avgCardValue) })}</dd>
-          </div>
-        </dl>
-        <dl className="dashboard-summary-secondary">
-          <div>
-            <dt>{t(isArchive ? 'dash.archivedCost' : 'dash.totalInvested')}</dt>
-            <dd className="dashboard-summary-value">{currencySymbol()}{money(summary.totalSpent)}</dd>
-          </div>
-          <div>
-            <dt>{t(isArchive ? 'dash.archivedValueDifference' : 'dash.unrealizedGain')}</dt>
-            <dd className={`dashboard-summary-value ${isPositive ? 'positive' : 'negative'}`}>
-              {isPositive ? '+' : '−'}{currencySymbol()}{money(Math.abs(roi.abs || 0))}
-            </dd>
-            <dd className="dashboard-summary-note">
-              {roi.pct === null ? t(isArchive ? 'dash.archivedCostUnset' : 'dash.roiUnset') : t('dash.roiVsCost', { pct: `${isPositive ? '+' : ''}${roi.pct}` })}
-            </dd>
           </div>
         </dl>
       </div>

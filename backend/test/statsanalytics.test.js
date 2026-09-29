@@ -8,14 +8,14 @@ process.env.DB_PATH = path.join(tmpDir, 'test.db');
 process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 const db = require('../src/db');
 const router = require('../src/routes/stats');
-async function stats(userId, inventory = 'all', endpoint = '/stats') {
+async function stats(userId, inventory = 'all', endpoint = '/stats', period = '7d') {
   const handler = router.stack.find(layer => layer.route?.path === endpoint).route.stack[0].handle;
   const res = {
     statusCode: 200,
     status(code) { this.statusCode = code; return this; },
     json(body) { this.body = body; return this; }
   };
-  await handler({ user: { id: userId }, query: { inventory, period: '7d' } }, res);
+  await handler({ user: { id: userId }, query: { inventory, period } }, res);
   assert.strictEqual(res.statusCode, 200, JSON.stringify(res.body));
   return res.body;
 }
@@ -122,6 +122,14 @@ async function main() {
       const history = await stats(owner, inventory, '/stats/history');
       assert.deepStrictEqual(history.map(point => point.value),
         [67, 67, 67, 87, 87, 87, 87].map(value => (physical ? value : 0) + (arena ? 49 : 0)));
+      for (const period of ['7d', '30d', '1y', '5y', 'unknown']) {
+        const points = await stats(owner, inventory, '/stats/history', period);
+        assert.strictEqual(points.at(-1).date, '2026-09-23');
+        for (const point of points) {
+          assert.match(point.date, /^\d{4}-\d{2}-\d{2}$/);
+          assert.ok(Number.isFinite(new Date(`${point.date}T00:00:00Z`).getTime()));
+        }
+      }
       assert.deepStrictEqual(result.growth, months.map((month, i) => ({
         month, physical: physical ? ({ 0: 2, 10: 3, 11: 15 }[i] || 0) : 0,
         arena: arena && i === 11 ? 7 : 0, graveyard: 0

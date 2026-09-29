@@ -4,6 +4,9 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Fixed Invalid Date labels in dashboard valuation timelines: history responses now return ISO calendar dates for every range, with localized formatting left to the browser.
+- Dashboard Deck performance now shows only decks with at least one recorded win or loss; all-zero records are hidden without changing saved decks.
+- Removed Total Invested and Unrealized Gain from dashboard summaries, including archived cost comparisons; card totals and estimated value remain, and purchase records are unchanged.
 - Added **Price Check** immediately after Dashboard's **Add Cards** action: reuse the scanner to inspect a printing's estimated prices without adding inventory or changing Scan review drafts, then return with dashboard filters preserved.
 - Simplified history-period configuration and Magic-only statistics, shared set-family toggling between scanner and catalog selection, derived currency symbols from the existing registry, and removed unused mobile navigation CSS without changing supported workflows.
 - Shared deck cards now sort by card type in Deck Builder order, then alphabetically within each type.
