@@ -3,6 +3,7 @@
 // to import each other.
 const db = require('../db');
 const { recommendSlot, compartmentLabel, locationAcceptsCard, STACK_KEY_SQL } = require('./compartmentSort');
+const { rebalanceCompartmentPositions } = require('./priceHelpers');
 
 // Default compartment plan by container type — used when a caller doesn't
 // specify one at creation time (see POST /locations).
@@ -446,8 +447,53 @@ async function setStackQuantity(database, userId, entryId, target) {
   return current - start;
 }
 
+// The caller holds a transaction. Reuse whole single copies, split only the
+// selected quantity from legacy stacks, and leave remaining source copies intact.
+async function moveContainerCopies(userId, locationId, compartmentId, entries, quantity) {
+  if (quantity <= 0 || entries.length === 0) return;
+  await rebalanceCompartmentPositions(db, compartmentId, userId);
+  const occupied = await db.get(
+    `SELECT COUNT(*) AS count FROM collection WHERE compartment_id = ? AND user_id = ?`,
+    [compartmentId, userId]
+  );
+  let slot = occupied.count;
+  const sources = new Set();
+  for (const entry of entries) {
+    if (quantity <= 0) break;
+    const copies = Math.min(quantity, entry.available);
+    quantity -= copies;
+    const originalUsed = copies === entry.quantity;
+    if (originalUsed) {
+      await db.run(`
+        UPDATE collection SET quantity = 1, location_id = ?, compartment_id = ?, position = ?
+        WHERE id = ? AND user_id = ?
+      `, [locationId, compartmentId, ++slot * 1000, entry.id, userId]);
+    } else {
+      await db.run(`UPDATE collection SET quantity = quantity - ? WHERE id = ? AND user_id = ?`, [copies, entry.id, userId]);
+    }
+    for (let copy = originalUsed ? 1 : 0; copy < copies; copy++) {
+      await db.run(`
+        INSERT INTO collection (
+          card_id, user_id, quantity, condition, printing, language, purchase_price,
+          favorite, is_trade, list_type, game, added_at, notes, grader, grade,
+          cert_number, market_value, market_value_source, market_value_at, missing,
+          location_id, compartment_id, position
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        entry.card_id, userId, entry.condition, entry.printing, entry.language, entry.purchase_price,
+        entry.favorite, entry.is_trade, entry.list_type, entry.game, entry.added_at, entry.notes, entry.grader,
+        entry.grade, entry.cert_number, entry.market_value, entry.market_value_source, entry.market_value_at, entry.missing,
+        locationId, compartmentId, ++slot * 1000
+      ]);
+    }
+    if (entry.compartment_id) sources.add(entry.compartment_id);
+  }
+  for (const source of sources) await rebalanceCompartmentPositions(db, source, userId);
+}
 module.exports = {
   defaultCompartmentPlan,
+  sourceEntries,
+  moveContainerCopies,
   checkedOutAllocation,
   checkedOutSources,
   deckMissingCards,

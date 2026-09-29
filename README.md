@@ -209,6 +209,10 @@ Open a Physical or Graveyard container and choose **Create Deck**. This uses its
 
 The container and reservations stay unchanged; the deck is **not checked out**. Review its format, size, and commander. Physical decks must resolve missing or reserved copies before checkout; Graveyard decks cannot check out. Empty containers cannot supply this workflow.
 
+### Create a container from a deck
+
+Open a saved Physical or Graveyard deck and choose **Create Container**. Confirm a name to create a Deck Box and file available matching copies from the same inventory. Review moved/missing counts; no owned cards are created. Locked, missing, and reserved copies stay untouched, and saved physical source selections are respected. Return the deck first to make its reserved copies eligible. Arena decks cannot create storage containers.
+
 ### Store archived cards in Graveyard containers
 
 Open **Collection → Graveyard → Graveyard containers**, or select **Graveyard** in Storage. Archived inventory has separate containers, unassigned cards, layouts, capacity, locks, and covers, with the same filing controls.

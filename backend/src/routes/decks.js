@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('../db');
 const cardApi = require('../utils/cardApi');
 const { parseCardRow, recordPrice } = require('../utils/priceHelpers');
-const { deckCardSources, validateDeckSource, deckLocations, reserveDeckSources, deckMissingCards } = require('../utils/collectionHelpers');
+const { deckCardSources, validateDeckSource, deckLocations, reserveDeckSources, deckMissingCards, checkedOutAllocation, checkedOutSources, sourceEntries, moveContainerCopies, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { FORMATS } = require('../utils/aiDecks');
 const scryfallApi = require('../scryfallApi');
@@ -197,6 +197,85 @@ router.post('/', async (req, res) => {
     if (newDeckId) await db.run(`DELETE FROM decks WHERE id = ? AND user_id = ?`, [newDeckId, req.user.id]);
     if (!error.status) console.error(error);
     res.status(error.status || 500).json({ error: error.status ? error.message : 'Failed to create deck' });
+  }
+});
+
+// File existing copies from a saved deck without creating ownership or changing checkout.
+router.post('/:id/container', async (req, res) => {
+  const deckId = Number(req.params.id);
+  const name = req.body?.name;
+  if (!Number.isSafeInteger(deckId) || deckId < 1) {
+    return res.status(400).json({ error: 'Deck ID must be a positive integer' });
+  }
+  if (typeof name !== 'string' || !name.trim() || name.trim().length > 120) {
+    return res.status(400).json({ error: 'Container name must be between 1 and 120 characters' });
+  }
+  const containerName = name.trim();
+  try {
+    const result = await db.withTransaction(async () => {
+      const deck = await db.get(`SELECT * FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [deckId, req.user.id]);
+      if (!deck) throw Object.assign(new Error('Deck not found'), { status: 404 });
+      if (!['collection', 'graveyard'].includes(deck.inventory_type)) {
+        throw Object.assign(new Error('Only Physical and Graveyard decks can create containers'), { status: 400 });
+      }
+      const cards = await db.all(`
+        SELECT dc.*, COALESCE(cc.name, dc.card_id) AS name FROM deck_cards dc
+        LEFT JOIN card_cache cc ON cc.id = dc.card_id
+        WHERE dc.deck_id = ? ORDER BY dc.card_id
+      `, [deckId]);
+      if (!cards.length || cards.some(card => !Number.isSafeInteger(card.quantity) || card.quantity <= 0)) {
+        throw Object.assign(new Error('Save a nonempty deck with positive card quantities first'), { status: 400 });
+      }
+      const requested = cards.reduce((total, card) => total + card.quantity, 0);
+      if (!Number.isSafeInteger(requested) || requested > 2147483647) {
+        throw Object.assign(new Error('Deck quantity is too large'), { status: 400 });
+      }
+      const duplicate = await db.get(`SELECT id FROM locations WHERE name = ? AND user_id = ? AND inventory_type = ?`,
+        [containerName, req.user.id, deck.inventory_type]);
+      if (duplicate) throw Object.assign(new Error('A container with this name already exists in this inventory'), { status: 400 });
+      // Freeze legacy fallback identities before filing changes their storage order.
+      for (const source of await checkedOutSources(req.user.id)) {
+        await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+          [source.deck_id, source.card_id, source.entry_id, source.quantity]);
+      }
+      // Include this deck's reservations, including legacy and archived allocations.
+      const allocated = await checkedOutAllocation(req.user.id);
+      const location = await db.run(`
+        INSERT INTO locations (name, type, sort_order, rule_type, game, inventory_type, user_id)
+        VALUES (?, 'Deck Box', 'custom', 'any', 'mtg', ?, ?)
+      `, [containerName, deck.inventory_type, req.user.id]);
+      const compartment = await db.run(`INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, ?)`,
+        [location.lastID, Math.max(defaultCompartmentPlan('Deck Box').capacity, requested)]);
+      const items = [];
+      for (const card of cards) {
+        const candidates = await db.all(`
+          SELECT c.*, c.id AS entry_id, l.locked AS location_locked, cp.locked AS compartment_locked
+          FROM collection c JOIN card_cache cc ON cc.id = c.card_id AND cc.game = 'mtg'
+          LEFT JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
+          LEFT JOIN compartments cp ON cp.id = c.compartment_id AND cp.location_id = l.id
+          WHERE c.user_id = ? AND c.card_id = ? AND c.game = 'mtg' AND c.list_type = ?
+            AND c.quantity > 0 AND COALESCE(c.missing, 0) = 0
+            AND (c.location_id IS NULL OR (l.id IS NOT NULL AND l.inventory_type = ?))
+            AND (c.compartment_id IS NULL OR cp.id IS NOT NULL)
+          ORDER BY c.location_id, c.compartment_id, c.position, c.id
+        `, [req.user.id, card.card_id, deck.inventory_type, deck.inventory_type]);
+        const entries = sourceEntries(candidates, card, deck.game)
+          // ponytail: exclude whole reserved stacks; splitting can reassign legacy allocations.
+          .filter(entry => !entry.location_locked && !entry.compartment_locked
+            && !allocated.has(entry.id) && !(entry.quantity > 1 && entry.cert_number))
+          .map(entry => ({ ...entry, available: entry.quantity }));
+        const moved = Math.min(card.quantity, entries.reduce((total, entry) => total + entry.available, 0));
+        await moveContainerCopies(req.user.id, location.lastID, compartment.lastID, entries, moved);
+        items.push({ card_id: card.card_id, name: card.name, requested: card.quantity, moved, missing: card.quantity - moved });
+      }
+      const count = items.reduce((total, item) => total + item.moved, 0);
+      return { id: location.lastID, name: containerName, inventory_type: deck.inventory_type,
+        requested, count, missing: requested - count, items };
+    });
+    res.status(201).json(result);
+  } catch (error) {
+    if (!error.status) console.error(error);
+    res.status(error.status || 500).json({ error: error.status ? error.message : 'Failed to create container from deck' });
   }
 });
 

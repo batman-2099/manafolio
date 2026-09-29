@@ -10,6 +10,7 @@ Release history starts with Manafolio 2.0.
 - Clarified precon selection in Deck Builder with a Choose deck action and save reminder. Successful deck creation now closes the creation dialog and opens the saved deck instead of leaving a reset form over the result.
 - Deck creation now displays failures inside the modal, preserves the draft for retry, and shows saving progress while preventing duplicate submission.
 - Physical, Arena, and Graveyard deck creation now permit unowned cards, including precon, decklist, and commander creation. Missing-copy reporting and Physical checkout requirements remain unchanged; creating a definition never adds owned inventory.
+- Added Create Container to saved Physical and Graveyard decks: file available existing copies into a same-inventory Deck Box and report shortages without creating inventory or changing reservations.
 
 ## 2.1.2
 

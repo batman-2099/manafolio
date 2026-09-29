@@ -655,6 +655,17 @@ Arena and Graveyard decks cannot be checked out, even if a checkout control is v
 
 **Expected result:** related-token references and inventory information. This panel does not add tokens to your collection or deck, and it does not promise how many token copies a game will require. An empty result means no related tokens were returned, not a general ruling on every possible card interaction.
 
+### Create a container from a deck
+
+1. Open a saved, nonempty Physical or Graveyard deck and save any editor changes.
+2. Select **Create Container** and review the proposed box name.
+3. Confirm creation to file available matching copies into a new **Deck Box** in the deck's inventory.
+4. Review the moved and missing quantities. Missing means copies could not be filed—not that new copies were added. Open Storage to find the box and physically arrange the cards to match.
+
+This moves existing collection entries; it never creates owned copies, changes the deck list, or checks out/returns a deck. It respects selected physical sources and skips missing copies, locked locations/compartments, and reserved copies—including this deck's reservations. Return a checked-out deck first if you want those copies filed. Other inventories and other accounts never supply cards. Arena decks have no storage container action.
+
+Partial availability still creates the box and reports shortages. Use a different name if a container with that name already exists in the same inventory.
+
 ### Simulate opening hands
 
 1. Open a nonempty deck and select **Draw Simulator**.

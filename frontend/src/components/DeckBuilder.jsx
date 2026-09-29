@@ -17,6 +17,7 @@ import AiDeckBuilder from './AiDeckBuilder';
 import RelatedTokens from './RelatedTokens';
 import Modal from './Modal';
 import DeckCardBack from './DeckCardBack';
+import DeckContainerModal from './DeckContainerModal';
 import './DeckBuilder.css';
 
 // Basic lands are exempt from the "max 4 of a card" deck rule.
@@ -183,8 +184,9 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
   const [savingSleeved, setSavingSleeved] = useState(false);
   const [sleevedError, setSleevedError] = useState(false);
   const [savingCardBack, setSavingCardBack] = useState(false);
+  const [showDeckContainerModal, setShowDeckContainerModal] = useState(false);
 
-  const editorBusy = savingDeck || savingSleeved || savingCardBack || loading || refreshingInventory || comparingImport || checkingOut || showCheckoutModal;
+  const editorBusy = savingDeck || savingSleeved || savingCardBack || loading || refreshingInventory || comparingImport || checkingOut || showCheckoutModal || showDeckContainerModal;
   const hasUnsavedChanges = !!activeDeck && (
     JSON.stringify(deckEditorState(activeDeck)) !== savedEditorState
     || (!!deckDraft && JSON.stringify(deckEditorState({ ...activeDeck, ...deckDraft })) !== JSON.stringify(deckEditorState(activeDeck)))
@@ -1750,6 +1752,20 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
               >
                 <Download size={14} /> Import
               </button>
+              {['collection', 'graveyard'].includes(activeDeck.inventory_type) && (
+                <div>
+                  <button
+                    className="btn btn-secondary"
+                    disabled={editorBusy || savingRecord || searching || hasUnsavedChanges || !!deckDraft || !activeDeck.cards.length}
+                    aria-describedby={hasUnsavedChanges ? 'deck-container-save-first' : undefined}
+                    onClick={() => setShowDeckContainerModal(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minHeight: '44px' }}
+                  >
+                    <FolderPlus size={14} aria-hidden="true" /> {t('deck.createContainer')}
+                  </button>
+                  {hasUnsavedChanges && <p id="deck-container-save-first" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>{t('deck.saveFirst')}</p>}
+                </div>
+              )}
               {/* Checkout / Return button */}
               {activeDeck.inventory_type === 'collection' && (activeDeck.checked_out ? (
                 <button
@@ -2294,6 +2310,18 @@ function DeckBuilder({ showToast, navigationGuardRef }) {
       )}
 
       {/* --- POPUPS & MODALS --- */}
+
+      {showDeckContainerModal && activeDeck && (
+        <DeckContainerModal
+          deck={activeDeck}
+          onClose={() => setShowDeckContainerModal(false)}
+          onCreated={async () => {
+            const refreshed = await loadDeckDetails(activeDeck.id);
+            await fetchDecks();
+            return refreshed;
+          }}
+        />
+      )}
 
       {/* A. Create Deck Modal */}
       {showCreateModal && (
