@@ -129,7 +129,6 @@ router.get('/stats', async (req, res) => {
       // Parse types
       const types = JSON.parse(row.types || '[]');
       const subtypes = JSON.parse(row.subtypes || '[]');
-      const isMtg = row.game === 'mtg' || row.supertype === 'MTG';
       addDistribution(row, qty, 'owned', types, subtypes);
       // Current retained copies grouped by addition month, not an immutable ownership history.
       if (row.added_at && Number.isFinite(addedTime)) {
@@ -137,24 +136,15 @@ router.get('/stats', async (req, res) => {
         if (point) point[row.list_type === 'collection' ? 'physical' : row.list_type] += qty;
       }
 
-      if (isMtg) {
-        const isLand = subtypes.includes('Land') || row.supertype === 'Land' || (types.length === 0 && subtypes.some(s => ['Plains','Island','Swamp','Mountain','Forest','Land'].includes(s)));
-        if (isLand) {
-          typeCounts['Land'] = (typeCounts['Land'] || 0) + qty;
-        } else if (types.length === 0) {
-          typeCounts['Colorless'] = (typeCounts['Colorless'] || 0) + qty;
-        } else {
-          types.forEach(t => {
-            typeCounts[t] = (typeCounts[t] || 0) + qty;
-          });
-        }
+      const isLand = subtypes.includes('Land') || row.supertype === 'Land' || (types.length === 0 && subtypes.some(s => ['Plains','Island','Swamp','Mountain','Forest','Land'].includes(s)));
+      if (isLand) {
+        typeCounts['Land'] = (typeCounts['Land'] || 0) + qty;
+      } else if (types.length === 0) {
+        typeCounts['Colorless'] = (typeCounts['Colorless'] || 0) + qty;
       } else {
         types.forEach(t => {
           typeCounts[t] = (typeCounts[t] || 0) + qty;
         });
-        if (types.length === 0) {
-          typeCounts['Colorless'] = (typeCounts['Colorless'] || 0) + qty;
-        }
       }
 
       // Rarity
@@ -411,31 +401,15 @@ router.get('/stats/history', async (req, res) => {
     };
 
     const now = Date.now();
-    let step = 0;
-    let count = 0;
-    let formatLabel = (d) => d.toLocaleDateString();
-
-    if (period === '7d') {
-      count = 7;
-      step = 24 * 60 * 60 * 1000;
-      formatLabel = (d) => d.toLocaleDateString(undefined, { weekday: 'short' });
-    } else if (period === '30d') {
-      count = 30;
-      step = 24 * 60 * 60 * 1000;
-      formatLabel = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    } else if (period === '1y') {
-      count = 12;
-      step = 30 * 24 * 60 * 60 * 1000;
-      formatLabel = (d) => d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
-    } else if (period === '5y') {
-      count = 20;
-      step = 91 * 24 * 60 * 60 * 1000;
-      formatLabel = (d) => d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
-    } else {
-      count = 30;
-      step = 24 * 60 * 60 * 1000;
-      formatLabel = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    }
+    const periods = {
+      '7d': [7, 1, { weekday: 'short' }],
+      '30d': [30, 1, { month: 'short', day: 'numeric' }],
+      '1y': [12, 30, { month: 'short', year: '2-digit' }],
+      '5y': [20, 91, { month: 'short', year: 'numeric' }],
+    };
+    const [count, stepDays, dateOptions] = periods[Object.hasOwn(periods, period) ? period : '30d'];
+    const step = stepDays * 24 * 60 * 60 * 1000;
+    const formatLabel = d => d.toLocaleDateString(undefined, dateOptions);
 
     const historyData = [];
     for (let i = count - 1; i >= 0; i--) {

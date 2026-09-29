@@ -9,14 +9,7 @@ export const CURRENCIES = [
 
 export const DEFAULT_CURRENCY = 'USD';
 
-export const SYMBOLS = {
-  USD: '$',
-  EUR: '€',
-  GBP: '£',
-  CAD: 'C$',
-  AUD: 'A$',
-  JPY: '¥',
-};
+export const SYMBOLS = Object.fromEntries(CURRENCIES.map(({ code, symbol }) => [code, symbol]));
 
 export const getCurrency = () => {
   try {

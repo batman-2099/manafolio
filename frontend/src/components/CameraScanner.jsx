@@ -17,6 +17,7 @@ import {
 import { defaultGame, isGameEnabled } from '../utils/games';
 import { useT } from '../utils/i18n';
 import SetTree from './SetTree';
+import { toggleSetCodes } from '../utils/setSelection';
 // Centered card-shaped guide box, styled in CSS (.scan-card-guide): card ratio
 // with margin, centered by the overlay's flex. The crop maps the box's on-screen
 // rect (getBoundingClientRect) into the frame, so its size is driven by CSS.
@@ -248,21 +249,11 @@ function CameraScanner({ onAddSuccess, showToast }) {
   // format: a family is "on" when its parent code is in there, and a subset is
   // included when its own code is. Nothing to migrate, nothing to keep in sync.
   const hasCode = (code) => scanSetCodes.some(c => c.toLowerCase() === String(code).toLowerCase());
-  const dropCodes = (arr, codes) => {
-    const gone = new Set(codes.map(c => String(c).toLowerCase()));
-    return arr.filter(c => !gone.has(c.toLowerCase()));
-  };
-  const toggleCode = (code) => persistSets(hasCode(code) ? dropCodes(scanSetCodes, [code]) : [...scanSetCodes, code]);
+  const toggleCode = (code) => persistSets(toggleSetCodes(scanSetCodes, code));
   // Ticking a family takes its subsets with it; unticking drops the whole family.
   // Untick one subset afterwards and the parent stays on — that is the "I am
   // feeding the box but not the tokens" case this exists for.
-  const toggleSetFamily = (s) => {
-    const code = setScanCode(s);
-    const kids = (s.children || []).map(c => c.code);
-    persistSets(hasCode(code)
-      ? dropCodes(scanSetCodes, [code, ...kids])
-      : [...dropCodes(scanSetCodes, [code, ...kids]), code, ...kids]);
-  };
+  const toggleSetFamily = (s) => persistSets(toggleSetCodes(scanSetCodes, setScanCode(s), (s.children || []).map(c => c.code)));
   // Which languages this game has a catalog of its own in. Empty until /scan-sets
   // answers, and every check below treats empty as "do not claim anything".
   const scanBuiltLangs = scanSets?.builtLangs || [];

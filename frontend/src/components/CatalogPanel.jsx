@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Database, Play, Square, RefreshCw, Check, AlertTriangle, Cpu, Download, ListFilter, Zap } from 'lucide-react';
 import SetTree from './SetTree';
 import { useT } from '../utils/i18n';
+import { toggleSetCodes } from '../utils/setSelection';
 
 // Scan catalogs.
 //
@@ -207,17 +208,8 @@ function BuildPicker({ game, lang, disabled, onBuild, showToast, label }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const has = (code) => picked.some(c => c.toLowerCase() === String(code).toLowerCase());
-  const drop = (arr, codes) => {
-    const gone = new Set(codes.map(c => String(c).toLowerCase()));
-    return arr.filter(c => !gone.has(c.toLowerCase()));
-  };
-  const toggleCode = (code) => setPicked(p => has(code) ? drop(p, [code]) : [...p, code]);
-  const toggleFamily = (s) => {
-    const code = codeOf(s);
-    const kids = (s.children || []).map(c => c.code);
-    setPicked(p => has(code) ? drop(p, [code, ...kids]) : [...drop(p, [code, ...kids]), code, ...kids]);
-  };
+  const toggleCode = (code) => setPicked(p => toggleSetCodes(p, code));
+  const toggleFamily = (s) => setPicked(p => toggleSetCodes(p, codeOf(s), (s.children || []).map(c => c.code)));
 
   // Closed, this is the RECOMMENDED action rather than an afterthought next to
   // "Build all": picking the sets you actually own is minutes of work, and a whole

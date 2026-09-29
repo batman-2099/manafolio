@@ -2512,9 +2512,6 @@ button.collection-card-trigger {
 
 /* Mobile styles for navigation and tabs */
 @media (max-width: 768px) {
-  .nav-tabs.mobile-hide-tabs {
-    display: none !important;
-  }
   .app-container {
     /* header owns the top inset now (it's sticky and covers the status bar) */
     padding-top: 0 !important;
