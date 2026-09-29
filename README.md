@@ -72,6 +72,20 @@ Organize decks and see which inventory supplies them.
 
 ![Manafolio Deck Builder showing sample decks](docs/images/manafolio-decks.webp)
 
+### Customize card back
+
+Preview a sleeve design, solid color, or custom image, then save it for your deck. This dialog uses a sample deck and shows an Ultra PRO Chocobo sleeve.
+
+![Manafolio Customize card back dialog showing an Ultra PRO Chocobo sleeve preview, image controls, and Save and Cancel buttons](docs/images/manafolio-card-back.webp)
+
+Available sleeve vendors:
+
+- [Dragon Shield](https://www.dragonshield.com/collections/card-sleeves) — plain-color and art sleeves.
+- [Ultimate Guard](https://ultimateguard.com/en/Card-Sleeves/) — plain-color and Magic art sleeves.
+- [Ultra PRO](https://ultrapro.com/collections/magic-the-gathering-deck-protectors) — Magic: The Gathering art sleeves.
+
+The picker includes selected designs, not live shop inventories. See [Customize a deck's card back](docs/USER_GUIDE.md#customize-a-decks-card-back) for the workflow.
+
 ### AI Deck Builder
 
 Choose inventory filters, deck archetype, format, target size, and power level before starting a conversation. This screenshot shows demo setup options; live AI requests are disabled in the demo.
