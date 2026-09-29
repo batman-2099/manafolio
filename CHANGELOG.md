@@ -2,7 +2,7 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.2.0
 
 - Closed cross-account/wrong-parent compartment mutations, bound OIDC login state to the initiating browser with single-use consumption, and made account deletion dispose local Codex work and credentials.
 - Preserved quantity-row identities and metadata at startup; corrected quantity-aware purchase-cost splitting and cent allocation; made swaps, settings updates, and admin updates atomic.
