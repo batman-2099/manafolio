@@ -100,6 +100,7 @@
 .howto-article code { font-size: 0.9em; background: var(--surface-2); padding: 0.15em 0.3em; border-radius: 3px; }
 .howto-article pre { max-width: 100%; overflow-x: auto; background: var(--input-bg); padding: 1rem; margin-block: 1.25rem; border: 1px solid var(--border-glass); border-radius: var(--radius-sm); }
 .howto-article pre code { padding: 0; background: none; }
+.howto-article img { display: block; max-width: 100%; height: auto; }
 .howto-pagination { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border-glass); }
 .howto-pagination .btn { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 44px; }
 .howto-next { margin-left: auto; }

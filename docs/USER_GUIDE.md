@@ -353,10 +353,27 @@ Storage describes where cards are physically kept. It does not create inventory 
 
 Use a **storage unit** for something holding card containers: a cabinet, shelf, drawer, carrying case, or tote. Keep **container** for a binder, card box, deck box, or tin holding cards directly. Pages/rows and slots remain inside containers. Classify a case by what it holds, not its shape.
 
-1. Choose **Create storage unit** in Storage, enter a name, and select **Type**: Cabinet, Shelf, Drawer, Storage Bin / Tote, Carrying Case, Bag / Backpack, or Other (the default). Types describe the unit; they do not impose capacities or filing rules.
-2. Set a container's **Stored in** field during creation or in **Container Settings**. To move an existing container without changing other settings, use **More → Move container…**.
-3. Open **Storage units** and select a unit to browse its containers. **All containers** keeps the flat gallery available; **No storage unit** shows containers without a unit.
-4. Continue using **Physical** and **Graveyard** to choose the inventory to browse. A unit may group containers from both inventories; grouping never archives or restores cards.
+1. Open **Storage → Create Storage Unit**.
+2. Enter a recognizable **Storage unit name**, such as “Tournament bag,” then select **Type** using the table below. Choose **Save**. This creates an empty grouping, not cards or a card container.
+3. Set a container's **Stored in** field during creation or in **Container Settings**. To move an existing container without changing other settings, use **More → Move container** and choose the unit.
+4. Open **Storage units** and select a unit to browse its containers. **All containers** keeps the flat gallery available; **No storage unit** shows containers without a unit. On a phone, use the selector above the inventory controls to switch between these views or jump to a unit.
+5. Continue using **Physical** and **Graveyard** to choose the inventory to browse. A unit may group containers from both inventories; grouping never archives or restores cards.
+
+| Storage unit type | Use it for |
+| --- | --- |
+| Cabinet | A cupboard holding binders and card boxes. |
+| Shelf | A shelf or shelving unit holding containers. |
+| Drawer | A drawer holding deck boxes or other containers. |
+| Storage Bin / Tote | A large bin holding several card containers. |
+| Carrying Case | A hard case holding deck boxes for transport. |
+| Bag / Backpack | A tournament bag holding decks and a trade binder. |
+| Other | Any grouping not covered above; the default for existing units. |
+
+Types are descriptive only: they do not impose capacities or filing rules. A case holding deck boxes is a storage unit; a case holding individual cards is a card container.
+
+![Create Storage Unit dialog with the sample name Tournament bag and Bag / Backpack selected as its type](images/manafolio-storage-unit.webp)
+
+*Sample data: creating a storage unit for a tournament bag. Choose its containers separately through Stored in.*
 
 A recorded card path can read **Tournament bag › Trade binder › Page 4 › Slot 7**. **No storage unit** is not **Unassigned Pile**: an ungrouped binder can still contain fully filed cards.
 

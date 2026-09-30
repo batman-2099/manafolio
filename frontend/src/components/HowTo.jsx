@@ -3,9 +3,10 @@ import { ArrowLeft, ArrowRight, Search, X } from 'lucide-react';
 import { useT } from '../utils/i18n';
 import { buildGuide } from '../utils/helpGuide';
 import guideSource from '../../../docs/USER_GUIDE.md?raw';
+import storageUnitImage from '../../../docs/images/manafolio-storage-unit.webp';
 import './HowTo.css';
 
-const chapters = buildGuide(guideSource);
+const chapters = buildGuide(guideSource.replace('images/manafolio-storage-unit.webp', new URL(storageUnitImage, window.location.href).href));
 
 export default function HowTo() {
   const { t } = useT();

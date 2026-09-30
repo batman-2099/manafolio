@@ -212,11 +212,15 @@ Open **Add Cards → Precon Deck**, search MTGJSON by name, set code, or type, a
 
 ### Group containers into storage units
 
-In **Storage**, choose **Create storage unit**, enter a name, and select its **Type**: Cabinet, Shelf, Drawer, Storage Bin / Tote, Carrying Case, Bag / Backpack, or Other (the default). A **storage unit** holds containers; a **container** holds cards, organized into pages/rows and slots. Open a unit and choose **Edit storage unit** to change its name or type. Types are descriptive only; they do not set capacities or change storage behavior. Existing units and backups without a type use Other.
+In **Storage**, choose **Create Storage Unit**, enter a name, and select its **Type**: Cabinet, Shelf, Drawer, Storage Bin / Tote, Carrying Case, Bag / Backpack, or Other (the default). Choose **Save**, then assign containers through **Stored in**. A **storage unit** holds containers; a **container** holds cards, organized into pages/rows and slots. Open a unit and choose **Edit storage unit** to change its name or type. Types are descriptive only; they do not set capacities or change storage behavior. Existing units and backups without a type use Other.
 
 Use **Stored in** when creating or editing a container, or **Move container…** in its More menu. Browse **Storage units**, **All containers**, or **No storage unit**; the latter is separate from **Unassigned Pile**, which contains unfiled cards. Physical/Graveyard filters still apply to containers. Moving a container between units changes only its grouping, not card positions, inventory, locks, or deck reservations.
 
 Deleting a storage unit keeps its containers and cards and clears their unit assignment. Units have container counts, not card capacities, and cannot contain other units. Complete account backups preserve units and membership; unit names remain private and are not included in public shares.
+
+![Create Storage Unit with a sample tournament bag and the Bag / Backpack type](docs/images/manafolio-storage-unit.webp)
+
+*Sample data only.* See the [storage-unit how-to](docs/USER_GUIDE.md#group-containers-into-storage-units) for type examples and phone navigation.
 
 ### Import a ManaBox storage container
 
