@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay, MouseSensor, useSensor, useSensors, useDraggable, useDroppable, pointerWithin } from '@dnd-kit/core';
 import { Plus, Minus, Trash2, X, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, Edit3, Download, Search, SlidersHorizontal, Layers } from 'lucide-react';
-import { sortCardsByOrder } from '../utils/cardSort';
+import { sortCardsByOrder, TYPE_ORDER, typeCategory } from '../utils/cardSort';
 import { priceText } from '../utils/formatPrice';
 import { getFoilOverlayClass, getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
 import { getCardRarityBorder, getRarityBadgeStyle, getRarityBadgeLabel } from '../utils/cardRarity';
@@ -666,7 +666,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const unsortedFilterOptions = useMemo(() => ({
     sets: Array.from(new Set(unsortedCollection.map(card => card.set_name).filter(Boolean))).sort(),
     types: Array.from(new Set(unsortedCollection.flatMap(card => [...(card.types || []), ...(card.subtypes || [])]).filter(Boolean))).sort(),
-    colors: Array.from(new Set(unsortedCollection.flatMap(card => card.color_identity || []).filter(Boolean))).sort(),
+    colors: Object.keys(TYPE_ORDER).filter(color => unsortedCollection.some(card => typeCategory(card.types) === color)),
     rarities: Array.from(new Set(unsortedCollection.map(card => card.rarity).filter(Boolean))).sort(),
     conditions: Array.from(new Set(unsortedCollection.map(card => card.condition).filter(Boolean))).sort(),
     printings: Array.from(new Set(unsortedCollection.map(card => card.printing).filter(Boolean))).sort(),
@@ -679,7 +679,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       (!search || [card.name, card.printed_name, card.set_name, card.number].some(value => String(value || '').toLowerCase().includes(search)))
       && (!unsortedFilters.set || card.set_name === unsortedFilters.set)
       && (!unsortedFilters.type || [...(card.types || []), ...(card.subtypes || [])].includes(unsortedFilters.type))
-      && (!unsortedFilters.color || (card.color_identity || []).includes(unsortedFilters.color))
+      && (!unsortedFilters.color || typeCategory(card.types) === unsortedFilters.color)
       && (!unsortedFilters.rarity || card.rarity === unsortedFilters.rarity)
       && (!unsortedFilters.condition || card.condition === unsortedFilters.condition)
       && (!unsortedFilters.printing || card.printing === unsortedFilters.printing)
@@ -2766,7 +2766,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 ].map(([key, label, options]) => (
                   <select key={key} className="select-control" aria-label={label} value={unsortedFilters[key]} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
                     <option value="">{label}</option>
-                    {options.map(option => <option key={option} value={option}>{option}</option>)}
+                    {options.map(option => <option key={option} value={option}>{key === 'color' ? t(`dash.color.${option}`) : option}</option>)}
                   </select>
                 ))}
                 <select className="select-control" aria-label={t('loc.allDeckStatuses')} value={unsortedFilters.deckStatus} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>

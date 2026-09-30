@@ -423,7 +423,7 @@ For example, a binder can sort by set then collector number while accepting only
 ### File cards from Unassigned Pile
 
 1. Open the destination container in the correct Storage inventory.
-2. Find the **Unsorted** queue and review the cards waiting to be filed. Its search, filters, and ordering help you inspect the pile.
+2. Find the **Unsorted** queue and review the cards waiting to be filed. Its search, filters, and ordering help you inspect the pile. The color filter uses actual card colors, matching Deck Builder: white, blue, black, red, green, multicolor, and colorless—not Commander color identity. Only categories present in the pile are offered; multicolor cards have their own category and basic lands are colorless.
 3. Choose one of the two filing workflows below.
 4. After filing, compare the recorded row/page/slot with the real container.
 
