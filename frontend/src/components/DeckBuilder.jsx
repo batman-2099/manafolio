@@ -3,7 +3,7 @@ import { Plus, Minus, Trash2, Copy, X, ChevronLeft, Play, BarChart2, Search, Log
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { shuffleArray } from '../utils/shuffle';
 import { displayName } from '../utils/languages';
-import { sortCardsByOrder } from '../utils/cardSort';
+import { TYPE_ORDER, typeCategory } from '../utils/cardSort';
 import CheckoutWizardModal from './CheckoutWizardModal';
 import { useBackGuard } from '../utils/useBackGuard';
 import { ownedImportIndex, findOwnedImportCard, buildDeckExport, parseDeckLine } from '../utils/deckText';
@@ -1015,13 +1015,11 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
         })
       }]
     : activeDeck && deckCardSortBy === 'color'
-    ? [{
-        name: t('sort.by.color'),
-        cards: sortCardsByOrder(
-          [...activeDeck.cards].sort((a, b) => displayName(a).localeCompare(displayName(b))),
-          [{ by: 'color', dir: 'asc' }]
-        )
-      }]
+    ? Object.keys(TYPE_ORDER).map(color => ({
+        name: t(`dash.color.${color}`),
+        cards: activeDeck.cards.filter(card => typeCategory(card.types) === color)
+          .sort((a, b) => displayName(a).localeCompare(displayName(b)))
+      }))
     : GROUP_ORDER.map(name => ({
         name,
         cards: activeDeck?.cards.filter(card => cardGroup(card).toLowerCase() === name.toLowerCase())
@@ -2224,7 +2222,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                       style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', height: 'auto' }}
                     >
                       <option value="type">{t('deck.sortByType')}</option>
-                      <option value="color">{t('sort.by.color')}</option>
+                      <option value="color">{t('collection.fColor')}</option>
                       {activeDeck.inventory_type === 'collection' && <option value="location">{t('collection.fLocation')}</option>}
                       {activeDeck.inventory_type === 'collection' && <option value="pulled">{t('deck.pulledStatus')}</option>}
                     </select>

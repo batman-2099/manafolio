@@ -657,6 +657,7 @@
   "dash.color.Black": "Schwarz",
   "dash.color.Red": "Rot",
   "dash.color.Green": "Grün",
+  "dash.color.Multicolor": "Mehrfarbig",
   "dash.color.Colorless": "Farblos",
   "dash.color.Unknown": "Unbekannt",
   "dash.avgPerCard": "Ø {price} pro Karte",

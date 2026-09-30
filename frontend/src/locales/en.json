@@ -524,6 +524,7 @@
   "dash.color.Black": "Black",
   "dash.color.Red": "Red",
   "dash.color.Green": "Green",
+  "dash.color.Multicolor": "Multicolor",
   "dash.color.Colorless": "Colorless",
   "dash.color.Unknown": "Unknown",
   "wizard.checkout.title": "Deck Checked Out",
