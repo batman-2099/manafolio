@@ -23,7 +23,7 @@ Manafolio was originally forked from [Bindarr](https://github.com/thenotoriousJe
 - **Four inventory destinations.** Track Physical and Arena copies separately, plan purchases in Wishlist, and archive cards in Graveyard without deleting their quantities or metadata. Wishlist and Graveyard do not inflate owned totals; archived cards supply only Graveyard deck definitions, never Physical or Arena decks.
 - **Collection detail.** Search Scryfall, track printing, finish, language, condition, purchase price and graded slabs, and mark copies Missing/Found without losing their last known locations. Filter, sort, stack duplicates, and switch between grid and table views.
 - **Dashboard.** Compare All Cards, Physical, and Arena quantities, value, recorded costs, collection growth, color identity, mana value, and saved deck performance. Graveyard has its own archived-card view. Accessible chart-data tables expose the underlying numbers.
-- **Physical storage.** Organize binders and boxes by page, row, and slot. Find unfiled cards in Unassigned Pile; move or auto-file copies, expand capacity, lock compartments, and choose card-art covers for containers. Graveyard containers keep archived storage separate.
+- **Physical storage.** Organize binders and boxes by page, row, and slot. Find unassigned cards in Unassigned Pile; move or auto-move copies, expand capacity, lock compartments, and choose card-art covers for containers. Graveyard containers keep archived storage separate.
 - **Deck building and play.** Create Physical or Arena decks, import lists and precons, select a commander, inspect mana curves and rules, simulate draws, and track wins/losses. Physical checkout reserves copies and creates a storage-aware pull list; Pulled status helps gather cards. Related tokens show ownership and physical locations.
 - **Import, export, and backup.** Review CSV and ManaBox imports, export the current collection view or decklists, and move an account with a complete JSON backup. Automatic SQLite snapshots support server-level recovery.
 - **Optional AI.** Use your own ChatGPT/Codex account, Gemini or OpenRouter API key, or an Ollama service for inventory-aware suggestions and deck improvements. Review and edit drafts before saving; the collection and deck workflows do not require AI.
@@ -226,9 +226,9 @@ Deleting a storage unit keeps its containers and cards and clears their unit ass
 
 ### Import a ManaBox storage container
 
-Storage opens a searchable, sortable gallery. Create a container, choose its cover through **More → Container Settings → Choose container image**, and organize cards by layout or image list. Move selections between containers or back to Unsorted, or use automatic filing. Capacity is advisory: cards stay in the chosen eligible container even when full, and Storage marks containers/pages/rows **Over limit**. Add pages/rows or change capacity manually to match your physical storage.
+Storage opens a searchable, sortable gallery. Create a container, choose its cover through **More → Container Settings → Choose container image**, and organize cards by layout or image list. Move selections between containers or back to Unsorted, or use automatic moving. Capacity is advisory: cards stay in the chosen eligible container even when full, and Storage marks containers/pages/rows **Over limit**. Add pages/rows or change capacity manually to match your physical storage.
 
-Choose **Import ManaBox container** and upload a `.txt` export. This creates a box named after the file and files matching, already-owned physical copies from Unsorted into its first row—it does not create missing collection cards.
+Choose **Import ManaBox container** and upload a `.txt` export. This creates a box named after the file and moves matching, already-owned physical copies from Unsorted into its first row—it does not create missing collection cards.
 
 Expand **Full summary** for requested, moved, and remaining quantities. **Move** fills remaining quantities from eligible copies in unlocked containers or Unsorted, without moving the same copies twice on retry. Matching uses exact printing identity and may use another finish while preserving the actual copy's metadata. Missing, Arena, and Wishlist copies stay put. Checked-out copies may change storage assignments without changing reservations. The imported box and first row must remain unlocked and unrestricted, with custom sorting and stacking disabled.
 
@@ -242,7 +242,7 @@ The container and reservations stay unchanged; the deck is **not checked out**. 
 
 ### Create a container from a deck
 
-Open a saved Physical or Graveyard deck and choose **Create Container**. Confirm a name to create a Deck Box and file available matching copies from the same inventory. Review moved/missing counts; no owned cards are created. Locked, missing, and reserved copies stay untouched, and saved physical source selections are respected. Return the deck first to make its reserved copies eligible. Arena decks cannot create storage containers.
+Open a saved Physical or Graveyard deck and choose **Create Container**. Confirm a name to create a Deck Box and move available matching copies from the same inventory. Review moved/missing counts; no owned cards are created. Locked, missing, and reserved copies stay untouched, and saved physical source selections are respected. Return the deck first to make its reserved copies eligible. Arena decks cannot create storage containers.
 
 ### Share a deck
 
@@ -254,7 +254,7 @@ Deck links use the root URL of the site currently open in your browser, includin
 
 ### Store archived cards in Graveyard containers
 
-Open **Collection → Graveyard → Graveyard containers**, or select **Graveyard** in Storage. Archived inventory has separate containers, unassigned cards, layouts, capacity, locks, and covers, with the same filing controls.
+Open **Collection → Graveyard → Graveyard containers**, or select **Graveyard** in Storage. Archived inventory has separate containers, unassigned cards, layouts, capacity, locks, and covers, with the same moving controls.
 
 A container's **More → Move to Graveyard / Restore to Collection** transfers it and all contents atomically, retaining quantities, metadata, positions, layout, settings, and cover. Unlock the container and compartments first. Cards may remain in decks, including checked-out decks: deck lists, checkout state, and exact-copy reservations are preserved. Archived copies do not supply owned totals or new checkouts. Individual restores clear archived placement; whole-container restores preserve it. Deleting an archived container leaves its cards archived and unassigned. Graveyard containers can supply Graveyard deck definitions, but not physical imports, Physical/Arena decks, AI inventory, or public container shares.
 

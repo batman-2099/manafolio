@@ -2563,18 +2563,18 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         {filingMode ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', height: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong style={{ fontSize: '0.85rem' }}>{t(filingReadOnly ? 'loc.refileGuide' : 'loc.filingMode')}</strong>
-              <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => { setFilingMode(false); setFilingReadOnly(false); refreshAll(); }} style={{ padding: '0.2rem 0.5rem', width: 'auto', fontSize: '0.7rem' }}>
+              <strong style={{ fontSize: 'max(0.85rem, var(--unsorted-text-min, 0rem))' }}>{t(filingReadOnly ? 'loc.refileGuide' : 'loc.filingMode')}</strong>
+              <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => { setFilingMode(false); setFilingReadOnly(false); refreshAll(); }} style={{ padding: '0.2rem 0.5rem', width: 'auto', fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))' }}>
                 {t(filingReadOnly ? 'bulk.done' : 'common.cancel')}
               </button>
             </div>
             {filingReadOnly && (
-              <div style={{ textAlign: 'center', fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
+              <div style={{ textAlign: 'center', fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)' }}>
                 {t('loc.resortGuideHint')}
               </div>
             )}
             
-            <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <div style={{ textAlign: 'center', fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-muted)' }}>
               {t('loc.filingCardProgress', { current: filingIndex + 1, total: filingQueue.length })}
             </div>
             
@@ -2584,7 +2584,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 
                 <div style={{ textAlign: 'center' }}>
                   <strong style={{ fontSize: '1rem', display: 'block' }}>{displayName(filingQueue[filingIndex].entry)}</strong>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{filingQueue[filingIndex].entry.set_name} • {filingQueue[filingIndex].entry.printing}</span>
+                  <span style={{ fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)' }}>{filingQueue[filingIndex].entry.set_name} • {filingQueue[filingIndex].entry.printing}</span>
                 </div>
                 
                 {(() => {
@@ -2592,10 +2592,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   if (!rec) {
                     return (
                       <div style={{ background: 'rgba(255, 71, 71, 0.15)', border: '1px solid #ff4747', borderRadius: 'var(--radius-sm)', padding: '0.75rem', width: '100%', textAlign: 'center' }}>
-                        <strong style={{ fontSize: '0.9rem', color: 'var(--text-strong)' }}>
+                        <strong style={{ fontSize: 'max(0.9rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-strong)' }}>
                           {t('loc.noEligibleCompartment')}
                         </strong>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                        <div style={{ fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                           {t('loc.skipRejected')}
                         </div>
                       </div>
@@ -2609,18 +2609,18 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       onClick={() => locateRecommendedSpot(rec)}
                       title={t('loc.snapToSlot')}
                     >
-                      <div style={{ fontSize: '0.7rem', color: '#ffc107', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold', marginBottom: '0.25rem' }}>{t('loc.clickToLocate')}</div>
-                      <strong style={{ fontSize: '0.9rem', color: 'var(--text-strong)', display: 'block' }}>{rec.label}</strong>
+                      <div style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', color: '#ffc107', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold', marginBottom: '0.25rem' }}>{t('loc.clickToLocate')}</div>
+                      <strong style={{ fontSize: 'max(0.9rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-strong)', display: 'block' }}>{rec.label}</strong>
                       <strong style={{ fontSize: '1.2rem', color: '#ffc107', display: 'block', marginTop: '0.25rem' }}>{t('loc.slotNumber', { n: Math.floor(rec.position / 1000) })}</strong>
                       {rec.after ? (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '0.4rem' }}>
                           <CardImage card={rec.after} style={{ width: '26px', borderRadius: '3px' }} />
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{t('loc.fileAfter')} <strong style={{ color: 'var(--text-strong)' }}>{displayName(rec.after)}</strong></span>
+                          <span style={{ fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)' }}>{t('loc.fileAfter')} <strong style={{ color: 'var(--text-strong)' }}>{displayName(rec.after)}</strong></span>
                         </div>
                       ) : rec.before ? (
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>{t('loc.fileBefore')} <strong style={{ color: 'var(--text-strong)' }}>{displayName(rec.before)}</strong></div>
+                        <div style={{ fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>{t('loc.fileBefore')} <strong style={{ color: 'var(--text-strong)' }}>{displayName(rec.before)}</strong></div>
                       ) : (
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>{t('loc.firstInSection')}</div>
+                        <div style={{ fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>{t('loc.firstInSection')}</div>
                       )}
                     </div>
                   );
@@ -2638,7 +2638,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       const rec = filingQueue[filingIndex].recommended;
                       handleFilingPlaced(filingQueue[filingIndex].entry.entry_id, rec.location_id, rec.compartment_id, rec.position);
                     }}
-                    style={{ flex: 2, padding: '0.6rem', fontSize: '0.9rem', fontWeight: 'bold' }}
+                    style={{ flex: 2, padding: '0.6rem', fontSize: 'max(0.9rem, var(--unsorted-text-min, 0rem))', fontWeight: 'bold' }}
                   >
                     {filingReadOnly ? t('loc.next') : t('loc.placed')}
                   </button>
@@ -2649,13 +2649,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         ) : (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong style={{ fontSize: '0.85rem' }}>{t('loc.unsortedCount', { count: unsortedCards.length })}</strong>
+              <strong style={{ fontSize: 'max(0.85rem, var(--unsorted-text-min, 0rem))' }}>{t('loc.unsortedCount', { count: unsortedCards.length })}</strong>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <button
                   type="button"
                   className={`btn ${unsortedSelectMode ? 'btn-primary' : 'btn-secondary'}`}
                   onClick={() => (unsortedSelectMode ? exitUnsortedSelectMode() : setUnsortedSelectMode(true))}
-                  style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', height: '24px' }}
+                  style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', padding: '0.2rem 0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', height: '24px' }}
                   title={t('loc.toggleMultiSelect')}
                 >
                   <MousePointerClick size={12} />
@@ -2687,10 +2687,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             {unsortedSelectMode && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: 'rgba(0,0,0,0.25)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', marginTop: '0.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-strong)' }}>{t('bulk.selectedCount', { count: unsortedSelectedIds.size })}</span>
+                  <span style={{ fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', fontWeight: 700, color: 'var(--text-strong)' }}>{t('bulk.selectedCount', { count: unsortedSelectedIds.size })}</span>
                   <div style={{ display: 'flex', gap: '0.3rem' }}>
-                    <button type="button" className="btn btn-secondary" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }} onClick={() => setUnsortedSelectedIds(new Set(unsortedCards.map(c => c.entry_id)))}>{t('loc.selectAll')}</button>
-                    <button type="button" className="btn btn-secondary" style={{ fontSize: '0.65rem', padding: '0.15rem 0.4rem' }} onClick={clearUnsortedSelection}>{t('bulk.clear')}</button>
+                    <button type="button" className="btn btn-secondary" style={{ fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', padding: '0.15rem 0.4rem' }} onClick={() => setUnsortedSelectedIds(new Set(unsortedCards.map(c => c.entry_id)))}>{t('loc.selectAll')}</button>
+                    <button type="button" className="btn btn-secondary" style={{ fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', padding: '0.15rem 0.4rem' }} onClick={clearUnsortedSelection}>{t('bulk.clear')}</button>
                   </div>
                 </div>
 
@@ -2699,7 +2699,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     className="select-control"
                     value={unsortedBulkLocation}
                     onChange={(e) => setUnsortedBulkLocation(e.target.value)}
-                    style={{ fontSize: '0.7rem', padding: '0.25rem 0.4rem', flex: 1, minWidth: 0 }}
+                    style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', padding: '0.25rem 0.4rem', flex: 1, minWidth: 0 }}
                   >
                     <option value="">{t('loc.fileSelectedTo')}</option>
                     {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -2714,7 +2714,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       runUnsortedBulk('move', unsortedBulkLocation, t('loc.confirmBulkFile', { count: unsortedSelectedIds.size, name: locObj?.name || t('loc.containerLower') }));
                       setUnsortedBulkLocation('');
                     }}
-                    style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem', fontWeight: 'bold' }}
+                    style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', padding: '0.25rem 0.5rem', fontWeight: 'bold' }}
                   >
                     {t('loc.file')}
                   </button>
@@ -2723,15 +2723,15 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     className="btn btn-danger"
                     disabled={!unsortedSelectedIds.size}
                     onClick={() => runUnsortedBulk('delete', null, t('bulk.confirmDelete', { count: unsortedSelectedIds.size }))}
-                    style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}
+                    style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', padding: '0.25rem 0.5rem' }}
                   >
                     {t('common.delete')}
                   </button>
                 </div>
                 {isArchive && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-                    <button className="btn btn-secondary" style={{ fontSize: '0.65rem', padding: '0.25rem 0.4rem' }} disabled={!unsortedSelectedIds.size} onClick={() => runUnsortedBulk('list_type', 'collection')}>{t('bulk.restoreToCollection')}</button>
-                    <button className="btn btn-secondary" style={{ fontSize: '0.65rem', padding: '0.25rem 0.4rem' }} disabled={!unsortedSelectedIds.size} onClick={() => runUnsortedBulk('list_type', 'arena')}>{t('bulk.restoreToArena')}</button>
+                    <button className="btn btn-secondary" style={{ fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', padding: '0.25rem 0.4rem' }} disabled={!unsortedSelectedIds.size} onClick={() => runUnsortedBulk('list_type', 'collection')}>{t('bulk.restoreToCollection')}</button>
+                    <button className="btn btn-secondary" style={{ fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', padding: '0.25rem 0.4rem' }} disabled={!unsortedSelectedIds.size} onClick={() => runUnsortedBulk('list_type', 'arena')}>{t('bulk.restoreToArena')}</button>
                   </div>
                 )}
               </div>
@@ -2740,12 +2740,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             <div className="storage-queue-filters" style={{ display: 'flex', gap: '0.4rem' }}>
               <input
                 className="input-control" aria-label={t('shared.search')} placeholder={t('loc.searchPlaceholder')} value={unsortedFilters.search}
-                onChange={(e) => setUnsortedFilters(filters => ({ ...filters, search: e.target.value }))} style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem', flex: 1, minWidth: 0 }}
+                onChange={(e) => setUnsortedFilters(filters => ({ ...filters, search: e.target.value }))} style={{ fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', padding: '0.3rem 0.5rem', flex: 1, minWidth: 0 }}
               />
               <button className={`btn ${showUnsortedFilters ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setShowUnsortedFilters(show => !show)} style={{ padding: '0.3rem 0.5rem', display: 'inline-flex', alignItems: 'center' }} title={t('collection.filters')}>
                 <SlidersHorizontal size={13} />
               </button>
-              <select className="select-control" aria-label={t('collection.sortBy')} value={unsortedSort} onChange={(e) => setUnsortedSort(e.target.value)} style={{ fontSize: '0.7rem', padding: '0.3rem 0.5rem', maxWidth: '150px' }}>
+              <select className="select-control" aria-label={t('collection.sortBy')} value={unsortedSort} onChange={(e) => setUnsortedSort(e.target.value)} style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', padding: '0.3rem 0.5rem', maxWidth: '150px' }}>
                 <option value="scanned-desc">{t('collection.sort.scanned-desc')}</option>
                 <option value="scanned-asc">{t('collection.sort.scanned-asc')}</option>
                 <option value="name-asc">{t('loc.sortAZ')}</option>
@@ -2764,17 +2764,17 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   ['printing', t('collection.allPrintings'), unsortedFilterOptions.printings],
                   ['language', t('collection.allLanguages'), unsortedFilterOptions.languages]
                 ].map(([key, label, options]) => (
-                  <select key={key} className="select-control" aria-label={label} value={unsortedFilters[key]} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
+                  <select key={key} className="select-control" aria-label={label} value={unsortedFilters[key]} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))', padding: '0.3rem' }}>
                     <option value="">{label}</option>
                     {options.map(option => <option key={option} value={option}>{key === 'color' ? t(`dash.color.${option}`) : option}</option>)}
                   </select>
                 ))}
-                <select className="select-control" aria-label={t('loc.allDeckStatuses')} value={unsortedFilters.deckStatus} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
+                <select className="select-control" aria-label={t('loc.allDeckStatuses')} value={unsortedFilters.deckStatus} onChange={(e) => setUnsortedFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))', padding: '0.3rem' }}>
                   <option value="">{t('loc.allDeckStatuses')}</option>
                   <option value="inPlay">{t('loc.inPlay')}</option>
                   <option value="notInPlay">{t('loc.notInPlay')}</option>
                 </select>
-                <button className="btn btn-secondary" onClick={() => setUnsortedFilters({ search: '', set: '', type: '', color: '', rarity: '', condition: '', printing: '', language: '', deckStatus: '' })} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>{t('collection.clearFilters')}</button>
+                <button className="btn btn-secondary" onClick={() => setUnsortedFilters({ search: '', set: '', type: '', color: '', rarity: '', condition: '', printing: '', language: '', deckStatus: '' })} style={{ fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))', padding: '0.3rem' }}>{t('collection.clearFilters')}</button>
               </div>
             )}
 
@@ -2786,7 +2786,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   onClick={startFilingMode}
                   disabled={!activeLocationId}
                   title={t(activeLocationId ? 'loc.fileWalkHint' : 'loc.selectContainerFirst')}
-                  style={{ fontSize: '0.8rem', padding: '0.45rem', width: '100%' }}
+                  style={{ fontSize: 'max(0.8rem, var(--unsorted-text-min, 0rem))', padding: '0.45rem', width: '100%' }}
                 >
                   {t('loc.sortAndFile')}
                 </button>
@@ -2796,7 +2796,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   onClick={handleApplyAll}
                   disabled={!activeLocationId}
                   title={t(activeLocationId ? 'loc.autoFileHint' : 'loc.selectContainerFirst')}
-                  style={{ fontSize: '0.7rem', padding: '0.35rem', width: '100%' }}
+                  style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', padding: '0.35rem', width: '100%' }}
                 >
                   {t('loc.autoFileAll')}
                 </button>
@@ -2842,7 +2842,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem',
-                        fontSize: '0.72rem',
+                        fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))',
                         padding: '0.4rem',
                         background: isHighlighted ? 'rgba(255,71,71,0.18)' : 'rgba(255, 255, 255, 0.02)',
                         border: isHighlighted ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)',
@@ -2870,7 +2870,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         
                         {/* Selected / Picked checkmark badge */}
                         {isHighlighted && (
-                          <div style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 20, width: '20px', height: '20px', borderRadius: '50%', background: 'var(--accent-red)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.75rem', fontWeight: 900 }}>
+                          <div style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 20, width: '20px', height: '20px', borderRadius: '50%', background: 'var(--accent-red)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', fontWeight: 900 }}>
                             ✓
                           </div>
                         )}
@@ -2880,7 +2880,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                           position: 'absolute',
                           top: '4px',
                           left: '4px',
-                          fontSize: '0.5rem',
+                          fontSize: 'max(0.5rem, var(--unsorted-text-min, 0rem))',
                           fontWeight: 900,
                           padding: '1px 3px',
                           borderRadius: '2px',
@@ -2898,7 +2898,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                             position: 'absolute',
                             bottom: '4px',
                             right: '4px',
-                            fontSize: '0.5rem',
+                            fontSize: 'max(0.5rem, var(--unsorted-text-min, 0rem))',
                             fontWeight: 900,
                             padding: '1px 3px',
                             borderRadius: '2px',
@@ -2916,7 +2916,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       <div style={{ marginTop: '0.35rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.15rem' }}>
                         <div
                           style={{
-                            fontSize: '0.72rem',
+                            fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))',
                             fontWeight: isHighlighted ? 700 : 600,
                             color: 'var(--text-primary)',
                             whiteSpace: 'nowrap',
@@ -2926,7 +2926,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         >
                           {isHighlighted ? '✓ ' : ''}{displayName(card)}
                         </div>
-                        <div style={{ fontSize: '0.62rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: 'max(0.62rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.set_name || ''}</span>
                           {card.price_trend > 0 && <span style={{ color: 'var(--accent-yellow)', fontWeight: 600, flexShrink: 0 }}>{priceText(card.price_trend, card.price_currency)}</span>}
                         </div>
@@ -2940,7 +2940,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         <CardImage card={card} loading="lazy" decoding="async" style={{ width: '100%', aspectRatio: 0.718, objectFit: 'cover', display: 'block' }} />
                         {foilClass && <div className={foilClass} style={{ borderRadius: '4px' }} />}
                         {isHighlighted && (
-                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(255, 71, 71, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontWeight: 900, fontSize: '0.8rem' }}>
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(255, 71, 71, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontWeight: 900, fontSize: 'max(0.8rem, var(--unsorted-text-min, 0rem))' }}>
                             ✓
                           </div>
                         )}
@@ -2950,15 +2950,15 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         <div style={{ fontWeight: isHighlighted ? 700 : 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {isHighlighted ? '✓ ' : ''}{displayName(card)}
                         </div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.4rem', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', display: 'flex', gap: '0.4rem', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <span>{card.set_name || 'Unset'} {card.number ? `#${card.number}` : ''}</span>
                           {card.condition && (
-                            <span style={{ padding: '1px 3px', borderRadius: '2px', background: 'rgba(0,0,0,0.4)', fontSize: '0.55rem', fontWeight: 700 }}>
+                            <span style={{ padding: '1px 3px', borderRadius: '2px', background: 'rgba(0,0,0,0.4)', fontSize: 'max(0.55rem, var(--unsorted-text-min, 0rem))', fontWeight: 700 }}>
                               {card.condition}
                             </span>
                           )}
                           {printingBadgeLabel && (
-                            <span style={{ padding: '1px 3px', borderRadius: '2px', fontSize: '0.55rem', fontWeight: 700, ...getPrintingBadgeStyle(card.printing) }}>
+                            <span style={{ padding: '1px 3px', borderRadius: '2px', fontSize: 'max(0.55rem, var(--unsorted-text-min, 0rem))', fontWeight: 700, ...getPrintingBadgeStyle(card.printing) }}>
                               {printingBadgeLabel}
                             </span>
                           )}
@@ -2966,7 +2966,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       </div>
 
                       {card.price_trend > 0 && (
-                        <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--accent-yellow)', flexShrink: 0 }}>
+                        <span style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', fontWeight: 600, color: 'var(--accent-yellow)', flexShrink: 0 }}>
                           {priceText(card.price_trend, card.price_currency)}
                         </span>
                       )}
@@ -2977,7 +2977,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 })}
               </div>
 
-            {unsortedCards.length === 0 && <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.5rem' }}>{t('loc.nothingUnsorted')}</p>}
+            {unsortedCards.length === 0 && <p style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.5rem' }}>{t('loc.nothingUnsorted')}</p>}
             </UnsortedDropZone>
           </>
         )}

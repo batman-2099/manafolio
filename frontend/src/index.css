@@ -2537,6 +2537,19 @@ button.collection-card-trigger {
   }
 }
 
+@media (min-width: 769px) {
+  .location-unsorted-col { --unsorted-text-min: 0.875rem; }
+  .location-unsorted-col :is(button, input, select) {
+    font-size: 1rem !important;
+    min-height: 40px;
+    line-height: 1.4;
+  }
+  .location-unsorted-col button { min-width: 40px; }
+  .location-unsorted-col button svg { width: 18px; height: 18px; }
+  .location-unsorted-col .storage-queue-filters { flex-wrap: wrap; }
+  .location-unsorted-col .storage-queue-filters select { max-width: none !important; }
+}
+
 .sub-nav-tabs {
   display: flex;
   background: var(--bg-glass);

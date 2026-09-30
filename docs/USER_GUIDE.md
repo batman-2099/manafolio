@@ -51,7 +51,7 @@ The guide text is currently English. Tables scroll horizontally on narrow screen
 | Dashboard | Quantities, valuation, growth, deck-result summaries, and scan-only Price Check. |
 | Add Cards | Search, rapid entry, collection imports, preconstructed decks, and camera scanning. |
 | Collection | Find and inspect owned, planned, or archived cards; filter and export results. |
-| Storage | Physical and archived containers, positions, covers, filing, and moving copies. |
+| Storage | Physical and archived containers, positions, covers, and moving copies. |
 | Deck Builder | Deck drafts, private deck notes, imports, commander selection, checkout, results, and draw simulation. |
 | How-to | Searchable chapters and step-by-step instructions from this guide. |
 | Settings | Preferences, sharing, security, API access, AI configuration, and account backup/restore. |
@@ -124,7 +124,7 @@ The **Add cards to** selector in **Search & Add** chooses **Collection** (physic
 4. Choose **Search cards**. Open a result; a search with exactly one result can open its add form directly. Compare the artwork, set, collector number, and language.
 5. In **Add Card to Collection**, set **Quantity**, **Purchase Price**, **Condition**, **Printing**, and **Language**. Use the grading fields if this is a slab; leave the grader as raw for an ordinary card.
 6. Choose **Add to Collection** or **Add to Arena**, matching your selected destination, or **Add to Wishlist** if you do not own it yet.
-7. Open Collection in the corresponding inventory and check the new entry. Physical additions are initially unassigned; filing them is a separate step.
+7. Open Collection in the corresponding inventory and check the new entry. Physical additions are initially unassigned; moving them is a separate step.
 
 **Expected result:** a saved entry for the chosen printing and destination, with the quantity and copy details you supplied.
 
@@ -347,7 +347,7 @@ Both methods account for the number of copies in each entry. Entry shares are al
 
 ## Storage: keep the app and the cards on your shelf in sync
 
-Storage describes where cards are physically kept. It does not create inventory when you create a box, and changing a recorded placement cannot move a real card for you. Keep the physical container beside you when filing or rearranging.
+Storage describes where cards are physically kept. It does not create inventory when you create a box, and changing a recorded placement cannot move a real card for you. Keep the physical container beside you when moving or rearranging.
 
 ### Group containers into storage units
 
@@ -369,13 +369,13 @@ Use a **storage unit** for something holding card containers: a cabinet, shelf, 
 | Bag / Backpack | A tournament bag holding decks and a trade binder. |
 | Other | Any grouping not covered above; the default for existing units. |
 
-Types are descriptive only: they do not impose capacities or filing rules. A case holding deck boxes is a storage unit; a case holding individual cards is a card container.
+Types are descriptive only: they do not impose capacities or moving rules. A case holding deck boxes is a storage unit; a case holding individual cards is a card container.
 
 ![Create Storage Unit dialog with the sample name Tournament bag and Bag / Backpack selected as its type](images/manafolio-storage-unit.webp)
 
 *Sample data: creating a storage unit for a tournament bag. Choose its containers separately through Stored in.*
 
-A recorded card path can read **Tournament bag › Trade binder › Page 4 › Slot 7**. **No storage unit** is not **Unassigned Pile**: an ungrouped binder can still contain fully filed cards.
+A recorded card path can read **Tournament bag › Trade binder › Page 4 › Slot 7**. **No storage unit** is not **Unassigned Pile**: an ungrouped binder can still contain stored cards.
 
 Units show container counts across both inventories, not card-capacity meters. Moving a container preserves its card positions, quantities, locks, and deck reservations. It does not move physical objects for you.
 
@@ -398,7 +398,7 @@ Choose **Automatic image** to let the gallery use a recent eligible card. If a m
 3. In **Type**, choose a suitable layout: **Binder**, **Toploader Binder**, **Box**, **Toploader Box**, **Graded Slab Box**, **Display Shelf / Stand**, **Deck Box**, **Tin / Case**, or **Other**.
 4. In **Layout**, enter a recognizable **Name**, choose **Sleeved** (**None**, **Single**, **Double**, or **Triple**), and enter the actual number of pages/rows and cards per page/row. Read the total-capacity summary.
 5. In **Sort**, add ordering rules if desired. Leave this empty for manual **Custom** order. A rule's **Divider** option shows labeled category breaks.
-6. In **Filing**, add restrictions only if needed. No rules is a useful starting point for a general-purpose container.
+6. In **Moving**, add restrictions only if needed. No rules is a useful starting point for a general-purpose container.
 7. Choose **Create Container**.
 
 **Expected result:** an empty named container with the chosen layout. It does not add cards to Collection.
@@ -409,40 +409,42 @@ The container toolbar shows its saved sleeve type. Change it through **More → 
 
 Change **Type** through **More → Container Settings**, then **Save Settings**. Existing cards, pages/rows, capacities, and sleeve settings are retained; changing type does not apply the creation wizard's default layout.
 
-### Choose between sort rules and filing rules
+### Choose between sort rules and moving rules
 
 - **Sort** answers “in what order?” Rules can order cards by name, set/number, value, finish, type/color, language, and other offered fields. Rule priority matters.
-- **Filing Rules (Allow/Deny List)** answers “which cards are allowed here?” Use **Add Rule**, **Require** or **Exclude**, a field, comparison, and value.
+- **Moving Rules (Allow/Deny List)** answers “which cards are allowed here?” Use **Add Rule**, **Require** or **Exclude**, a field, comparison, and value.
 - Container rules apply to the whole container. A row/page's **Accepts** control adds restrictions for that compartment.
-- Locks affect whether a card can be filed. Capacity is advisory: eligible cards can be filed beyond the configured limit.
+- Locks affect whether a card can be moved. Capacity is advisory: eligible cards can be moved beyond the configured limit.
 
 For example, a binder can sort by set then collector number while accepting only one set. These are separate decisions: sorting by set does not by itself reject cards from other sets.
 
-**Warning:** saving filing rules that existing cards no longer match can move those cards to Unsorted. Check the resulting location changes and move the physical cards as needed.
+**Warning:** saving moving rules that existing cards no longer match can move those cards to Unsorted. Check the resulting location changes and move the physical cards as needed.
 
-### File cards from Unassigned Pile
+### Move cards from Unassigned Pile
 
 1. Open the destination container in the correct Storage inventory.
-2. Find the **Unsorted** queue and review the cards waiting to be filed. Its search, filters, and ordering help you inspect the pile. The color filter uses actual card colors, matching Deck Builder: white, blue, black, red, green, multicolor, and colorless—not Commander color identity. Only categories present in the pile are offered; multicolor cards have their own category and basic lands are colorless.
-3. Choose one of the two filing workflows below.
-4. After filing, compare the recorded row/page/slot with the real container.
+2. Find the **Unsorted** queue and review the cards waiting to be moved. Its search, filters, and ordering help you inspect the pile. The color filter uses actual card colors, matching Deck Builder: white, blue, black, red, green, multicolor, and colorless—not Commander color identity. Only categories present in the pile are offered; multicolor cards have their own category and basic lands are colorless.
+3. Choose one of the two moving workflows below.
+4. After moving, compare the recorded row/page/slot with the real container.
 
-#### Guided filing
+On desktop, Unsorted uses larger text and controls for its search, filters, selection actions, and move workflow; mobile retains its touch layout.
 
-1. Choose **Sort & File (into open container)**.
-2. The app finds cards accepted by the open container's rules and unlocked pages/rows. Cards rejected by those restrictions remain unassigned; exceeding capacity does not prevent filing.
+#### Guided moving
+
+1. Choose **Sort & Move (into open container)**.
+2. The app finds cards accepted by the open container's rules and unlocked pages/rows. Cards rejected by those restrictions remain unassigned; exceeding capacity does not prevent moving.
 3. Follow each recommendation. Use **Click to Locate** or the corresponding tap-to-locate control to find the suggested spot.
-4. Put the physical card there and choose **File**. Use **Skip** for a card you are not ready to place.
-5. Continue through the queue, or use **Exit filing** when you need to stop.
+4. Put the physical card there and choose **Move**. Use **Skip** for a card you are not ready to place.
+5. Continue through the queue, or use **Exit moving** when you need to stop.
 
-#### Automatic filing
+#### Automatic moving
 
-1. Choose **Auto-File All (into open container)**.
-2. Read the confirmation and count carefully. This is a filing operation for the open container, not an automatic search across all containers.
+1. Choose **Auto-Move All (into open container)**.
+2. Read the confirmation and count carefully. This is a moving operation for the open container, not an automatic search across all containers.
 3. Full pages/rows still accept eligible cards. The app marks over-capacity storage **Over limit** without automatically expanding capacity or choosing another container.
 4. Confirm, then review the resulting locations and arrange the physical cards accordingly.
 
-**Scope:** both filing actions use the currently filtered Unsorted queue, and only file into the open container. Check the queue and confirmation count before proceeding. To file a hand-picked group instead, select the cards and use **File selected to…**.
+**Scope:** both moving actions use the currently filtered Unsorted queue, and only move into the open container. Check the queue and confirmation count before proceeding. To move a hand-picked group instead, select the cards and use **Move selected to…**.
 
 ### Move cards without deleting them
 
@@ -450,7 +452,7 @@ To change the location of several stored entries:
 
 1. Open the unlocked source container and choose **Select**, or long-press a card.
 2. Select the entries to move and check the count.
-3. Choose a destination from the move selector and choose **File**, then confirm.
+3. Choose a destination from the move selector and choose **Move**, then confirm.
 4. Move the real cards to their new recorded positions.
 
 To take cards out of a container but keep the records, select them and choose **Remove from Storage**. They return to Unsorted in the same inventory. Collection also provides **Move to container… → Apply Move**, including **Unassigned Pile**.
@@ -464,7 +466,7 @@ To take cards out of a container but keep the records, select them and choose **
 3. Tap a card, then the destination. In a binder, tap an empty pocket to place it or an occupied pocket to swap. Row layouts prompt you to drop before another card or into an empty slot.
 4. Repeat, moving the physical cards to match, then choose **Done Arranging**.
 
-Automatic sorting can renumber positions and shift later cards, especially in a binder. Use Custom order for a fixed pocket layout. If you choose to re-sort after changing structured sorting, the **Re-sort: Re-file Guide** reflects positions already saved in the app: move each physical card to the displayed spot and choose **Next →**. Exiting that guide is not an undo of the re-sort.
+Automatic sorting can renumber positions and shift later cards, especially in a binder. Use Custom order for a fixed pocket layout. If you choose to re-sort after changing structured sorting, the **Re-sort: Move Guide** reflects positions already saved in the app: move each physical card to the displayed spot and choose **Next →**. Exiting that guide is not an undo of the re-sort.
 
 ### Capacity, stacking, and locks
 
@@ -480,10 +482,10 @@ Deleting a container is not the same as deleting its cards: **Delete Container**
 
 ### Import a ManaBox container layout from a text list
 
-This workflow is for **filing cards already in physical Collection**. It does not add missing copies.
+This workflow is for **moving cards already in physical Collection**. It does not add missing copies.
 
 1. In physical **Storage**, choose **Import ManaBox container** and select a ManaBox `.txt` export.
-2. The app creates a box named after the file and tries to file matching, already-owned copies from Unsorted into its first row.
+2. The app creates a box named after the file and tries to move matching, already-owned copies from Unsorted into its first row.
 3. Read **Container import review**. Expand **Show full summary** to compare **Requested**, **Moved**, **Not moved**, and **Other locations / inventory**.
 4. For remaining quantities, review the available locations and choose **Move** where offered. This can bring eligible copies from other unlocked containers or Unsorted.
 5. Repeat only for quantities still shown as remaining, then verify the box and physically relocate the cards.
@@ -492,7 +494,7 @@ Matching uses the exact card/set/collector-number identity. The requested finish
 
 Missing, Arena, Wishlist, and Graveyard entries are not a source of physical cards for this import. Checked-out physical copies can have their recorded storage changed without changing their reservation; the import does not return those cards or make them available.
 
-**Keep the imported destination suitable:** its box and first row must remain unlocked and unrestricted, use Custom sorting, and have stacking disabled for follow-up moves. If the printing is unresolved, check the catalog/printing first. If you do not own enough copies, add only the genuinely owned missing inventory through Add Cards before trying to file it.
+**Keep the imported destination suitable:** its box and first row must remain unlocked and unrestricted, use Custom sorting, and have stacking disabled for follow-up moves. If the printing is unresolved, check the catalog/printing first. If you do not own enough copies, add only the genuinely owned missing inventory through Add Cards before trying to move it.
 
 ### Archive and restore cards with Graveyard
 
@@ -503,7 +505,7 @@ Use Graveyard for cards you no longer want counted as owned but whose quantities
 1. Open an entry's inspector, or select entries in Collection/an unlocked container.
 2. Choose **Archive to Graveyard**. Return checked-out copies first if the operation is blocked by reservations.
 3. Open **Collection → Graveyard** to see the archived entries.
-4. If you want archived storage, choose **Graveyard containers** or select **Graveyard** in Storage, then create/file into archived containers.
+4. If you want archived storage, choose **Graveyard containers** or select **Graveyard** in Storage, then create/move into archived containers.
 5. To bring an entry back, choose **Restore to Physical Collection** or **Restore to Arena** explicitly.
 
 Individual archiving clears the old physical placement. An individual physical restore returns to **Unassigned Pile**, not its former physical container. Arena restores have no physical placement.
@@ -517,9 +519,9 @@ Individual archiving clears the old physical placement. An individual physical r
 
 Cards can remain in saved or checked-out decks. Transferring the container preserves deck lists, checkout status, exact-copy reservations, and return locations. Archived copies no longer supply owned totals or new checkouts; restoring the container does not release existing reservations.
 
-**Expected result:** the container and all its contents change inventory together, preserving quantities, metadata, positions, layout, sorting/filing configuration, and cover. This differs from restoring individual entries.
+**Expected result:** the container and all its contents change inventory together, preserving quantities, metadata, positions, layout, sorting/moving configuration, and cover. This differs from restoring individual entries.
 
-Graveyard has separate unassigned cards and storage; physical cards cannot be filed directly into archived containers or vice versa. Archived cards do not supply owned totals or physical/Arena decks. Graveyard containers are not available for public container sharing.
+Graveyard has separate unassigned cards and storage; physical cards cannot be moved directly into archived containers or vice versa. Archived cards do not supply owned totals or physical/Arena decks. Graveyard containers are not available for public container sharing.
 
 Choose **More → Create Deck** in a Graveyard container to create an archived deck from its complete contents, regardless of current filters or selection. The container and card entries stay unchanged. Empty containers cannot create a deck.
 
@@ -527,12 +529,12 @@ Choose **More → Create Deck** in a Graveyard container to create an archived d
 
 | Problem | Check first |
 | --- | --- |
-| A card will not file | Confirm the inventory, container/row locks, and filing rules. Capacity alone does not block filing. |
-| Automatic filing leaves cards behind | They may not match the open container's rules or any unlocked page/row. Review the remaining Unsorted cards rather than assuming they were lost. |
-| The physical binder no longer matches the app | Sorting or filing may have shifted positions. Follow the re-file guide, or switch to Custom and arrange a fixed layout deliberately. |
+| A card will not move | Confirm the inventory, container/row locks, and moving rules. Capacity alone does not block moving. |
+| Automatic moving leaves cards behind | They may not match the open container's rules or any unlocked page/row. Review the remaining Unsorted cards rather than assuming they were lost. |
+| The physical binder no longer matches the app | Sorting or moving may have shifted positions. Follow the move guide, or switch to Custom and arrange a fixed layout deliberately. |
 | A row/page cannot be removed | It must be the last removable empty compartment. The container also must be unlocked. |
 | A move/archive/restore is blocked | Check locks and inventory boundaries. Individual card archiving also requires returning reserved copies; whole-container transfers retain their reservations. |
-| ManaBox container import moved fewer copies than requested | It only files existing eligible physical copies. Expand the full summary for unresolved printings, other locations, and remaining quantities. |
+| ManaBox container import moved fewer copies than requested | It only moves existing eligible physical copies. Expand the full summary for unresolved printings, other locations, and remaining quantities. |
 | Cards vanished after deleting a container | Look in Unsorted for that inventory. Deleting a container leaves its cards; deleting cards is a different action. |
 
 
@@ -715,10 +717,10 @@ Arena and Graveyard decks cannot be checked out, even if a checkout control is v
 
 1. Open a saved, nonempty Physical or Graveyard deck and save any editor changes.
 2. Select **Create Container** near the top and review the proposed box name.
-3. Confirm creation to file available matching copies into a new **Deck Box** in the deck's inventory.
-4. Review the moved and missing quantities. Missing means copies could not be filed—not that new copies were added. Open Storage to find the box and physically arrange the cards to match.
+3. Confirm creation to move available matching copies into a new **Deck Box** in the deck's inventory.
+4. Review the moved and missing quantities. Missing means copies could not be moved—not that new copies were added. Open Storage to find the box and physically arrange the cards to match.
 
-This moves existing collection entries; it never creates owned copies, changes the deck list, or checks out/returns a deck. It respects selected physical sources and skips missing copies, locked locations/compartments, and reserved copies—including this deck's reservations. Return a checked-out deck first if you want those copies filed. Other inventories and other accounts never supply cards. Arena decks have no storage container action.
+This moves existing collection entries; it never creates owned copies, changes the deck list, or checks out/returns a deck. It respects selected physical sources and skips missing copies, locked locations/compartments, and reserved copies—including this deck's reservations. Return a checked-out deck first if you want those copies moved. Other inventories and other accounts never supply cards. Arena decks have no storage container action.
 
 Partial availability still creates the box and reports shortages. Use a different name if a container with that name already exists in the same inventory.
 
