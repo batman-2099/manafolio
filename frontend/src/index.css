@@ -395,6 +395,14 @@ button, input, select, textarea {
 .storage-workspace-identity .sub-nav-tabs { width: auto; }
 .storage-workspace-identity .sub-nav-tab { min-height: 44px; padding: 0.5rem 0.75rem; }
 .storage-workspace-actions .btn { padding-inline: 0.65rem; }
+.storage-create-actions, .storage-unit-desktop-nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.storage-unit-mobile-nav { display: none; }
+@media (max-width: 768px) {
+  .storage-unit-desktop-nav { display: none; }
+  .storage-unit-mobile-nav { display: block; width: 100%; }
+  .storage-create-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .storage-create-actions .btn { white-space: normal; padding-inline: var(--space-2); min-height: 44px; }
+}
 .storage-page-nav { min-width: 0; }
 .storage-page-nav select { min-width: 0; }
 @media (max-width: 768px) {

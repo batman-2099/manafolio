@@ -8,6 +8,7 @@ const { resolveCardPrice } = require('../utils/priceHelpers');
 const { isBinderType } = require('../utils/compartmentSort');
 const { assertStorageInventory, checkedOutSources, moveContainerCopies } = require('../utils/collectionHelpers');
 const { normalizeCardBack } = require('../utils/cardBack');
+const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
 const validImportQuantity = quantity => Number.isSafeInteger(quantity) && quantity > 0 && quantity <= 2147483647;
 
 function parseCsvRows(data) {
@@ -48,6 +49,18 @@ async function parseCompleteBackup(data) {
   const arrays = ['collection', 'card_cache', 'locations', 'compartments', 'compartment_assignments', 'decks', 'deck_cards'];
   if (!backup || backup.format !== 'manafolio-backup' || backup.version !== 1 || !arrays.every(key => Array.isArray(backup[key]))) {
     throw new Error('Invalid backup file');
+  }
+  const storageUnits = backup.storage_units === undefined ? [] : backup.storage_units;
+  if (!Array.isArray(storageUnits) || storageUnits.some(unit => !unit
+      || !Number.isSafeInteger(unit.id) || unit.id < 1
+      || typeof unit.name !== 'string' || !unit.name.trim()
+      || (unit.type !== undefined && !storageUnitTypes.includes(unit.type)))
+      || new Set(storageUnits.map(unit => unit.id)).size !== storageUnits.length) {
+    throw new Error('Invalid backup storage units');
+  }
+  const storageUnitIds = new Set(storageUnits.map(unit => unit.id));
+  if (backup.locations.some(location => location.storage_unit_id != null && !storageUnitIds.has(location.storage_unit_id))) {
+    throw new Error('Invalid backup storage unit references');
   }
   if (backup.decks.some(deck => !['collection', 'arena', 'graveyard'].includes(deck.inventory_type ?? 'collection')
       || ((deck.inventory_type ?? 'collection') !== 'collection' && (deck.checked_out || deck.checked_out_at != null)))) {
@@ -129,6 +142,7 @@ async function parseCompleteBackup(data) {
 }
 
 async function restoreCompleteBackup(backup, userId) {
+  const storageUnitIds = new Map();
   const locationIds = new Map();
   const compartmentIds = new Map();
   const deckIds = new Map();
@@ -161,6 +175,7 @@ async function restoreCompleteBackup(backup, userId) {
     await db.run('DELETE FROM decks WHERE user_id = ?', [userId]);
     await db.run('DELETE FROM collection WHERE user_id = ?', [userId]);
     await db.run('DELETE FROM locations WHERE user_id = ?', [userId]);
+    await db.run('DELETE FROM storage_units WHERE user_id = ?', [userId]);
 
     for (const card of backup.card_cache) {
       await db.run(`
@@ -178,14 +193,19 @@ async function restoreCompleteBackup(backup, userId) {
       ]);
     }
 
+    for (const unit of backup.storage_units ?? []) {
+      const result = await db.run('INSERT INTO storage_units (user_id, name, type) VALUES (?, ?, ?)', [userId, unit.name, unit.type ?? 'Other']);
+      storageUnitIds.set(unit.id, result.lastID);
+    }
+
     for (const location of backup.locations) {
       const result = await db.run(`
-        INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, locked, allow_stacking, cover_card_id, inventory_type, sleeved)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, locked, allow_stacking, cover_card_id, inventory_type, sleeved, storage_unit_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         location.name, location.type, location.sort_order, location.foil_sorting, location.rule_type, location.rule_config,
         location.game, userId, location.locked || 0, location.allow_stacking || 0, location.cover_card_id || null, location.inventory_type ?? 'collection',
-        location.sleeved ?? 0
+        location.sleeved ?? 0, location.storage_unit_id == null ? null : storageUnitIds.get(location.storage_unit_id)
       ]);
       locationIds.set(location.id, result.lastID);
     }
@@ -289,6 +309,7 @@ router.get('/export', async (req, res) => {
         collection,
         card_cache: cardCache,
         locations,
+        storage_units: await db.all('SELECT id, name, type FROM storage_units WHERE user_id = ? ORDER BY id', [req.user.id]),
         compartments,
         compartment_assignments: compartmentAssignments,
         decks,
@@ -676,13 +697,14 @@ async function containerItemReport(userId, cardId, printing, requested, location
   }
   const entries = await movableContainerEntries(userId, cardId, printing, locationId);
   const locations = await db.all(`
-    SELECT c.location_id, l.name AS location_name, c.list_type, c.printing,
+    SELECT c.location_id, l.name AS location_name, su.name AS storage_unit_name, c.list_type, c.printing,
       SUM(c.quantity) AS quantity, c.missing
     FROM collection c
     LEFT JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
+    LEFT JOIN storage_units su ON su.id = l.storage_unit_id AND su.user_id = c.user_id
     WHERE c.user_id = ? AND c.card_id = ? AND c.quantity > 0
       AND (c.location_id IS NULL OR (c.location_id != ? AND l.id IS NOT NULL))
-    GROUP BY c.location_id, l.name, c.list_type, c.printing, c.missing
+    GROUP BY c.location_id, l.name, su.name, c.list_type, c.printing, c.missing
     ORDER BY c.location_id, c.list_type, c.printing, c.missing
   `, [userId, cardId, locationId]);
   return {

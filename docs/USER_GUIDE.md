@@ -349,6 +349,21 @@ Both methods account for the number of copies in each entry. Entry shares are al
 
 Storage describes where cards are physically kept. It does not create inventory when you create a box, and changing a recorded placement cannot move a real card for you. Keep the physical container beside you when filing or rearranging.
 
+### Group containers into storage units
+
+Use a **storage unit** for something holding card containers: a cabinet, shelf, drawer, carrying case, or tote. Keep **container** for a binder, card box, deck box, or tin holding cards directly. Pages/rows and slots remain inside containers. Classify a case by what it holds, not its shape.
+
+1. Choose **Create storage unit** in Storage, enter a name, and select **Type**: Cabinet, Shelf, Drawer, Storage Bin / Tote, Carrying Case, Bag / Backpack, or Other (the default). Types describe the unit; they do not impose capacities or filing rules.
+2. Set a container's **Stored in** field during creation or in **Container Settings**. To move an existing container without changing other settings, use **More → Move container…**.
+3. Open **Storage units** and select a unit to browse its containers. **All containers** keeps the flat gallery available; **No storage unit** shows containers without a unit.
+4. Continue using **Physical** and **Graveyard** to choose the inventory to browse. A unit may group containers from both inventories; grouping never archives or restores cards.
+
+A recorded card path can read **Tournament bag › Trade binder › Page 4 › Slot 7**. **No storage unit** is not **Unassigned Pile**: an ungrouped binder can still contain fully filed cards.
+
+Units show container counts across both inventories, not card-capacity meters. Moving a container preserves its card positions, quantities, locks, and deck reservations. It does not move physical objects for you.
+
+Open a unit and choose **Edit storage unit** to change its name or type. Deletion requires confirmation and leaves all containers and cards intact, with **No storage unit** assigned. Complete account backups preserve these groupings and types; older backups restore without units, and units without a saved type use Other. Existing units also start as Other. Unit names remain private, including when a container is publicly shared. Storage units do not nest inside other units.
+
 ### Create a container
 
 1. Open **Storage** and check **Storage inventory**. Use physical Collection for owned cards or **Graveyard** for archived cards.

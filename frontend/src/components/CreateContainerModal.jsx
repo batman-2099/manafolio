@@ -5,6 +5,7 @@ import { isBinderType, containerTypeKey } from '../utils/cardOptions';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
 import Modal from './Modal';
+import { StorageUnitSelect } from './StorageUnitDialog';
 
 // Container types and their default layout. Counts kept modest; the user adjusts
 // them on step 2. Mirrors defaultCompartmentPlan in
@@ -31,11 +32,12 @@ const compartmentKind = (type) => (isBinderType(type) ? 'page' : 'row');
 
 const STEPS = ['type', 'layout', 'sort', 'filing'];
 
-export default function CreateContainerModal({ onClose, onCreate, setsList = [], filterFieldOptions = {} }) {
+export default function CreateContainerModal({ onClose, onCreate, setsList = [], filterFieldOptions = {}, storageUnits = [], initialStorageUnitId = null, storageUnitsLoading = false, storageUnitsError = false, onRetryStorageUnits }) {
   const { t } = useT();
   const [step, setStep] = useState(0);
   const [type, setType] = useState('Binder');
   const [name, setName] = useState('');
+  const [storageUnitId, setStorageUnitId] = useState(initialStorageUnitId);
   const [sleeved, setSleeved] = useState(0);
   const game = 'mtg';
   const [count, setCount] = useState(TYPE_META[0].plan.count);
@@ -65,6 +67,7 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
       type,
       game,
       sleeved,
+      storage_unit_id: storageUnitId,
       compartmentPlan: { count: Math.max(1, parseInt(count, 10) || 1), capacity: Math.max(1, parseInt(capacity, 10) || 1) },
       sort_order: sortDraft.length > 0 ? JSON.stringify(sortDraft) : 'custom',
       rule_type: filterDraft.length > 0 ? 'compound' : 'any',
@@ -124,6 +127,9 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
               <label htmlFor="create-container-name" style={{ fontSize: '0.72rem' }}>{t('container.name')}</label>
               <input id="create-container-name" className="input-control" placeholder={t('container.namePlaceholder', { type: typeLabel(TYPE_META.find(m => m.type === type) || TYPE_META[0]) })} value={name} onChange={(e) => setName(e.target.value)} />
             </div>
+            {storageUnitsLoading && <p role="status">{t('common.loading')}</p>}
+            {storageUnitsError && <div role="alert"><p>{t('storageUnit.loadError')}</p><button type="button" className="btn btn-secondary" onClick={onRetryStorageUnits}>{t('loc.retry')}</button></div>}
+            <StorageUnitSelect units={storageUnits} value={storageUnitId} onChange={setStorageUnitId} disabled={submitting || storageUnitsLoading || storageUnitsError} />
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label htmlFor="create-container-sleeved" style={{ fontSize: '0.72rem' }}>{t('deck.sleeved')}</label>
               <select id="create-container-sleeved" className="input-control" value={sleeved} disabled={submitting} onChange={(e) => setSleeved(Number(e.target.value))}>

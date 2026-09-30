@@ -24,9 +24,11 @@ async function physicalCardEntries(userId, cardId = null, legacyCheckout = false
     SELECT c.id AS entry_id, c.card_id, c.quantity, c.position, c.location_id, c.compartment_id,
       c.printing, c.language, c.condition, c.game,
       cc.name AS card_name, cc.printed_name, cc.set_name, cc.number,
+      su.name AS storage_unit_name,
       l.name AS location_name, l.type AS location_type, cp.label AS compartment_label, cp.idx AS compartment_idx
     FROM collection c JOIN card_cache cc ON cc.id = c.card_id
     LEFT JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
+    LEFT JOIN storage_units su ON su.id = l.storage_unit_id AND su.user_id = c.user_id
     LEFT JOIN compartments cp ON cp.id = c.compartment_id AND cp.location_id = l.id
     WHERE c.user_id = ? AND c.list_type = 'collection' AND (? OR COALESCE(c.missing, 0) = 0)
       AND c.quantity > 0 AND c.game = cc.game AND (? IS NULL OR c.card_id = ?)
@@ -159,6 +161,7 @@ async function deckCardSources(userId, deckId, cardId, sourceEntryId = null) {
     if (!group) {
       group = { entry_id: entry.entry_id, location_id: entry.location_id, compartment_id: entry.compartment_id,
         location_name: entry.location_name || 'Unassigned Pile',
+        storage_unit_name: entry.storage_unit_name,
         compartment_display: sourcePlacement(entry).compartment_display,
         position: entry.location_id == null ? null : entry.position, quantity: 0, available: 0, entry_count: 0 };
       groups.set(key, group);
@@ -206,9 +209,11 @@ async function deckLocations(deck, userId) {
     ? await db.all(`
         SELECT c.id AS entry_id, c.card_id, c.position, c.location_id, c.compartment_id,
           cc.name AS card_name, cc.printed_name, cc.set_name, cc.number,
+          su.name AS storage_unit_name,
           l.name AS location_name, l.type AS location_type, cp.label AS compartment_label, cp.idx AS compartment_idx
         FROM collection c JOIN card_cache cc ON cc.id = c.card_id
         LEFT JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
+        LEFT JOIN storage_units su ON su.id = l.storage_unit_id AND su.user_id = c.user_id
         LEFT JOIN compartments cp ON cp.id = c.compartment_id AND cp.location_id = l.id
         WHERE c.user_id = ?
       `, [userId])

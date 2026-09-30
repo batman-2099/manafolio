@@ -140,6 +140,20 @@ async function initDb() {
   await run(`INSERT OR IGNORE INTO app_settings (id, public_base_url) VALUES (1, '')`);
 
   await run(`
+    CREATE TABLE IF NOT EXISTS storage_units (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL CHECK(length(trim(name)) > 0),
+      type TEXT NOT NULL DEFAULT 'Other'
+    )
+  `);
+  await run(`CREATE INDEX IF NOT EXISTS idx_storage_units_user ON storage_units(user_id)`);
+  const storageUnitCols = await all(`PRAGMA table_info(storage_units)`);
+  if (!storageUnitCols.some(c => c.name === 'type')) {
+    await run(`ALTER TABLE storage_units ADD COLUMN type TEXT NOT NULL DEFAULT 'Other'`);
+  }
+
+  await run(`
     CREATE TABLE IF NOT EXISTS locations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -151,6 +165,7 @@ async function initDb() {
       game TEXT DEFAULT 'any',
       inventory_type TEXT NOT NULL DEFAULT 'collection' CHECK(inventory_type IN ('collection', 'graveyard')),
       sleeved INTEGER NOT NULL DEFAULT 0 CHECK (sleeved IN (0, 1, 2, 3)),
+      storage_unit_id INTEGER REFERENCES storage_units(id) ON DELETE SET NULL,
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
     )
   `);
@@ -579,6 +594,10 @@ async function initDb() {
   if (!locationsCols.some(c => c.name === 'sleeved')) {
     await run(`ALTER TABLE locations ADD COLUMN sleeved INTEGER NOT NULL DEFAULT 0 CHECK (sleeved IN (0, 1, 2, 3))`);
   }
+  if (!locationsCols.some(c => c.name === 'storage_unit_id')) {
+    await run(`ALTER TABLE locations ADD COLUMN storage_unit_id INTEGER REFERENCES storage_units(id) ON DELETE SET NULL`);
+  }
+  await run(`CREATE INDEX IF NOT EXISTS idx_locations_storage_unit ON locations(storage_unit_id)`);
 
   const usersCols = await all(`PRAGMA table_info(users)`);
   if (!usersCols.some(c => c.name === 'theme')) {

@@ -51,8 +51,8 @@ const deckEditorState = (deck) => ({
   commander_card_id: deck.commander_card_id || null
 });
 
-const formatCardLocations = (locations) => locations.map(({ take, location_name, compartment_display }) =>
-  `${take > 1 ? `×${take} ` : ''}${location_name}${compartment_display ? ` · ${compartment_display}` : ''}`
+const formatCardLocations = (locations) => locations.map(({ take, storage_unit_name, location_name, compartment_display }) =>
+  `${take > 1 ? `×${take} ` : ''}${storage_unit_name ? `${storage_unit_name} · ` : ''}${location_name}${compartment_display ? ` · ${compartment_display}` : ''}`
 ).join(', ');
 
 const locationCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
@@ -314,6 +314,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   };
 
   const sourceLabel = (source) => [
+    source.storage_unit_name,
     source.location_name || t('bulk.unassignedPile'),
     source.compartment_display,
     t('deck.sourceAvailable', { available: source.available, quantity: source.quantity })

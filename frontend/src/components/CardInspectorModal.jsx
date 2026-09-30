@@ -554,7 +554,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                 <select id="inspector-location" className="select-control" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
                   <option value="">{t('bulk.unassignedPile')}</option>
                   {locations.slice().sort((a, b) => a.name.localeCompare(b.name)).map((loc) => (
-                    <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
+                    <option key={loc.id} value={loc.id}>{loc.storage_unit_name && `${loc.storage_unit_name} · `}{loc.name} ({loc.type})</option>
                   ))}
                 </select>
               </div>
@@ -621,6 +621,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                   <div style={{ minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>
                     <span style={{ color: 'var(--text-muted)' }}>{t('inspector.locationLabel')} </span>
                     <strong style={{ color: 'var(--text-strong)' }}>
+                      {activeCard.storage_unit_name && `${activeCard.storage_unit_name} · `}
                       {activeCard.location_name ? `${activeCard.location_name}${activeCard.location_type ? ` (${activeCard.location_type})` : ''}` : t('bulk.unassignedPile')}
                     </strong>
                     {activeCard.location_name && activeCard.compartment_display_label && (

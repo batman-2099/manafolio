@@ -100,7 +100,10 @@ async function testContainerImport() {
     ], 'one report per resolved card counts actual finishes once, preferring the requested finish');
     const location = (location_id, location_name, list_type, printing, quantity, missing = 0) =>
       ({ location_id, location_name, list_type, printing, quantity, missing });
-    assert.deepStrictEqual(res.body.items.map(item => item.locations), [
+    assert.deepStrictEqual(res.body.items.map(item => item.locations.map(
+      ({ location_id, location_name, list_type, printing, quantity, missing }) =>
+        location(location_id, location_name, list_type, printing, quantity, missing)
+    )), [
       [location(null, null, 'collection', 'Normal', 2)],
       [
         location(null, null, 'arena', 'Normal', 7),

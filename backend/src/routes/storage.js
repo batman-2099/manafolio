@@ -12,6 +12,7 @@ const {
 } = require('../utils/compartmentSort');
 const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, checkedOutSources } = require('../utils/collectionHelpers');
 const { normalizeMtgColorIdentity } = require('../utils/mtgColors');
+const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
 
 const MANA_SYMBOLS = { White: 'W', Blue: 'U', Black: 'B', Red: 'R', Green: 'G', Colorless: 'C' };
 
@@ -45,6 +46,72 @@ async function loadEntries(entryIds, userId) {
   return new Map(rows.map(r => [String(r.id), r]));
 }
 
+router.get('/storage-units', async (req, res) => {
+  try {
+    res.json(await db.all(`
+      SELECT su.id, su.name, su.type, COUNT(l.id) AS container_count
+      FROM storage_units su
+      LEFT JOIN locations l ON l.storage_unit_id = su.id AND l.user_id = su.user_id
+      WHERE su.user_id = ?
+      GROUP BY su.id ORDER BY su.name COLLATE NOCASE, su.id
+    `, [req.user.id]));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to retrieve storage units' });
+  }
+});
+
+router.post('/storage-units', async (req, res) => {
+  const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+  if (!name) return res.status(400).json({ error: 'Storage unit name is required' });
+  const type = req.body.type === undefined ? 'Other' : req.body.type;
+  if (!storageUnitTypes.includes(type)) return res.status(400).json({ error: 'Invalid storage unit type' });
+  try {
+    const result = await db.run('INSERT INTO storage_units (user_id, name, type) VALUES (?, ?, ?)', [req.user.id, name, type]);
+    res.status(201).json({ id: result.lastID, name, type, container_count: 0 });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to create storage unit' });
+  }
+});
+
+router.put('/storage-units/:id', async (req, res) => {
+  const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+  if (!name) return res.status(400).json({ error: 'Storage unit name is required' });
+  const { type } = req.body;
+  if (type !== undefined && !storageUnitTypes.includes(type)) return res.status(400).json({ error: 'Invalid storage unit type' });
+  try {
+    const result = await db.run('UPDATE storage_units SET name = ?, type = COALESCE(?, type) WHERE id = ? AND user_id = ?', [name, type ?? null, req.params.id, req.user.id]);
+    if (!result.changes) return res.status(404).json({ error: 'Storage unit not found' });
+    res.json({ message: 'Storage unit updated' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update storage unit' });
+  }
+});
+
+router.delete('/storage-units/:id', async (req, res) => {
+  try {
+    // ON DELETE SET NULL detaches containers atomically without touching their contents.
+    const result = await db.run('DELETE FROM storage_units WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    if (!result.changes) return res.status(404).json({ error: 'Storage unit not found' });
+    res.json({ message: 'Storage unit deleted; containers are now unassigned' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to delete storage unit' });
+  }
+});
+
+async function validateStorageUnit(id, userId) {
+  if (id == null) return;
+  if (!Number.isSafeInteger(id) || id < 1) {
+    throw Object.assign(new Error('Invalid storage_unit_id'), { status: 400 });
+  }
+  if (!await db.get('SELECT id FROM storage_units WHERE id = ? AND user_id = ?', [id, userId])) {
+    throw Object.assign(new Error('Storage unit not found'), { status: 404 });
+  }
+}
+
 // 1. Get Storage Locations with Compartment Summaries
 router.get('/locations', async (req, res) => {
   if (req.query?.game !== undefined && req.query.game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
@@ -68,7 +135,7 @@ router.get('/locations', async (req, res) => {
         WHERE c.user_id = ? AND c.list_type = ? AND cc.game = 'mtg'
           AND cc.image_url IS NOT NULL AND cc.image_url != ''
       )
-      SELECT l.*, cover.id AS resolved_cover_card_id, cover.name AS cover_name,
+      SELECT l.*, su.name AS storage_unit_name, cover.id AS resolved_cover_card_id, cover.name AS cover_name,
              cover.game AS cover_game, cover.image_url AS cover_image_url,
              (SELECT COUNT(*) FROM compartments WHERE location_id = l.id) as compartment_count,
              (SELECT COALESCE(SUM(capacity), 0) FROM compartments WHERE location_id = l.id) as total_capacity,
@@ -82,6 +149,7 @@ router.get('/locations', async (req, res) => {
                 WHERE user_id = l.user_id AND COALESCE(list_type, 'collection') = l.inventory_type
                   AND compartment_id IN (SELECT id FROM compartments WHERE location_id = l.id)) as total_cards
       FROM locations l
+      LEFT JOIN storage_units su ON su.id = l.storage_unit_id AND su.user_id = l.user_id
       LEFT JOIN ranked_covers rc ON rc.location_id = l.id AND rc.cover_rank = 1
       LEFT JOIN card_cache cover ON cover.id = rc.card_id
       WHERE l.user_id = ? AND l.inventory_type = ?
@@ -124,7 +192,7 @@ const RULE_TYPES = ['any', 'alphabetical_range', 'specific_sets', 'compound'];
 const GAME_RESTRICTIONS = ['mtg'];
 
 router.post('/locations', async (req, res) => {
-  const { name, type, sort_order = 'name-asc', foil_sorting = 'normals_first', rule_type = 'any', rule_config, compartmentPlan, game = 'mtg', inventory_type = 'collection', sleeved = 0 } = req.body;
+  const { name, type, sort_order = 'name-asc', foil_sorting = 'normals_first', rule_type = 'any', rule_config, compartmentPlan, game = 'mtg', inventory_type = 'collection', sleeved = 0, storage_unit_id } = req.body;
   if (!['collection', 'graveyard'].includes(inventory_type)) return res.status(400).json({ error: 'Invalid inventory_type' });
   if (!Number.isInteger(sleeved) || sleeved < 0 || sleeved > 3) {
     return res.status(400).json({ error: 'Sleeved must be an integer between 0 and 3' });
@@ -146,21 +214,23 @@ router.post('/locations', async (req, res) => {
     return res.status(400).json({ error: 'rule_config must be valid JSON' });
   }
   try {
+    await validateStorageUnit(storage_unit_id, req.user.id);
     const existing = await db.get(`SELECT id FROM locations WHERE name = ? AND user_id = ?`, [name, req.user.id]);
     if (existing) {
       return res.status(400).json({ error: 'A location with this name already exists' });
     }
 
     const result = await db.run(`
-      INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, inventory_type, sleeved)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [name, type, sort_order, foil_sorting || 'normals_first', rule_type, ruleConfigJson, game, req.user.id, inventory_type, sleeved]);
+      INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, inventory_type, sleeved, storage_unit_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [name, type, sort_order, foil_sorting || 'normals_first', rule_type, ruleConfigJson, game, req.user.id, inventory_type, sleeved, storage_unit_id ?? null]);
 
     const plan = compartmentPlan || defaultCompartmentPlan(type);
     await db.createCompartments(result.lastID, Math.max(1, parseInt(plan.count, 10) || 1), Math.max(1, parseInt(plan.capacity, 10) || 40));
 
     res.status(200).json({ message: 'Location created', id: result.lastID });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     console.error(error);
     res.status(500).json({ error: 'Failed to create location' });
   }
@@ -169,7 +239,9 @@ router.post('/locations', async (req, res) => {
 router.get('/locations/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const loc = await db.get(`SELECT * FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
+    const loc = await db.get(`SELECT l.*, su.name AS storage_unit_name FROM locations l
+      LEFT JOIN storage_units su ON su.id = l.storage_unit_id AND su.user_id = l.user_id
+      WHERE l.id = ? AND l.user_id = ?`, [id, req.user.id]);
     if (!loc) return res.status(404).json({ error: 'Location not found' });
     res.json(loc);
   } catch (error) {
@@ -216,7 +288,7 @@ router.post('/locations/:id/transfer', async (req, res) => {
 
 router.put('/locations/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, type, sort_order, foil_sorting, rule_type, rule_config, game, locked, allow_stacking, sleeved } = req.body;
+  const { name, type, sort_order, foil_sorting, rule_type, rule_config, game, locked, allow_stacking, sleeved, storage_unit_id } = req.body;
   if (sleeved !== undefined && (!Number.isInteger(sleeved) || sleeved < 0 || sleeved > 3)) {
     return res.status(400).json({ error: 'Sleeved must be an integer between 0 and 3' });
   }
@@ -237,6 +309,7 @@ router.put('/locations/:id', async (req, res) => {
     if (!loc) {
       return res.status(404).json({ error: 'Location not found' });
     }
+    await validateStorageUnit(storage_unit_id, req.user.id);
     if (loc.game != null && !['mtg', 'any'].includes(loc.game)) {
       return res.status(400).json({ error: 'Unsupported game' });
     }
@@ -283,12 +356,14 @@ router.put('/locations/:id', async (req, res) => {
         locked = COALESCE(?, locked),
         allow_stacking = COALESCE(?, allow_stacking),
         sleeved = COALESCE(?, sleeved),
+        storage_unit_id = CASE WHEN ? THEN ? ELSE storage_unit_id END,
         cover_card_id = CASE WHEN ? THEN ? ELSE cover_card_id END
       WHERE id = ? AND user_id = ?
     `, [name, type, sort_order, foil_sorting, rule_type, ruleConfigJson, game,
         locked === undefined ? null : (locked ? 1 : 0),
         allow_stacking === undefined ? null : (allow_stacking ? 1 : 0),
         sleeved ?? null,
+        storage_unit_id !== undefined ? 1 : 0, storage_unit_id ?? null,
         cover_card_id !== undefined ? 1 : 0, cover_card_id ?? null,
         id, req.user.id]);
 
@@ -315,6 +390,7 @@ router.put('/locations/:id', async (req, res) => {
     }
     res.json({ message: 'Location updated', evicted });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     console.error(error);
     res.status(500).json({ error: 'Failed to update location' });
   }

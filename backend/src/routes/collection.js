@@ -450,6 +450,7 @@ router.get('/collection', async (req, res) => {
         cc.tcgplayer_product_id,
         l.id as location_id,
         l.name as location_name,
+        su.name as storage_unit_name,
         l.type as location_type,
         cp.idx as compartment_idx,
         cp.label as compartment_label,
@@ -458,6 +459,7 @@ router.get('/collection', async (req, res) => {
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
       LEFT JOIN locations l ON c.location_id = l.id
+      LEFT JOIN storage_units su ON su.id = l.storage_unit_id AND su.user_id = c.user_id
       LEFT JOIN compartments cp ON c.compartment_id = cp.id
       LEFT JOIN (
         SELECT dc.card_id, d.user_id, GROUP_CONCAT(d.name, ', ') AS deck_names

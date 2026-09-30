@@ -17,6 +17,7 @@ import CardImage from './CardImage';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
 import Modal from './Modal';
+import StorageUnitDialog, { StorageUnitSelect } from './StorageUnitDialog';
 
 const MANA_SYMBOLS = [
   ['W', 'White', -475], ['U', 'Blue', -370], ['B', 'Black', -265],
@@ -122,7 +123,7 @@ function ContainerImportReview({ report, onClose, onMove, movingItem, expanded, 
                     <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: '0.5rem' }}>
                       {item.locations.map((location, locationIndex) => (
                         <li key={locationIndex} style={{ overflowWrap: 'anywhere' }}>
-                          <strong>{location.quantity}× {location.location_id == null ? t('loc.importUnsorted') : location.location_name}</strong>
+                          <strong>{location.quantity}× {location.storage_unit_name && `${location.storage_unit_name} · `}{location.location_id == null ? t('loc.importUnsorted') : location.location_name}</strong>
                           <div style={{ color: 'var(--text-secondary)' }}>
                             {location.list_type === 'collection' ? t('dash.physical') : location.list_type === 'arena' ? t('collection.arena') : location.list_type === 'wishlist' ? t('collection.wishlist') : location.list_type === 'graveyard' ? t('collection.graveyard') : location.list_type}
                             {' · '}{finishLabel(location.printing)}
@@ -193,16 +194,46 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [showGallery, setShowGallery] = useState(true);
   const [gallerySearch, setGallerySearch] = useState('');
   const [gallerySort, setGallerySort] = useState('name-asc');
+  const [storageUnits, setStorageUnits] = useState([]);
+  const [unitsLoading, setUnitsLoading] = useState(true);
+  const [unitsError, setUnitsError] = useState(false);
+  const [unitFilter, setUnitFilter] = useState('all');
+  const [unitDraft, setUnitDraft] = useState(null);
+  const [storageUnitDraft, setStorageUnitDraft] = useState(null);
+  const unitsRequest = useRef(0);
+  const ungroupedButton = useRef(null);
+  const unitNavigationSelect = useRef(null);
+  const fetchStorageUnits = useCallback(async () => {
+    const request = ++unitsRequest.current;
+    setUnitsLoading(true);
+    setUnitsError(false);
+    try {
+      const response = await fetch('/api/storage-units');
+      if (!response.ok) throw new Error('Storage units unavailable');
+      const data = await response.json();
+      if (request === unitsRequest.current) setStorageUnits(data);
+    } catch {
+      if (request === unitsRequest.current) setUnitsError(true);
+    } finally {
+      if (request === unitsRequest.current) setUnitsLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    const requests = unitsRequest;
+    fetchStorageUnits();
+    return () => { requests.current++; };
+  }, [fetchStorageUnits, statsTrigger]);
   const [coverLocation, setCoverLocation] = useState(null);
   const [savingCover, setSavingCover] = useState(false);
   const coverChoices = useMemo(() => [...new Map(allCards
     .filter(card => card.location_id === coverLocation?.id && card.image_url)
     .map(card => [card.card_id, card])).values()], [allCards, coverLocation]);
   const galleryLocations = useMemo(() => locations
+    .filter(location => unitFilter === 'all' || (unitFilter === 'none' ? location.storage_unit_id == null : location.storage_unit_id === Number(unitFilter)))
     .filter(location => `${location.name} ${location.type}`.toLowerCase().includes(gallerySearch.toLowerCase()))
     .sort((a, b) => gallerySort === 'qty-desc'
       ? (b.total_cards || 0) - (a.total_cards || 0) || a.name.localeCompare(b.name)
-      : a.name.localeCompare(b.name)), [locations, gallerySearch, gallerySort]);
+      : a.name.localeCompare(b.name)), [locations, gallerySearch, gallerySort, unitFilter]);
 
   useEffect(() => {
     fetch('/api/sets')
@@ -1303,6 +1334,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       allow_stacking: stackingDraft,
       sleeved: sleevedDraft,
       type: typeDraft,
+      storage_unit_id: storageUnitDraft,
     };
     const trimmedName = (nameDraft || '').trim();
     if (trimmedName && trimmedName !== selectedLoc.name) fields.name = trimmedName;
@@ -1418,15 +1450,56 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       ))}
     </div>
   );
+  const unitDialog = unitDraft && <StorageUnitDialog key={`${unitDraft.mode}:${unitDraft.id || 'new'}`} draft={unitDraft} units={storageUnits} onClose={() => setUnitDraft(null)} onDeleted={() => (unitNavigationSelect.current?.getClientRects().length ? unitNavigationSelect.current : ungroupedButton.current)?.focus()} onSaved={async () => {
+    if (unitDraft.mode === 'delete' && String(unitDraft.id) === unitFilter) setUnitFilter('none');
+    await Promise.all([fetchStorageUnits(), fetchLocations()]);
+    onUpdate();
+  }} />;
+  const selectedUnit = storageUnits.find(unit => String(unit.id) === unitFilter);
+  const unitsFeedback = unitsError ? <div className="read-state" role="alert">
+    <p>{t('storageUnit.loadError')}</p><button type="button" className="btn btn-secondary" onClick={fetchStorageUnits}>{t('loc.retry')}</button>
+  </div> : unitsLoading ? <p role="status">{t('common.loading')}</p> : null;
 
   if (showGallery) return (
     <section>
       <header className="page-heading" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <h2 className="page-title">{t('nav.storage')}</h2>
+        <div className="storage-create-actions">
         <button type="button" className="btn btn-primary" onClick={() => setShowCreate(true)}>
           <Plus size={16} aria-hidden="true" /> {t('loc.createContainer')}
         </button>
+        <button type="button" className="btn btn-secondary" onClick={() => setUnitDraft({ mode: 'create' })}>
+          <Plus size={16} aria-hidden="true" /> {t('storageUnit.create')}
+        </button>
+        </div>
       </header>
+      <nav className="view-toolbar" aria-label={t('storageUnit.title')}>
+        <select ref={unitNavigationSelect} className="select-control storage-unit-mobile-nav" aria-label={t('storageUnit.title')} value={unitFilter} onChange={event => { setUnitFilter(event.target.value); setGallerySearch(''); }}>
+          <option value="all">{t('storageUnit.all')}</option>
+          <option value="none">{t('storageUnit.none')}</option>
+          <option value="units">{t('storageUnit.title')}</option>
+          {storageUnits.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
+        </select>
+        <div className="storage-unit-desktop-nav">
+        {[['all', t('storageUnit.all')], ['none', t('storageUnit.none')], ['units', t('storageUnit.title')]].map(([value, label]) => <button key={value} ref={value === 'none' ? ungroupedButton : undefined} type="button" className={`btn ${unitFilter === value ? 'btn-primary' : 'btn-secondary'}`} aria-current={unitFilter === value ? 'page' : undefined} onClick={() => { setUnitFilter(value); setGallerySearch(''); }}>{label}</button>)}
+        {selectedUnit && <strong style={{ overflowWrap: 'anywhere' }}>{selectedUnit.name}</strong>}
+        </div>
+      </nav>
+      {unitsFeedback}
+      {unitFilter === 'units' && !unitsLoading && !unitsError && <>
+        {!storageUnits.length && <div className="read-state"><p>{t('storageUnit.empty')}</p><p>{t('storageUnit.helper')}</p></div>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: '1.25rem', marginBottom: '1rem' }}>
+          {storageUnits.map(unit => <button key={unit.id} type="button" className="glass-panel" onClick={() => { setUnitFilter(String(unit.id)); setGallerySearch(''); }} style={{ padding: '1.25rem', textAlign: 'left', color: 'var(--text-strong)', cursor: 'pointer', overflowWrap: 'anywhere' }}>
+            <strong>{unit.name}</strong><p style={{ marginBottom: 0, color: 'var(--text-secondary)' }}>{unit.type} · {t('storageUnit.count', { count: unit.container_count })}</p>
+          </button>)}
+        </div>
+      </>}
+      {selectedUnit && <div className="view-toolbar">
+        <span>{selectedUnit.type} · {t('storageUnit.count', { count: selectedUnit.container_count })}</span>
+        <button type="button" className="btn btn-secondary" onClick={() => setUnitDraft({ ...selectedUnit, mode: 'edit' })}>{t('storageUnit.edit')}</button>
+        <button type="button" className="btn btn-secondary" onClick={() => setUnitDraft({ ...selectedUnit, mode: 'delete' })}>{t('storageUnit.delete')}</button>
+      </div>}
+      {unitFilter !== 'units' && <>
       <div className="view-toolbar">
         {inventorySelector}
         <input className="input-control" aria-label={t('shared.search')} placeholder={t('loc.searchPlaceholder')} value={gallerySearch} onChange={e => setGallerySearch(e.target.value)} style={{ flex: '1 1 200px' }} />
@@ -1441,8 +1514,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       {locationsFeedback}
       {locationsReady && !locationsLoading && !locationsError && galleryLocations.length === 0 && (
         <div className="read-state read-state-initial">
-          <h3>{t(locations.length ? 'loc.noMatchingLocations' : 'loc.noLocations')}</h3>
-          {locations.length ? (
+          <h3>{t(unitFilter !== 'all' && !gallerySearch ? 'storageUnit.noContainers' : locations.length ? 'loc.noMatchingLocations' : 'loc.noLocations')}</h3>
+          {gallerySearch ? (
             <button type="button" className="btn btn-secondary" onClick={() => setGallerySearch('')}>{t('loc.clearSearch')}</button>
           ) : (
             <>
@@ -1466,6 +1539,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             <div style={{ padding: '0.75rem 1rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '0.75rem' }}>
               <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflowWrap: 'anywhere' }}>{!!location.locked && <Lock size={14} />}{location.name}</strong>
               <span style={{ gridColumn: 1, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{location.type}</span>
+              {location.storage_unit_name && <span style={{ gridColumn: 1, color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>{location.storage_unit_name}</span>}
               {!!location.mana_symbols?.length && (
                 <span style={{ gridColumn: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem', marginTop: '0.5rem' }}>
                   {MANA_SYMBOLS.filter(([symbol]) => location.mana_symbols.includes(symbol)).map(([symbol, name, x]) => (
@@ -1494,6 +1568,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           </div>
         ))}
       </div>
+      </>}
       <footer style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.5rem' }}>
         <button className="btn btn-secondary" onClick={() => setShowGallery(false)}>{t('bulk.unassignedPile')}</button>
         {!isArchive && <>
@@ -1501,7 +1576,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         <input ref={containerImportInput} type="file" accept=".txt,text/plain" disabled={importingContainer} onChange={handleContainerImportFile} style={{ display: 'none' }} />
         </>}
       </footer>
-      {showCreate && <CreateContainerModal onClose={() => setShowCreate(false)} onCreate={handleCreateLocation} setsList={setsList} filterFieldOptions={filterFieldOptions} />}
+      {showCreate && <CreateContainerModal onClose={() => setShowCreate(false)} onCreate={handleCreateLocation} setsList={setsList} filterFieldOptions={filterFieldOptions} storageUnits={storageUnits} initialStorageUnitId={selectedUnit?.id ?? null} storageUnitsLoading={unitsLoading} storageUnitsError={unitsError} onRetryStorageUnits={fetchStorageUnits} />}
+      {unitDialog}
       {importReview}
     </section>
   );
@@ -1574,12 +1650,18 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           />
         </DragOverlay>
       )}
+      {unitDialog}
       {showCreate && (
         <CreateContainerModal
           onClose={() => setShowCreate(false)}
           onCreate={handleCreateLocation}
           setsList={setsList}
           filterFieldOptions={filterFieldOptions}
+          storageUnits={storageUnits}
+          initialStorageUnitId={selectedUnit?.id ?? null}
+          storageUnitsLoading={unitsLoading}
+          storageUnitsError={unitsError}
+          onRetryStorageUnits={fetchStorageUnits}
         />
       )}
 
@@ -1620,6 +1702,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           <div className="glass-panel" style={{ width: '400px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
             <h3 id="container-settings-title" style={{ margin: 0 }}>{t('loc.containerSettings')}</h3>
             <button className="btn btn-secondary" onClick={() => setCoverLocation(selectedLoc)}>{t('loc.chooseCover')}</button>
+            {unitsFeedback}
+            <StorageUnitSelect units={storageUnits} value={storageUnitDraft} onChange={setStorageUnitDraft} disabled={unitsLoading || unitsError} />
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
               {t('loc.containerName')}
@@ -1742,6 +1826,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           at the bottom of the screen. */}
       <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto' }}>
         {locationsFeedback}
+        {unitsFeedback}
         <div className="view-toolbar storage-workspace-toolbar" style={{ justifyContent: 'space-between' }}>
           <div className="storage-workspace-identity" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', minWidth: 0 }}>
             <button className="btn btn-secondary" onClick={() => { storage.exitSelectMode(); setActiveLocationId(null); setShowGallery(true); }} title={t('nav.storage')} aria-label={t('nav.storage')}><LayoutGrid size={16} /></button>
@@ -1754,7 +1839,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               style={{ fontSize: '1rem', fontWeight: 'bold', padding: '0.3rem', width: 'auto', minWidth: '150px', maxWidth: '100%' }}
             >
               <option value="" disabled>{t('loc.selectContainer')}</option>
-              {locations.slice().sort((a, b) => a.name.localeCompare(b.name)).map(loc => <option key={loc.id} value={loc.id}>{loc.locked ? '🔒 ' : ''}{loc.name} ({loc.type})</option>)}
+              {locations.slice().sort((a, b) => a.name.localeCompare(b.name)).map(loc => <option key={loc.id} value={loc.id}>{loc.locked ? '🔒 ' : ''}{loc.storage_unit_name && `${loc.storage_unit_name} · `}{loc.name} ({loc.type})</option>)}
             </select>
             {selectedLoc && <span className="storage-sleeve-summary" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
               {t('deck.sleeved')}: {t(['deck.sleevedNone', 'deck.sleevedOne', 'deck.sleevedDouble', 'deck.sleevedTriple'][selectedLoc.sleeved ?? 0])}
@@ -1916,6 +2001,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     <Download size={14} aria-hidden="true" /> {t(importingContainer ? 'loc.importingContainer' : 'loc.importContainer')}
                   </button>}
                   {selectedLoc && <>
+                  <button type="button" className="kebab-item" disabled={unitsLoading || unitsError} onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setUnitDraft({ ...selectedLoc, mode: 'move' }); }}>
+                    <Layers size={14} aria-hidden="true" /> {t('storageUnit.move')}
+                  </button>
                   <button type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setContainerDeckError(''); setContainerDeckDraft({ location_id: selectedLoc.id, name: selectedLoc.name, format: 'Casual' }); }}>
                     <Layers size={14} aria-hidden="true" /> {t('deck.createDeck')}
                   </button>
@@ -1952,6 +2040,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     setNameDraft(selectedLoc.name || '');
                     setTypeDraft(selectedLoc.type);
                     setSleevedDraft(selectedLoc.sleeved ?? 0);
+                    setStorageUnitDraft(selectedLoc.storage_unit_id ?? null);
                     setStackingDraft(!!selectedLoc.allow_stacking);
                     setCountDraft(String(compartments.length));
                     const caps = compartments.map(c => c.capacity);

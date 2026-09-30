@@ -210,6 +210,14 @@ Tokens are references, not additions to the deck: they do not change size, reser
 
 Open **Add Cards → Precon Deck**, search MTGJSON by name, set code, or type, and inspect the contents. **Create Storage Container** and **Create Deck** are both enabled by default. The first creates a sized Deck Box; the second creates a Physical deck containing all imported cards and checks it out. Disable either if unwanted. With deck creation selected, unresolved cards or import failure leave no partial collection, container, or deck.
 
+### Group containers into storage units
+
+In **Storage**, choose **Create storage unit**, enter a name, and select its **Type**: Cabinet, Shelf, Drawer, Storage Bin / Tote, Carrying Case, Bag / Backpack, or Other (the default). A **storage unit** holds containers; a **container** holds cards, organized into pages/rows and slots. Open a unit and choose **Edit storage unit** to change its name or type. Types are descriptive only; they do not set capacities or change storage behavior. Existing units and backups without a type use Other.
+
+Use **Stored in** when creating or editing a container, or **Move container…** in its More menu. Browse **Storage units**, **All containers**, or **No storage unit**; the latter is separate from **Unassigned Pile**, which contains unfiled cards. Physical/Graveyard filters still apply to containers. Moving a container between units changes only its grouping, not card positions, inventory, locks, or deck reservations.
+
+Deleting a storage unit keeps its containers and cards and clears their unit assignment. Units have container counts, not card capacities, and cannot contain other units. Complete account backups preserve units and membership; unit names remain private and are not included in public shares.
+
 ### Import a ManaBox storage container
 
 Storage opens a searchable, sortable gallery. Create a container, choose its cover through **More → Container Settings → Choose container image**, and organize cards by layout or image list. Move selections between containers or back to Unsorted, or use automatic filing. Capacity is advisory: cards stay in the chosen eligible container even when full, and Storage marks containers/pages/rows **Over limit**. Add pages/rows or change capacity manually to match your physical storage.

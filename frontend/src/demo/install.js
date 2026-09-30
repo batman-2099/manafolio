@@ -3,6 +3,7 @@
 // read-only tour of the real UI. Only bundled when VITE_DEMO is set (see
 // main.jsx guard) so production/mobile builds carry none of this.
 import themes from '../../../shared/themes.json';
+import storageUnitTypes from '../../../shared/storageUnitTypes.json';
 
 // Route = '/api/' + fixture basename with '_' -> '/'. Capture filenames were
 // chosen so this mapping is exact: stats_history -> /api/stats/history,
@@ -40,6 +41,57 @@ window.fetch = (input, opts = {}) => {
   const method = (opts.method || 'GET').toUpperCase();
   const path = (url.replace(/^https?:\/\/[^/]+/, '').split('?')[0].replace(/\/+$/, '')) || '/';
 
+  if (path === '/api/storage-units' || /^\/api\/storage-units\/\d+$/.test(path)) {
+    const units = routes['/api/storage-units'];
+    const id = path === '/api/storage-units' ? null : Number(path.split('/').pop());
+    const unit = units.find(item => item.id === id);
+    if (method === 'GET' && id === null) return Promise.resolve(json(units.map(item => ({
+      ...item, container_count: routes['/api/locations'].filter(location => location.storage_unit_id === item.id).length,
+    }))));
+    if (id !== null && !unit) return Promise.resolve(json({ error: 'Storage unit not found.' }, 404));
+    if (method === 'DELETE' && unit) {
+      routes['/api/storage-units'] = units.filter(item => item.id !== id);
+      routes['/api/locations'].forEach(location => {
+        if (location.storage_unit_id === id) Object.assign(location, { storage_unit_id: null, storage_unit_name: null });
+      });
+      return Promise.resolve(json({ message: 'Storage unit deleted; containers retained.' }));
+    }
+    if (method === 'POST' || method === 'PUT') {
+      const { name, type } = JSON.parse(opts.body || '{}');
+      if (type !== undefined && !storageUnitTypes.includes(type)) return Promise.resolve(json({ error: 'Choose a valid storage unit type.' }, 400));
+      if (typeof name !== 'string' || !name.trim() || name.trim().length > 200) return Promise.resolve(json({ error: 'Enter a name of up to 200 characters.' }, 400));
+      if (unit) {
+        unit.name = name.trim();
+        if (type !== undefined) unit.type = type;
+        routes['/api/locations'].forEach(location => {
+          if (location.storage_unit_id === id) location.storage_unit_name = unit.name;
+        });
+        return Promise.resolve(json({ message: 'Storage unit updated.' }));
+      }
+      const created = { id: Math.max(0, ...units.map(item => item.id)) + 1, name: name.trim(), type: type ?? 'Other', container_count: 0 };
+      units.push(created);
+      return Promise.resolve(json(created, 201));
+    }
+    return Promise.resolve(json({ error: 'Unsupported storage unit request.' }, 405));
+  }
+  if ((method === 'PUT' && /^\/api\/locations\/\d+$/.test(path)) || (method === 'POST' && path === '/api/locations')) {
+    const body = JSON.parse(opts.body || '{}');
+    const unit = routes['/api/storage-units'].find(item => item.id === body.storage_unit_id);
+    if (body.storage_unit_id != null && !unit) return Promise.resolve(json({ error: 'Storage unit not found.' }, 404));
+    let location = routes['/api/locations'].find(item => item.id === Number(path.split('/').pop()));
+    if (method === 'POST') {
+      const { count = 1, capacity = 9 } = body.compartmentPlan || {};
+      location = { id: Math.max(0, ...routes['/api/locations'].map(item => item.id)) + 1, locked: 0, total_cards: 0, compartment_count: count, total_capacity: count * capacity, inventory_type: 'collection', storage_unit_id: null, storage_unit_name: null };
+      routes['/api/locations'].push(location);
+      routes[`/api/locations/${location.id}/compartments`] = Array.from({ length: count }, (_, index) => ({
+        id: location.id * 1000 + index, location_id: location.id, idx: index + 1, capacity, locked: 0, display_label: String(index + 1),
+      }));
+    }
+    if (!location) return Promise.resolve(json({ error: 'Container not found.' }, 404));
+    Object.assign(location, body);
+    if (Object.hasOwn(body, 'storage_unit_id')) location.storage_unit_name = unit?.name ?? null;
+    return Promise.resolve(json(method === 'POST' ? { id: location.id } : { message: 'Container updated.' }, method === 'POST' ? 201 : 200));
+  }
   if (/^\/api\/decks\/\d+\/share$/.test(path) || path.startsWith('/api/shared/decks/')) {
     return Promise.resolve(json({ error: 'Public deck sharing is unavailable in the demo.' }, 503));
   }
@@ -116,6 +168,15 @@ window.fetch = (input, opts = {}) => {
 
   if (method === 'GET' && routes[path]) {
     let data = routes[path];
+    if (path === '/api/collection') data = data.map(card => ({
+      ...card,
+      storage_unit_name: routes['/api/locations'].find(location => location.id === card.location_id)?.storage_unit_name ?? null,
+    }));
+    if (/^\/api\/decks\/\d+\/locations$/.test(path)) data = data.map(card => ({
+      ...card, locations: card.locations.map(source => ({
+        ...source, storage_unit_name: routes['/api/locations'].find(location => location.id === source.location_id)?.storage_unit_name ?? null,
+      })),
+    }));
     const game = new URL(url, window.location.origin).searchParams.get('game');
     if (game && Array.isArray(data) && ['/api/sets', '/api/collection', '/api/locations', '/api/decks'].includes(path)) {
       data = data.filter(item => item.game === game);
