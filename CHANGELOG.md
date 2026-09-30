@@ -2,6 +2,10 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Fixed frontend test discovery on Node 20 CI by allowing the shell to expand the test-file wildcard.
+
 ## 2.3.0
 
 - Added account-owned storage units for grouping card containers, with stored-in selection, container movement, private location paths, and safe deletion that retains containers and cards. Complete account backups preserve units and membership; older backups remain supported.
