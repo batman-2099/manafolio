@@ -3,6 +3,7 @@ import { Plus, Minus, Trash2, Copy, X, ChevronLeft, Play, BarChart2, Search, Log
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { shuffleArray } from '../utils/shuffle';
 import { displayName } from '../utils/languages';
+import { sortCardsByOrder } from '../utils/cardSort';
 import CheckoutWizardModal from './CheckoutWizardModal';
 import { useBackGuard } from '../utils/useBackGuard';
 import { ownedImportIndex, findOwnedImportCard, buildDeckExport, parseDeckLine } from '../utils/deckText';
@@ -1012,6 +1013,14 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             || (aLocation.position || 0) - (bLocation.position || 0)
             || displayName(a).localeCompare(displayName(b));
         })
+      }]
+    : activeDeck && deckCardSortBy === 'color'
+    ? [{
+        name: t('sort.by.color'),
+        cards: sortCardsByOrder(
+          [...activeDeck.cards].sort((a, b) => displayName(a).localeCompare(displayName(b))),
+          [{ by: 'color', dir: 'asc' }]
+        )
       }]
     : GROUP_ORDER.map(name => ({
         name,
@@ -2215,6 +2224,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                       style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', height: 'auto' }}
                     >
                       <option value="type">{t('deck.sortByType')}</option>
+                      <option value="color">{t('sort.by.color')}</option>
                       {activeDeck.inventory_type === 'collection' && <option value="location">{t('collection.fLocation')}</option>}
                       {activeDeck.inventory_type === 'collection' && <option value="pulled">{t('deck.pulledStatus')}</option>}
                     </select>
