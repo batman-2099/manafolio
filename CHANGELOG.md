@@ -5,6 +5,7 @@ Release history starts with Manafolio 2.0.
 ## Unreleased
 
 - Fixed frontend test discovery on Node 20 CI by allowing the shell to expand the test-file wildcard.
+- Included guide images in the Docker frontend build stage, fixing the missing storage-unit screenshot import.
 
 ## 2.3.0
 
