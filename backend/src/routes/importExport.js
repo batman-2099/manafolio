@@ -8,6 +8,7 @@ const { resolveCardPrice } = require('../utils/priceHelpers');
 const { isBinderType } = require('../utils/compartmentSort');
 const { assertStorageInventory, checkedOutSources, moveContainerCopies } = require('../utils/collectionHelpers');
 const { normalizeCardBack } = require('../utils/cardBack');
+const { normalizeUploadedImage } = require('../utils/uploadedImage');
 const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
 const validImportQuantity = quantity => Number.isSafeInteger(quantity) && quantity > 0 && quantity <= 2147483647;
 
@@ -54,9 +55,14 @@ async function parseCompleteBackup(data) {
   if (!Array.isArray(storageUnits) || storageUnits.some(unit => !unit
       || !Number.isSafeInteger(unit.id) || unit.id < 1
       || typeof unit.name !== 'string' || !unit.name.trim()
-      || (unit.type !== undefined && !storageUnitTypes.includes(unit.type)))
+      || (unit.type !== undefined && !storageUnitTypes.includes(unit.type))
+      || (unit.cover_card_id != null && typeof unit.cover_card_id !== 'string'))
       || new Set(storageUnits.map(unit => unit.id)).size !== storageUnits.length) {
     throw new Error('Invalid backup storage units');
+  }
+  for (const unit of storageUnits) {
+    if (unit.cover_image != null && unit.cover_card_id != null) throw new Error('Invalid backup storage unit cover');
+    unit.cover_image = unit.cover_image == null ? null : await normalizeUploadedImage(unit.cover_image, 980, 700, true);
   }
   const storageUnitIds = new Set(storageUnits.map(unit => unit.id));
   if (backup.locations.some(location => location.storage_unit_id != null && !storageUnitIds.has(location.storage_unit_id))) {
@@ -194,7 +200,7 @@ async function restoreCompleteBackup(backup, userId) {
     }
 
     for (const unit of backup.storage_units ?? []) {
-      const result = await db.run('INSERT INTO storage_units (user_id, name, type) VALUES (?, ?, ?)', [userId, unit.name, unit.type ?? 'Other']);
+      const result = await db.run('INSERT INTO storage_units (user_id, name, type, cover_card_id, cover_image) VALUES (?, ?, ?, ?, ?)', [userId, unit.name, unit.type ?? 'Other', unit.cover_card_id ?? null, unit.cover_image ?? null]);
       storageUnitIds.set(unit.id, result.lastID);
     }
 
@@ -309,7 +315,7 @@ router.get('/export', async (req, res) => {
         collection,
         card_cache: cardCache,
         locations,
-        storage_units: await db.all('SELECT id, name, type FROM storage_units WHERE user_id = ? ORDER BY id', [req.user.id]),
+        storage_units: await db.all('SELECT id, name, type, cover_card_id, cover_image FROM storage_units WHERE user_id = ? ORDER BY id', [req.user.id]),
         compartments,
         compartment_assignments: compartmentAssignments,
         decks,

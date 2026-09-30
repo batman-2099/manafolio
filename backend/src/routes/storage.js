@@ -13,6 +13,7 @@ const {
 const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, checkedOutSources } = require('../utils/collectionHelpers');
 const { normalizeMtgColorIdentity } = require('../utils/mtgColors');
 const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
+const { normalizeUploadedImage } = require('../utils/uploadedImage');
 
 const MANA_SYMBOLS = { White: 'W', Blue: 'U', Black: 'B', Red: 'R', Green: 'G', Colorless: 'C' };
 
@@ -46,18 +47,65 @@ async function loadEntries(entryIds, userId) {
   return new Map(rows.map(r => [String(r.id), r]));
 }
 
+const UNIT_COVER_ROWS = `
+  SELECT su.id AS storage_unit_id, su.cover_card_id, c.card_id, c.added_at, c.id AS entry_id,
+         cc.name, cc.game, cc.image_url
+  FROM storage_units su
+  JOIN locations l ON l.storage_unit_id = su.id AND l.user_id = su.user_id
+  JOIN collection c ON c.location_id = l.id AND c.user_id = su.user_id
+    AND COALESCE(c.list_type, 'collection') = l.inventory_type
+  JOIN card_cache cc ON cc.id = c.card_id
+  WHERE su.user_id = ? AND l.inventory_type IN ('collection', 'graveyard')
+    AND cc.game = 'mtg' AND cc.image_url IS NOT NULL AND cc.image_url != ''
+`;
+
 router.get('/storage-units', async (req, res) => {
   try {
-    res.json(await db.all(`
-      SELECT su.id, su.name, su.type, COUNT(l.id) AS container_count
+    const units = await db.all(`
+      WITH eligible_covers AS (${UNIT_COVER_ROWS}),
+      ranked_covers AS (
+        SELECT *, ROW_NUMBER() OVER (
+          PARTITION BY storage_unit_id
+          ORDER BY CASE WHEN card_id = cover_card_id THEN 0 ELSE 1 END, added_at DESC, entry_id ASC
+        ) AS cover_rank FROM eligible_covers
+      )
+      SELECT su.id, su.name, su.type, su.cover_card_id, su.cover_image, COUNT(l.id) AS container_count,
+             cover.card_id AS resolved_cover_card_id, cover.name AS cover_name,
+             cover.game AS cover_game, cover.image_url AS cover_image_url
       FROM storage_units su
       LEFT JOIN locations l ON l.storage_unit_id = su.id AND l.user_id = su.user_id
+      LEFT JOIN ranked_covers cover ON cover.storage_unit_id = su.id AND cover.cover_rank = 1
       WHERE su.user_id = ?
       GROUP BY su.id ORDER BY su.name COLLATE NOCASE, su.id
-    `, [req.user.id]));
+    `, [req.user.id, req.user.id]);
+    res.json(units.map(({ resolved_cover_card_id, cover_name, cover_game, cover_image_url, ...unit }) => ({
+      ...unit,
+      cover: unit.cover_image ? {
+        card_id: null, name: unit.name, game: 'mtg', image_url: unit.cover_image,
+      } : resolved_cover_card_id ? {
+        card_id: resolved_cover_card_id, name: cover_name, game: cover_game, image_url: cover_image_url,
+      } : null,
+    })));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to retrieve storage units' });
+  }
+});
+
+router.get('/storage-units/:id/cover-choices', async (req, res) => {
+  try {
+    if (!await db.get('SELECT id FROM storage_units WHERE id = ? AND user_id = ?', [req.params.id, req.user.id])) {
+      return res.status(404).json({ error: 'Storage unit not found' });
+    }
+    res.json(await db.all(`
+      WITH eligible_covers AS (${UNIT_COVER_ROWS})
+      SELECT card_id, name, game, image_url FROM eligible_covers
+      WHERE storage_unit_id = ?
+      GROUP BY card_id ORDER BY name COLLATE NOCASE, card_id
+    `, [req.user.id, req.params.id]));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to retrieve storage unit cover choices' });
   }
 });
 
@@ -68,7 +116,7 @@ router.post('/storage-units', async (req, res) => {
   if (!storageUnitTypes.includes(type)) return res.status(400).json({ error: 'Invalid storage unit type' });
   try {
     const result = await db.run('INSERT INTO storage_units (user_id, name, type) VALUES (?, ?, ?)', [req.user.id, name, type]);
-    res.status(201).json({ id: result.lastID, name, type, container_count: 0 });
+    res.status(201).json({ id: result.lastID, name, type, container_count: 0, cover_card_id: null, cover_image: null, cover: null });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to create storage unit' });
@@ -76,15 +124,37 @@ router.post('/storage-units', async (req, res) => {
 });
 
 router.put('/storage-units/:id', async (req, res) => {
-  const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
-  if (!name) return res.status(400).json({ error: 'Storage unit name is required' });
-  const { type } = req.body;
+  const name = req.body.name === undefined ? undefined : typeof req.body.name === 'string' ? req.body.name.trim() : '';
+  if (name !== undefined && !name) return res.status(400).json({ error: 'Storage unit name is required' });
+  const { type, cover_card_id, cover_image } = req.body;
   if (type !== undefined && !storageUnitTypes.includes(type)) return res.status(400).json({ error: 'Invalid storage unit type' });
   try {
-    const result = await db.run('UPDATE storage_units SET name = ?, type = COALESCE(?, type) WHERE id = ? AND user_id = ?', [name, type ?? null, req.params.id, req.user.id]);
-    if (!result.changes) return res.status(404).json({ error: 'Storage unit not found' });
+    if (!await db.get('SELECT id FROM storage_units WHERE id = ? AND user_id = ?', [req.params.id, req.user.id])) {
+      return res.status(404).json({ error: 'Storage unit not found' });
+    }
+    if (Object.hasOwn(req.body, 'cover_image') && Object.hasOwn(req.body, 'cover_card_id')) {
+      return res.status(400).json({ error: 'Choose either an uploaded image or a card image' });
+    }
+    const image = cover_image === undefined ? null : await normalizeUploadedImage(cover_image, 980, 700);
+    const changeCover = cover_image !== undefined || cover_card_id !== undefined;
+    if (cover_card_id !== undefined && cover_card_id !== null) {
+      if (typeof cover_card_id !== 'string' || !await db.get(`
+        WITH eligible_covers AS (${UNIT_COVER_ROWS})
+        SELECT card_id FROM eligible_covers WHERE storage_unit_id = ? AND card_id = ? LIMIT 1
+      `, [req.user.id, req.params.id, cover_card_id])) {
+        return res.status(400).json({ error: 'Choose a card image from this storage unit' });
+      }
+    }
+    await db.run(`
+      UPDATE storage_units SET name = COALESCE(?, name), type = COALESCE(?, type),
+        cover_card_id = CASE WHEN ? THEN ? ELSE cover_card_id END,
+        cover_image = CASE WHEN ? THEN ? ELSE cover_image END
+      WHERE id = ? AND user_id = ?
+    `, [name ?? null, type ?? null, changeCover ? 1 : 0, cover_card_id ?? null,
+      changeCover ? 1 : 0, image, req.params.id, req.user.id]);
     res.json({ message: 'Storage unit updated' });
   } catch (error) {
+    if (error.status === 400) return res.status(400).json({ error: error.message });
     console.error(error);
     res.status(500).json({ error: 'Failed to update storage unit' });
   }

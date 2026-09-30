@@ -18,6 +18,15 @@ import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
 import Modal from './Modal';
 import StorageUnitDialog, { StorageUnitSelect } from './StorageUnitDialog';
+import { prepareStorageImage } from '../utils/prepareImage';
+
+function GalleryCover({ cover }) {
+  return <div style={{ aspectRatio: '1.4', overflow: 'hidden', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    {cover
+      ? <CardImage card={cover} src={cover.image_url.replace(/^(https:\/\/cards\.scryfall\.io\/)(?:small|normal|large|png)\/([^?]+)(.*)$/, (_, host, path, query) => `${host}art_crop/${path.replace(/\.png$/, '.jpg')}${query}`)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      : <Layers size={56} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />}
+  </div>;
+}
 
 const MANA_SYMBOLS = [
   ['W', 'White', -475], ['U', 'Blue', -370], ['B', 'Black', -265],
@@ -225,9 +234,29 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   }, [fetchStorageUnits, statsTrigger]);
   const [coverLocation, setCoverLocation] = useState(null);
   const [savingCover, setSavingCover] = useState(false);
-  const coverChoices = useMemo(() => [...new Map(allCards
+  const [unitCoverChoices, setUnitCoverChoices] = useState([]);
+  const [coverLoading, setCoverLoading] = useState(false);
+  const [coverError, setCoverError] = useState('');
+  const [coverRetry, setCoverRetry] = useState(0);
+  useEffect(() => {
+    setCoverError('');
+    if (!coverLocation?.isUnit) return;
+    let cancelled = false;
+    setCoverLoading(true);
+    setUnitCoverChoices([]);
+    fetch(`/api/storage-units/${coverLocation.id}/cover-choices`)
+      .then(response => {
+        if (!response.ok) throw new Error('Cover choices unavailable');
+        return response.json();
+      })
+      .then(choices => { if (!cancelled) setUnitCoverChoices(choices); })
+      .catch(() => { if (!cancelled) setCoverError(t('storageUnit.coverLoadError')); })
+      .finally(() => { if (!cancelled) setCoverLoading(false); });
+    return () => { cancelled = true; };
+  }, [coverLocation, coverRetry, t]);
+  const coverChoices = useMemo(() => coverLocation?.isUnit ? unitCoverChoices : [...new Map(allCards
     .filter(card => card.location_id === coverLocation?.id && card.image_url)
-    .map(card => [card.card_id, card])).values()], [allCards, coverLocation]);
+    .map(card => [card.card_id, card])).values()], [allCards, coverLocation, unitCoverChoices]);
   const galleryLocations = useMemo(() => locations
     .filter(location => unitFilter === 'all' || (unitFilter === 'none' ? location.storage_unit_id == null : location.storage_unit_id === Number(unitFilter)))
     .filter(location => `${location.name} ${location.type}`.toLowerCase().includes(gallerySearch.toLowerCase()))
@@ -546,7 +575,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
   // The gallery uses summary covers; workspace rules and filing need the full
   // inventory, including the unassigned queue (the API only scopes compartments).
-  const needsCards = !showGallery || showCreate || !!coverLocation
+  const needsCards = !showGallery || showCreate || (!!coverLocation && !coverLocation.isUnit)
     || (!!focusEntryId && focusNavRef.current !== focusEntryId);
 
   const refreshAll = async () => {
@@ -1385,18 +1414,22 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     }
   };
 
-  const saveCover = async (cardId) => {
+  const saveCover = async (cardId, file = null) => {
+    if (savingCover) return;
     setSavingCover(true);
+    setCoverError('');
     try {
-      const response = await fetch(`/api/locations/${coverLocation.id}`, {
+      const coverFields = file ? { cover_image: await prepareStorageImage(file).catch(() => { throw new Error(t('storageUnit.uploadError')); }) } : { cover_card_id: cardId };
+      const response = await fetch(`/api/${coverLocation.isUnit ? 'storage-units' : 'locations'}/${coverLocation.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cover_card_id: cardId }),
+        body: JSON.stringify(coverFields),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || t('loc.errUpdateContainer'));
-      await fetchLocations();
+      if (!response.ok) throw new Error(data.error || t('storageUnit.saveError'));
+      await (coverLocation.isUnit ? fetchStorageUnits() : fetchLocations());
       setCoverLocation(null);
     } catch (error) {
+      setCoverError(error.message);
       showToast(error.message, 'error');
     } finally {
       setSavingCover(false);
@@ -1450,7 +1483,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       ))}
     </div>
   );
-  const unitDialog = unitDraft && <StorageUnitDialog key={`${unitDraft.mode}:${unitDraft.id || 'new'}`} draft={unitDraft} units={storageUnits} onClose={() => setUnitDraft(null)} onDeleted={() => (unitNavigationSelect.current?.getClientRects().length ? unitNavigationSelect.current : ungroupedButton.current)?.focus()} onSaved={async () => {
+  const unitDialog = unitDraft && <StorageUnitDialog key={`${unitDraft.mode}:${unitDraft.id || 'new'}`} draft={unitDraft} units={storageUnits} onChooseCover={() => { setCoverLoading(true); setCoverLocation({ ...storageUnits.find(unit => unit.id === unitDraft.id), isUnit: true }); }} onClose={() => setUnitDraft(null)} onDeleted={() => (unitNavigationSelect.current?.getClientRects().length ? unitNavigationSelect.current : ungroupedButton.current)?.focus()} onSaved={async () => {
     if (unitDraft.mode === 'delete' && String(unitDraft.id) === unitFilter) setUnitFilter('none');
     await Promise.all([fetchStorageUnits(), fetchLocations()]);
     onUpdate();
@@ -1460,6 +1493,41 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     <p>{t('storageUnit.loadError')}</p><button type="button" className="btn btn-secondary" onClick={fetchStorageUnits}>{t('loc.retry')}</button>
   </div> : unitsLoading ? <p role="status">{t('common.loading')}</p> : null;
 
+  const coverDialog = coverLocation && (
+        <Modal onClose={() => { if (!savingCover) setCoverLocation(null); }} aria-labelledby="container-cover-title">
+        <div style={{ width: 'min(700px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
+          <h3 id="container-cover-title">{t(coverLocation.isUnit ? 'storageUnit.chooseCover' : 'loc.chooseCover')} — {coverLocation.name}</h3>
+          {coverLocation.isUnit && <p>{t('storageUnit.coverHint')}</p>}
+          {coverLocation.isUnit && <div style={{ marginBlock: '1rem' }}>
+            {coverLocation.cover_image && <div style={{ maxWidth: '280px', marginBottom: '0.75rem' }}>
+              <GalleryCover cover={{ card_id: null, name: coverLocation.name, game: 'mtg', image_url: coverLocation.cover_image }} />
+              <p>{t('storageUnit.uploadSelected')}</p>
+            </div>}
+            <label htmlFor="storage-unit-cover-upload">{t('storageUnit.uploadImage')}</label>
+            <input id="storage-unit-cover-upload" className="input-control" style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }} type="file" accept="image/png,image/jpeg,image/webp" aria-describedby="storage-unit-cover-upload-hint" disabled={savingCover} onChange={event => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) saveCover(null, file);
+            }} />
+            <p id="storage-unit-cover-upload-hint">{t('storageUnit.uploadHint')}</p>
+          </div>}
+          {coverLocation.isUnit && coverLoading && <p role="status">{t('common.loading')}</p>}
+          {savingCover && <p role="status">{t('deck.saving')}</p>}
+          {coverError && <div role="alert"><p>{coverError}</p>{coverLocation.isUnit && <button type="button" className="btn btn-secondary" disabled={savingCover || coverLoading} onClick={() => setCoverRetry(value => value + 1)}>{t('loc.retry')}</button>}</div>}
+          {coverLocation.isUnit && !coverLoading && !coverError && !coverChoices.length && <p>{t('storageUnit.coverEmpty')}</p>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '0.75rem' }}>
+            {coverChoices.map(card => <button key={card.card_id} type="button" className="btn btn-secondary" aria-pressed={coverLocation.cover_card_id === card.card_id} disabled={savingCover || (coverLocation.isUnit && coverLoading)} onClick={() => saveCover(card.card_id)} style={{ display: 'flex', flexDirection: 'column', padding: '0.4rem', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+              <CardImage card={card} style={{ width: '100%', borderRadius: '4px' }} />
+              <span>{displayName(card)}</span>
+            </button>)}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem' }}>
+            <button type="button" className="btn btn-secondary" aria-pressed={coverLocation.cover_card_id == null && !coverLocation.cover_image} disabled={savingCover} onClick={() => saveCover(null)}>{t('loc.automaticCover')}</button>
+            <button className="btn btn-secondary" disabled={savingCover} onClick={() => setCoverLocation(null)}>{t('common.close')}</button>
+          </div>
+        </div>
+        </Modal>
+      );
   if (showGallery) return (
     <section>
       <header className="page-heading" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
@@ -1489,8 +1557,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       {unitFilter === 'units' && !unitsLoading && !unitsError && <>
         {!storageUnits.length && <div className="read-state"><p>{t('storageUnit.empty')}</p><p>{t('storageUnit.helper')}</p></div>}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: '1.25rem', marginBottom: '1rem' }}>
-          {storageUnits.map(unit => <button key={unit.id} type="button" className="glass-panel" onClick={() => { setUnitFilter(String(unit.id)); setGallerySearch(''); }} style={{ padding: '1.25rem', textAlign: 'left', color: 'var(--text-strong)', cursor: 'pointer', overflowWrap: 'anywhere' }}>
-            <strong>{unit.name}</strong><p style={{ marginBottom: 0, color: 'var(--text-secondary)' }}>{unit.type} · {t('storageUnit.count', { count: unit.container_count })}</p>
+          {storageUnits.map(unit => <button key={unit.id} type="button" className="glass-panel" onClick={() => { setUnitFilter(String(unit.id)); setGallerySearch(''); }} style={{ padding: 0, overflow: 'hidden', textAlign: 'left', color: 'var(--text-strong)', cursor: 'pointer', overflowWrap: 'anywhere' }}>
+            <GalleryCover cover={unit.cover} />
+            <div style={{ padding: '0.75rem 1rem' }}>
+              <strong>{unit.name}</strong><p style={{ marginBottom: 0, color: 'var(--text-secondary)' }}>{unit.type} · {t('storageUnit.count', { count: unit.container_count })}</p>
+            </div>
           </button>)}
         </div>
       </>}
@@ -1531,11 +1602,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         {galleryLocations.map(location => (
           <div key={location.id} className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
           <button onClick={() => setActiveLocationId(location.id)} style={{ width: '100%', padding: 0, border: 0, background: 'transparent', textAlign: 'left', color: 'var(--text-strong)', cursor: 'pointer' }}>
-            <div style={{ aspectRatio: '1.4', overflow: 'hidden', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {location.cover
-                ? <CardImage card={location.cover} src={location.cover.image_url.replace(/^(https:\/\/cards\.scryfall\.io\/)(?:small|normal|large|png)\/([^?]+)(.*)$/, (_, host, path, query) => `${host}art_crop/${path.replace(/\.png$/, '.jpg')}${query}`)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <Layers size={56} style={{ color: 'var(--text-muted)' }} />}
-            </div>
+            <GalleryCover cover={location.cover} />
             <div style={{ padding: '0.75rem 1rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '0.75rem' }}>
               <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflowWrap: 'anywhere' }}>{!!location.locked && <Lock size={14} />}{location.name}</strong>
               <span style={{ gridColumn: 1, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{location.type}</span>
@@ -1578,6 +1645,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       </footer>
       {showCreate && <CreateContainerModal onClose={() => setShowCreate(false)} onCreate={handleCreateLocation} setsList={setsList} filterFieldOptions={filterFieldOptions} storageUnits={storageUnits} initialStorageUnitId={selectedUnit?.id ?? null} storageUnitsLoading={unitsLoading} storageUnitsError={unitsError} onRetryStorageUnits={fetchStorageUnits} />}
       {unitDialog}
+      {coverDialog}
       {importReview}
     </section>
   );
@@ -1624,23 +1692,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           </form>
         </dialog>
       )}
-      {coverLocation && (
-        <Modal onClose={() => setCoverLocation(null)} aria-labelledby="container-cover-title">
-        <div style={{ width: 'min(700px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
-          <h3 id="container-cover-title">{t('loc.chooseCover')} — {coverLocation.name}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '0.75rem' }}>
-            {coverChoices.map(card => <button key={card.card_id} className="btn btn-secondary" disabled={savingCover} onClick={() => saveCover(card.card_id)} style={{ display: 'flex', flexDirection: 'column', padding: '0.4rem' }}>
-              <CardImage card={card} style={{ width: '100%', borderRadius: '4px' }} />
-              <span>{displayName(card)}</span>
-            </button>)}
-          </div>
-          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-            <button className="btn btn-secondary" disabled={savingCover} onClick={() => saveCover(null)}>{t('loc.automaticCover')}</button>
-            <button className="btn btn-secondary" disabled={savingCover} onClick={() => setCoverLocation(null)}>{t('common.close')}</button>
-          </div>
-        </div>
-        </Modal>
-      )}
       {draggingCard && (
         <DragOverlay dropAnimation={null}>
           <img
@@ -1651,6 +1702,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         </DragOverlay>
       )}
       {unitDialog}
+      {coverDialog}
       {showCreate && (
         <CreateContainerModal
           onClose={() => setShowCreate(false)}

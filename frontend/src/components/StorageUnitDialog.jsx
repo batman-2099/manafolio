@@ -15,7 +15,7 @@ export function StorageUnitSelect({ units, value, onChange, disabled = false }) 
   </label>;
 }
 
-export default function StorageUnitDialog({ draft, units, onClose, onSaved, onDeleted }) {
+export default function StorageUnitDialog({ draft, units, onClose, onSaved, onDeleted, onChooseCover }) {
   const { t } = useT();
   const [name, setName] = useState(draft.name || '');
   const [type, setType] = useState(draft.type || 'Other');
@@ -50,6 +50,7 @@ export default function StorageUnitDialog({ draft, units, onClose, onSaved, onDe
   return <Modal onClose={close} aria-labelledby="storage-unit-dialog-title">
     <form className="glass-panel" onSubmit={submit} style={{ width: '440px', maxWidth: '100%', maxHeight: '90dvh', overflowY: 'auto', padding: '1.5rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1rem', background: 'var(--bg-secondary)' }}>
       <h3 id="storage-unit-dialog-title" style={{ margin: 0 }}>{title}</h3>
+      {draft.mode === 'edit' && <button type="button" className="btn btn-secondary" disabled={busy} onClick={onChooseCover}>{t('storageUnit.chooseCover')}</button>}
       {deleting ? <p style={{ overflowWrap: 'anywhere' }}>{t('storageUnit.deleteHint', { name: draft.name })}</p> : moving ? <>
         <p style={{ overflowWrap: 'anywhere', margin: 0 }}>{draft.name}</p>
         <StorageUnitSelect units={units} value={unitId} onChange={setUnitId} disabled={busy} />

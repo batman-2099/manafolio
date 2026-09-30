@@ -144,13 +144,21 @@ async function initDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL CHECK(length(trim(name)) > 0),
-      type TEXT NOT NULL DEFAULT 'Other'
+      type TEXT NOT NULL DEFAULT 'Other',
+      cover_card_id TEXT,
+      cover_image TEXT
     )
   `);
   await run(`CREATE INDEX IF NOT EXISTS idx_storage_units_user ON storage_units(user_id)`);
   const storageUnitCols = await all(`PRAGMA table_info(storage_units)`);
   if (!storageUnitCols.some(c => c.name === 'type')) {
     await run(`ALTER TABLE storage_units ADD COLUMN type TEXT NOT NULL DEFAULT 'Other'`);
+  }
+  if (!storageUnitCols.some(c => c.name === 'cover_card_id')) {
+    await run(`ALTER TABLE storage_units ADD COLUMN cover_card_id TEXT`);
+  }
+  if (!storageUnitCols.some(c => c.name === 'cover_image')) {
+    await run(`ALTER TABLE storage_units ADD COLUMN cover_image TEXT`);
   }
 
   await run(`

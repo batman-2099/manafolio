@@ -7,6 +7,8 @@ Release history starts with Manafolio 2.0.
 - Added account-owned storage units for grouping card containers, with stored-in selection, container movement, private location paths, and safe deletion that retains containers and cards. Complete account backups preserve units and membership; older backups remain supported.
 - Added descriptive storage unit types: Cabinet, Shelf, Drawer, Storage Bin / Tote, Carrying Case, Bag / Backpack, and Other. Choose a type on creation or through Edit storage unit; galleries and account backups retain it. Existing units and legacy backups default to Other, with no capacity or filing-rule changes.
 - Expanded the storage how-to with type examples, mobile navigation instructions, and a sample-data screenshot bundled into the in-app guide.
+- Added storage-unit card-art images: choose artwork from contained Physical or Graveyard cards, or use an automatic recent-card cover. Unit galleries retain readable name/type/count details; image choices include loading, retry, and empty states without changing container contents or filing.
+- Added private uploaded storage-unit images alongside existing card-art choices, inside Edit storage unit → Choose storage unit image. Static PNG/JPEG/WebP files are resized locally and validated by the server; uploads work for empty units, survive complete account backups, and are replaced by card art or Automatic image without changing container covers or editor drafts.
 
 ## 2.2.0
 

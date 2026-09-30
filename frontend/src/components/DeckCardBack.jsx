@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Modal from './Modal';
 import { useT } from '../utils/i18n';
 import { useBackGuard } from '../utils/useBackGuard';
+import { prepareImage } from '../utils/prepareImage';
 import dragonShieldSleeves from '../data/dragonShieldSleeves.json';
 import ultimateGuardSleeves from '../data/ultimateGuardSleeves.json';
 import ultraProSleeves from '../data/ultraProSleeves.json';
@@ -23,30 +24,6 @@ for (const sleeve of sleeves) {
   const provider = sleeve.id.startsWith('ultimate-guard-') ? 1 : sleeve.id.startsWith('ultra-pro-') ? 2 : 0;
   const group = sleeve.group || (/(?:Classic|Matte|Matte Dual) Sleeves$/.test(sleeve.name) ? 'plain' : 'art');
   sleeveGroups[provider][group].push(sleeve);
-}
-
-async function prepareImage(file, crop) {
-  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('format');
-  const bitmap = await createImageBitmap(file);
-  try {
-    const x = (crop?.x ?? 0) * bitmap.width;
-    const y = (crop?.y ?? 0) * bitmap.height;
-    const width = (crop?.width ?? 1) * bitmap.width;
-    const height = (crop?.height ?? 1) * bitmap.height;
-    const rotated = crop?.rotate === 90;
-    const scale = Math.min(1, 488 / (rotated ? height : width), 680 / (rotated ? width : height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round((rotated ? height : width) * scale));
-    canvas.height = Math.max(1, Math.round((rotated ? width : height) * scale));
-    const context = canvas.getContext('2d');
-    if (rotated) context.setTransform(0, 1, -1, 0, canvas.width, 0);
-    context.drawImage(bitmap, x, y, width, height, 0, 0, rotated ? canvas.height : canvas.width, rotated ? canvas.width : canvas.height);
-    const image = canvas.toDataURL('image/webp', 0.82);
-    if (!image.startsWith('data:image/webp;base64,') || image.length >= 500_000) throw new Error('size');
-    return image;
-  } finally {
-    bitmap.close();
-  }
 }
 
 function BackPreview({ color, image, label }) {

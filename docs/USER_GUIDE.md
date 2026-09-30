@@ -381,6 +381,16 @@ Units show container counts across both inventories, not card-capacity meters. M
 
 Open a unit and choose **Edit storage unit** to change its name or type. Deletion requires confirmation and leaves all containers and cards intact, with **No storage unit** assigned. Complete account backups preserve these groupings and types; older backups restore without units, and units without a saved type use Other. Existing units also start as Other. Unit names remain private, including when a container is publicly shared. Storage units do not nest inside other units.
 
+#### Choose a storage unit image
+
+Open a unit and choose **Edit storage unit → Choose storage unit image**. Select a card illustration from any of that unit’s Physical or Graveyard containers; you do not need to switch the inventory filter to see both. Only cards with artwork can be selected. This saves the unit’s gallery image immediately and returns to the editor with any unsaved name/type changes intact. It does not change container images, card placement, locks, inventory, or deck reservations.
+
+Choose **Upload image** in the same picker to use a static PNG, JPEG or WebP from your device, including for empty units. Source files must be at most 10 MB and 20 megapixels; animated images, SVG and invalid files are rejected. The browser resizes the image to fit within 980 × 700 pixels and produces a WebP data URI under 500,000 characters before sending it to your server for validation and metadata-free normalization. If an image still cannot fit, choose a smaller file and retry. Selecting a file saves immediately; progress is announced and the picker stays open on failure, with the file control reset so the same file can be selected again.
+
+Uploaded images stay private to your account and are included in complete account backups, not public container shares. The picker labels the current uploaded image. Selecting card artwork replaces the upload; **Automatic image** removes it and restores automatic card artwork. Closing the picker without selecting a new image leaves the saved image unchanged.
+
+Choose **Automatic image** to let the gallery use a recent eligible card. If a manually selected card is no longer in the unit, another eligible card is shown automatically. Units without an upload or eligible artwork show a storage icon; upload an image or add cards to a contained container. If the choices fail to load, choose **Retry**; if saving fails, the picker stays open so you can try the selection again. **Close** leaves the image unchanged.
+
 ### Create a container
 
 1. Open **Storage** and check **Storage inventory**. Use physical Collection for owned cards or **Graveyard** for archived cards.

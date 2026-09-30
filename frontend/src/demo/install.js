@@ -4,6 +4,7 @@
 // main.jsx guard) so production/mobile builds carry none of this.
 import themes from '../../../shared/themes.json';
 import storageUnitTypes from '../../../shared/storageUnitTypes.json';
+import { prepareStorageImage } from '../utils/prepareImage';
 
 // Route = '/api/' + fixture basename with '_' -> '/'. Capture filenames were
 // chosen so this mapping is exact: stats_history -> /api/stats/history,
@@ -23,6 +24,17 @@ localStorage.setItem('manafolio_user', JSON.stringify(routes['/api/auth/me'].use
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
+function unitCoverChoices(unitId) {
+  const locations = routes['/api/locations'].filter(location => location.storage_unit_id === unitId);
+  const cards = routes['/api/collection'].filter(card => card.quantity > 0 && card.game === 'mtg' && card.image_url?.trim() && locations.some(location =>
+    location.id === card.location_id && ['collection', 'graveyard'].includes(location.inventory_type || 'collection')
+    && (card.list_type || 'collection') === (location.inventory_type || 'collection')));
+  cards.sort((a, b) => (b.added_at || '').localeCompare(a.added_at || '') || a.entry_id - b.entry_id);
+  return [...new Map(cards.map(card => [card.card_id, {
+    card_id: card.card_id, name: card.name, game: card.game, image_url: card.image_url,
+  }])).values()];
+}
+
 let aiPreferences = { provider: 'chatgpt', model: null, reasoning_effort: null, ollama_url: null };
 const aiConnections = { chatgpt: false, ollama: true, gemini: false, openrouter: false };
 const aiModels = {
@@ -33,7 +45,7 @@ const aiModels = {
 };
 const orig = window.fetch.bind(window);
 
-window.fetch = (input, opts = {}) => {
+window.fetch = async (input, opts = {}) => {
   const url = typeof input === 'string' ? input : (input && input.url) || '';
   // Non-API traffic (fonts, Scryfall card images) still hits the network.
   if (!url.includes('/api/')) return orig(input, opts);
@@ -41,14 +53,18 @@ window.fetch = (input, opts = {}) => {
   const method = (opts.method || 'GET').toUpperCase();
   const path = (url.replace(/^https?:\/\/[^/]+/, '').split('?')[0].replace(/\/+$/, '')) || '/';
 
-  if (path === '/api/storage-units' || /^\/api\/storage-units\/\d+$/.test(path)) {
+  if (path === '/api/storage-units' || /^\/api\/storage-units\/\d+(?:\/cover-choices)?$/.test(path)) {
     const units = routes['/api/storage-units'];
-    const id = path === '/api/storage-units' ? null : Number(path.split('/').pop());
+    const id = path === '/api/storage-units' ? null : Number(path.split('/')[3]);
     const unit = units.find(item => item.id === id);
-    if (method === 'GET' && id === null) return Promise.resolve(json(units.map(item => ({
-      ...item, container_count: routes['/api/locations'].filter(location => location.storage_unit_id === item.id).length,
-    }))));
+    if (method === 'GET' && id === null) return Promise.resolve(json(units.map(item => {
+      const choices = unitCoverChoices(item.id);
+      return { ...item, cover_card_id: item.cover_card_id ?? null, cover_image: item.cover_image ?? null,
+        cover: item.cover_image ? { card_id: null, name: item.name, game: 'mtg', image_url: item.cover_image } : choices.find(card => card.card_id === item.cover_card_id) || choices[0] || null,
+        container_count: routes['/api/locations'].filter(location => location.storage_unit_id === item.id).length };
+    })));
     if (id !== null && !unit) return Promise.resolve(json({ error: 'Storage unit not found.' }, 404));
+    if (method === 'GET' && path.endsWith('/cover-choices')) return Promise.resolve(json(unitCoverChoices(id).sort((a, b) => a.name.localeCompare(b.name) || a.card_id.localeCompare(b.card_id))));
     if (method === 'DELETE' && unit) {
       routes['/api/storage-units'] = units.filter(item => item.id !== id);
       routes['/api/locations'].forEach(location => {
@@ -57,18 +73,31 @@ window.fetch = (input, opts = {}) => {
       return Promise.resolve(json({ message: 'Storage unit deleted; containers retained.' }));
     }
     if (method === 'POST' || method === 'PUT') {
-      const { name, type } = JSON.parse(opts.body || '{}');
+      const { name, type, cover_card_id, cover_image } = JSON.parse(opts.body || '{}');
+      if (cover_image !== undefined && cover_card_id !== undefined) return json({ error: 'Choose either an upload or a card image.' }, 400);
+      let image;
+      if (cover_image !== undefined) {
+        try {
+          if (typeof cover_image !== 'string' || cover_image.length >= 700_000 || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(cover_image)) throw new Error('format');
+          image = await prepareStorageImage(await (await orig(cover_image)).blob());
+        } catch {
+          return json({ error: 'Choose a static PNG, JPEG or WebP image.' }, 400);
+        }
+      }
       if (type !== undefined && !storageUnitTypes.includes(type)) return Promise.resolve(json({ error: 'Choose a valid storage unit type.' }, 400));
-      if (typeof name !== 'string' || !name.trim() || name.trim().length > 200) return Promise.resolve(json({ error: 'Enter a name of up to 200 characters.' }, 400));
+      if ((method === 'POST' || name !== undefined) && (typeof name !== 'string' || !name.trim() || name.trim().length > 200)) return Promise.resolve(json({ error: 'Enter a name of up to 200 characters.' }, 400));
+      if (cover_card_id != null && !unitCoverChoices(id).some(card => card.card_id === cover_card_id)) return Promise.resolve(json({ error: 'Choose a card from this storage unit.' }, 400));
       if (unit) {
-        unit.name = name.trim();
+        if (name !== undefined) unit.name = name.trim();
+        if (cover_card_id !== undefined) Object.assign(unit, { cover_card_id, cover_image: null });
+        if (image !== undefined) Object.assign(unit, { cover_card_id: null, cover_image: image });
         if (type !== undefined) unit.type = type;
         routes['/api/locations'].forEach(location => {
           if (location.storage_unit_id === id) location.storage_unit_name = unit.name;
         });
         return Promise.resolve(json({ message: 'Storage unit updated.' }));
       }
-      const created = { id: Math.max(0, ...units.map(item => item.id)) + 1, name: name.trim(), type: type ?? 'Other', container_count: 0 };
+      const created = { id: Math.max(0, ...units.map(item => item.id)) + 1, name: name.trim(), type: type ?? 'Other', container_count: 0, cover_card_id: null, cover_image: null, cover: null };
       units.push(created);
       return Promise.resolve(json(created, 201));
     }

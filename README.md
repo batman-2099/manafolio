@@ -216,6 +216,8 @@ In **Storage**, choose **Create Storage Unit**, enter a name, and select its **T
 
 Use **Stored in** when creating or editing a container, or **Move container…** in its More menu. Browse **Storage units**, **All containers**, or **No storage unit**; the latter is separate from **Unassigned Pile**, which contains unfiled cards. Physical/Graveyard filters still apply to containers. Moving a container between units changes only its grouping, not card positions, inventory, locks, or deck reservations.
 
+Open a unit and choose **Edit storage unit → Choose storage unit image** to use artwork from a card in any of its Physical or Graveyard containers, or **Upload image** to choose a static PNG, JPEG or WebP from your device—even for an empty unit. Uploads are resized locally and saved immediately as private unit images. **Automatic image** removes an upload and uses a recent eligible card; choosing card art also replaces the upload. If a chosen card leaves the unit, the gallery falls back automatically. Units without uploaded or eligible card artwork show a storage icon. Image selection changes no cards, placements, locks, inventory, or deck reservations. Complete account backups preserve uploaded unit images.
+
 Deleting a storage unit keeps its containers and cards and clears their unit assignment. Units have container counts, not card capacities, and cannot contain other units. Complete account backups preserve units and membership; unit names remain private and are not included in public shares.
 
 ![Create Storage Unit with a sample tournament bag and the Bag / Backpack type](docs/images/manafolio-storage-unit.webp)

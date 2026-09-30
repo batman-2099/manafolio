@@ -1,6 +1,6 @@
 # Manafolio privacy
 
-**Effective date:** September 26, 2026
+**Effective date:** September 30, 2026
 
 Manafolio is a self-hosted Magic: The Gathering collection, storage, and deck manager. Your chosen server holds your account and collection; this repository does not provide a central Manafolio account or hosted collection service. Installing the application does not give its maintainers access to your server.
 
@@ -34,6 +34,8 @@ The normal scan path processes images in memory rather than adding them to your 
 **Uploaded replacement artwork is different from a scan.** Artwork uploads are saved on the server and served through unauthenticated card-art URLs so shared views can display them. They are not private account attachments, even when collection sharing is off. Do not upload images containing personal information. Uploading art does not automatically submit it to the source repository.
 
 **Custom deck backs** are separate from shared card artwork. Uploaded deck-back images are resized and stored in the collection database, returned through account-authenticated deck endpoints, and included in complete account backups. They are not published through the public card-art route.
+
+**Uploaded storage-unit images** are also private account attachments, not shared replacement card artwork. The browser resizes your selected PNG, JPEG or WebP locally; your server validates and re-encodes it without source metadata, stores it in the account database, and includes it in complete account backups. Unit images are returned only through authenticated storage endpoints, not public container shares or public card-art URLs. Choosing card artwork or Automatic image replaces the saved upload; copies in earlier backups may remain. Uploading a local file does not send it to an external image provider.
 
 ## External network requests
 

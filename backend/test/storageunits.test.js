@@ -3,6 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const express = require('express');
+const sharp = require('sharp');
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'manafolio-storage-units-'));
 process.env.DB_PATH = path.join(tmpDir, 'test.db');
@@ -40,7 +41,7 @@ async function main() {
     await db.run("UPDATE users SET share_enabled = 1, share_locations = 1, share_token = 'owner-share' WHERE id = 1");
 
     const app = express();
-    app.use(express.json());
+    app.use(express.json({ limit: '1mb' }));
     app.use('/api/shared', require('../src/routes/shared'));
     app.use('/api/admin', require('../src/routes/admin'));
     app.use('/api', authenticateToken, require('../src/routes/storage'), require('../src/routes/collection'), require('../src/routes/importExport'));
@@ -61,7 +62,7 @@ async function main() {
     }, user);
     await request('GET', 'storage-units', undefined, null, 401);
     assert.deepStrictEqual(await request('GET', 'storage-units'), [
-      { id: 1, name: 'Legacy unit', type: 'Other', container_count: 0 }
+      { id: 1, name: 'Legacy unit', type: 'Other', container_count: 0, cover_card_id: null, cover_image: null, cover: null }
     ]);
     await request('DELETE', 'storage-units/1');
     for (const type of ['Cabinet', 'Shelf', 'Drawer', 'Storage Bin / Tote', 'Carrying Case', 'Bag / Backpack', 'Other']) {
@@ -69,7 +70,7 @@ async function main() {
       assert.strictEqual(unit.type, type);
       await request('PUT', `storage-units/${unit.id}`, { name: 'Renamed unit' });
       assert.deepStrictEqual(await request('GET', 'storage-units'), [
-        { id: unit.id, name: 'Renamed unit', type, container_count: 0 }
+        { id: unit.id, name: 'Renamed unit', type, container_count: 0, cover_card_id: null, cover_image: null, cover: null }
       ]);
       await request('PUT', `storage-units/${unit.id}`, { name: 'Changed unit', type: 'Other' });
       await request('PUT', `storage-units/${unit.id}`, { name: 'Changed unit', type });
@@ -91,12 +92,15 @@ async function main() {
     const loose = await createLocation('Loose box');
     const foreignBox = await createLocation('Foreign box', foreign.id, 'collection', 2);
     assert.deepStrictEqual(await request('GET', 'storage-units'), [
-      { id: first.id, name: 'Cabinet', type: 'Other', container_count: 2 }, { id: second.id, name: 'Closet', type: 'Other', container_count: 0 }
+      { id: first.id, name: 'Cabinet', type: 'Other', container_count: 2, cover_card_id: null, cover_image: null, cover: null },
+      { id: second.id, name: 'Closet', type: 'Other', container_count: 0, cover_card_id: null, cover_image: null, cover: null }
     ]);
     assert.deepStrictEqual(await request('GET', 'storage-units', undefined, 2), [{ ...foreign, container_count: 1 }]);
     for (const suffix of [`storage-units/${foreign.id}`, 'storage-units/999999']) {
       await request('PUT', suffix, { name: 'Not yours' }, 1, 404);
       await request('DELETE', suffix, undefined, 1, 404);
+      await request('GET', `${suffix}/cover-choices`, undefined, 1, 404);
+      await request('PUT', suffix, { cover_card_id: null }, 1, 404);
     }
     await request('PUT', `locations/${foreignBox.id}`, { storage_unit_id: first.id }, 1, 404);
     for (const storage_unit_id of [foreign.id, 999999]) {
@@ -130,10 +134,125 @@ async function main() {
       definitions: await db.all('SELECT * FROM deck_cards ORDER BY deck_id, card_id'),
       reservations: await db.all('SELECT * FROM deck_card_allocations ORDER BY deck_id, card_id, entry_id')
     });
+    const cover = { card_id: 'mtg-unit-card', name: 'Unit Card', game: 'mtg', image_url: 'https://example.com/unit.jpg' };
+    const unitSummary = async id => (await request('GET', 'storage-units')).find(unit => unit.id === id);
+    assert.deepStrictEqual(await request('GET', `storage-units/${first.id}/cover-choices`), []);
+    await request('PUT', `storage-units/${first.id}`, { cover_card_id: cover.card_id }, 1, 400);
+    await db.run('UPDATE card_cache SET image_url = ? WHERE id = ?', [cover.image_url, cover.card_id]);
+    const coverContents = await contents();
+    const coverLocations = await db.all('SELECT * FROM locations ORDER BY id');
+    await request('PUT', `storage-units/${first.id}`, { cover_card_id: cover.card_id });
+    await request('PUT', `storage-units/${first.id}`, { type: 'Other' });
+    assert.deepStrictEqual((await unitSummary(first.id)).cover, cover);
+    assert.strictEqual((await unitSummary(first.id)).cover_card_id, cover.card_id);
+    assert.deepStrictEqual(await request('GET', `storage-units/${first.id}/cover-choices`), [cover]);
+    const imageUri = (bytes, format = 'png') => `data:image/${format};base64,${bytes.toString('base64')}`;
+    const png = await sharp({ create: { width: 1400, height: 700, channels: 3, background: '#123456' } }).png().toBuffer();
+    const jpeg = await sharp({ create: { width: 80, height: 120, channels: 3, background: '#654321' } }).withMetadata().jpeg().toBuffer();
+    await request('PUT', `storage-units/${first.id}`, { cover_image: imageUri(png) });
+    const uploaded = await unitSummary(first.id);
+    assert.strictEqual(uploaded.cover_card_id, null);
+    assert.deepStrictEqual(uploaded.cover, { card_id: null, name: uploaded.name, game: 'mtg', image_url: uploaded.cover_image });
+    const uploadedMetadata = await sharp(Buffer.from(uploaded.cover_image.split(',')[1], 'base64')).metadata();
+    assert.strictEqual(uploadedMetadata.format, 'webp');
+    assert.deepStrictEqual([uploadedMetadata.width, uploadedMetadata.height], [980, 490]);
+    await request('PUT', `storage-units/${first.id}`, { name: 'Uploaded cabinet', type: 'Shelf' });
+    assert.strictEqual((await unitSummary(first.id)).cover_image, uploaded.cover_image);
+    assert.strictEqual((await unitSummary(first.id)).cover.name, 'Uploaded cabinet');
+    await request('PUT', `storage-units/${first.id}`, { cover_image: imageUri(jpeg, 'jpeg') });
+    const replacement = await unitSummary(first.id);
+    assert.notStrictEqual(replacement.cover_image, uploaded.cover_image);
+    const replacementMetadata = await sharp(Buffer.from(replacement.cover_image.split(',')[1], 'base64')).metadata();
+    assert.deepStrictEqual([replacementMetadata.width, replacementMetadata.height], [80, 120]);
+    for (const key of ['exif', 'icc', 'xmp', 'orientation']) assert.strictEqual(replacementMetadata[key], undefined);
+    const overPixels = await sharp({ create: { width: 5000, height: 4001, channels: 3, background: '#000000' } }).png().toBuffer();
+    const animatedGif = Buffer.from('47494638396101000100800000000000ffffff21f904000a0000002c000000000100010000020244010021f904000a0000002c00000000010001000002024c01003b', 'hex');
+    const animatedWebp = await sharp(animatedGif, { animated: true }).webp().toBuffer();
+    assert.strictEqual((await sharp(animatedWebp).metadata()).pages, 2);
+    const animationChunk = Buffer.alloc(20);
+    animationChunk.writeUInt32BE(8);
+    animationChunk.write('acTL', 4);
+    animationChunk.writeUInt32BE(2, 8);
+    const apng = Buffer.concat([png.subarray(0, 33), animationChunk, png.subarray(33)]);
+    const invalidImages = [null, {}, '', 'https://example.com/private.jpg', 'data:image/svg+xml;base64,PHN2Zy8+',
+      'data:image/png;base64,YmFk', imageUri(png, 'jpeg'), imageUri(png.subarray(0, 40)),
+      imageUri(overPixels), imageUri(animatedWebp, 'webp'), imageUri(apng), 'x'.repeat(700001)];
+    for (const cover_image of invalidImages) {
+      await request('PUT', `storage-units/${first.id}`, { name: 'Must not change', type: 'Other', cover_image }, 1, 400);
+      assert.deepStrictEqual(await unitSummary(first.id), replacement, 'invalid image updates are atomic');
+    }
+    await request('PUT', `storage-units/${first.id}`, { cover_image: uploaded.cover_image, cover_card_id: null }, 1, 400);
+    assert.deepStrictEqual(await unitSummary(first.id), replacement);
+    await request('PUT', `storage-units/${foreign.id}`, { cover_image: uploaded.cover_image }, 1, 404);
+    assert.strictEqual((await request('GET', 'storage-units', undefined, 2))[0].cover_image, null);
+    await db.run(`CREATE TRIGGER reject_unit_image BEFORE UPDATE ON storage_units
+      WHEN NEW.id = ${first.id} BEGIN SELECT RAISE(ABORT, 'reject image update'); END`);
+    const logError = console.error;
+    console.error = () => {};
+    try {
+      await request('PUT', `storage-units/${first.id}`, { name: 'Must not change', cover_image: uploaded.cover_image }, 1, 500);
+      assert.deepStrictEqual(await unitSummary(first.id), replacement);
+    } finally {
+      console.error = logError;
+      await db.run('DROP TRIGGER reject_unit_image');
+    }
+    await request('PUT', `storage-units/${first.id}`, { cover_card_id: cover.card_id });
+    assert.strictEqual((await unitSummary(first.id)).cover_image, null);
+    assert.deepStrictEqual((await unitSummary(first.id)).cover, cover);
+    await request('PUT', `storage-units/${first.id}`, { cover_image: uploaded.cover_image });
+    await request('PUT', `storage-units/${first.id}`, { cover_card_id: null });
+    assert.strictEqual((await unitSummary(first.id)).cover_image, null);
+    assert.deepStrictEqual((await unitSummary(first.id)).cover, cover);
+    await request('PUT', `storage-units/${first.id}`, { name: 'Private cabinet', type: 'Other', cover_card_id: cover.card_id });
+    for (const cover_card_id of ['absent', '', 1, {}, []]) {
+      await request('PUT', `storage-units/${first.id}`, { cover_card_id }, 1, 400);
+    }
+    await request('PUT', `storage-units/${second.id}`, { cover_card_id: cover.card_id }, 1, 400);
+    assert.deepStrictEqual(await contents(), coverContents, 'cover changes preserve copies, placements, locks and reservations');
+    assert.deepStrictEqual(await db.all('SELECT * FROM locations ORDER BY id'), coverLocations);
+    const archivedCover = { card_id: 'unit-archive', name: 'Archive image', game: 'mtg', image_url: 'https://example.com/archive.jpg' };
+    for (const [id, game, image] of [
+      [archivedCover.card_id, 'mtg', archivedCover.image_url], ['unit-foreign', 'mtg', cover.image_url],
+      ['unit-wrong-inventory', 'mtg', cover.image_url], ['unit-wrong-game', 'pokemon', cover.image_url],
+    ]) await db.run('INSERT INTO card_cache (id, name, game, image_url) VALUES (?, ?, ?, ?)', [id, id === archivedCover.card_id ? archivedCover.name : id, game, image]);
+    const temporaryEntries = [];
+    for (const [cardId, userId, locationId, listType] of [
+      [archivedCover.card_id, 1, archived.id, 'graveyard'], [archivedCover.card_id, 1, archived.id, 'graveyard'],
+      ['unit-foreign', 2, box.id, 'collection'], ['unit-wrong-inventory', 1, archived.id, 'collection'],
+      ['unit-wrong-game', 1, box.id, 'collection'],
+    ]) temporaryEntries.push((await db.run(`INSERT INTO collection (card_id, user_id, location_id, list_type, added_at)
+      VALUES (?, ?, ?, ?, '2099-01-01')`, [cardId, userId, locationId, listType])).lastID);
+    assert.deepStrictEqual(await request('GET', `storage-units/${first.id}/cover-choices`), [archivedCover, cover], 'choices deduplicate and enforce scope');
+    for (const cover_card_id of ['unit-foreign', 'unit-wrong-inventory', 'unit-wrong-game']) {
+      await request('PUT', `storage-units/${first.id}`, { cover_card_id }, 1, 400);
+    }
+    assert.deepStrictEqual((await unitSummary(first.id)).cover, cover, 'chosen cover wins over newer cards');
+    await request('PUT', `storage-units/${first.id}`, { cover_card_id: null });
+    assert.strictEqual((await unitSummary(first.id)).cover_card_id, null);
+    assert.deepStrictEqual((await unitSummary(first.id)).cover, archivedCover, 'automatic cover includes archived containers');
+    await request('PUT', `storage-units/${first.id}`, { cover_card_id: archivedCover.card_id });
+    await request('PUT', `locations/${archived.id}`, { storage_unit_id: second.id });
+    assert.deepStrictEqual((await unitSummary(first.id)).cover, cover, 'moving the selected container falls back');
+    assert.strictEqual((await unitSummary(first.id)).cover_card_id, archivedCover.card_id);
+    await request('PUT', `locations/${archived.id}`, { storage_unit_id: first.id });
+    await db.run("DELETE FROM collection WHERE card_id = 'unit-wrong-inventory'");
+    await request('POST', `locations/${archived.id}/transfer`, { inventory_type: 'collection' });
+    assert.deepStrictEqual((await unitSummary(first.id)).cover, archivedCover, 'restoring a contained container preserves its eligible cover');
+    await request('POST', `locations/${archived.id}/transfer`, { inventory_type: 'graveyard' });
+    assert.deepStrictEqual((await unitSummary(first.id)).cover, archivedCover, 'archiving a contained container preserves its eligible cover');
+    await db.run('UPDATE card_cache SET image_url = NULL WHERE id = ?', [archivedCover.card_id]);
+    assert.deepStrictEqual((await unitSummary(first.id)).cover, cover, 'losing the selected image falls back');
+    await db.run('UPDATE card_cache SET image_url = ? WHERE id = ?', [archivedCover.image_url, archivedCover.card_id]);
+    await db.run("UPDATE collection SET list_type = 'collection' WHERE card_id = ?", [archivedCover.card_id]);
+    assert.deepStrictEqual((await unitSummary(first.id)).cover, cover, 'out-of-inventory cards cannot remain covers');
+    for (const id of temporaryEntries) await db.run('DELETE FROM collection WHERE id = ?', [id]);
+    await request('PUT', `storage-units/${first.id}`, { cover_card_id: cover.card_id });
     const before = await contents();
     const originalBox = await db.get('SELECT * FROM locations WHERE id = ?', [box.id]);
     await request('PUT', `locations/${box.id}`, { storage_unit_id: second.id });
     assert.deepStrictEqual(await db.get('SELECT * FROM locations WHERE id = ?', [box.id]), { ...originalBox, storage_unit_id: second.id });
+    assert.strictEqual((await unitSummary(first.id)).cover, null);
+    assert.deepStrictEqual((await unitSummary(second.id)).cover, cover);
     await request('PUT', `locations/${box.id}`, {});
     assert.strictEqual((await request('GET', `locations/${box.id}`)).storage_unit_id, second.id, 'omission preserves membership');
     assert.strictEqual((await request('GET', 'collection'))[0].storage_unit_name, 'Closet');
@@ -167,9 +286,13 @@ async function main() {
     const empty = await createUnit('Empty unit');
     await request('PUT', `storage-units/${second.id}`, { name: second.name, type: 'Cabinet' });
     await request('PUT', `storage-units/${empty.id}`, { name: empty.name, type: 'Bag / Backpack' });
+    await request('PUT', `storage-units/${second.id}`, { cover_card_id: cover.card_id });
+    await request('PUT', `storage-units/${empty.id}`, { cover_image: uploaded.cover_image });
+    const backupImage = (await unitSummary(empty.id)).cover_image;
     const backup = await request('GET', 'export?format=backup');
     assert.deepStrictEqual(backup.storage_units, [
-      { id: second.id, name: 'Closet', type: 'Cabinet' }, { id: empty.id, name: 'Empty unit', type: 'Bag / Backpack' }
+      { id: second.id, name: 'Closet', type: 'Cabinet', cover_card_id: cover.card_id, cover_image: null },
+      { id: empty.id, name: 'Empty unit', type: 'Bag / Backpack', cover_card_id: null, cover_image: backupImage }
     ]);
     assert.strictEqual(backup.locations.find(location => location.id === box.id).storage_unit_id, second.id);
     const foreignBefore = await db.get('SELECT * FROM locations WHERE id = ?', [foreignBox.id]);
@@ -181,6 +304,21 @@ async function main() {
       invalidTypeBackup.storage_units[0].type = type;
       await request('POST', 'import', { format: 'backup', data: invalidTypeBackup }, 1, 400);
     }
+    for (const cover_card_id of [1, {}, []]) {
+      const invalidCoverBackup = structuredClone(backup);
+      invalidCoverBackup.storage_units[0].cover_card_id = cover_card_id;
+      await request('POST', 'import', { format: 'backup', data: invalidCoverBackup }, 1, 400);
+    }
+    const unitsBeforeBadBackup = await request('GET', 'storage-units');
+    for (const cover_image of invalidImages.filter(image => image !== null)) {
+      const invalidImageBackup = structuredClone(backup);
+      invalidImageBackup.storage_units[1].cover_image = cover_image;
+      await request('POST', 'import', { format: 'backup', data: invalidImageBackup }, 1, 400);
+      assert.deepStrictEqual(await request('GET', 'storage-units'), unitsBeforeBadBackup);
+    }
+    const conflictingImageBackup = structuredClone(backup);
+    conflictingImageBackup.storage_units[1].cover_card_id = cover.card_id;
+    await request('POST', 'import', { format: 'backup', data: conflictingImageBackup }, 1, 400);
     const badReference = structuredClone(backup);
     badReference.locations.find(location => location.id === box.id).storage_unit_id = foreign.id;
     await request('POST', 'import', { format: 'backup', data: badReference }, 1, 400);
@@ -190,6 +328,11 @@ async function main() {
     assert.deepStrictEqual(restoredUnits.map(({ name, type, container_count }) => ({ name, type, container_count })), [
       { name: 'Closet', type: 'Cabinet', container_count: 2 }, { name: 'Empty unit', type: 'Bag / Backpack', container_count: 0 }
     ]);
+    assert.strictEqual(restoredUnits.find(unit => unit.name === 'Closet').cover_card_id, cover.card_id);
+    assert.deepStrictEqual(restoredUnits.find(unit => unit.name === 'Closet').cover, cover);
+    const restoredUpload = restoredUnits.find(unit => unit.name === 'Empty unit');
+    assert.strictEqual(restoredUpload.cover_image, backupImage, 'backup preserves normalized WebP bytes');
+    assert.deepStrictEqual(restoredUpload.cover, { card_id: null, name: 'Empty unit', game: 'mtg', image_url: backupImage });
     const restoredBox = (await request('GET', 'locations')).find(location => location.name === 'Stored box');
     assert.strictEqual(restoredBox.storage_unit_id, restoredUnits.find(unit => unit.name === 'Closet').id);
     assert.notStrictEqual(restoredBox.storage_unit_id, second.id, 'restore remaps unit identities');
@@ -201,11 +344,17 @@ async function main() {
     assert.strictEqual((await db.get('SELECT location_id FROM compartments WHERE id = ?', [restoredCard.compartment_id])).location_id, restoredBox.id);
     assert.deepStrictEqual(await db.get('SELECT * FROM locations WHERE id = ?', [foreignBox.id]), foreignBefore);
     const legacyTypeBackup = structuredClone(backup);
-    for (const unit of legacyTypeBackup.storage_units) delete unit.type;
+    for (const unit of legacyTypeBackup.storage_units) {
+      delete unit.type;
+      delete unit.cover_card_id;
+      delete unit.cover_image;
+    }
     await request('POST', 'import', { format: 'backup', data: legacyTypeBackup });
     assert.deepStrictEqual((await request('GET', 'storage-units')).map(({ name, type, container_count }) => ({ name, type, container_count })), [
       { name: 'Closet', type: 'Other', container_count: 2 }, { name: 'Empty unit', type: 'Other', container_count: 0 }
     ]);
+    assert.ok((await request('GET', 'storage-units')).every(unit => unit.cover_card_id === null && unit.cover_image === null));
+    assert.deepStrictEqual((await request('GET', 'storage-units')).find(unit => unit.name === 'Closet').cover, cover);
 
     const oldBackup = structuredClone(backup);
     delete oldBackup.storage_units;
