@@ -37,12 +37,15 @@ class ErrorBoundary extends React.Component {
       // Class component, so no hook: App hands t down as a prop.
       const t = this.props.t;
       return (
-        <div style={{ padding: '2rem', color: 'var(--text-strong)', background: 'rgba(255,0,0,0.1)', border: '1px solid red', borderRadius: '8px', margin: '2rem' }}>
-          <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: 'var(--accent-red)' }}>{t('error.crashed')}</h2>
-          <pre style={{ whiteSpace: 'pre-wrap', color: '#ff8888', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '4px', fontSize: '0.85rem' }}>{this.state.error && this.state.error.toString()}</pre>
-          <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.75rem', marginTop: '1rem', color: 'var(--text-secondary)' }}>{this.state.error && this.state.error.stack}</pre>
-          <button className="btn btn-primary" style={{ marginTop: '1.5rem' }} onClick={() => window.location.reload()}>{t('error.reload')}</button>
-        </div>
+        <section className="glass-panel render-error" aria-labelledby="render-error-title">
+          <h2 id="render-error-title">{t('error.crashed')}</h2>
+          <p role="alert">{t('error.recoveryHint')}</p>
+          <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>{t('error.reload')}</button>
+          <details>
+            <summary>{t('error.details')}</summary>
+            <pre>{String(this.state.error?.stack || this.state.error || '')}</pre>
+          </details>
+        </section>
       );
     }
     return this.props.children;
@@ -160,6 +163,16 @@ function App() {
     const id = new URLSearchParams(window.location.search).get('container');
     return /^\d+$/.test(id || '') ? id : null;
   });
+
+  useEffect(() => {
+    if (shareToken || deckShareToken) return;
+    const titleKey = !token || !user ? 'login.signIn' : {
+      dashboard: 'nav.dashboard', 'add-cards': 'nav.addCards', collection: 'nav.collection',
+      storage: 'nav.storage', deckbuilder: 'nav.deckBuilder', howto: 'nav.howto',
+      settings: 'nav.settings', admin: 'nav.admin',
+    }[activeTab];
+    document.title = `${t(titleKey)} · Manafolio`;
+  }, [activeTab, token, user, shareToken, deckShareToken, t]);
 
   // The browser value is only a first-paint cache; the account owns the theme.
   useLayoutEffect(() => {

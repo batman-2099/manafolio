@@ -1535,73 +1535,30 @@ button.collection-card-trigger {
   100% { top: 0%; }
 }
 
-/* Drawer / Dialog Overlay for Add-Card Details Form */
+/* Native dialogs own modality; the shared add-card panel only owns layout. */
 .quick-add-drawer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
   width: 100%;
-  max-width: 100vw;
+  max-width: 1200px;
+  min-width: 0;
   box-sizing: border-box;
   background: var(--bg-secondary);
-  border-top: 2px solid var(--border-glass-hover);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-  padding: 1.5rem;
-  z-index: 1010;
-  max-height: 80vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
-  transform: translateY(100%);
-  transition: transform 250ms cubic-bezier(0.32, 0.72, 0, 1);
-  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border-glass-hover);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  max-height: 90dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
-.quick-add-drawer.open {
-  transform: translateY(0);
-}
+.quick-add-modal { padding: var(--space-4); }
 
-@media (min-width: 769px) {
+@media (max-width: 768px) {
+  .quick-add-modal { align-items: flex-end !important; padding: 0; }
   .quick-add-drawer {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0.9);
-    width: 92%;
-    max-width: 1200px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-glass-hover);
-    max-height: 90vh;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 200ms ease, transform 200ms var(--ease-out);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    padding: var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+    max-height: 92dvh;
   }
-  
-  .quick-add-drawer.open {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-    pointer-events: auto;
-  }
-}
-
-.drawer-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-  z-index: 1009;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
-
-.drawer-backdrop.open {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 /* Persistent scanner review: collection actions stay explicit, even on mobile. */
@@ -2012,17 +1969,6 @@ button.collection-card-trigger {
     grid-column: 1 / -1 !important;
   }
   
-  .quick-add-drawer {
-    width: 100vw !important;
-    max-width: 100vw !important;
-    left: 0 !important;
-    right: 0 !important;
-    box-sizing: border-box !important;
-    padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)) !important;
-    max-height: 92dvh !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
-  }
   .quick-add-fields-group {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
@@ -2648,17 +2594,6 @@ button.collection-card-trigger {
     scroll-behavior: auto !important;
   }
 
-  .quick-add-drawer {
-    transform: none;
-    opacity: 0;
-    visibility: hidden;
-  }
-
-  .quick-add-drawer.open {
-    opacity: 1;
-    visibility: visible;
-  }
-
   .row-flash {
     background-color: color-mix(in srgb, var(--accent-yellow) 25%, var(--bg-secondary));
   }
@@ -2668,12 +2603,6 @@ button.collection-card-trigger {
   }
 }
 
-@media (min-width: 769px) and (prefers-reduced-motion: reduce) {
-  .quick-add-drawer,
-  .quick-add-drawer.open {
-    transform: translate(-50%, -50%);
-  }
-}
 
 /* Recharts tooltip colors follow the active theme. */
 .recharts-default-tooltip {
@@ -2714,8 +2643,8 @@ button.collection-card-trigger {
   .dashboard-page .set-progress-header { flex-wrap: wrap; gap: 0.25rem 0.75rem; }
 
   .deck-overview { min-width: 0; }
-  .deck-overview .btn, .deck-overview .select-control { min-height: 44px; }
-  .deck-overview .btn-icon-only { min-width: 44px; }
+  .deck-gallery .btn, .deck-gallery .select-control { min-height: 44px; }
+  .deck-gallery .btn-icon-only { min-width: 44px; }
   .deck-overview-search { min-width: 0 !important; }
   .deck-overview-search input { padding-right: 3.25rem; }
   .deck-overview-toolbar select { max-width: 100%; }
@@ -2724,8 +2653,8 @@ button.collection-card-trigger {
   .deck-overview-card-heading > div { min-width: 0; }
   .deck-overview-card-footer { gap: 0.75rem; }
   .deck-overview-actions { justify-content: flex-start !important; }
-  .deck-overview .deck-list-table, .deck-overview .deck-list-table tbody { display: block; }
-  .deck-overview .deck-list-table thead {
+  .deck-gallery .deck-list-table, .deck-gallery .deck-list-table tbody { display: block; }
+  .deck-gallery .deck-list-table thead {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -2735,8 +2664,8 @@ button.collection-card-trigger {
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .deck-overview .deck-list-table tr { display: block; padding: 0.75rem; }
-  .deck-overview .deck-list-table td {
+  .deck-gallery .deck-list-table tr { display: block; padding: 0.75rem; }
+  .deck-gallery .deck-list-table td {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
     align-items: start;
@@ -2748,15 +2677,67 @@ button.collection-card-trigger {
     border: 0;
     overflow-wrap: anywhere;
   }
-  .deck-overview .deck-list-table td::before {
+  .deck-gallery .deck-list-table td::before {
     content: attr(data-label);
     color: var(--text-secondary);
     font-size: 0.78rem;
     font-weight: 600;
   }
-  .deck-overview .deck-list-table td > * { min-width: 0; justify-self: start; }
-  .deck-overview .deck-list-table td:first-child, .deck-overview .deck-list-table td:last-child { display: block; }
-  .deck-overview .deck-list-table td:first-child { font-size: 1.05rem !important; padding-bottom: 0.75rem !important; }
-  .deck-overview .deck-list-table td:first-child::before { content: none; }
-  .deck-overview .deck-list-table td:last-child::before { display: block; margin-bottom: 0.5rem; }
+  .deck-gallery .deck-list-table td > * { min-width: 0; justify-self: start; }
+  .deck-gallery .deck-list-table td:first-child, .deck-gallery .deck-list-table td:last-child { display: block; }
+  .deck-gallery .deck-list-table td:first-child { font-size: 1.05rem !important; padding-bottom: 0.75rem !important; }
+  .deck-gallery .deck-list-table td:first-child::before { content: none; }
+  .deck-gallery .deck-list-table td:last-child::before { display: block; margin-bottom: 0.5rem; }
+}
+
+.render-error { min-width: 0; padding: var(--space-6); }
+.render-error h2 { font-size: 1.25rem; margin: 0; }
+.render-error p { margin-block: var(--space-3); }
+.render-error details { margin-top: var(--space-4); }
+.render-error pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.shared-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+  margin-bottom: var(--space-6);
+  border-block: 1px solid var(--border-glass);
+}
+.shared-summary-value { font-size: 1.25rem; font-weight: 700; color: var(--text-strong); overflow-wrap: anywhere; }
+.shared-summary .metric-header { margin-bottom: var(--space-1); }
+.shared-summary .metric-footer { color: var(--text-secondary); }
+.shared-valuable-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  background: transparent;
+  padding: var(--space-3) 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-glass);
+  border-radius: 0;
+  text-align: left;
+  font: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+  min-width: 0;
+}
+.shared-valuable-row:hover { background: var(--surface-1); }
+.shared-collection .dashboard-details { grid-template-columns: minmax(0, 1fr); }
+.shared-collection .dashboard-details > *, .shared-collection .dashboard-details .glass-panel { min-width: 0; }
+.shared-load-status { color: var(--text-secondary); }
+.shared-load-status:empty { margin: 0; }
+@media (min-width: 1024px) {
+  .shared-collection .dashboard-details { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .shared-summary { grid-template-columns: minmax(0, 1fr); }
+  .shared-summary > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-3); }
+  .shared-summary .metric-footer { grid-column: 1 / -1; }
 }

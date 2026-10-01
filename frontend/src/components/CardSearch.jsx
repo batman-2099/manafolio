@@ -5,6 +5,7 @@ import { priceText } from '../utils/formatPrice';
 import { resolveCardPrice } from '../utils/resolveCardPrice';
 import CardEntryFields from './CardEntryFields';
 import CardImageZoom from './CardImageZoom';
+import Modal from './Modal';
 import { getCardDisplayName } from '../utils/langHelper';
 import { useMultiSelect } from '../utils/useMultiSelect';
 import { CONDITIONS, getPrintings } from '../utils/cardOptions';
@@ -14,6 +15,7 @@ import CardImage from './CardImage';
 import { useT } from '../utils/i18n';
 import { readProgressStream } from '../utils/importStream';
 import { downloadBlob } from '../utils/downloadBlob';
+import { useBackGuard } from '../utils/useBackGuard';
 
 const CSV_FIELDS = [
   ['name', 'csvMapping.name', ['name', 'card name', 'card']],
@@ -90,6 +92,8 @@ function CardSearch({ onAddSuccess, showToast }) {
   const [loading, setLoading] = useState(false);
   const searchPending = useRef(false);
   const submittedSearch = useRef(null);
+  const searchFormRef = useRef(null);
+  const searchInputRef = useRef(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
 
@@ -123,6 +127,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   const rapidInputRef = useRef(null);
   const textImportInput = useRef(null);
   const csvImportInput = useRef(null);
+  const importTriggerRef = useRef(null);
   const [importingText, setImportingText] = useState(false);
   const [manaBoxPreview, setManaBoxPreview] = useState(null);
   const [csvPreview, setCsvPreview] = useState(null);
@@ -154,6 +159,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const drawerGeneration = useRef(0);
+  const drawerTriggerRef = useRef(null);
   const printingRequest = useRef(0);
   const printingPending = useRef(false);
   const [localizing, setLocalizing] = useState(false);
@@ -202,10 +208,17 @@ function CardSearch({ onAddSuccess, showToast }) {
     const submitted = criteria || (append ? submittedSearch.current : { query, numberQuery, setCodeQuery, game, searchLang });
     if (!submitted) { searchPending.current = false; return; }
     if (!append) submittedSearch.current = submitted;
+    // Keep a stable return target before loading disables/removes the trigger.
+    const trigger = searchFormRef.current?.contains(document.activeElement)
+      ? document.activeElement
+      : searchInputRef.current;
     if (append) setLoadingMore(true); else setLoading(true);
     setSearchError(null);
     if (!append) {
       setSearching(true);
+      setCards([]);
+      setPage(1);
+      setHasMore(false);
       setFilterType('');
       setFilterRarity('');
       setSortBy('relevance');
@@ -239,18 +252,18 @@ function CardSearch({ onAddSuccess, showToast }) {
         });
         // Exactly one match means the search already identified the card (set +
         // number usually does). Skip the "click the only result" step.
-        if (!append && data.length === 1 && !selectMode) openQuickAdd(data[0]);
+        if (!append && data.length === 1 && !selectMode) openQuickAdd(data[0], trigger);
       } else {
         const errData = await response.json().catch(() => ({}));
-        if (response.status === 429 || errData.error === 'Rate limit exceeded') {
-          setSearchError('rate-limit');
-        } else if (response.status === 503) {
-          setSearchError('upstream');
-        }
+        const kind = response.status === 429 || errData.error === 'Rate limit exceeded'
+          ? 'rate-limit'
+          : response.status === 503 ? 'upstream' : 'request';
+        setSearchError({ kind, page: pageNum, size, message: errData.error });
         showToast(errData.error || t('search.errRequest'), 'error');
       }
     } catch (err) {
       console.error(err);
+      setSearchError({ kind: 'network', page: pageNum, size });
       showToast(t('search.errApi'), 'error');
     } finally {
       searchPending.current = false;
@@ -334,7 +347,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   const handleCardClick = (card, event) => {
     if (longPressFired.current) { longPressFired.current = false; return; }
     if (selectMode) selectAt(card.id, filteredAndSortedCards.map(c => c.id), event?.shiftKey);
-    else openQuickAdd(card);
+    else openQuickAdd(card, event?.currentTarget);
   };
 
   const handleBulkAdd = async () => {
@@ -404,30 +417,49 @@ function CardSearch({ onAddSuccess, showToast }) {
   // Enter in the rapid field: look the number up in the pinned set and add it.
   // One unambiguous match adds immediately; anything else falls back to the
   // normal result grid rather than guessing which printing was meant.
-  const handleRapidAdd = async () => {
-    const number = rapidNumber.trim();
-    if (!number || rapidBusy) return;
-    if (!setCodeQuery.trim()) { showToast(t('search.errNoSetCode'), 'error'); return; }
+  const handleRapidAdd = async (criteria = null) => {
+    const submitted = criteria || { query: '', numberQuery: rapidNumber.trim(), setCodeQuery, game, searchLang };
+    const number = submitted.numberQuery;
+    if (!number || rapidBusy || searchPending.current) return;
+    if (!submitted.setCodeQuery.trim()) { showToast(t('search.errNoSetCode'), 'error'); return; }
+    searchPending.current = true;
+    setSearchError(null);
+    let lookupComplete = false;
+    const failLookup = (kind, message) => {
+      submittedSearch.current = submitted;
+      setCards([]);
+      setHasMore(false);
+      setTotal(null);
+      setPage(1);
+      setSearching(true);
+      setSearchError({ kind, message, rapid: submitted });
+    };
     setRapidBusy(true);
     try {
       const params = new URLSearchParams({
-        number, set: setCodeQuery, scope: 'internet', game, lang: searchLang, page: '1', limit: '10'
+        number, set: submitted.setCodeQuery, scope: 'internet', game: submitted.game, lang: submitted.searchLang, page: '1', limit: '10'
       });
       const res = await fetch(`/api/search?${params.toString()}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        failLookup(res.status === 429 || err.error === 'Rate limit exceeded' ? 'rate-limit' : res.status === 503 ? 'upstream' : 'request', err.error);
         showToast(err.error || t('search.errLookup'), 'error');
         return;
       }
       const matches = await res.json();
+      lookupComplete = true;
       const exact = matches.filter(c => String(c.number) === number || parseInt(c.number, 10) === parseInt(number, 10));
       const hit = exact.length === 1 ? exact[0] : (matches.length === 1 ? matches[0] : null);
 
       if (!hit) {
         if (matches.length === 0) {
-          showToast(t('search.errNoSuchNumber', { number, set: setCodeQuery.toUpperCase() }), 'error');
+          showToast(t('search.errNoSuchNumber', { number, set: submitted.setCodeQuery.toUpperCase() }), 'error');
         } else {
           // Ambiguous: show them and let the user pick, keeping the number typed.
+          submittedSearch.current = submitted;
+          setHasMore(false);
+          setTotal(null);
+          setPage(1);
           setCards(matches);
           setSearching(true);
           showToast(t('search.pickPrinting', { count: matches.length, number }), 'status');
@@ -447,8 +479,10 @@ function CardSearch({ onAddSuccess, showToast }) {
       onAddSuccess();
     } catch (err) {
       console.error(err);
+      if (!lookupComplete) failLookup('network');
       showToast(err.message || t('search.errAddCardGeneric'), 'error');
     } finally {
+      searchPending.current = false;
       setRapidBusy(false);
       // Focus never leaves the field, so the next number can just be typed.
       rapidInputRef.current?.focus();
@@ -501,7 +535,8 @@ function CardSearch({ onAddSuccess, showToast }) {
     }
   };
 
-  const openQuickAdd = (card) => {
+  const openQuickAdd = (card, trigger = document.activeElement) => {
+    drawerTriggerRef.current = trigger;
     drawerGeneration.current++;
     printingRequest.current++;
     printingPending.current = false;
@@ -520,6 +555,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   };
 
   const closeDrawer = () => {
+    if (addPending.current) return false;
     drawerGeneration.current++;
     printingRequest.current++;
     printingPending.current = false;
@@ -588,6 +624,7 @@ function CardSearch({ onAddSuccess, showToast }) {
         }
 
         onAddSuccess(); // Update stats
+        addPending.current = false;
         closeDrawer();
       } else {
         // A rejected cert number (already in the collection) explains itself; the
@@ -625,14 +662,16 @@ function CardSearch({ onAddSuccess, showToast }) {
           signal: controller.signal,
           body: JSON.stringify({ format, data: text })
         });
-        const summary = await response.json().catch(() => ({}));
+        const summary = await response.json();
         if (controller.signal.aborted) return;
         const preview = { ...summary, text, filename: file.name, listType };
         if (format === 'internal') {
           setCsvPreview({
             ...preview,
             errors: response.ok ? summary.errors || [] : [summary.error || t('settings.importFailed', { error: '' })],
-            mapping: suggestedCsvMapping(summary.headers || [])
+            mapping: suggestedCsvMapping(summary.headers || []),
+            stale: !response.ok,
+            previewError: null
           });
         } else {
           if (!response.ok) throw new Error(summary.error || t('settings.importFailed', { error: '' }));
@@ -659,10 +698,11 @@ function CardSearch({ onAddSuccess, showToast }) {
   };
 
   const refreshCsvPreview = async () => {
-    if (!csvPreview || importingText) return;
+    if (!csvPreview || importingText || importRequest.current) return;
     const controller = new AbortController();
     importRequest.current = controller;
     setImportingText(true);
+    setCsvPreview(preview => ({ ...preview, stale: true }));
     try {
       const response = await fetch('/api/import/preview', {
         method: 'POST',
@@ -670,15 +710,22 @@ function CardSearch({ onAddSuccess, showToast }) {
         signal: controller.signal,
         body: JSON.stringify({ format: 'internal', data: csvPreview.text, mapping: csvPreview.mapping })
       });
-      const summary = await response.json().catch(() => ({}));
+      const summary = await response.json();
       if (controller.signal.aborted) return;
+      if (!response.ok) throw new Error(summary.error || t('settings.importFailed', { error: '' }));
       setCsvPreview(preview => ({
         ...preview,
         ...summary,
-        errors: response.ok ? summary.errors || [] : [summary.error || t('settings.importFailed', { error: '' })]
+        errors: summary.errors || [],
+        stale: false,
+        previewError: null
       }));
     } catch (error) {
-      if (!controller.signal.aborted) showToast(error.message || t('settings.importFailed', { error: '' }), 'error');
+      if (!controller.signal.aborted) {
+        const message = error.message || t('settings.importFailed', { error: '' });
+        setCsvPreview(preview => ({ ...preview, stale: true, previewError: message }));
+        showToast(message, 'error');
+      }
     } finally {
       if (!controller.signal.aborted) setImportingText(false);
       if (importRequest.current === controller) importRequest.current = null;
@@ -696,7 +743,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   };
 
   const commitImport = async (format, preview) => {
-    if (!preview || importingText || (format === 'internal' && preview.errors.length)) return;
+    if (!preview || importingText || importRequest.current || (format === 'internal' && (preview.stale || preview.errors.length))) return;
     const controller = new AbortController();
     importRequest.current = controller;
     setImportingText(true);
@@ -733,6 +780,16 @@ function CardSearch({ onAddSuccess, showToast }) {
     }
   };
 
+  const closeImportPreview = () => {
+    if (importingText || importRequest.current) return false;
+    setManaBoxPreview(null);
+    setCsvPreview(null);
+  };
+  useBackGuard(isDrawerOpen, closeDrawer);
+  useBackGuard(!!manaBoxPreview || !!csvPreview, closeImportPreview);
+  useBackGuard(!!importSummary, () => setImportSummary(null));
+  useBackGuard(isFullScreen, () => setIsFullScreen(false));
+
   // Helper to determine location type layout guidance
   return (
     <div className="card-search">
@@ -741,12 +798,13 @@ function CardSearch({ onAddSuccess, showToast }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
           <h2 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--text-strong)' }}>{t('search.title', { game: gameLabel(game) })}</h2>
         </div>
-        <form onSubmit={handleSearch} style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+        <form ref={searchFormRef} onSubmit={handleSearch} style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <label className="control-label" htmlFor="search-card-name">{t('search.cardName')}</label>
               <div style={{ position: 'relative' }}>
                 <input
+                  ref={searchInputRef}
                   id="search-card-name"
                   type="text"
                   className="input-control"
@@ -875,12 +933,12 @@ function CardSearch({ onAddSuccess, showToast }) {
         <section className="search-import-actions" aria-labelledby="search-import-title">
           <h3 id="search-import-title" className="section-heading">{t('search.importTitle')}</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <button type="button" className="btn btn-secondary" onClick={() => textImportInput.current?.click()} disabled={importingText}>
+            <button type="button" className="btn btn-secondary" onClick={event => { importTriggerRef.current = event.currentTarget; textImportInput.current?.click(); }} disabled={importingText}>
               <Download size={18} aria-hidden="true" />
               {importingText ? t('settings.importing') : t('deck.chooseManaBoxFile')}
             </button>
             <input ref={textImportInput} type="file" accept=".txt,text/plain" onChange={event => handleImportFile(event, 'manabox')} style={{ display: 'none' }} />
-            <button type="button" className="btn btn-secondary" onClick={() => csvImportInput.current?.click()} disabled={importingText}>
+            <button type="button" className="btn btn-secondary" onClick={event => { importTriggerRef.current = event.currentTarget; csvImportInput.current?.click(); }} disabled={importingText}>
               <Download size={18} aria-hidden="true" />
               {importingText ? t('settings.importing') : t('search.chooseCsvFile')}
             </button>
@@ -982,11 +1040,18 @@ function CardSearch({ onAddSuccess, showToast }) {
         <div role="alert" className="glass-panel" style={{ borderLeft: '4px solid var(--accent-red)', background: 'rgba(239, 68, 68, 0.08)', padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-red)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
             <ShieldAlert size={18} />
-            {t(`searchErr.${searchError}.title`)}
+            {t(`searchErr.${searchError.kind}.title`)}
           </h3>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
-            {t(`searchErr.${searchError}.body`)}
+            {t(`searchErr.${searchError.kind}.body`)}
           </p>
+          {searchError.message && <p style={{ fontSize: '0.85rem', margin: 0 }}>{searchError.message}</p>}
+          {searchError.page > 1 && <p style={{ fontSize: '0.85rem', margin: 0 }}>{t('searchErr.moreRetained')}</p>}
+          <button type="button" className="btn btn-secondary" style={{ alignSelf: 'flex-start' }}
+            disabled={loading || loadingMore || rapidBusy}
+            onClick={() => searchError.rapid ? handleRapidAdd(searchError.rapid) : runSearch(searchError.page, searchError.size, submittedSearch.current)}>
+            {t('common.retry')}
+          </button>
         </div>
       )}
 
@@ -1021,7 +1086,7 @@ function CardSearch({ onAddSuccess, showToast }) {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <label className="control-label" htmlFor="search-page-size">{t('search.cardsPerPage')}</label>
-              <select id="search-page-size" className="select-control" value={pageSize} onChange={e => changePageSize(parseInt(e.target.value, 10))}>
+              <select id="search-page-size" className="select-control" value={pageSize} disabled={loadingMore || rapidBusy} onChange={e => changePageSize(parseInt(e.target.value, 10))}>
                 {[30, 60, 120, 250].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
             </div>
@@ -1187,16 +1252,12 @@ function CardSearch({ onAddSuccess, showToast }) {
         </div>
       )}
 
-      {/* Drawer Dialog Backdrop */}
-      <div className={`drawer-backdrop ${isDrawerOpen ? 'open' : ''}`} onClick={closeDrawer}></div>
-
-      {/* Quick Add Drawer Sheet */}
-      <div className={`quick-add-drawer ${isDrawerOpen ? 'open' : ''}`}>
-        {selectedCard && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+      {isDrawerOpen && selectedCard && (
+        <Modal className="quick-add-modal" onClose={closeDrawer} returnFocus={drawerTriggerRef.current} aria-labelledby="search-quick-add-title">
+          <div className="quick-add-drawer" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
               <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                <h3 style={{ color: 'var(--text-strong)', fontSize: '1.25rem', margin: 0, wordBreak: 'break-word' }}>{t('search.addCardTitle')}</h3>
+                <h3 id="search-quick-add-title" style={{ color: 'var(--text-strong)', fontSize: '1.25rem', margin: 0, wordBreak: 'break-word' }}>{t('search.addCardTitle')}</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.25rem 0 0 0', wordBreak: 'break-word' }}>
                   {getCardDisplayName(selectedCard.name, selectedCard.printed_name)}
                   {translatedName(selectedCard) && <span style={{ color: 'var(--text-muted)' }}> ({translatedName(selectedCard)})</span>}
@@ -1206,7 +1267,7 @@ function CardSearch({ onAddSuccess, showToast }) {
                   {' • '}#{selectedCard.number})
                 </p>
               </div>
-              <button type="button" aria-label={t('common.close')} className="btn btn-secondary btn-icon-only" onClick={closeDrawer} style={{ borderRadius: '50%', flexShrink: 0 }}>
+              <button type="button" aria-label={t('common.close')} className="btn btn-secondary btn-icon-only" onClick={closeDrawer} disabled={adding} style={{ borderRadius: '50%', flexShrink: 0 }}>
                 <X size={18} />
               </button>
             </div>
@@ -1248,24 +1309,21 @@ function CardSearch({ onAddSuccess, showToast }) {
 
               <div className="quick-add-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem' }}>
                 <div className="quick-add-footer-actions">
-                  <button type="button" className="btn btn-secondary" onClick={closeDrawer}>{t('common.cancel')}</button>
+                  <button type="button" className="btn btn-secondary" onClick={closeDrawer} disabled={adding}>{t('common.cancel')}</button>
                   <button type="submit" value="wishlist" className="btn btn-secondary" disabled={adding || localizing} aria-busy={adding || localizing}>{t('search.addToWishlist')}</button>
                   <button type="submit" value="collection" className="btn btn-primary" disabled={adding || localizing} aria-busy={adding || localizing}>{t(addToArena ? 'search.addToArena' : 'search.addToCollection')}</button>
                 </div>
               </div>
             </form>
           </div>
-        )}
-      </div>
+        </Modal>
+      )}
 
       {manaBoxPreview && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0, 0, 0, 0.78)', display: 'grid', placeItems: 'center', padding: '1rem' }}
-          onClick={() => !importingText && setManaBoxPreview(null)}
-        >
-          <div className="glass-panel" role="dialog" aria-modal="true" aria-label={t('manaboxPreview.title')} onClick={event => event.stopPropagation()} style={{ width: '100%', maxWidth: '420px', minWidth: 0, maxHeight: 'calc(100dvh - 2rem)', overflowY: 'auto', display: 'grid', gap: '1rem' }}>
+        <Modal onClose={closeImportPreview} returnFocus={importTriggerRef.current} aria-labelledby="search-manabox-preview-title" style={{ padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', minWidth: 0, maxHeight: 'calc(100dvh - 2rem)', overflowY: 'auto', display: 'grid', gap: '1rem' }}>
             <div>
-              <h2 style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('manaboxPreview.title')}</h2>
+              <h2 id="search-manabox-preview-title" style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('manaboxPreview.title')}</h2>
               <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{manaBoxPreview.filename}</p>
               <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)' }}>{t('csvPreview.destination', { destination: t(manaBoxPreview.listType === 'arena' ? 'collection.arena' : 'nav.collection') })}</p>
             </div>
@@ -1284,24 +1342,23 @@ function CardSearch({ onAddSuccess, showToast }) {
             <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{t('manaboxPreview.printings', { count: manaBoxPreview.printings })}</p>
             <ImportLog entries={importLog} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-              <button type="button" className="btn btn-secondary" onClick={() => setManaBoxPreview(null)} disabled={importingText}>{t('common.cancel')}</button>
+              <button type="button" className="btn btn-secondary" onClick={closeImportPreview} disabled={importingText}>{t('common.cancel')}</button>
               <button type="button" className="btn btn-primary" onClick={() => commitImport('manabox', manaBoxPreview)} disabled={importingText}>{importingText ? t('settings.importing') : t('manaboxPreview.commit')}</button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {csvPreview && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0, 0, 0, 0.78)', display: 'grid', placeItems: 'center', padding: '1rem' }}
-          onClick={() => !importingText && setCsvPreview(null)}
-        >
-          <div className="glass-panel" role="dialog" aria-modal="true" aria-label={t('csvPreview.title')} onClick={event => event.stopPropagation()} style={{ width: '100%', maxWidth: '520px', minWidth: 0, maxHeight: 'calc(100dvh - 2rem)', overflowY: 'auto', display: 'grid', gap: '1rem' }}>
+        <Modal onClose={closeImportPreview} returnFocus={importTriggerRef.current} aria-labelledby="search-csv-preview-title" style={{ padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '520px', minWidth: 0, maxHeight: 'calc(100dvh - 2rem)', overflowY: 'auto', display: 'grid', gap: '1rem' }}>
             <div>
-              <h2 style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('csvPreview.title')}</h2>
+              <h2 id="search-csv-preview-title" style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('csvPreview.title')}</h2>
               <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{csvPreview.filename}</p>
               <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{t('csvPreview.destination', { destination: t(csvPreview.listType === 'arena' ? 'collection.arena' : 'nav.collection') })}</p>
             </div>
+            {csvPreview.stale && <p role="status" style={{ margin: 0, color: 'var(--text-secondary)' }}>{t('csvPreview.stale')}</p>}
+            {csvPreview.previewError && <p role="alert" style={{ margin: 0, color: 'var(--accent-red)' }}>{csvPreview.previewError}</p>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.8rem' }}>
               {[
                 [t('csvPreview.cards'), csvPreview.cards || 0],
@@ -1323,7 +1380,7 @@ function CardSearch({ onAddSuccess, showToast }) {
                       disabled={importingText}
                       style={{ minWidth: 0, width: '100%' }}
                       value={csvPreview.mapping?.[field] || ''}
-                      onChange={event => setCsvPreview(preview => ({ ...preview, errors: [], mapping: { ...preview.mapping, [field]: event.target.value } }))}
+                      onChange={event => setCsvPreview(preview => ({ ...preview, stale: true, mapping: { ...preview.mapping, [field]: event.target.value } }))}
                     >
                       <option value="">{t('csvMapping.unused')}</option>
                       {(csvPreview.headers || []).map(header => <option key={header} value={header}>{header}</option>)}
@@ -1345,21 +1402,18 @@ function CardSearch({ onAddSuccess, showToast }) {
             )}
             <ImportLog entries={importLog} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-              <button type="button" className="btn btn-secondary" onClick={() => setCsvPreview(null)} disabled={importingText}>{t('common.cancel')}</button>
-              <button type="button" className="btn btn-primary" onClick={() => commitImport('internal', csvPreview)} disabled={importingText || csvPreview.errors.length > 0}>{importingText ? t('settings.importing') : t('csvPreview.commit')}</button>
+              <button type="button" className="btn btn-secondary" onClick={closeImportPreview} disabled={importingText}>{t('common.cancel')}</button>
+              <button type="button" className="btn btn-primary" onClick={() => commitImport('internal', csvPreview)} disabled={importingText || csvPreview.stale || csvPreview.errors.length > 0}>{importingText ? t('settings.importing') : t('csvPreview.commit')}</button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {importSummary && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0, 0, 0, 0.78)', display: 'grid', placeItems: 'center', padding: '1rem' }}
-          onClick={() => setImportSummary(null)}
-        >
-          <div className="glass-panel" role="dialog" aria-modal="true" aria-label={t('importSummary.title')} onClick={event => event.stopPropagation()} style={{ width: '100%', maxWidth: '520px', minWidth: 0, maxHeight: 'calc(100dvh - 2rem)', overflowY: 'auto', display: 'grid', gap: '1rem' }}>
+        <Modal onClose={() => setImportSummary(null)} returnFocus={importTriggerRef.current} aria-labelledby="search-import-summary-title" style={{ padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '520px', minWidth: 0, maxHeight: 'calc(100dvh - 2rem)', overflowY: 'auto', display: 'grid', gap: '1rem' }}>
             <div>
-              <h2 style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('importSummary.title')}</h2>
+              <h2 id="search-import-summary-title" style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('importSummary.title')}</h2>
               <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{importSummary.filename}</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.8rem' }}>
@@ -1399,12 +1453,10 @@ function CardSearch({ onAddSuccess, showToast }) {
               <button type="button" className="btn btn-primary" onClick={() => setImportSummary(null)}>{t('common.close')}</button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
-      {/* Outside the drawer on purpose: .quick-add-drawer is transformed, and a
-          transformed ancestor becomes the containing block for position:fixed,
-          which would trap this overlay inside the drawer instead of the page. */}
+      {/* A separate native dialog keeps image zoom above the Quick Add dialog. */}
       {isFullScreen && selectedCard && (
         <CardImageZoom card={selectedCard} onClose={() => setIsFullScreen(false)} />
       )}

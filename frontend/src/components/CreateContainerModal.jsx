@@ -171,12 +171,12 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
 
         {/* Step 4: Filing rules */}
         {step === 3 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <form id="container-filing-form" onSubmit={event => { event.preventDefault(); submit(); }} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: 0 }}>
               {t('container.filingHint')}
             </p>
             <FilterBuilder value={filterDraft} onChange={setFilterDraft} setsList={setsList} fieldOptions={filterFieldOptions} />
-          </div>
+          </form>
         )}
 
         {/* Footer nav */}
@@ -189,7 +189,7 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
               {t('common.next')} <ArrowRight size={14} />
             </button>
           ) : (
-            <button className="btn btn-primary" disabled={submitting || !name.trim()} onClick={submit}>
+            <button type="submit" form="container-filing-form" className="btn btn-primary" disabled={submitting || !name.trim()}>
               {t(submitting ? 'container.creating' : 'container.create')}
             </button>
           )}

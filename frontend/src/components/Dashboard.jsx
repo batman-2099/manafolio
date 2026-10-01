@@ -461,7 +461,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                     <YAxis allowDecimals={false} domain={[0, 'auto']} stroke="var(--text-secondary)" width={45} />
                     <Bar dataKey="value" maxBarSize={48} radius={[4, 4, 0, 0]}>
                       {typeChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} aria-label={`${entry.name}: ${entry.value}`} />
+                        <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Bar>
                     <Tooltip 
@@ -492,7 +492,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                     <YAxis allowDecimals={false} domain={[0, 'auto']} stroke="var(--text-secondary)" width={45} />
                     <Bar dataKey="value" maxBarSize={48} radius={[4, 4, 0, 0]}>
                       {rarityChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} aria-label={`${entry.name}: ${entry.value}`} />
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Bar>
                     <Tooltip 

@@ -67,6 +67,18 @@ const DECK_DISTRIBUTION_COLORS = {
   'Land (Mountain)': '#f87171', 'Land (Forest)': '#4ade80', 'Land (Nonbasic)': '#fbbf24',
 };
 
+const CARD_GROUP_LABELS = {
+  Creature: 'mtgDeck.creatures',
+  Planeswalker: 'deck.cardGroupPlaneswalkers',
+  Instant: 'deck.cardGroupInstants',
+  Sorcery: 'deck.cardGroupSorceries',
+  Enchantment: 'deck.cardGroupEnchantments',
+  Artifact: 'deck.cardGroupArtifacts',
+  Battle: 'deck.cardGroupBattles',
+  Land: 'mtgDeck.lands',
+  Other: 'deck.cardGroupOther',
+};
+
 const MANA_SYMBOLS = [
   ['white_cards', 'White', -475],
   ['blue_cards', 'Blue', -370],
@@ -92,6 +104,8 @@ function ManaCounts({ deck }) {
 
 function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const { t } = useT();
+  const cardsHeadingRef = useRef(null);
+  const addCardsInputRef = useRef(null);
   const [decks, setDecks] = useState([]);
   const [activeDeck, setActiveDeck] = useState(null);
   const [savedEditorState, setSavedEditorState] = useState(null);
@@ -1832,6 +1846,14 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   <Play size={14} /> Draw Simulator
                 </button>
             </div>
+            <div className="deck-jump-controls">
+              <button type="button" className="btn btn-secondary" onClick={() => cardsHeadingRef.current?.focus()}>
+                {t('deck.jumpToCards')} <ArrowRight size={14} aria-hidden="true" />
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => addCardsInputRef.current?.focus()}>
+                {t('deck.jumpToAddCards')} <ArrowRight size={14} aria-hidden="true" />
+              </button>
+            </div>
           </div>
             <div className="deck-tools">
               {activeDeck.game === 'mtg' && activeDeck.inventory_type !== 'graveyard' && (
@@ -1924,7 +1946,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           )}
 
           <div className={`deck-summary-layout${commanderCard || activeDeck.game === 'mtg' ? ' deck-summary-layout--commander' : ''}`}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
+            <div className="deck-summary-content">
             <div className="deck-overview">
               <div className="deck-overview-column">
                 <section className="deck-overview-section" aria-labelledby="deck-types-heading">
@@ -1933,7 +1955,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     <ul className="deck-distribution">
                       {supertypeData.map(entry => (
                         <li key={entry.name} style={{ '--distribution-color': DECK_DISTRIBUTION_COLORS[entry.name] || 'var(--accent-blue)' }}>
-                          <span>{entry.name}</span>
+                          <span>{t(CARD_GROUP_LABELS[entry.name])}</span>
                           <strong>{entry.value}</strong>
                           <span className="deck-distribution-track" aria-hidden="true">
                             <span style={{ width: `${entry.value / totalDeckCardsCount * 100}%` }} />
@@ -2143,6 +2165,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   </div>
                   <form onSubmit={handleSearchCards} className="deck-search-form">
                     <input
+                      ref={addCardsInputRef}
                       type="text"
                       aria-label={t('deck.searchPlaceholder')}
                       className="input-control"
@@ -2224,7 +2247,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 {/* Deck Cards Header & Display Mode Toggle */}
                 <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <h3 style={{ fontSize: '1rem', color: 'var(--text-strong)', borderLeft: '3px solid var(--accent-red)', paddingLeft: '0.5rem', margin: 0 }}>
+                    <h3 ref={cardsHeadingRef} tabIndex={-1} className="deck-cards-heading" style={{ fontSize: '1rem', color: 'var(--text-strong)', borderLeft: '3px solid var(--accent-red)', paddingLeft: '0.5rem', margin: 0 }}>
                       Deck Cards ({totalDeckCardsCount} / {targetDeckCardsCount})
                     </h3>
                     <div className="deck-display-controls">
@@ -2297,7 +2320,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                       return (
                         <div key={supertype} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           <h4 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.25rem', display: 'flex', justifyContent: 'space-between' }}>
-                            <span>{deckCardSortBy === 'type' ? `${supertype}s` : supertype}</span>
+                            <span>{deckCardSortBy === 'type' ? t(CARD_GROUP_LABELS[supertype]) : supertype}</span>
                             <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{sum}</span>
                           </h4>
 

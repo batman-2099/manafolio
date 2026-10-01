@@ -859,7 +859,8 @@ export default function CompartmentView({
             ref={coverflowContainerRef}
             className="box-coverflow-container"
             tabIndex={0}
-            style={{ outline: 'none' }}
+            role="group"
+            aria-label={t('compartment.browseCards')}
             onTouchStart={handleCoverflowTouchStart}
             onTouchEnd={(e) => handleCoverflowTouchEnd(e, renderedCards.length)}
             onMouseDown={handleCoverflowMouseDown}

@@ -2840,8 +2840,8 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
           <button type="button" className="btn btn-primary" onClick={closeDrawer}><RefreshCw size={16} aria-hidden="true" />{t('scan.rescan')}</button>
         </div>
       </Modal>}
-      {!priceCheck && isDrawerOpen && <Modal onClose={closeDrawer} aria-labelledby="scan-drawer-title">
-      <div className="quick-add-drawer open">
+      {!priceCheck && isDrawerOpen && <Modal onClose={closeDrawer} className="quick-add-modal" aria-labelledby="scan-drawer-title">
+      <div className="quick-add-drawer">
         {selectedCard && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem', gap: '0.75rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>

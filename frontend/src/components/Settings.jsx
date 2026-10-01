@@ -41,6 +41,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
   const [bulkBusy, setBulkBusy] = useState('loading');
   const [bulkNotice, setBulkNotice] = useState(null);
   const mountedRef = useRef(true);
+  const importInputRef = useRef(null);
 
   const theme = themes.includes(user?.theme) ? user.theme : 'dark';
   const [themeLoading, setThemeLoading] = useState(false);
@@ -755,7 +756,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 {t('settings.accessIntro')} {t('settings.accessNetWorth')}
               </div>
               <pre style={{ margin: '0.4rem 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontFamily: 'monospace', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                {`curl -H "Authorization: Bearer ${accessKey || '<key>'}" ${origin}/api/stats/networth`}
+                {`curl -H "Authorization: Bearer <key>" ${origin}/api/stats/networth`}
               </pre>
             </div>
 
@@ -873,19 +874,22 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
               <span>{t('settings.exportJson')}</span>
             </button>
 
-            <label 
-              className="btn btn-primary" 
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', cursor: 'pointer', margin: 0 }}
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              className="btn btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
             >
-              <Upload size={14} />
+              <Upload size={14} aria-hidden="true" />
               <span>{t('settings.importBackup')}</span>
-              <input
-                type="file"
-                accept=".json,.csv,.txt"
-                onChange={handleImportFile}
-                style={{ display: 'none' }}
-              />
-            </label>
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json,.csv,.txt"
+              onChange={handleImportFile}
+              style={{ display: 'none' }}
+            />
           </div>
         </div>
 

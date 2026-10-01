@@ -13,27 +13,33 @@ function SharedContainer({ shareToken, containerId }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [retry, setRetry] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchContainer = async () => {
       try {
         setLoading(true);
-        setError(null);
-        const res = await fetch(`/api/shared/${shareToken}/containers/${containerId}`);
+        const res = await fetch(`/api/shared/${shareToken}/containers/${containerId}`, { signal: controller.signal });
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.error || t('shared.errLoadContainer'));
         }
-        setData(await res.json());
+        const result = await res.json();
+        if (!controller.signal.aborted) {
+          setData(result);
+          setError(null);
+        }
       } catch (err) {
-        setError(err.message);
+        if (!controller.signal.aborted) setError(err.message);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
     fetchContainer();
-  }, [shareToken, containerId, t]);
+    return () => controller.abort();
+  }, [shareToken, containerId, t, retry]);
 
   const cardsByCompartment = useMemo(() => {
     const byComp = new Map();
@@ -45,30 +51,23 @@ function SharedContainer({ shareToken, containerId }) {
     return byComp;
   }, [data]);
 
-  if (loading) {
+  if (loading || error) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
-        <div className="spinner"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', padding: '1rem' }}>
-        <div className="glass-panel" style={{ textAlign: 'center', maxWidth: '400px', width: '100%', padding: '2.5rem 1.5rem', border: '1px solid rgba(255, 71, 71, 0.2)' }}>
-          <ShieldAlert size={48} style={{ color: 'var(--accent-red)', marginBottom: '1rem' }} />
-          <h2 style={{ color: 'var(--text-strong)', fontSize: '1.25rem', marginBottom: '0.5rem' }}>{t('shared.unavailable')}</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{error}</p>
-          <a href="/" style={{
-            display: 'inline-block', marginTop: '1.5rem', padding: '0.5rem 1.5rem',
-            backgroundColor: 'var(--accent-red)', color: 'var(--text-strong)',
-            textDecoration: 'none', fontWeight: 700, borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-accent)'
-          }}>
-            {t('shared.goToManafolio')}
-          </a>
+      <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', padding: '1rem' }}>
+        <div className="glass-panel" style={{ textAlign: 'center', maxWidth: '400px', width: '100%', padding: '2.5rem 1.5rem' }}>
+          <p role="status">{loading ? t('common.loading') : ''}</p>
+          {loading && <div className="spinner" aria-hidden="true" />}
+          {error && <>
+            <ShieldAlert size={48} aria-hidden="true" style={{ color: 'var(--accent-red)', marginBottom: '1rem' }} />
+            <h1 style={{ color: 'var(--text-strong)', fontSize: '1.25rem', marginBottom: '0.5rem' }}>{t('shared.unavailable')}</h1>
+            <p role="alert" style={{ color: 'var(--text-secondary)' }}>{error}</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0.75rem', marginTop: '1.5rem' }}>
+              <button type="button" className="btn btn-primary" aria-disabled={loading} onClick={() => { if (!loading) setRetry(value => value + 1); }}>{t('common.retry')}</button>
+              <a href="/" className="btn btn-secondary">{t('shared.goToManafolio')}</a>
+            </div>
+          </>}
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -92,9 +91,9 @@ function SharedContainer({ shareToken, containerId }) {
   const prevIndex = binder ? (spread <= 1 ? 0 : (spread - 1) * 2 - 1) : pageIndex - 1;
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <Logo size={34} />
+        <Logo style={{ width: '34px', height: '34px', flexShrink: 0 }} />
         <div>
           <h1 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-strong)' }}>{location.name}</h1>
           <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{t('shared.sharedBy')} {owner}</span>
@@ -144,7 +143,7 @@ function SharedContainer({ shareToken, containerId }) {
           )}
         </>
       )}
-    </div>
+    </main>
   );
 }
 
