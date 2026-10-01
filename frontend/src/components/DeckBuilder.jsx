@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Plus, Minus, Trash2, Copy, X, ChevronLeft, Play, BarChart2, Search, LogOut, PackageCheck, LayoutGrid, List, Download, Upload, Eye, Filter, CheckCircle, AlertTriangle, Layers, Zap, Swords, Gamepad2, SlidersHorizontal, ArrowRight, FolderPlus, FileText, MapPin, Share2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { shuffleArray } from '../utils/shuffle';
@@ -150,6 +150,32 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [browseFilters, setBrowseFilters] = useState({});
+  const [showBrowseFilters, setShowBrowseFilters] = useState(false);
+  const browseEntries = useMemo(() => searchResults.flatMap(card => card.inventory_entries || []), [searchResults]);
+  const browseFilterOptions = useMemo(() => {
+    const values = field => [...new Set(browseEntries.map(card => card[field]).filter(Boolean))].sort();
+    return [
+      ['set_name', 'collection.allSets', values('set_name')],
+      ['type', 'collection.allTypes', [...new Set(browseEntries.flatMap(card => [...(card.types || []), ...(card.subtypes || [])]))].sort()],
+      ['color', 'collection.allColors', Object.keys(TYPE_ORDER).filter(color => browseEntries.some(card => typeCategory(card.types) === color))],
+      ['rarity', 'collection.allRarities', values('rarity')],
+      ['condition', 'collection.allConditions', values('condition')],
+      ['printing', 'collection.allPrintings', values('printing')],
+      ['language', 'collection.allLanguages', values('language')],
+    ];
+  }, [browseEntries]);
+  const filteredSearchResults = useMemo(() => searchResults.filter(card =>
+    !card.inventory_entries || card.inventory_entries.some(entry =>
+      Object.entries(browseFilters).every(([field, value]) => {
+        if (!value) return true;
+        if (field === 'type') return [...(entry.types || []), ...(entry.subtypes || [])].includes(value);
+        if (field === 'color') return typeCategory(entry.types) === value;
+        if (field === 'deckStatus') return value === 'inPlay' ? entry.checked_out_qty > 0 : !(entry.checked_out_qty > 0);
+        return entry[field] === value;
+      })
+    )
+  ), [searchResults, browseFilters]);
   const [deckSearchGame, setDeckSearchGame] = useState(() => defaultGame());
 
   // Deck Selection Menu Controls
@@ -337,6 +363,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     setSaveDeckError(null);
     setSleevedError(false);
     setSearchResults([]);
+    setBrowseFilters({});
+    setShowBrowseFilters(false);
     setImportComparison(null);
     setViewMode('list');
     fetchDecks();
@@ -476,6 +504,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
         const owned = new Map(inventory.map(card => [card.id, card.owned_qty]));
         cards = cards.map(card => ({ ...card, source_entry_id: null, owned_qty: owned.get(card.id) || 0, locked_qty: 0, locked_decks: null }));
         setSearchResults([]);
+        setBrowseFilters({});
+        setShowBrowseFilters(false);
         setImportComparison(null);
         setDeckCardLocations({});
         setDeckCardSortBy('type');
@@ -535,6 +565,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
       setSaveDeckError(null);
       setSleevedError(false);
       setSearchResults([]);
+      setBrowseFilters({});
+      setShowBrowseFilters(false);
       setImportComparison(null);
       setDeckSearchGame(data.game);
       setViewMode('detail');
@@ -689,25 +721,26 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     // Collection rows are physical entries; the editor needs totals per printing.
     for (const item of await response.json()) {
       const card = byId.get(item.card_id) || {
-        ...item, id: item.card_id, number: item.number || item.collector_number || item.card_number || '', owned_qty: 0
+        ...item, id: item.card_id, number: item.number || item.collector_number || item.card_number || '', owned_qty: 0, inventory_entries: []
       };
       card.owned_qty += item.quantity || 1;
+      card.inventory_entries.push(item);
       byId.set(item.card_id, card);
     }
     return Array.from(byId.values());
   };
 
-  const handleSearchCards = async (e, forceBrowse = false) => {
+  const handleSearchCards = async (e, forceBrowse = false, search = searchQuery) => {
     if (e) e.preventDefault();
     try {
       setSearching(true);
       const inventoryType = activeDeck?.inventory_type || 'collection';
-      if (forceBrowse || !searchQuery.trim() || inventoryType !== 'collection') {
+      if (forceBrowse || !search.trim() || inventoryType !== 'collection') {
         const cards = await loadInventoryCards(deckSearchGame, inventoryType);
-        const query = searchQuery.trim().toLowerCase();
-        setSearchResults(cards.filter(card => !query || card.name.toLowerCase().includes(query) || card.printed_name?.toLowerCase().includes(query)));
+        const query = search.trim().toLowerCase();
+        setSearchResults(cards.filter(card => !query || [card.name, card.printed_name, card.set_name, card.number].some(value => String(value || '').toLowerCase().includes(query))));
       } else {
-        const response = await fetch(`/api/search?name=${encodeURIComponent(searchQuery)}&scope=collection&game=${deckSearchGame}`);
+        const response = await fetch(`/api/search?name=${encodeURIComponent(search)}&scope=collection&game=${deckSearchGame}`);
         if (response.ok) {
           const data = await response.json();
           setSearchResults(data);
@@ -2125,13 +2158,38 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                       {t('deck.browseCollection')}
                     </button>
                   </form>
+                  {browseEntries.length > 0 && (
+                    <>
+                      <button type="button" className={`btn ${showBrowseFilters ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setShowBrowseFilters(show => !show)} aria-expanded={showBrowseFilters} aria-controls="deck-browse-filters" style={{ marginTop: '0.75rem' }}>
+                        <SlidersHorizontal size={16} /> {t('collection.filters')}{Object.values(browseFilters).filter(Boolean).length > 0 && ` (${Object.values(browseFilters).filter(Boolean).length})`}
+                      </button>
+                      {showBrowseFilters && (
+                        <div id="deck-browse-filters" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(160px, 100%), 1fr))', gap: '0.5rem', marginTop: '0.75rem' }}>
+                          {browseFilterOptions.map(([key, label, options]) => (
+                            <select key={key} className="select-control" aria-label={t(label)} value={browseFilters[key] || ''} onChange={e => setBrowseFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ minWidth: 0 }}>
+                              <option value="">{t(label)}</option>
+                              {options.map(option => <option key={option} value={option}>{key === 'color' ? t(`dash.color.${option}`) : option}</option>)}
+                            </select>
+                          ))}
+                          <select className="select-control" aria-label={t('loc.allDeckStatuses')} value={browseFilters.deckStatus || ''} onChange={e => setBrowseFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ minWidth: 0 }}>
+                            <option value="">{t('loc.allDeckStatuses')}</option>
+                            <option value="inPlay">{t('loc.inPlay')}</option>
+                            <option value="notInPlay">{t('loc.notInPlay')}</option>
+                          </select>
+                          <button type="button" className="btn btn-secondary" onClick={() => { setBrowseFilters({}); setSearchQuery(''); handleSearchCards(null, true, ''); }}>{t('collection.clearFilters')}</button>
+                        </div>
+                      )}
+                    </>
+                  )}
 
                   {/* Search results grid */}
                   {searching ? (
                     <div className="spinner" style={{ margin: '1rem auto' }}></div>
-                  ) : searchResults.length > 0 && (
+                  ) : searchResults.length > 0 && filteredSearchResults.length === 0 ? (
+                    <p role="status" style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>{t('collection.noMatches')} {t('collection.noMatchesFiltered')}</p>
+                  ) : filteredSearchResults.length > 0 && (
                     <div className="card-grid" style={{ marginTop: '1rem', maxHeight: '65vh', overflowY: 'auto', background: 'var(--surface-1)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
-                      {searchResults.map(card => {
+                      {filteredSearchResults.map(card => {
                           const existingInDeck = activeDeck?.cards.find(c => c.id === card.id);
                           const qtyInDeck = existingInDeck ? existingInDeck.quantity : 0;
                           const ownedQty = card.owned_qty || 0;
