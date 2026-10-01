@@ -90,8 +90,8 @@ export default function CardEntryFields({
   const Grading = grading && (
     <div className="card-entry-fields-row-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.75rem' }}>
       <div className="form-group" style={groupStyle}>
-        <label>{t('card.grader')}</label>
-        <select className="select-control" value={grader} onChange={(e) => {
+        <label htmlFor={`${fieldId}-grader`}>{t('card.grader')}</label>
+        <select id={`${fieldId}-grader`} className="select-control" value={grader} onChange={(e) => {
           const next = e.target.value;
           onGrader(next);
           // Switching back to Raw clears the grade and cert here as well as on the
@@ -103,15 +103,15 @@ export default function CardEntryFields({
         </select>
       </div>
       <div className="form-group" style={groupStyle}>
-        <label>{t('card.grade')}</label>
-        <select className="select-control" value={grade ?? ''} disabled={!graded} onChange={(e) => onGrade(e.target.value)}>
+        <label htmlFor={`${fieldId}-grade`}>{t('card.grade')}</label>
+        <select id={`${fieldId}-grade`} className="select-control" value={grade ?? ''} disabled={!graded} onChange={(e) => onGrade(e.target.value)}>
           <option value="">{t('card.gradeNone')}</option>
           {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
       </div>
       <div className="form-group" style={groupStyle}>
-        <label>{t('card.certNumber')}</label>
-        <input type="text" inputMode="numeric" className="input-control" value={certNumber ?? ''} disabled={!graded}
+        <label htmlFor={`${fieldId}-cert-number`}>{t('card.certNumber')}</label>
+        <input id={`${fieldId}-cert-number`} type="text" inputMode="numeric" className="input-control" value={certNumber ?? ''} disabled={!graded}
           onChange={(e) => onCertNumber(e.target.value)} placeholder={graded ? t('card.certPlaceholder') : ''} />
       </div>
     </div>

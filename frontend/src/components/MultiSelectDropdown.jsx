@@ -53,8 +53,9 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
         aria-controls={open ? groupId : undefined}
         aria-expanded={open}
         aria-label={label}
+        aria-describedby={`${groupId}-summary`}
       >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary}</span>
+        <span id={`${groupId}-summary`} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary}</span>
         <ChevronDown size={14} style={{ flexShrink: 0, marginLeft: '0.4rem' }} />
       </button>
 

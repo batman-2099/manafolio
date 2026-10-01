@@ -6,6 +6,11 @@ Release history starts with Manafolio 2.0.
 
 - Fixed frontend test discovery on Node 20 CI by allowing the shell to expand the test-file wildcard.
 - Included guide images in the Docker frontend build stage, fixing the missing storage-unit screenshot import.
+- Fixed API-key masking in command examples, keyboard access to backup import, native-dialog focus and dismissal for Quick Add/imports, grading/filter labels, selected-filter announcements, and box-coverflow focus visibility.
+- Prevented Admin settings saves after failed initial loads; added explicit backup/search/public-share errors and retry controls. CSV mapping changes now require a fresh preview, and incompatible storage-rule values are cleared and require completion before saving.
+- Made public collection browsing precede analytics, reused accessible chart-data tables, corrected public container branding and recovery-button contrast, and retained content/navigation during public-list refreshes.
+- Added mobile deck jump controls and visible table actions without collapsing the overview, corrected card-type terminology and plurals, and removed repeated AI conversation guidance.
+- Added contextual browser titles without changing routes. Render-error recovery now keeps the reload action visible and contains optional technical details on narrow screens.
 
 ## 2.3.0
 

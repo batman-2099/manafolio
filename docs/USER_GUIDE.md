@@ -167,7 +167,7 @@ Use this workflow when you want to **add inventory**. It is different from **Sto
 1. Choose the destination in **Add cards to**, then choose **Choose CSV File** under **Import cards**.
 2. In **CSV Import Review**, verify **Destination**, **Cards**, and **Copies**.
 3. Under **Match CSV columns**, check the mapping for card name, quantity, set code, collector number, condition, printing/foil, language, purchase price, and card ID. Select **Not used** for an irrelevant column.
-4. Choose **Update preview** after changing the mappings. Read and correct **Errors**; importing is disabled while the preview reports errors.
+4. Choose **Update preview** after changing the mappings. The previous counts and errors remain visible but are marked out of date; importing stays disabled until the new preview succeeds without errors.
 5. Choose **Import CSV** only when the preview is satisfactory.
 6. Review **Import Complete**, including **Cards added** and **Cards not added**. Download the failed-card list where offered, correct those entries, and retry only the unresolved work.
 
@@ -583,7 +583,7 @@ The selection is anchored to an existing collection copy and follows its current
 
 ### Add cards, change quantities, and save
 
-1. Open the deck and scroll below the overview to **Add Cards to Deck**.
+1. Open the deck and scroll below the overview to **Add Cards to Deck**, or use **Jump to add cards** near the header. **Jump to cards** moves directly to the deck list. These controls keep the overview, Description, and Notes available.
 2. Search by card name using the search button, or select **Browse Collection** to browse the deck's matching Physical, Arena, or Graveyard inventory. Graveyard decks use archived cards only.
    After browsing, open **Filters** for the same set, type, color, rarity, condition, finish, language, and deck-status filters as Unsorted. Choices come from the browsed inventory; colors use actual card colors, not Commander color identity. Combined filters must match the same owned entry. **Clear filters** clears the search and filters and reloads the inventory. Filtering narrows the displayed printings; owned totals, copy limits, and source-location selection remain unchanged.
 3. Inspect the set and collector number before adding a printing. Select its add control.
@@ -898,7 +898,7 @@ Duplicated decks and decks restored from an account JSON backup start without sh
 
 1. Open **Settings → API Keys → API Access**.
 2. Select **Create API Key**.
-3. Reveal/select the key when needed and store it securely. Send it as `Authorization: Bearer <key>` in a script, using your server's address, for example:
+3. Reveal/select the key when needed and store it securely. **Hide API key** masks the field and replaces the key in the displayed command example with `<key>`. Send the real key as `Authorization: Bearer <key>` in a script, using your server's address, for example:
 
    ```sh
    curl -H 'Authorization: Bearer <key>' https://your-manafolio.example/api/stats/networth
@@ -978,6 +978,8 @@ Deletion also stops the account's local ChatGPT/Codex work and removes its crede
 ### Configure the server's public address
 
 Under **Admin → Instance Settings**, configure **Public Base URL** when share links would otherwise point to an internal address. Use the externally reachable HTTPS address and choose **Save Settings**. Check a generated link from a separate browser/device. Changing the URL does not itself configure DNS, TLS, firewall rules, or a reverse proxy.
+
+Settings cannot be saved until their initial load succeeds. If loading fails, choose **Retry** rather than replacing the server configuration with empty values.
 
 ### Keep price data and scan assets distinct
 

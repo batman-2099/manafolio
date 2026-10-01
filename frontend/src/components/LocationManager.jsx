@@ -1719,17 +1719,17 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
       {rulesComp && (
         <Modal onClose={() => setRulesComp(null)} aria-labelledby="compartment-rules-title">
-          <div className="glass-panel" style={{ width: '480px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-secondary)' }} onClick={(e) => e.stopPropagation()}>
+          <form onSubmit={event => { event.preventDefault(); saveCompartmentRules(); }} className="glass-panel" style={{ width: '480px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-secondary)' }} onClick={(e) => e.stopPropagation()}>
             <h3 id="compartment-rules-title" style={{ margin: 0 }}>{rulesComp.display_label}: {t('compartment.accepts')}</h3>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0 }}>
               Rules controlling which cards may be filed into this {isBinderType ? 'page' : 'row'}. No rules = accepts anything the container allows.
             </p>
             <FilterBuilder value={compRuleDraft} onChange={setCompRuleDraft} setsList={setsList} fieldOptions={filterFieldOptions} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <button className="btn btn-secondary" onClick={() => setRulesComp(null)}>{t('common.cancel')}</button>
-              <button className="btn btn-primary" onClick={saveCompartmentRules}>{t('loc.saveRules')}</button>
+              <button type="button" className="btn btn-secondary" onClick={() => setRulesComp(null)}>{t('common.cancel')}</button>
+              <button type="submit" className="btn btn-primary">{t('loc.saveRules')}</button>
             </div>
-          </div>
+          </form>
         </Modal>
       )}
 
@@ -1751,9 +1751,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
       {showRulesModal && selectedLoc && (
         <Modal onClose={() => setShowRulesModal(false)} aria-labelledby="container-settings-title">
-          <div className="glass-panel" style={{ width: '400px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
+          <form onSubmit={event => { event.preventDefault(); saveContainerSettings(); }} className="glass-panel" style={{ width: '400px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
             <h3 id="container-settings-title" style={{ margin: 0 }}>{t('loc.containerSettings')}</h3>
-            <button className="btn btn-secondary" onClick={() => setCoverLocation(selectedLoc)}>{t('loc.chooseCover')}</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setCoverLocation(selectedLoc)}>{t('loc.chooseCover')}</button>
             {unitsFeedback}
             <StorageUnitSelect units={storageUnits} value={storageUnitDraft} onChange={setStorageUnitDraft} disabled={unitsLoading || unitsError} />
 
@@ -1865,10 +1865,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             <FilterBuilder value={filterDraft} onChange={setFilterDraft} setsList={setsList} fieldOptions={filterFieldOptions} />
 
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-              <button className="btn btn-secondary" onClick={() => setShowRulesModal(false)}>{t('common.cancel')}</button>
-              <button className="btn btn-primary" onClick={saveContainerSettings}>{t('admin.saveSettings')}</button>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowRulesModal(false)}>{t('common.cancel')}</button>
+              <button type="submit" className="btn btn-primary">{t('admin.saveSettings')}</button>
             </div>
-          </div>
+          </form>
         </Modal>
       )}
 

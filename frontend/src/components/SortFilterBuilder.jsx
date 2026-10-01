@@ -201,12 +201,26 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
   const { t } = useT();
   const rules = Array.isArray(value) ? value : [];
 
+  const optionsFor = (field) => {
+    if (fieldOptions[field]?.length) return fieldOptions[field];
+    if (field === 'set_name') return setsList.map(set => set.name);
+    if (field === 'set_id') return setsList.map(set => set.id);
+    return KNOWN_OPTIONS[field] || [];
+  };
+
   const addRule = () => {
     onChange([...rules, { id: Date.now().toString(), action: 'exclude', field: 'types', operator: 'equals', value: '' }]);
   };
 
   const updateRule = (id, updates) => {
-    onChange(rules.map(r => r.id === id ? { ...r, ...updates } : r));
+    onChange(rules.map(rule => {
+      if (rule.id !== id) return rule;
+      const next = { ...rule, ...updates };
+      if (updates.field !== undefined && updates.field !== rule.field) next.value = '';
+      const options = optionsFor(next.field);
+      if (next.operator === 'exists' || (next.operator === 'equals' && options.length && !options.some(option => String(option) === String(next.value)))) next.value = '';
+      return next;
+    }));
   };
 
   const removeRule = (id) => {
@@ -217,6 +231,9 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
     <div className="sort-filter-builder" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', borderTop: '1px solid var(--border-glass)', paddingTop: '1rem' }}>
       <strong style={{ fontSize: '0.75rem' }}>{t('filter.title')}</strong>
       <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t('filter.hint')}</span>
+      {rules.some(rule => rule.operator !== 'exists' && !String(rule.value ?? '').trim()) && (
+        <p role="status" style={{ margin: 0, color: 'var(--text-secondary)' }}>{t('filter.valueRequired')}</p>
+      )}
 
       {rules.length === 0 && (
         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>
@@ -227,12 +244,7 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
       {rules.map((rule) => {
         // Prefer values from the user's actual collection; fall back to the
         // hardcoded list (or the set catalog) when none are owned yet.
-        let options = fieldOptions[rule.field] || [];
-        if (options.length === 0) {
-          options = KNOWN_OPTIONS[rule.field] || [];
-          if (rule.field === 'set_name') options = setsList.map(s => s.name);
-          if (rule.field === 'set_id') options = setsList.map(s => s.id);
-        }
+        const options = optionsFor(rule.field);
         
         return (
           <div key={rule.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap', background: 'rgba(0,0,0,0.1)', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
@@ -273,7 +285,8 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
                   className="select-control"
                   aria-label={t('filter.value')}
                   style={{ flex: 1, minWidth: '100px', padding: '0.2rem' }}
-                  value={rule.value || ''}
+                  required
+                  value={rule.value ?? ''}
                   onChange={(e) => updateRule(rule.id, { value: e.target.value })}
                 >
                   <option value="">{t('filter.selectValue')}</option>
@@ -286,8 +299,9 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
                     aria-label={t('filter.value')}
                     style={{ flex: 1, minWidth: '100px', padding: '0.2rem' }}
                     placeholder={t('filter.value')}
+                    required
                     list={`opts-${rule.id}`}
-                    value={rule.value || ''}
+                    value={rule.value ?? ''}
                     onChange={(e) => updateRule(rule.id, { value: e.target.value })}
                   />
                   {options.length > 0 && (

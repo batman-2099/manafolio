@@ -11,7 +11,7 @@ export function ChartDataTable({ titleId, title, category, rows, series, format,
   return (
     <details className="dashboard-data" style={{ marginTop: '0.75rem' }}>
       <summary aria-describedby={titleId}>{t('dash.viewData')}</summary>
-      <div role="region" aria-labelledby={titleId} tabIndex={0} style={{ overflowX: 'auto' }}>
+      <div role="group" aria-labelledby={titleId} tabIndex={0} style={{ overflowX: 'auto' }}>
         <table style={tableStyle}>
           <caption style={noteStyle}>{title}</caption>
           <thead><tr><th scope="col" style={{ ...cellStyle, overflowWrap: 'normal' }}>{category}</th>{series.map(item => <th key={item.key} scope="col" style={{ ...cellStyle, overflowWrap: 'normal' }}>{item.label}</th>)}</tr></thead>

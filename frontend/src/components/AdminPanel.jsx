@@ -40,11 +40,15 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   const [publicBaseUrl, setPublicBaseUrl] = useState('');
   const [priceRefreshDays, setPriceRefreshDays] = useState(1);
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsStatus, setSettingsStatus] = useState('loading');
+  const settingsRequestRef = useRef(0);
   const mountedRef = useRef(true);
 
   // Database backup states
   const [backups, setBackups] = useState([]);
   const [backupLoading, setBackupLoading] = useState(false);
+  const [backupsStatus, setBackupsStatus] = useState('loading');
+  const backupsRequestRef = useRef(0);
 
   // Scan catalog management (and its own polling) lives in CatalogPanel now.
   useEffect(() => {
@@ -52,7 +56,11 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
     fetchUsers();
     fetchSettings();
     fetchBackups();
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+      settingsRequestRef.current += 1;
+      backupsRequestRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -91,15 +99,18 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   };
 
   const fetchBackups = async () => {
+    const request = ++backupsRequestRef.current;
+    setBackupsStatus('loading');
     try {
       const res = await fetch('/api/admin/backups');
-      if (res.ok) {
-        const data = await res.json();
-        if (!mountedRef.current) return;
-        setBackups(data.backups || []);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (!mountedRef.current || request !== backupsRequestRef.current) return;
+      setBackups(data.backups || []);
+      setBackupsStatus('loaded');
     } catch (err) {
       console.error(err);
+      if (mountedRef.current && request === backupsRequestRef.current) setBackupsStatus('error');
     }
   };
 
@@ -154,21 +165,25 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   };
 
   const fetchSettings = async () => {
+    const request = ++settingsRequestRef.current;
+    setSettingsStatus('loading');
     try {
       const response = await fetch('/api/settings');
-      if (response.ok) {
-        const data = await response.json();
-        if (!mountedRef.current) return;
-        setPublicBaseUrl(data.public_base_url || '');
-        setPriceRefreshDays(data.price_refresh_days ?? 1);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (!mountedRef.current || request !== settingsRequestRef.current) return;
+      setPublicBaseUrl(data.public_base_url || '');
+      setPriceRefreshDays(data.price_refresh_days ?? 1);
+      setSettingsStatus('loaded');
     } catch (err) {
       console.error(err);
+      if (mountedRef.current && request === settingsRequestRef.current) setSettingsStatus('error');
     }
   };
 
   const handleSaveSettings = async (e) => {
     e.preventDefault();
+    if (settingsStatus !== 'loaded' || settingsLoading) return;
     setSettingsLoading(true);
     try {
       const response = await fetch('/api/settings', {
@@ -430,6 +445,13 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
             <Globe size={18} style={{ color: 'var(--accent-red)' }} />
             {t('admin.instanceTitle')}
           </h3>
+          {settingsStatus === 'loading' && <p role="status">{t('common.loading')}</p>}
+          {settingsStatus === 'error' && (
+            <div role="alert">
+              <p>{t('admin.errLoadSettings')}</p>
+              <button type="button" className="btn btn-secondary" onClick={fetchSettings}>{t('admin.retry')}</button>
+            </div>
+          )}
           <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ background: 'rgba(255, 71, 71, 0.03)', border: '1px solid var(--border-glass)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
               {t('admin.instanceHint', { envVar: 'PUBLIC_BASE_URL' })}
@@ -445,7 +467,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                 placeholder="https://cards.example.com"
                 value={publicBaseUrl}
                 onChange={(e) => setPublicBaseUrl(e.target.value)}
-                disabled={settingsLoading}
+                disabled={settingsStatus !== 'loaded' || settingsLoading}
               />
             </div>
             {/* How often prices are refreshed automatically. */}
@@ -456,7 +478,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                 className="select-control"
                 value={priceRefreshDays}
                 onChange={(e) => setPriceRefreshDays(Number(e.target.value))}
-                disabled={settingsLoading}
+                disabled={settingsStatus !== 'loaded' || settingsLoading}
               >
                 <option value={1}>{t('admin.priceRefreshDaily')}</option>
                 <option value={3}>{t('admin.priceRefresh3')}</option>
@@ -468,7 +490,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                 {t('admin.priceRefreshHint')}
               </p>
             </div>
-            <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem', fontWeight: 700, alignSelf: 'flex-start' }} disabled={settingsLoading}>
+            <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem', fontWeight: 700, alignSelf: 'flex-start' }} disabled={settingsStatus !== 'loaded' || settingsLoading}>
               {settingsLoading ? <div className="spinner" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }}></div> : t('admin.saveSettings')}
             </button>
           </form>
@@ -501,11 +523,19 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
             {t('admin.backupHint', { keep: 10, dbFile: 'manafolio.db' })}
           </p>
 
-          {backups.length === 0 ? (
+          {backupsStatus === 'loading' && <p role="status">{t('common.loading')}</p>}
+          {backupsStatus === 'error' && (
+            <div role="alert">
+              <p>{t('admin.errLoadBackups')}</p>
+              <button type="button" className="btn btn-secondary" onClick={fetchBackups}>{t('admin.retry')}</button>
+            </div>
+          )}
+          {backups.length === 0 && backupsStatus === 'loaded' && (
             <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
               {t('admin.noBackups')}
             </div>
-          ) : (
+          )}
+          {backups.length > 0 && (
             <div className="collection-table-wrapper" style={{ overflowX: 'auto' }}>
               <table className="collection-table">
                 <thead>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis } from 'recharts';
+import { ResponsiveContainer, Cell, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { Search, Trophy, Compass, Library, ShieldAlert, Sparkles, X, MapPin, SlidersHorizontal } from 'lucide-react';
 import Logo from './Logo';
 import { priceText, currencySymbol, getCurrency, SYMBOLS } from '../utils/formatPrice';
@@ -10,6 +10,7 @@ import { COLLECTION_SORT_CRITERIA, sortCardsByOrder } from '../utils/cardSort';
 import { displayName } from '../utils/languages';
 import CardImage from './CardImage';
 import Modal from './Modal';
+import { ChartDataTable } from './DashboardAnalytics';
 import { useT } from '../utils/i18n';
 import themes from '../../../shared/themes.json';
 
@@ -37,6 +38,7 @@ function SharedCollection({ shareToken }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [listType, setListType] = useState(getInitialList);
+  const [retry, setRetry] = useState(0);
 
   const [searchFilter, setSearchFilter] = useState('');
   const [rarityFilter, setRarityFilter] = useState('');
@@ -64,14 +66,16 @@ function SharedCollection({ shareToken }) {
     const fetchSharedData = async () => {
       try {
         setLoading(true);
-        setError(null);
         const response = await fetch(`/api/shared/${shareToken}?list=${listType}`, { signal: controller.signal });
         if (!response.ok) {
           const errData = await response.json();
           throw new Error(errData.error || t('shared.errLoad'));
         }
         const data = await response.json();
-        if (!controller.signal.aborted) setData(data);
+        if (!controller.signal.aborted) {
+          setData({ value: data, listType, shareToken });
+          setError(null);
+        }
       } catch (err) {
         if (!controller.signal.aborted) setError(err.message);
       } finally {
@@ -80,10 +84,11 @@ function SharedCollection({ shareToken }) {
     };
     fetchSharedData();
     return () => controller.abort();
-  }, [shareToken, listType, t]);
+  }, [shareToken, listType, t, retry]);
 
-  const collection = useMemo(() => data?.collection || [], [data]);
-  const shareLocations = data?.shareLocations;
+  const loadedData = data?.shareToken === shareToken ? data.value : null;
+  const collection = useMemo(() => loadedData?.collection || [], [loadedData]);
+  const shareLocations = loadedData?.shareLocations;
   const currencies = new Set(collection.map(card => Object.hasOwn(SYMBOLS, card.price_currency) ? card.price_currency : getCurrency()));
   const mixedCurrencies = currencies.size > 1;
   const sourceCurrency = currencies.values().next().value;
@@ -133,41 +138,15 @@ function SharedCollection({ shareToken }) {
     return Object.values(groups);
   }, [filteredCollection, stackCards, stackByCondition, stackByPrinting]);
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
-        <div className="spinner"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', padding: '1rem' }}>
-        <div className="glass-panel" style={{ textAlign: 'center', maxWidth: '400px', width: '100%', padding: '2.5rem 1.5rem', border: '1px solid rgba(255, 71, 71, 0.2)' }}>
-          <ShieldAlert size={48} style={{ color: 'var(--accent-red)', marginBottom: '1rem' }} />
-          <h2 style={{ color: 'var(--text-strong)', fontSize: '1.25rem', marginBottom: '0.5rem' }}>{t('shared.unavailable')}</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{error}</p>
-          <a href="/" style={{
-            display: 'inline-block', marginTop: '1.5rem', padding: '0.5rem 1.5rem',
-            backgroundColor: 'var(--accent-red)', color: 'var(--text-strong)',
-            textDecoration: 'none', fontWeight: 700, borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-accent)'
-          }}>
-            {t('shared.goToManafolio')}
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  const { owner, stats } = data;
-  const { summary, types, rarities, sets = [] } = stats;
+  const { owner, stats } = loadedData || {};
+  const { summary, types = [], rarities = [], sets = [] } = stats || {};
 
   const typeChartData = types.map((entry, i) => ({ name: entry.name, value: entry.value, color: typeColor(entry.name, i) }));
-  const rarityChartData = rarities.map((r, i) => ({ ...r, fill: COLORS[i % COLORS.length] }));
+  const rarityChartData = rarities.map((r, i) => ({ ...r, color: COLORS[i % COLORS.length] }));
 
   const handleTabChange = (type) => {
     if (type === listType) return;
+    setError(null);
     setListType(type);
     const themeParam = new URLSearchParams(window.location.search).get('theme');
     const qTheme = themes.includes(themeParam) && themeParam !== 'dark' ? `&theme=${encodeURIComponent(themeParam)}` : '';
@@ -175,179 +154,123 @@ function SharedCollection({ shareToken }) {
     window.history.pushState({ path: newUrl }, '', newUrl);
   };
 
-  // Every label on this page changes with the list being shown, so the list kind
-  // is part of the key rather than three parallel ternaries.
-  const kind = ['collection', 'wishlist', 'trade'].includes(listType) ? listType : 'collection';
+  // Keep the loaded list's heading with its cards while another list is fetched.
+  const displayedList = loadedData ? data.listType : listType;
+  const kind = ['collection', 'wishlist', 'trade'].includes(displayedList) ? displayedList : 'collection';
   const valueLabel = t(`shared.${kind}.valueLabel`);
   const qtyLabel = t(`shared.${kind}.qtyLabel`);
   const listTitle = t(`shared.${kind}.title`);
   const listBlurb = t(`shared.${kind}.blurb`);
 
-  const donut = (chartData, title, colorKey) => (
-    <div className="glass-panel">
-      <h3 className="chart-title">{title}</h3>
-      <div className="chart-container" style={{ height: '220px' }}>
+  const distribution = (chartData, title, titleId, category) => (
+    <section className="glass-panel" aria-labelledby={titleId}>
+      <h3 id={titleId} className="chart-title">{title}</h3>
+      <div className="chart-container" style={{ height: '220px', overflowX: 'auto' }} role="group" aria-labelledby={titleId} tabIndex={0}>
         {chartData.length === 0 ? (
           <div className="chart-empty">{t('shared.noData')}</div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={chartData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
-                {chartData.map((entry, i) => <Cell key={i} fill={entry[colorKey]} />)}
-              </Pie>
-              <Tooltip contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }} itemStyle={{ color: 'var(--text-strong)' }} labelStyle={{ color: 'var(--text-strong)' }} formatter={(v) => [v, t('dash.cards')]} />
-              <Legend verticalAlign="bottom" height={36} iconSize={10} style={{ fontSize: '0.75rem' }}
-                formatter={(value) => <span style={{ color: 'var(--text-secondary)' }}>{value}</span>} />
-            </PieChart>
-          </ResponsiveContainer>
+          <div style={{ height: '100%', minWidth: Math.max(300, chartData.length * 85) }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} role="img" aria-labelledby={titleId} accessibilityLayer={false} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
+                <XAxis dataKey="name" stroke="var(--text-secondary)" tickLine={false} interval={0} style={{ fontSize: '0.8rem' }} />
+                <YAxis allowDecimals={false} domain={[0, 'auto']} stroke="var(--text-secondary)" width={45} />
+                <Bar dataKey="value" maxBarSize={48} radius={[4, 4, 0, 0]}>
+                  {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                </Bar>
+                <Tooltip contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }} itemStyle={{ color: 'var(--text-strong)' }} labelStyle={{ color: 'var(--text-strong)' }} formatter={(v) => [v, t('dash.cards')]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
-    </div>
+      {chartData.length > 0 && <ChartDataTable titleId={titleId} title={title} category={category} rows={chartData} series={[{ key: 'value', label: t('dash.cards') }]} />}
+    </section>
   );
 
   return (
-    <div className="app-container" style={{ paddingBottom: '3rem' }}>
+    <main className="app-container shared-collection" style={{ paddingBottom: '3rem' }}>
       {/* Header */}
       <header className="app-header" style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-glass)' }}>
         <div className="logo-section">
           <h1 className="logo-text">Manafolio</h1>
           <div className="logo-icon"><Logo /></div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-          <Sparkles size={14} style={{ color: 'var(--accent-yellow)' }} />
+        {owner && <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+          <Sparkles size={14} aria-hidden="true" style={{ color: 'var(--accent-yellow)' }} />
           <span>{t('shared.sharedBy')} <strong>{owner}</strong></span>
-        </div>
+        </div>}
       </header>
 
       {/* Public Sub Navigation Tabs */}
       <div className="sub-nav-tabs" style={{ marginBottom: '1.5rem' }}>
         {['collection', 'wishlist', 'trade'].map((val) => (
-          <button key={val} className={`sub-nav-tab ${listType === val ? 'active' : ''}`} onClick={() => handleTabChange(val)}>
+          <button type="button" key={val} className={`sub-nav-tab ${listType === val ? 'active' : ''}`} aria-pressed={listType === val} onClick={() => handleTabChange(val)}>
             {t(`shared.${val}.tab`)}
           </button>
         ))}
       </div>
 
+      <p role="status" className="shared-load-status">{loading ? t('shared.loadingList', { list: t(`shared.${['collection', 'wishlist', 'trade'].includes(listType) ? listType : 'collection'}.tab`) }) : ''}</p>
+      {error && <section className="glass-panel" style={{ marginBottom: '1.5rem' }}>
+        <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><ShieldAlert size={24} aria-hidden="true" />{t('shared.unavailable')}</h2>
+        <p role="alert">{error}</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem' }}>
+          <button type="button" className="btn btn-primary" aria-disabled={loading} onClick={() => { if (!loading) setRetry(value => value + 1); }}>{t('common.retry')}</button>
+          <a href="/" className="btn btn-secondary">{t('shared.goToManafolio')}</a>
+        </div>
+      </section>}
+
+      {loadedData && <>
+
       {/* Title block */}
-      <div className="glass-panel" style={{ marginBottom: '1.5rem' }}>
+      <div style={{ marginBottom: '1rem' }}>
         <h2 style={{ fontSize: '1.25rem', color: 'var(--text-strong)' }}>{t('shared.ownerTitle', { owner, list: listTitle })}</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{listBlurb}</p>
       </div>
-
-      {/* Overview stats */}
-      <div className="metrics-grid" style={{ marginBottom: '1.5rem' }}>
-        <div className="glass-panel metric-card">
-          <div className="metric-header"><span>{valueLabel}</span><Trophy size={18} style={{ color: 'var(--accent-yellow)' }} /></div>
-          <div className={mixedCurrencies ? 'metric-footer' : 'metric-value'}>{mixedCurrencies ? t('common.mixedCurrencies') : `${currencySymbol(sourceCurrency)}${summary.totalValue.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</div>
-          <div className="metric-footer">{t('shared.valueFooter')}</div>
-        </div>
-        <div className="glass-panel metric-card">
-          <div className="metric-header"><span>{qtyLabel}</span><Library size={18} /></div>
-          <div className="metric-value">{summary.totalCards}</div>
-          <div className="metric-footer">{t('shared.qtyFooter')}</div>
-        </div>
-        <div className="glass-panel metric-card">
-          <div className="metric-header"><span>{t('shared.uniqueCards')}</span><Compass size={18} /></div>
-          <div className="metric-value">{summary.uniqueCards}</div>
-          <div className="metric-footer">{t('shared.uniqueFooter')}</div>
-        </div>
-      </div>
-
-      {/* Analytics */}
-      <div className="dashboard-details" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div className="glass-panel">
-            <h3 className="chart-title">{t('shared.valueBySet')}</h3>
-            <div className="chart-container">
-              {mixedCurrencies ? (
-                <div className="chart-empty">{t('common.mixedCurrencies')}</div>
-              ) : sets.length === 0 ? (
-                <div className="chart-empty">{t('shared.noSetData')}</div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sets} layout="vertical" margin={{ left: 10, right: 30, top: 10, bottom: 10 }}>
-                    <XAxis type="number" stroke="var(--text-secondary)" tickFormatter={(v) => priceText(v, sourceCurrency)} />
-                    <YAxis dataKey="name" type="category" width={120} stroke="var(--text-secondary)" tickLine={false} axisLine={false} style={{ fontSize: '0.8rem' }} />
-                    <Tooltip contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }} itemStyle={{ color: 'var(--text-strong)' }} labelStyle={{ color: 'var(--text-strong)' }} formatter={(v) => [priceText(v, sourceCurrency), t('dash.value')]} />
-                    <Bar dataKey="value" fill="var(--accent-red)" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
-            {donut(typeChartData, t('shared.typeBreakdown'), 'color')}
-            {donut(rarityChartData, t('dash.rarityDistribution'), 'fill')}
-          </div>
-        </div>
-
-        {/* Top Valuable */}
-        <div className="glass-panel" style={{ flex: 1 }}>
-          <h3 className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Trophy size={18} style={{ color: 'var(--accent-yellow)' }} /> {t('dash.topValuable')}
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.25rem' }}>
-            {topValuable.map((card) => (
-              <button type="button" key={card.entry_id} onClick={() => setActiveCard(card)} className="dashboard-card-clickable" aria-haspopup="dialog" aria-label={`${t('shared.cardDetails')} ${displayName(card)}`}
-                style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
-                <CardImage card={card} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }} />
-                <span style={{ flex: 1, overflow: 'hidden' }}>
-                  <span style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName(card)}</span>
-                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.set_name} • {card.rarity}</span>
-                </span>
-                <span style={{ fontWeight: 800, color: 'var(--accent-yellow)', fontSize: '0.9rem' }}>{priceText(card.price_trend, card.price_currency)}</span>
-              </button>
-            ))}
-            {topValuable.length === 0 && <div className="chart-empty">{t('shared.noCards')}</div>}
-          </div>
-        </div>
-      </div>
-
       {/* Filters + Sort */}
       <div className="glass-panel" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div className="form-group" style={{ marginBottom: 0, flex: '1 1 220px' }}>
-            <label>{t('shared.search')}</label>
+            <label htmlFor="shared-search">{t('shared.search')}</label>
             <div style={{ position: 'relative' }}>
-              <input type="text" className="input-control" placeholder={t('shared.searchPlaceholder')}
+              <input id="shared-search" type="search" className="input-control" placeholder={t('shared.searchPlaceholder')}
                 value={searchFilter} onChange={(e) => setSearchFilter(e.target.value)} style={{ width: '100%', paddingLeft: '2.5rem' }} />
               <Search size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             </div>
           </div>
           <div className="form-group" style={{ marginBottom: 0, flex: '1 1 160px' }}>
-            <label>{t('collection.sortBy')}</label>
-            <select className="select-control" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <label htmlFor="shared-sort">{t('collection.sortBy')}</label>
+            <select id="shared-sort" className="select-control" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
               <option value="added-newest">{t('shared.sortRecent')}</option>
               {['name-asc', 'name-desc', 'price-desc', 'price-asc', 'qty-desc', 'set-asc', 'number-asc', 'type-asc', 'rarity-desc', 'rarity-asc', 'language-asc']
                 .map(key => <option key={key} value={key}>{t(`collection.sort.${key}`)}</option>)}
             </select>
           </div>
-          <button className={`btn ${showFilters ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setShowFilters(s => !s)}
+          <button type="button" className={`btn ${showFilters ? 'btn-primary' : 'btn-secondary'}`} aria-expanded={showFilters} aria-controls="shared-filters" onClick={() => setShowFilters(s => !s)}
             style={{ padding: '0.5rem 0.9rem', height: '40px', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
             <SlidersHorizontal size={15} /> {t('collection.filters')}
           </button>
         </div>
 
-        {showFilters && (
-          <div style={{ marginTop: '1rem' }}>
+          <div id="shared-filters" hidden={!showFilters} style={{ marginTop: '1rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>{t('shared.type')}</label>
-                <select className="select-control" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+                <label htmlFor="shared-type">{t('shared.type')}</label>
+                <select id="shared-type" className="select-control" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
                   <option value="">{t('collection.allTypes')}</option>
                   {uniqueTypes.map(type => <option key={type} value={type}>{type}</option>)}
                 </select>
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>{t('collection.fRarity')}</label>
-                <select className="select-control" value={rarityFilter} onChange={(e) => setRarityFilter(e.target.value)}>
+                <label htmlFor="shared-rarity">{t('collection.fRarity')}</label>
+                <select id="shared-rarity" className="select-control" value={rarityFilter} onChange={(e) => setRarityFilter(e.target.value)}>
                   <option value="">{t('collection.allRarities')}</option>
                   {uniqueRarities.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label>{t('card.printing')}</label>
-                <select className="select-control" value={printingFilter} onChange={(e) => setPrintingFilter(e.target.value)}>
+                <label htmlFor="shared-printing">{t('card.printing')}</label>
+                <select id="shared-printing" className="select-control" value={printingFilter} onChange={(e) => setPrintingFilter(e.target.value)}>
                   <option value="">{t('collection.allPrintings')}</option>
                   {getPrintings().map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
@@ -378,8 +301,28 @@ function SharedCollection({ shareToken }) {
               )}
             </div>
           </div>
-        )}
       </div>
+
+      {/* Overview stats */}
+      <section className="shared-summary" aria-label={t('shared.summary')}>
+        <div>
+          <div className="metric-header"><span>{valueLabel}</span><Trophy size={18} aria-hidden="true" style={{ color: 'var(--accent-yellow)' }} /></div>
+          <div className="shared-summary-value">{mixedCurrencies ? t('common.mixedCurrencies') : `${currencySymbol(sourceCurrency)}${summary.totalValue.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</div>
+          <div className="metric-footer">{t('shared.valueFooter')}</div>
+        </div>
+        <div>
+          <div className="metric-header"><span>{qtyLabel}</span><Library size={18} aria-hidden="true" /></div>
+          <div className="shared-summary-value">{summary.totalCards}</div>
+          <div className="metric-footer">{t('shared.qtyFooter')}</div>
+        </div>
+        <div>
+          <div className="metric-header"><span>{t('shared.uniqueCards')}</span><Compass size={18} aria-hidden="true" /></div>
+          <div className="shared-summary-value">{summary.uniqueCards}</div>
+          <div className="metric-footer">{t('shared.uniqueFooter')}</div>
+        </div>
+      </section>
+
+
 
       {/* Card grid */}
       {processedCollection.length === 0 ? (
@@ -422,6 +365,60 @@ function SharedCollection({ shareToken }) {
           })}
         </div>
       )}
+      <section className="shared-analytics" aria-labelledby="shared-analytics-title" style={{ marginTop: '2rem' }}>
+      <h2 id="shared-analytics-title" className="section-heading">{t('dash.analytics')}</h2>
+      <div className="dashboard-details" style={{ marginTop: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="glass-panel">
+            <h3 id="shared-set-title" className="chart-title">{t('shared.valueBySet')}</h3>
+            <div className="chart-container" style={{ overflowX: 'auto' }} role="region" aria-labelledby="shared-set-title" tabIndex={0}>
+              {mixedCurrencies ? (
+                <div className="chart-empty">{t('common.mixedCurrencies')}</div>
+              ) : sets.length === 0 ? (
+                <div className="chart-empty">{t('shared.noSetData')}</div>
+              ) : (
+                <div style={{ height: '100%', minWidth: Math.max(300, sets.length * 110) }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={sets} role="img" aria-labelledby="shared-set-title" accessibilityLayer={false} margin={{ left: 0, right: 15, top: 10, bottom: 5 }}>
+                    <XAxis dataKey="name" stroke="var(--text-secondary)" interval={0} tickLine={false} style={{ fontSize: '0.8rem' }} />
+                    <YAxis type="number" domain={[0, 'auto']} stroke="var(--text-secondary)" tickFormatter={(v) => priceText(v, sourceCurrency)} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }} itemStyle={{ color: 'var(--text-strong)' }} labelStyle={{ color: 'var(--text-strong)' }} formatter={(v) => [priceText(v, sourceCurrency), t('dash.value')]} />
+                    <Bar dataKey="value" fill="var(--accent-red)" maxBarSize={48} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+            {!mixedCurrencies && sets.length > 0 && <ChartDataTable titleId="shared-set-title" title={t('shared.valueBySet')} category={t('sort.by.set')} rows={sets} series={[{ key: 'value', label: t('dash.value') }]} format={value => priceText(value, sourceCurrency)} />}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
+            {distribution(typeChartData, t('shared.typeBreakdown'), 'shared-type-title', t('sort.by.type'))}
+            {distribution(rarityChartData, t('dash.rarityDistribution'), 'shared-rarity-title', t('sort.by.rarity'))}
+          </div>
+        </div>
+
+        {/* Top Valuable */}
+        <div className="glass-panel" style={{ flex: 1 }}>
+          <h3 className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Trophy size={18} style={{ color: 'var(--accent-yellow)' }} /> {t('dash.topValuable')}
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.25rem' }}>
+            {topValuable.map((card) => (
+              <button type="button" key={card.entry_id} onClick={() => setActiveCard(card)} className="dashboard-card-clickable shared-valuable-row" aria-haspopup="dialog" aria-label={`${t('shared.cardDetails')} ${displayName(card)}`}>
+                <CardImage card={card} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }} />
+                <span style={{ flex: 1, overflow: 'hidden' }}>
+                  <span style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName(card)}</span>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.set_name} • {card.rarity}</span>
+                </span>
+                <span style={{ fontWeight: 800, color: 'var(--accent-yellow)', fontSize: '0.9rem' }}>{priceText(card.price_trend, card.price_currency)}</span>
+              </button>
+            ))}
+            {topValuable.length === 0 && <div className="chart-empty">{t('shared.noCards')}</div>}
+          </div>
+        </div>
+      </div>
+      </section>
+      </>}
 
       {/* Read-only Card Detail Modal */}
       {activeCard && (
@@ -474,7 +471,7 @@ function SharedCollection({ shareToken }) {
           </div>
         </Modal>
       )}
-    </div>
+    </main>
   );
 }
 
