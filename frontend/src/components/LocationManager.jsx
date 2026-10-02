@@ -1170,8 +1170,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       let key = card.card_id;
       if (stackContainerByCondition) key += `-${card.condition}`;
       if (stackContainerByPrinting) key += `-${card.printing}`;
-      if (!groups[key]) groups[key] = { ...card };
-      else groups[key].quantity += card.quantity;
+      const foilQuantity = card.printing === 'Holofoil' ? card.quantity : 0;
+      if (!groups[key]) groups[key] = { ...card, foil_quantity: foilQuantity };
+      else {
+        groups[key].quantity += card.quantity;
+        groups[key].foil_quantity += foilQuantity;
+      }
     });
     return Object.values(groups);
   }, [containerListCards, stackContainerCards, stackContainerByCondition, stackContainerByPrinting]);
@@ -2307,6 +2311,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${110 * containerCardScale}px), 1fr))`, gap: '0.75rem' }}>
                       {section.cards.map(card => {
                   const selected = storage.selectedIds.has(card.entry_id);
+                  const foilQuantity = card.foil_quantity ?? (card.printing === 'Holofoil' ? card.quantity : 0);
                   return (
                     <button
                       key={card.entry_id}
@@ -2323,6 +2328,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       <span style={{ width: '100%', marginTop: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-strong)', fontSize: '0.65rem', fontWeight: 700 }}>
                         {displayName(card)}
                       </span>
+                      {foilQuantity > 0 && (
+                        <span style={{ position: 'absolute', top: '0.35rem', left: '0.35rem', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, ...getPrintingBadgeStyle('Holofoil') }}>
+                          {getPrintingBadgeLabel('Holofoil')}{foilQuantity < card.quantity && ` ${foilQuantity}/${card.quantity}`}
+                        </span>
+                      )}
                       {card.checked_out_qty > 0 && (
                         <span title={`${t('loc.inPlay')}: ${card.deck_names}`} style={{ position: 'absolute', right: '0.35rem', bottom: '1.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.45rem', borderRadius: '999px', background: 'rgba(0,0,0,0.85)', border: '2px solid var(--accent-red)', color: 'white', fontSize: '0.85rem', fontWeight: 800 }}>
                           <Layers size={14} /> {card.checked_out_qty < card.quantity ? `${card.checked_out_qty}/${card.quantity} Out` : t('loc.inPlay')}
