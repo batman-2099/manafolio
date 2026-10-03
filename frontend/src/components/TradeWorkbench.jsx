@@ -86,8 +86,9 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
   const selected = (rows, setRows, side) => rows.map((card, index) => {
     const maxQuantity = side === 'giving' ? Math.min(250, card.available) : 250;
     const errorId = `trade-${side}-${index}-quantity-error`;
-    return <li key={`${card.entry_id || card.id}-${index}`}>
-      <strong>{identity(card)}</strong>
+    return <li className="scan-review-card" key={`${card.entry_id || card.id}-${index}`}>
+      <CardImage card={card} loading="lazy" />
+      <strong className="scan-review-details">{identity(card)}</strong>
       {side === 'giving' && <p>{card.location_name || t('trade.unassigned')} · {card.compartment_label || card.compartment_idx || '—'} · #{card.entry_id} · {card.printing} · {card.condition}{card.grader !== 'Raw' ? ` · ${card.grader} ${card.grade || ''} ${card.cert_number || ''}` : ''}</p>}
       {side === 'giving' && staleIds.has(card.entry_id) && <p className="trade-error" role="alert">{t('trade.staleEntry')}</p>}
       <div className="trade-fields">
@@ -143,7 +144,7 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
             <button className="btn btn-secondary" disabled={loading} onClick={() => { setError(''); load(); }}>{t('trade.refresh')}</button>
             {giving.length >= MAX_ROWS && <p id="trade-giving-limit" role="status">{t('trade.rowLimit', { max: MAX_ROWS })}</p>}
             {loading ? <p role="status">{t('common.loading')}</p> : <>
-              <ul className="trade-list trade-results">{pageEntries.map(card => <li key={card.entry_id}><strong>{identity(card)}</strong><p>{card.quantity} × {card.printing} · {card.condition} · {card.location_name || t('trade.unassigned')} · #{card.entry_id}</p><button className="btn btn-secondary" disabled={giving.length >= MAX_ROWS} aria-describedby={giving.length >= MAX_ROWS ? 'trade-giving-limit' : undefined} onClick={() => { if (giving.length >= MAX_ROWS) return; setSuccess(null); setGiving([...giving, { ...card, available: card.quantity, quantity: 1 }]); }}>{t('trade.add')}</button></li>)}</ul>
+              <ul className="scan-review-list trade-results">{pageEntries.map(card => <li className="scan-review-card" key={card.entry_id}><CardImage card={card} loading="lazy" /><strong>{identity(card)}</strong><p>{card.quantity} × {card.printing} · {card.condition} · {card.location_name || t('trade.unassigned')} · #{card.entry_id}</p><button className="btn btn-secondary" disabled={giving.length >= MAX_ROWS} aria-describedby={giving.length >= MAX_ROWS ? 'trade-giving-limit' : undefined} onClick={() => { if (giving.length >= MAX_ROWS) return; setSuccess(null); setGiving([...giving, { ...card, available: card.quantity, quantity: 1 }]); }}>{t('trade.add')}</button></li>)}</ul>
               {pageCount > 1 && <nav className="trade-pagination" aria-label={t('trade.pagination')}>
                 <button className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>{t('collection.previousPage')}</button>
                 <span role="status">{t('collection.pageCount', { page: currentPage, count: pageCount })}<br />{t('collection.pageRange', { start: (currentPage - 1) * PAGE_SIZE + 1, end: Math.min(currentPage * PAGE_SIZE, matching.length), count: matching.length })}</span>
@@ -151,7 +152,6 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
               </nav>}
               {!entries.length ? <p role="status">{t('trade.empty')}</p> : !remaining.length ? <p role="status">{t('trade.allSelected')}</p> : !matching.length && <div><p role="status">{t('trade.noMatches')}</p><button className="btn btn-secondary" onClick={() => { setFilter(''); setPage(1); }}>{t('trade.clearFilter')}</button></div>}
             </>}
-            <ul className="trade-list">{selected(giving, setGiving, 'giving')}</ul>
           </section>
           <section><h3>{t('trade.receiving')}</h3><p>{t('trade.destination')}</p>
             <form onSubmit={event => { event.preventDefault(); run(async signal => { setResults(await api(`search?${new URLSearchParams({ name: query, lang: language, prints: '1', scope: 'database', limit: '60' })}`, null, signal)); }); }}>
@@ -160,10 +160,23 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
               <button className="btn btn-secondary" type="submit">{t('trade.search')}</button>
             </form>
             {receiving.length >= MAX_ROWS && <p id="trade-receiving-limit" role="status">{t('trade.rowLimit', { max: MAX_ROWS })}</p>}
-            {results && <><p>{t('trade.refine')}</p><ul className="trade-list trade-results">{results.map(card => <li key={card.id}><strong>{identity(card)}</strong><button className="btn btn-secondary" disabled={receiving.length >= MAX_ROWS} aria-describedby={receiving.length >= MAX_ROWS ? 'trade-receiving-limit' : undefined} onClick={() => { if (receiving.length >= MAX_ROWS) return; setSuccess(null); setReceiving([...receiving, { ...card, quantity: 1, printing: 'Normal', condition: 'Near Mint' }]); }}>{t('trade.add')}</button></li>)}</ul>{!results.length && <p>{t('trade.emptySearch')}</p>}</>}
-            <ul className="trade-list">{selected(receiving, setReceiving, 'receiving')}</ul>
+            {results && <><p>{t('trade.refine')}</p><ul className="scan-review-list trade-results">{results.map(card => <li className="scan-review-card" key={card.id}><CardImage card={card} loading="lazy" /><strong>{identity(card)}</strong><button className="btn btn-secondary" disabled={receiving.length >= MAX_ROWS} aria-describedby={receiving.length >= MAX_ROWS ? 'trade-receiving-limit' : undefined} onClick={() => { if (receiving.length >= MAX_ROWS) return; setSuccess(null); setReceiving([...receiving, { ...card, quantity: 1, printing: 'Normal', condition: 'Near Mint' }]); }}>{t('trade.add')}</button></li>)}</ul>{!results.length && <p>{t('trade.emptySearch')}</p>}</>}
           </section>
         </div>
+        <section className="trade-selection" aria-labelledby="trade-selection-title">
+          <h3 id="trade-selection-title">{t('trade.selectedTitle')}</h3>
+          <p>{t('trade.selectedHint')}</p>
+          <div className="trade-columns">
+            <section aria-labelledby="trade-selected-giving">
+              <h4 id="trade-selected-giving">{t('trade.giving')}</h4>
+              {giving.length ? <ul className="scan-review-list">{selected(giving, setGiving, 'giving')}</ul> : <p>{t('trade.selectedEmpty')}</p>}
+            </section>
+            <section aria-labelledby="trade-selected-receiving">
+              <h4 id="trade-selected-receiving">{t('trade.receiving')}</h4>
+              {receiving.length ? <ul className="scan-review-list">{selected(receiving, setReceiving, 'receiving')}</ul> : <p>{t('trade.selectedEmpty')}</p>}
+            </section>
+          </div>
+        </section>
       </fieldset>
       <form id="trade-review-form" className="trade-actions" onSubmit={event => {
         event.preventDefault();

@@ -71,6 +71,8 @@ Open **Trade workbench** in navigation (**More** on a phone). This exchanges you
 3. Choose **Review trade**. Compare the cached finish-specific market estimates and timestamps. Unknown prices or currencies are explicitly excluded from partial subtotals. Differences are shown separately by currency, never converted; they are not a guaranteed fair-trade, sale, or graded-slab value.
 4. Choose **Confirm inventory exchange** only after checking both sides. The server rechecks the exact giving entries, quantities, reservations, locks, and receiving identities. It removes only the requested quantities and adds received copies to Physical **Unassigned Pile** in one transaction. Remaining giving copies keep their metadata and placement. Received copies have no recorded purchase price.
 
+Selected artwork cards appear in **Cards being traded**, separate from available cards and search results. Its **Giving** and **Receiving** panels contain only the chosen entries. Adjust quantities there, choose finish and condition for received cards, or use **Remove** before reviewing. Empty panels explicitly say no cards are selected; browsing alone never adds a card to the trade.
+
 **Back** edits an unconfirmed review; **Cancel** clears an unconfirmed draft without inventory changes. Drafts are held only in the current page, with a leave warning. Each side supports up to 100 entries and each line up to 250 copies.
 
 Available Giving entries are paged in groups of 60; changing pages does not clear your selections. A filter with no matches offers **Clear filter**. Refreshing marks changed or unavailable selected entries with a warning: remove and explicitly reselect them before reviewing, so you can check the latest quantity and location.

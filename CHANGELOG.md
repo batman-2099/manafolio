@@ -2,8 +2,11 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.3.1
 
+- Separated Trade workbench Giving and Receiving into bordered sections in editing and review, side by side on desktop and stacked on phones.
+- Reused the scanner's artwork-card layout for Trade workbench selection and drafts on both sides, retaining quantity, finish, condition, location, and removal controls.
+- Added a dedicated **Cards being traded** section separating selected Giving/Receiving cards and their editing controls from browse results, with explicit empty states.
 - Fixed card-inspector Cancel to discard the complete edit draft; protected saves, duplication, and artwork changes against repeated submissions, with errors and progress inside the dialog.
 - Made quick-add Enter use the selected Physical/Arena destination, retained explicit Wishlist submission, and corrected destination-specific feedback.
 - Added persistent validation, loading, and retry states to sign-in setup, onboarding, account forms, user lists, and inspector lookups; guarded Settings imports while pending.
