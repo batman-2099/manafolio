@@ -19,6 +19,7 @@ import RelatedTokens from './RelatedTokens';
 import Modal from './Modal';
 import DeckCardBack from './DeckCardBack';
 import DeckContainerModal from './DeckContainerModal';
+import DeckHistory from './DeckHistory';
 import './DeckBuilder.css';
 
 // Basic lands are exempt from the "max 4 of a card" deck rule.
@@ -158,6 +159,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [deckDraft, setDeckDraft] = useState(null);
   const [savingDeck, setSavingDeck] = useState(false);
   const [saveDeckError, setSaveDeckError] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
   const [refreshingInventory, setRefreshingInventory] = useState(false);
   
   // Card Search States inside editor
@@ -1834,6 +1836,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 </button>
               ))}
               <button className="btn btn-primary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
+              <button className="btn btn-secondary" disabled={editorBusy || savingRecord} onClick={() => setShowHistory(true)}>{t('history.title')}</button>
               {activeDeck.game === 'mtg' && (
                 <button className="btn btn-secondary" disabled={editorBusy || savingRecord} onClick={event => {
                   shareTriggerRef.current = event.currentTarget;
@@ -2803,6 +2806,16 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           </div>
         </Modal>
       )}
+
+      {showHistory && activeDeck && <DeckHistory
+        deck={activeDeck} saved={JSON.parse(savedEditorState)} unsaved={hasUnsavedChanges}
+        onClose={() => setShowHistory(false)}
+        onRestored={async () => {
+          if (!await loadDeckDetails(activeDeck.id)) throw new Error(t('deck.errLoadDetails'));
+          await fetchDecks();
+          showToast(t('history.restored'), 'success');
+        }}
+      />}
 
       {showShareModal && activeDeck && (
         <Modal onClose={() => { if (!shareBusy) setShowShareModal(false); }} returnFocus={shareTriggerRef.current} aria-labelledby="deck-share-title" aria-describedby="deck-share-hint">

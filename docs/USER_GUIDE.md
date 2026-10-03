@@ -599,6 +599,17 @@ Ordinary additions cannot exceed owned printing quantities, and nonbasic cards a
 
 Return a checked-out deck before changing its card composition or inventory type. **Save** is also required before checkout, return, or **Improve with AI** when there are unsaved changes.
 
+### Compare and restore deck revisions
+
+Open a saved deck and choose **Deck history**. The first changed editor save records the list immediately before that edit as **Baseline**, then the saved revision. Later changes to card printings, quantities, source choices, commander, format, target size, or inventory create revisions. Identical saves and changes only to notes, name, appearance, results, or Pulled flags do not create history. New decks show an explanation until their composition changes; edits made before history was available cannot be recovered.
+
+1. Choose **From revision (restore this)**, then select **Compare with current deck** to compare that revision with your current editor state, including unsaved card edits. Alternatively, choose another saved revision under **Compare with**. Changed cards show thumbnails, labeled **Added**, **Removed**, or **Changed** highlights, and before → after quantities. Commander and source changes are highlighted even when quantities are unchanged; changed deck settings appear above the cards. Comparing never saves or restores anything.
+2. Browsing never changes your local draft. Save or discard unsaved changes before restoring. A checked-out Physical deck must first be returned.
+3. Choose **Restore selected revision** and confirm. This immediately saves that revision's composition, commander, format, target size and inventory through the usual validation. Current name, description, private notes, appearance and win/loss record stay unchanged. Pulled flags reset; no collection copies move or become reserved.
+4. Review owned/missing warnings before checkout. History is a deck definition, not a historical inventory backup: current inventory boundaries and source validity still apply. An invalid or deleted historical source can prevent restoration; failure leaves the current deck and history unchanged.
+
+The replaced composition remains available in history. Revisions persist across reloads and are included in complete account backups, including printing metadata and remapped source references. History is private to the account, is not published through deck sharing, is not copied when duplicating a deck, and is removed with its deck. The static demo cannot persist revisions and reports that limitation.
+
 ### Change deck properties
 
 1. Open the deck and select **Edit Properties** near the top.
