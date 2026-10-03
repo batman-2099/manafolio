@@ -5,6 +5,7 @@ import Logo from './components/Logo';
 import { pushBackGuard } from './utils/useBackGuard';
 import { useT } from './utils/i18n';
 import themes from '../../shared/themes.json';
+import { pendingContainerLink } from './utils/containerLabel';
 
 // View components are code-split so heavy deps (recharts in the chart views)
 // load on demand instead of in the initial bundle.
@@ -101,6 +102,7 @@ function App() {
   });
 
   const sessionRevision = useRef(0);
+  const [pendingContainer, setPendingContainer] = useState(pendingContainerLink);
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [settingsSection, setSettingsSection] = useState(null);
@@ -207,6 +209,37 @@ function App() {
   const showToast = useCallback((message, kind = 'status') => {
     setToast({ id: ++toastIdRef.current, message, kind });
   }, []);
+
+  useEffect(() => {
+    if (!pendingContainer || !token || !user?.id || shareToken || deckShareToken) return;
+    let cancelled = false;
+    const clearLink = () => {
+      setPendingContainer(null);
+      try { sessionStorage.removeItem('manafolio_login_container'); } catch { /* optional browser storage */ }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('storageContainer');
+      window.history.replaceState(window.history.state, '', url);
+    };
+    fetch(`/api/locations/${pendingContainer}`)
+      .then(async response => {
+        if (cancelled || response.status === 401) return;
+        if (!response.ok) throw new Error('Container unavailable');
+        const location = await response.json();
+        if (cancelled) return;
+        setStorageInventoryType(location.inventory_type === 'graveyard' ? 'graveyard' : 'collection');
+        setSelectedLocationId(location.id);
+        setFocusEntryId(null);
+        setStorageViewKey(key => key + 1);
+        setActiveTab('storage');
+        clearLink();
+      })
+      .catch(() => {
+        if (cancelled) return;
+        showToast(t('containerLabel.unavailable'), 'error');
+        clearLink();
+      });
+    return () => { cancelled = true; };
+  }, [pendingContainer, token, user?.id, shareToken, deckShareToken, showToast, t]);
 
   // Handle OIDC / SSO token in URL redirect
   useEffect(() => {
@@ -420,7 +453,7 @@ function App() {
 
   // Render login screen if unauthenticated
   if (!token || !user) {
-    return <><Login onLoginSuccess={handleLoginSuccess} />{toastNotification}</>;
+    return <><Login onLoginSuccess={handleLoginSuccess} pendingContainer={pendingContainer} />{toastNotification}</>;
   }
 
   const renderContent = () => {

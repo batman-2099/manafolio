@@ -21,6 +21,7 @@
     "lucide-react": "^0.378.0",
     "marked": "^18.0.14",
     "onnxruntime-web": "^1.27.0",
+    "qrcode-generator": "^2.0.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.12.7"
@@ -35,6 +36,7 @@
     "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-refresh": "^0.4.7",
     "espree": "^10.4.0",
+    "jsqr": "^1.4.0",
     "vite": "^8.1.3"
   }
 }

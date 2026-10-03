@@ -1,0 +1,64 @@
+.container-label-preview {
+  width: min(36rem, calc(100vw - 2rem));
+  max-height: 90dvh;
+  overflow-y: auto;
+  padding: 1.25rem;
+}
+
+.container-label-tools h2 { margin-top: 0; }
+.container-label-tools p { color: var(--text-secondary); }
+.container-label-destination { overflow-wrap: anywhere; }
+.container-label-destination a { color: var(--text-strong); text-decoration: underline; }
+.container-label-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.75rem; }
+.container-label-actions button { min-height: 44px; }
+
+.container-label-paper {
+  box-sizing: border-box;
+  width: 70mm;
+  max-width: 100%;
+  min-height: 70mm;
+  margin: 1rem auto;
+  padding: 4mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2mm;
+  background: #fff;
+  color: #000;
+  text-align: center;
+  border: 1px solid #000;
+  break-inside: avoid;
+}
+.container-label-paper strong { font-size: 16pt; line-height: 1.2; overflow-wrap: anywhere; max-width: 100%; }
+.container-label-paper img { display: block; width: 48mm; height: 48mm; max-width: 100%; object-fit: contain; }
+.container-label-paper span { font-size: 10pt; }
+
+@media print {
+  body:has(.container-label-dialog) { background: #fff !important; margin: 0 !important; }
+  body:has(.container-label-dialog) > :not(.container-label-dialog) { display: none !important; }
+  .container-label-dialog::backdrop { background: transparent; }
+  .container-label-dialog {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: #fff !important;
+    backdrop-filter: none !important;
+  }
+  .container-label-preview {
+    width: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    transition: none !important;
+  }
+  .container-label-tools { display: none !important; }
+  .container-label-paper { max-width: none; margin: 0; print-color-adjust: exact; }
+}

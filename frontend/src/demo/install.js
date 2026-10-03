@@ -65,6 +65,10 @@ window.fetch = async (input, opts = {}) => {
   if (/^\/api\/sets\/[^/]+\/completion$/.test(path)) {
     return json({ code: 'DEMO_UNAVAILABLE', error: 'Set completion requires a server catalog.' }, 503);
   }
+  if (method === 'GET' && /^\/api\/locations\/\d+$/.test(path)) {
+    const location = routes['/api/locations'].find(item => item.id === Number(path.split('/').pop()));
+    return json(location || { error: 'Container not found.' }, location ? 200 : 404);
+  }
   if (path === '/api/storage-units' || /^\/api\/storage-units\/\d+(?:\/cover-choices)?$/.test(path)) {
     const units = routes['/api/storage-units'];
     const id = path === '/api/storage-units' ? null : Number(path.split('/')[3]);

@@ -452,6 +452,15 @@ The container toolbar shows its saved sleeve type. Change it through **More → 
 
 Change **Type** through **More → Container Settings**, then **Save Settings**. Existing cards, pages/rows, capacities, and sleeve settings are retained; changing type does not apply the creation wizard's default layout.
 
+### Print a container label
+
+1. Open a container in **Storage**, then choose **More → Print container label**. Physical and Graveyard containers both support labels.
+2. Check the container name, QR preview, and **QR destination**. The link uses the public base URL from Settings (or `PUBLIC_BASE_URL`); when none is configured, it uses this browser's current origin and app path. Configure an address your phone can reach before printing—`localhost` on your computer does not point to that computer from a phone.
+3. Choose **Print** to open the browser's print dialog. Use 100% scale and disable browser headers/footers. The label is 70 mm wide, with a 48 mm QR image and a minimum 70 mm height; long names expand the height. Only the label prints, not application navigation or preview controls.
+4. Scan with your phone's QR reader. Sign in if asked; Manafolio opens the intended container in its current Physical or Graveyard inventory. A deleted container or one belonging to another account shows a safe unavailable message.
+
+Labels are private navigation links, **not public shares**. The QR contains only the installation address and container ID, never a session or share token. Generating a label does not change sharing settings, cards, reservations, or storage. The printed name is visible to anyone holding the label. QR generation is local to the browser; no remote QR service receives it. Reprint after changing the server address or container name; account restore can change container IDs.
+
 ### Choose between sort rules and moving rules
 
 - **Sort** answers “in what order?” Rules can order cards by name, set/number, value, finish, type/color, language, and other offered fields. Rule priority matters.
