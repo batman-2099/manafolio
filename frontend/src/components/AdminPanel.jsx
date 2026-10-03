@@ -19,7 +19,8 @@ const formatBytes = (n) => {
 function AdminPanel({ user, onUpdateUser, showToast }) {
   const { t, locale } = useT();
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [usersStatus, setUsersStatus] = useState('loading');
+  const usersRequestRef = useRef(0);
   const [filterText, setFilterText] = useState('');
   const [showWizard, setShowWizard] = useState(false);
 
@@ -28,13 +29,29 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState('member');
   const [addLoading, setAddLoading] = useState(false);
+  const [addErrors, setAddErrors] = useState({});
+  const addFormRef = useRef(null);
+  useEffect(() => {
+    if (!addLoading) addFormRef.current?.querySelector('[aria-invalid="true"], [role="alert"]')?.focus();
+  }, [addErrors, addLoading]);
 
   // Change Password Modal States
   const [targetUser, setTargetUser] = useState(null);
-  const closePassword = () => { setTargetUser(null); setUpdatePassword(''); };
+  const closePassword = () => {
+    if (pwdBusyRef.current) return;
+    setTargetUser(null);
+    setUpdatePassword('');
+    setPwdError('');
+  };
   useBackGuard(!!targetUser, closePassword);
   const [updatePassword, setUpdatePassword] = useState('');
   const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdError, setPwdError] = useState('');
+  const pwdBusyRef = useRef(false);
+  const pwdInputRef = useRef(null);
+  useEffect(() => {
+    if (pwdError && !pwdLoading) pwdInputRef.current?.focus();
+  }, [pwdError, pwdLoading]);
 
   // Instance Settings States
   const [publicBaseUrl, setPublicBaseUrl] = useState('');
@@ -60,8 +77,8 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       mountedRef.current = false;
       settingsRequestRef.current += 1;
       backupsRequestRef.current += 1;
+      usersRequestRef.current += 1;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
@@ -146,21 +163,18 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   };
 
   const fetchUsers = async () => {
+    const request = ++usersRequestRef.current;
+    setUsersStatus('loading');
     try {
-      setLoading(true);
       const response = await fetch('/api/admin/users');
-      if (response.ok) {
-        const data = await response.json();
-        if (!mountedRef.current) return;
-        setUsers(data);
-      } else {
-        showToast(t('admin.errUserList'), 'error');
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (!mountedRef.current || request !== usersRequestRef.current) return;
+      setUsers(data);
+      setUsersStatus('loaded');
     } catch (err) {
       console.error(err);
-      showToast(t('common.errBackend'), 'error');
-    } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current && request === usersRequestRef.current) setUsersStatus('error');
     }
   };
 
@@ -214,14 +228,12 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
   const handleAddUser = async (e) => {
     e.preventDefault();
-    if (newUsername.length < 3) {
-      showToast(t('admin.errUsernameShort', { count: 3 }), 'error');
-      return;
-    }
-    if (newPassword.length < 8) {
-      showToast(t('login.errPasswordShort', { count: 8 }), 'error');
-      return;
-    }
+    if (addLoading) return;
+    const errors = {};
+    if (newUsername.length < 3) errors.username = t('admin.errUsernameShort', { count: 3 });
+    if (newPassword.length < 8) errors.password = t('login.errPasswordShort', { count: 8 });
+    setAddErrors(errors);
+    if (Object.keys(errors).length) return;
 
     setAddLoading(true);
     try {
@@ -239,11 +251,11 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
         fetchUsers();
       } else {
         const data = await response.json();
-        showToast(data.error || t('admin.errCreateUser'), 'error');
+        setAddErrors({ form: data.error || t('admin.errCreateUser') });
       }
     } catch (err) {
       console.error(err);
-      showToast(t('admin.errCreateUserGeneric'), 'error');
+      setAddErrors({ form: t('admin.errCreateUserGeneric') });
     } finally {
       setAddLoading(false);
     }
@@ -282,11 +294,14 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    if (!targetUser) return;
+    if (!targetUser || pwdBusyRef.current) return;
     if (updatePassword.length < 8) {
-      showToast(t('login.errPasswordShort', { count: 8 }), 'error');
+      setPwdError(t('login.errPasswordShort', { count: 8 }));
+      pwdInputRef.current?.focus();
       return;
     }
+    setPwdError('');
+    pwdBusyRef.current = true;
 
     setPwdLoading(true);
     try {
@@ -302,12 +317,13 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
         setTargetUser(null);
       } else {
         const data = await response.json();
-        showToast(data.error || t('settings.errPasswordUpdate'), 'error');
+        setPwdError(data.error || t('settings.errPasswordUpdate'));
       }
     } catch (err) {
       console.error(err);
-      showToast(t('settings.errPasswordUpdateGeneric'), 'error');
+      setPwdError(t('settings.errPasswordUpdateGeneric'));
     } finally {
+      pwdBusyRef.current = false;
       setPwdLoading(false);
     }
   };
@@ -395,7 +411,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
             <UserPlus size={18} style={{ color: 'var(--accent-red)' }} />
             {t('admin.registerTitle')}
           </h3>
-          <form onSubmit={handleAddUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <form ref={addFormRef} noValidate onSubmit={handleAddUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label htmlFor="admin-new-username">{t('admin.newUsername')}</label>
               <input
@@ -409,7 +425,10 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                 onChange={(e) => setNewUsername(e.target.value)}
                 required
                 disabled={addLoading}
+                aria-invalid={!!addErrors.username}
+                aria-describedby={addErrors.username ? 'admin-username-error' : undefined}
               />
+              {addErrors.username && <p id="admin-username-error" role="alert" style={{ color: 'var(--text-negative)' }}>{addErrors.username}</p>}
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label htmlFor="admin-new-password">{t('admin.initialPassword')}</label>
@@ -424,7 +443,10 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
                 disabled={addLoading}
+                aria-invalid={!!addErrors.password}
+                aria-describedby={addErrors.password ? 'admin-password-error' : undefined}
               />
+              {addErrors.password && <p id="admin-password-error" role="alert" style={{ color: 'var(--text-negative)' }}>{addErrors.password}</p>}
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label htmlFor="admin-new-role">{t('admin.role')}</label>
@@ -433,8 +455,10 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                 <option value="admin">{t('admin.roleAdministrator')}</option>
               </select>
             </div>
+            {addErrors.form && <p role="alert" tabIndex={-1} style={{ color: 'var(--text-negative)' }}>{addErrors.form}</p>}
             <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem', fontWeight: 700 }} disabled={addLoading}>
-              {addLoading ? <div className="spinner" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }}></div> : t('admin.createAccount')}
+              {addLoading && <span className="spinner" aria-hidden="true" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }} />}
+              {t('admin.createAccount')}
             </button>
           </form>
         </div>
@@ -491,7 +515,8 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
               </p>
             </div>
             <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem', fontWeight: 700, alignSelf: 'flex-start' }} disabled={settingsStatus !== 'loaded' || settingsLoading}>
-              {settingsLoading ? <div className="spinner" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }}></div> : t('admin.saveSettings')}
+              {settingsLoading && <span className="spinner" aria-hidden="true" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }} />}
+              {t('admin.saveSettings')}
             </button>
           </form>
         </div>
@@ -516,7 +541,8 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
               disabled={backupLoading}
               style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', height: '34px' }}
             >
-              {backupLoading ? <div className="spinner" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }}></div> : <><HardDriveDownload size={14} /> {t('admin.backUpNow')}</>}
+              {backupLoading ? <span className="spinner" aria-hidden="true" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }} /> : <HardDriveDownload size={14} aria-hidden="true" />}
+              {t('admin.backUpNow')}
             </button>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, lineHeight: 1.4 }}>
@@ -591,13 +617,19 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
             </div>
           </div>
 
-          {loading ? (
-            <div className="spinner"></div>
-          ) : filteredUsers.length === 0 ? (
+          {usersStatus === 'loading' && <p role="status">{t('common.loading')}</p>}
+          {usersStatus === 'error' && (
+            <div role="alert">
+              <p>{t('admin.errUserList')}</p>
+              <button type="button" className="btn btn-secondary" onClick={fetchUsers}>{t('admin.retry')}</button>
+            </div>
+          )}
+          {usersStatus === 'loaded' && filteredUsers.length === 0 && (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
               {t('admin.noUserMatch')}
             </div>
-          ) : (
+          )}
+          {filteredUsers.length > 0 && (
             <div className="collection-table-wrapper" style={{ overflowX: 'auto' }}>
               <table className="collection-table admin-user-table">
                 <thead>
@@ -691,16 +723,18 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
           justifyContent: 'center',
           zIndex: 999, padding: '1rem'
         }}>
-          <div className="glass-panel" style={{ maxWidth: '380px', width: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="glass-panel dialog-panel-spacing" style={{ maxWidth: '380px', width: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div>
               <h3 id="admin-reset-title" style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('admin.resetPassword')}</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{t('admin.resetPasswordFor')} <strong>{targetUser.username}</strong></p>
             </div>
-            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <form noValidate onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label htmlFor="admin-reset-password">{t('settings.newPassword')}</label>
                 <input
                   id="admin-reset-password"
+                  ref={pwdInputRef}
+                  autoFocus
                   type="password"
                   name="reset-password"
                   autoComplete="new-password"
@@ -710,14 +744,18 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                   onChange={(e) => setUpdatePassword(e.target.value)}
                   required
                   disabled={pwdLoading}
+                  aria-invalid={!!pwdError}
+                  aria-describedby={pwdError ? 'admin-reset-error' : undefined}
                 />
+                {pwdError && <p id="admin-reset-error" role="alert" style={{ color: 'var(--text-negative)' }}>{pwdError}</p>}
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={closePassword} disabled={pwdLoading}>
                   {t('common.cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={pwdLoading}>
-                  {pwdLoading ? <div className="spinner" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }}></div> : t('admin.savePassword')}
+                  {pwdLoading && <span className="spinner" aria-hidden="true" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }} />}
+                  {t('admin.savePassword')}
                 </button>
               </div>
             </form>

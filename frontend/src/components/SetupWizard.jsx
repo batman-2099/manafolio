@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Cpu, Download, Check, X, MapPin, Trash2, Pencil,
   ArrowLeft, ArrowRight, Camera, Database, Swords, LayoutDashboard, Settings as SettingsIcon,
@@ -37,15 +37,42 @@ import Modal from './Modal';
 const NEW_LOCATION_TYPES = ['Binder', 'Box', 'Deck Box'];
 const STEPS = ['language', 'scanning', 'storage', 'tour'];
 
+function Heading({ icon, title, sub }) {
+  return (
+    <div>
+      <h3 id="setup-step-title" tabIndex={-1} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '1.05rem' }}>
+        {icon} {title}
+      </h3>
+      {sub && <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.55, margin: '0.4rem 0 0' }}>{sub}</p>}
+    </div>
+  );
+}
+
 const markComplete = () => fetch('/api/settings', {
   method: 'PUT',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ setup_complete: true }),
 });
 
-export default function SetupWizard({ user, onClose, showToast }) {
+export default function SetupWizard({ user, onClose }) {
   const { t, locale, setLocale } = useT();
   const [step, setStep] = useState(0);
+  const contentRef = useRef(null);
+  const previousStep = useRef(step);
+  const [modelsStatus, setModelsStatus] = useState('loading');
+  const [catalogsStatus, setCatalogsStatus] = useState('loading');
+  const [locationsStatus, setLocationsStatus] = useState('loading');
+  const [actionError, setActionError] = useState('');
+  const [finishError, setFinishError] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+
+  useEffect(() => {
+    if (previousStep.current !== step) {
+      contentRef.current?.querySelector('#setup-step-title')?.focus();
+      previousStep.current = step;
+      setActionError('');
+    }
+  }, [step]);
 
   // Step 2: scanning
   const [engine, setEngine] = useState(null);
@@ -64,27 +91,53 @@ export default function SetupWizard({ user, onClose, showToast }) {
   const mb = (n) => t('setup.scan.megabytes', { size: Number((n / 1024 / 1024).toFixed(1)) });
 
   const load = async (signal) => {
-    try {
-      const [e, c] = await Promise.all([
-        fetch('/api/admin/models', { signal }).then(r => {
+    await Promise.all([
+      (async () => {
+        try {
+          const r = await fetch('/api/admin/models', { signal });
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json();
-        }),
-        fetch('/api/admin/catalogs', { signal }).then(r => {
+          const data = await r.json();
+          if (signal?.aborted) return;
+          setEngine(data);
+          setModelsStatus('ready');
+        } catch {
+          if (!signal?.aborted) setModelsStatus('error');
+        }
+      })(),
+      (async () => {
+        try {
+          const r = await fetch('/api/admin/catalogs', { signal });
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json();
-        }),
-      ]);
-      if (signal.aborted) return;
-      setEngine(e);
-      setCatalogs(c?.catalogs || []);
-    } catch { /* retain progress and retry on a transient blip */ }
+          const data = await r.json();
+          if (signal?.aborted) return;
+          setCatalogs(data?.catalogs || []);
+          setCatalogsStatus('ready');
+        } catch {
+          if (!signal?.aborted) setCatalogsStatus('error');
+        }
+      })(),
+    ]);
   };
 
-  const loadLocations = (signal) => fetch('/api/locations', { signal })
-    .then(r => r.ok ? r.json() : [])
-    .then(rows => { if (!signal?.aborted) setLocations(Array.isArray(rows) ? rows : []); })
-    .catch(() => { /* the storage step degrades to its create form */ });
+  const retryScanning = () => {
+    setModelsStatus('loading');
+    setCatalogsStatus('loading');
+    load();
+  };
+
+  const loadLocations = async (signal) => {
+    setLocationsStatus('loading');
+    try {
+      const r = await fetch('/api/locations', { signal });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const rows = await r.json();
+      if (signal?.aborted) return;
+      setLocations(Array.isArray(rows) ? rows : []);
+      setLocationsStatus('ready');
+    } catch {
+      if (!signal?.aborted) setLocationsStatus('error');
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -112,7 +165,7 @@ export default function SetupWizard({ user, onClose, showToast }) {
   }, [engine?.progress]);
 
   const dl = engine?.progress;
-  const modelsReady = !!engine && (engine.models || []).every(m => m.present);
+  const modelsReady = !!engine?.models?.length && engine.models.every(m => m.present);
   const localCatalogs = catalogs.filter(c => c.built);
 
   const post = async (url, body) => {
@@ -125,26 +178,29 @@ export default function SetupWizard({ user, onClose, showToast }) {
   };
 
   const download = async (what) => {
+    setActionError('');
     try {
       const j = await post('/api/admin/models/download', { what });
       setEngine(prev => ({ ...(prev || {}), progress: j.progress }));
-    } catch (e) { showToast?.(e.message, 'error'); }
+    } catch (e) { setActionError(e.message); }
   };
 
 
   const addLocation = async () => {
     const name = newName.trim();
     if (!name) return;
+    setActionError('');
     try {
       await post('/api/locations', { name, type: newType });
       setNewName('');
       await loadLocations();
-    } catch (e) { showToast?.(e.message, 'error'); }
+    } catch (e) { setActionError(e.message); }
   };
 
   const renameLocation = async (id) => {
     const name = editName.trim();
     if (!name) return;
+    setActionError('');
     try {
       const r = await fetch(`/api/locations/${id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
@@ -153,7 +209,7 @@ export default function SetupWizard({ user, onClose, showToast }) {
       if (!r.ok) throw new Error(j.error || t('setup.storage.errRename'));
       setEditingId(null);
       await loadLocations();
-    } catch (e) { showToast?.(e.message, 'error'); }
+    } catch (e) { setActionError(e.message); }
   };
 
   const deleteLocation = async (loc) => {
@@ -163,16 +219,27 @@ export default function SetupWizard({ user, onClose, showToast }) {
       ? t('setup.storage.confirmDeleteCards', { name: loc.name, count: loc.total_cards })
       : t('setup.storage.confirmDelete', { name: loc.name });
     if (!window.confirm(warn)) return;
+    setActionError('');
     try {
       const r = await fetch(`/api/locations/${loc.id}`, { method: 'DELETE' });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || t('setup.storage.errDelete'));
       await loadLocations();
-    } catch (e) { showToast?.(e.message, 'error'); }
+    } catch (e) { setActionError(e.message); }
   };
 
   const finish = async () => {
-    try { await markComplete(); } catch { /* worst case, the wizard offers itself again */ }
-    onClose();
+    if (finishing) return;
+    setFinishing(true);
+    setFinishError(false);
+    try {
+      const response = await markComplete();
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      onClose();
+    } catch {
+      setFinishError(true);
+    } finally {
+      setFinishing(false);
+    }
   };
 
   // A type stored by an older install may have no locale key; it keeps its stored
@@ -195,14 +262,6 @@ export default function SetupWizard({ user, onClose, showToast }) {
     border: '1px solid var(--border-glass)', background: 'var(--surface-1)',
   };
 
-  const Heading = ({ icon, title, sub }) => (
-    <div>
-      <h3 id="setup-step-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '1.05rem' }}>
-        {icon} {title}
-      </h3>
-      {sub && <p style={{ ...body, marginTop: '0.4rem' }}>{sub}</p>}
-    </div>
-  );
 
   const Tip = ({ icon, title, children }) => (
     <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
@@ -288,6 +347,15 @@ export default function SetupWizard({ user, onClose, showToast }) {
         sub={t('setup.scan.sub')}
       />
 
+      {(modelsStatus === 'loading' || catalogsStatus === 'loading') && <p role="status" style={body}>{t('common.loading')}</p>}
+      {(modelsStatus === 'error' || catalogsStatus === 'error') && (
+        <div>
+          <p role="alert" style={{ ...body, color: 'var(--accent-red)' }}>{t('setup.scan.loadError')}</p>
+          <button className="btn btn-secondary btn-sm" onClick={retryScanning}>{t('common.retry')}</button>
+        </div>
+      )}
+      {modelsStatus === 'ready' && !engine?.models?.length && <p style={body}>{t('setup.scan.noModels')}</p>}
+      {modelsStatus === 'ready' && !!engine?.models?.length && <>
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
           <div style={label}>
@@ -310,14 +378,17 @@ export default function SetupWizard({ user, onClose, showToast }) {
         <Progress what="models" />
         <Failure what="models" />
       </div>
+      </>}
 
       <div>
         <div style={label}>{t('setup.scan.catalog')}</div>
         <p style={{ ...body, fontSize: '0.75rem', margin: '0.25rem 0 0.5rem' }}>
           {t('setup.scan.catalogBody')}
         </p>
+        {modelsStatus === 'ready' && !(engine?.catalogs || []).some(c => c.game === 'mtg') && <p style={body}>{t('setup.scan.noCatalogDownloads')}</p>}
+        {catalogsStatus === 'ready' && catalogs.length === 0 && <p style={body}>{t('setup.scan.noCatalogs')}</p>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          {(engine?.catalogs || []).filter(c => c.game === 'mtg').map(c => (
+          {(modelsStatus === 'ready' ? engine?.catalogs || [] : []).filter(c => c.game === 'mtg').map(c => (
             <div key={c.name}>
               <div style={row}>
                 <span style={{ fontSize: '0.76rem', color: 'var(--text-strong)' }}>
@@ -341,7 +412,7 @@ export default function SetupWizard({ user, onClose, showToast }) {
             </div>
           ))}
         </div>
-        {!modelsReady && (
+        {modelsStatus === 'ready' && !modelsReady && (
           <p style={{ fontSize: '0.72rem', color: 'var(--accent-yellow)', margin: '0.4rem 0 0' }}>
             {t('setup.scan.needModels')}
           </p>
@@ -363,7 +434,14 @@ export default function SetupWizard({ user, onClose, showToast }) {
         sub={t('setup.storage.sub')}
       />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-        {locations.length === 0 && <p style={{ ...body, fontSize: '0.76rem' }}>{t('setup.storage.none')}</p>}
+        {locationsStatus === 'loading' && <p role="status" style={body}>{t('common.loading')}</p>}
+        {locationsStatus === 'error' && (
+          <div>
+            <p role="alert" style={{ ...body, color: 'var(--accent-red)' }}>{t('setup.storage.loadError')}</p>
+            <button className="btn btn-secondary btn-sm" onClick={() => loadLocations()}>{t('common.retry')}</button>
+          </div>
+        )}
+        {locationsStatus === 'ready' && locations.length === 0 && <p style={{ ...body, fontSize: '0.76rem' }}>{t('setup.storage.none')}</p>}
         {locations.map(l => (
           <div key={l.id} style={row}>
             {editingId === l.id ? (
@@ -468,14 +546,14 @@ export default function SetupWizard({ user, onClose, showToast }) {
   const last = step === STEPS.length - 1;
 
   return (
-    <Modal onClose={onClose} aria-labelledby="setup-step-title" style={{
+    <Modal onClose={() => { if (!finishing) onClose(); }} aria-labelledby="setup-step-title" style={{
       position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: '1rem', background: 'rgba(0,0,0,0.72)',
       backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
     }}>
-      <div style={{
+      <div className="dialog-panel-spacing" style={{
         width: '100%', maxWidth: 580, maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-        padding: '1.25rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)',
+        background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)',
         borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-glow)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
@@ -487,30 +565,38 @@ export default function SetupWizard({ user, onClose, showToast }) {
                 transition: 'width 0.15s',
               }} />
             ))}
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
+            <span aria-live="polite" aria-atomic="true" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
               {t(`setup.step.${STEPS[step]}`)} · {t('setup.stepCount', { step: step + 1, total: STEPS.length })}
             </span>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('common.close')}
+          <button type="button" onClick={onClose} disabled={finishing} aria-label={t('common.close')}
             className="btn btn-icon-only" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
             <X size={18} />
           </button>
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', paddingRight: '0.25rem' }}>
+        <div ref={contentRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', paddingRight: '0.25rem' }}>
           {content}
+          {actionError && <p role="alert" style={{ ...body, color: 'var(--accent-red)' }}>{actionError}</p>}
         </div>
 
+        {finishError && (
+          <div>
+            <p role="alert" style={{ ...body, color: 'var(--accent-red)' }}>{t('setup.finishError')}</p>
+            <button className="btn btn-secondary btn-sm" disabled={finishing} onClick={finish}>{t('common.retry')}</button>
+          </div>
+        )}
+        {finishing && <p role="status" style={body}>{t('common.loading')}</p>}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderTop: '1px solid var(--border-glass)', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
-          <button className="btn btn-secondary btn-sm" onClick={finish}>{t('setup.skip')}</button>
+          <button className="btn btn-secondary btn-sm" disabled={finishing} onClick={finish}>{t('setup.skip')}</button>
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             {step > 0 && (
-              <button className="btn btn-secondary btn-sm" onClick={() => setStep(s => s - 1)}
+              <button className="btn btn-secondary btn-sm" disabled={finishing} onClick={() => setStep(s => s - 1)}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <ArrowLeft size={13} /> {t('common.back')}
               </button>
             )}
-            <button className="btn btn-primary btn-sm" onClick={() => last ? finish() : setStep(s => s + 1)}
+            <button className="btn btn-primary btn-sm" disabled={finishing} onClick={() => last ? finish() : setStep(s => s + 1)}
               style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
               {last ? t('setup.done') : t('common.next')} <ArrowRight size={13} />
             </button>
@@ -529,12 +615,8 @@ export default function SetupWizard({ user, onClose, showToast }) {
 // .jsx makes for its non-component exports.
 // eslint-disable-next-line react-refresh/only-export-components
 export async function setupNeeded() {
-  try {
-    const r = await fetch('/api/settings');
-    if (!r.ok) return false;   // not logged in, or the API is unhappy: say nothing
-    const s = await r.json();
-    return !s.setup_complete;
-  } catch {
-    return false;
-  }
+  const r = await fetch('/api/settings');
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const s = await r.json();
+  return !s.setup_complete;
 }

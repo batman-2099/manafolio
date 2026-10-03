@@ -9,7 +9,6 @@ export default function Modal({ onClose, returnFocus, children, className = '', 
     const trigger = triggerRef.current || document.activeElement;
     triggerRef.current = trigger;
     dialog.showModal();
-    dialog.focus();
     return () => {
       dialog.close();
       if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();

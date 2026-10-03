@@ -23,8 +23,13 @@ Manafolio was originally forked from [Bindarr](https://github.com/thenotoriousJe
 - **Four inventory destinations.** Track Physical and Arena copies separately, plan purchases in Wishlist, and archive cards in Graveyard without deleting their quantities or metadata. Wishlist and Graveyard do not inflate owned totals; archived cards supply only Graveyard deck definitions, never Physical or Arena decks.
 - **Collection detail.** Search Scryfall, track printing, finish, language, condition, purchase price and graded slabs, and mark copies Missing/Found without losing their last known locations. Filter, sort, stack duplicates, and switch between grid and table views.
 - **Dashboard.** Compare All Cards, Physical, and Arena quantities, value, recorded costs, collection growth, color identity, mana value, and saved deck performance. Graveyard has its own archived-card view. Accessible chart-data tables expose the underlying numbers.
-- **Physical storage.** Organize binders and boxes by page, row, and slot. Find unassigned cards in Unassigned Pile; move or auto-move copies, expand capacity, lock compartments, and choose card-art covers for containers. Graveyard containers keep archived storage separate.
+- **Physical storage.** Organize binders and boxes by page, row, and slot, and group containers into shelves, bags, and other storage units with card-art or private uploaded images. Find unassigned cards in Unassigned Pile; move or auto-move copies, expand capacity, lock compartments, and print QR container labels. Graveyard containers keep archived storage separate.
 - **Deck building and play.** Create Physical or Arena decks, import lists and precons, select a commander, inspect mana curves and rules, simulate draws, and track wins/losses. Physical checkout reserves copies and creates a storage-aware pull list; Pulled status helps gather cards. Related tokens show ownership and physical locations.
+- **Shopping List.** Combine purchase shortfalls from saved Physical decks using exact printings or matching canonical card names. Preview estimated costs, export a buylist, and confirm the exact number of new Wishlist copies without duplicating existing plans.
+- **Set completion.** Filter sets by name or code and track one of each card, every printing, or foil printings against Physical or Arena inventory separately.
+- **Take Stock.** Compare container contents against recorded copies, review missing and found quantities with card thumbnails, and apply decisions together. Partial missing counts preserve total copies; reserved entries remain unchanged.
+- **Trade workbench.** Review both sides of a Physical inventory exchange before confirmation. Select exact available entries, validate quantities, and explicitly reselect changed entries after refresh; cached estimates remain separate by currency.
+- **Deck history.** Compare saved composition revisions and restore a previous list without replacing current notes, appearance, or results. Current inventory and checkout rules still apply.
 - **Import, export, and backup.** Review CSV and ManaBox imports, export the current collection view or decklists, and move an account with a complete JSON backup. Automatic SQLite snapshots support server-level recovery.
 - **Optional AI.** Use your own ChatGPT/Codex account, Gemini or OpenRouter API key, or an Ollama service for inventory-aware suggestions and deck improvements. Review and edit drafts before saving; the collection and deck workflows do not require AI.
 - **Your own server.** Multi-user accounts, roles, invite-only registration by default, read-only API keys, optional public shares, account themes, and translated interfaces. Access the same server from desktop and phone browsers.
@@ -41,8 +46,15 @@ Manafolio was originally forked from [Bindarr](https://github.com/thenotoriousJe
 | Prepare a deck for play | Deck Builder: save, check out, and follow the pull list |
 | Keep records without counting cards as owned | Graveyard inventory and archived containers |
 | Move or recover account data | Settings: complete JSON backup; protect server-volume backups separately |
+| Plan purchases for several decks | Deck Builder → Shopping List |
+| Find gaps in a set | Collection → Set completion |
+| Reconcile a box or binder | Open its container → More → Take Stock |
+| Exchange Physical copies | Trade workbench; review both sides before confirming |
+| Compare an earlier deck list | Open the saved deck → Deck history |
 
 The application uses React, Express, and SQLite. It runs as one Docker service or from source; there is no required hosted Manafolio account or AI subscription.
+
+The [how-to guide](docs/USER_GUIDE.md) covers these workflows in the app and on GitHub. Keyboard users can skip directly to page content. Affected forms retain drafts after failed requests and show local errors or Retry controls; pending saves protect against repeated submissions.
 
 ## Screenshots
 

@@ -32,6 +32,25 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   const { t } = useT();
   const [mode, setMode] = useState(startInEdit ? 'edit' : 'view');
   const [locations, setLocations] = useState([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
+  const [locationsError, setLocationsError] = useState(false);
+  const [locationsVersion, setLocationsVersion] = useState(0);
+  const [mutationError, setMutationError] = useState('');
+  const [status, setStatus] = useState('');
+  const [writing, setWriting] = useState(false);
+  const writingRef = useRef(false);
+  const beginWrite = () => {
+    if (writingRef.current || printingPending.current) return false;
+    writingRef.current = true;
+    setWriting(true);
+    setMutationError('');
+    setStatus('');
+    return true;
+  };
+  const endWrite = () => {
+    writingRef.current = false;
+    setWriting(false);
+  };
   const [q, setQ] = useState(card.quantity ?? 1);
   const [condition, setCondition] = useState(card.condition || 'Near Mint');
   const [printing, setPrinting] = useState(card.printing || 'Normal');
@@ -85,15 +104,19 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   useEffect(() => {
     if (!targetEntryId) return;
     let cancelled = false;
-    setLocations([]);
+    setLocationsLoading(true);
+    setLocationsError(false);
     fetch(`/api/locations?inventory_type=${listType === 'graveyard' ? 'graveyard' : 'collection'}`)
-      .then(r => r.ok ? r.json() : [])
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(data => { if (!cancelled) setLocations(data); })
-      .catch(() => {});
+      .catch(() => { if (!cancelled) setLocationsError(true); })
+      .finally(() => { if (!cancelled) setLocationsLoading(false); });
     return () => { cancelled = true; };
-  }, [targetEntryId, listType]);
+  }, [targetEntryId, listType, locationsVersion]);
 
   const handleLanguageChange = async (newLang) => {
+    if (writingRef.current) return;
+    setMutationError('');
     setLanguage(newLang);
     if (!activeCard) return;
     const request = ++printingRequest.current;
@@ -111,9 +134,15 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
           return;
         }
       }
-      if (isCurrent()) setLanguage(activeCard.language || 'English');
+      if (isCurrent()) {
+        setLanguage(activeCard.language || 'English');
+        setMutationError(t('inspector.errLanguageRollback'));
+      }
     } catch (e) {
-      if (isCurrent()) setLanguage(activeCard.language || 'English');
+      if (isCurrent()) {
+        setLanguage(activeCard.language || 'English');
+        setMutationError(t('inspector.errLanguageRollback'));
+      }
       console.warn('Could not switch to localized printing:', e);
     } finally {
       if (isCurrent()) {
@@ -124,6 +153,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   };
 
   const handleClose = () => {
+    if (writingRef.current) return false;
     printingRequest.current++;
     setLocalizedCard(null);
     if (hasToggledRef.current && onUpdate) {
@@ -132,13 +162,35 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
     onClose && onClose();
   };
 
+  const resetDraft = () => {
+    if (writingRef.current) return;
+    printingRequest.current++;
+    printingPending.current = false;
+    setLocalizing(false);
+    setLocalizedCard(null);
+    setQ(card.quantity ?? 1);
+    setCondition(card.condition || 'Near Mint');
+    setPrinting(card.printing || 'Normal');
+    setLanguage(card.language || 'English');
+    setPurchasePrice(card.purchase_price || 0);
+    setLocationId(card.location_id || '');
+    setIsTrade(card.is_trade ? 1 : 0);
+    setFavorite(card.favorite ? 1 : 0);
+    setListType(card.list_type || 'collection');
+    setMissing(!!card.missing);
+    setNotes(card.notes || '');
+    setMarketValue(card.market_value == null ? '' : String(card.market_value));
+    setMutationError('');
+    setStatus('');
+    setMode('view');
+  };
   useBackGuard(!!card, handleClose);
 
   if (!card || !activeCard) return null;
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!targetEntryId || printingPending.current) return;
+    if (!targetEntryId || !beginWrite()) return;
     const qNum = Math.max(1, parseInt(q, 10) || 1);
     try {
       const res = await fetch(`/api/collection/${targetEntryId}`, {
@@ -182,16 +234,19 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
         // card already holding it, which a generic failure toast would throw away
         // and leave the user re-typing a number that was never the problem.
         const body = await res.json().catch(() => null);
-        showToast && showToast(body?.error || t('inspector.errUpdate'), 'error');
+        setMutationError(body?.error || t('inspector.errUpdate'));
       }
     } catch (err) {
       console.error(err);
-      showToast && showToast(t('inspector.errEdit'), 'error');
+      setMutationError(t('inspector.errEdit'));
+    } finally {
+      endWrite();
     }
   };
 
 
   const handleDuplicate = async () => {
+    if (!beginWrite()) return;
     try {
       const response = await fetch('/api/collection', {
         method: 'POST',
@@ -212,32 +267,21 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
       const body = await response.json().catch(() => null);
       if (!response.ok) throw new Error(body?.error || t('inspector.errDuplicate'));
       showToast?.(t('inspector.duplicated'), 'success');
+      setStatus(t('inspector.duplicated'));
       onUpdate?.();
     } catch (error) {
       console.error(error);
-      showToast?.(error.message || t('inspector.errDuplicate'), 'error');
+      setMutationError(error.message || t('inspector.errDuplicate'));
+    } finally {
+      endWrite();
     }
   };
 
   const handleQuickToggle = async (field, value) => {
-    if (!targetEntryId) return;
-    const nextFavorite = field === 'favorite' ? (value ? 1 : 0) : (favorite ? 1 : 0);
-    const nextIsTrade = field === 'is_trade' ? (value ? 1 : 0) : (isTrade ? 1 : 0);
-    const nextListType = field === 'list_type' ? value : listType;
-
-    // Optimistic UI & prop object updates
-    if (field === 'is_trade') { setIsTrade(nextIsTrade); card.is_trade = nextIsTrade; }
-    if (field === 'favorite') { setFavorite(nextFavorite); card.favorite = nextFavorite; }
-    if (field === 'list_type') { setListType(nextListType); card.list_type = nextListType; }
-
-    // Only the toggled flags. Quantity and placement are deliberately absent:
-    // a favourite/trade toggle must never change how many copies you own or
-    // where they live, and sending quantity here reconciles the whole stack.
-    const payload = field === 'list_type' ? { list_type: nextListType } : {
-      list_type: nextListType,
-      is_trade: nextIsTrade,
-      favorite: nextFavorite
-    };
+    if (!targetEntryId || mode !== 'view' || !beginWrite()) return;
+    const previousListType = card.list_type;
+    // Persist only this action, never unrelated fields from an abandoned draft.
+    const payload = { [field]: field === 'list_type' ? value : (value ? 1 : 0) };
 
     try {
       const res = await fetch(`/api/collection/${targetEntryId}`, {
@@ -246,31 +290,31 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
         body: JSON.stringify(payload)
       });
       if (res.ok) {
+        Object.assign(card, payload);
+        if (field === 'favorite') setFavorite(payload.favorite);
+        if (field === 'is_trade') setIsTrade(payload.is_trade);
+        if (field === 'list_type') setListType(payload.list_type);
+        setStatus(t('inspector.cardUpdated'));
         hasToggledRef.current = true;
         showToast && showToast(t('inspector.cardUpdated'), 'success');
-        if (field === 'list_type' && (nextListType === 'graveyard' || listType === 'graveyard')) {
+        if (field === 'list_type' && (value === 'graveyard' || previousListType === 'graveyard')) {
           onUpdate?.();
           onClose?.();
         }
       } else {
-        // revert on fail
-        if (field === 'is_trade') { setIsTrade(isTrade); card.is_trade = isTrade; }
-        if (field === 'favorite') { setFavorite(favorite); card.favorite = favorite; }
-        if (field === 'list_type') { setListType(listType); card.list_type = listType; }
         const data = await res.json().catch(() => null);
-        showToast && showToast(data?.error || t('inspector.errUpdate'), 'error');
+        setMutationError(data?.error || t('inspector.errUpdate'));
       }
     } catch (err) {
       console.error(err);
-      if (field === 'is_trade') { setIsTrade(isTrade); card.is_trade = isTrade; }
-      if (field === 'favorite') { setFavorite(favorite); card.favorite = favorite; }
-      if (field === 'list_type') { setListType(listType); card.list_type = listType; }
-      showToast && showToast(t('inspector.errUpdateGeneric'), 'error');
+      setMutationError(t('inspector.errUpdateGeneric'));
+    } finally {
+      endWrite();
     }
   };
 
   const handleAddToDeck = async (deckId) => {
-    if (!targetEntryId || !deckId) return;
+    if (!targetEntryId || !deckId || !beginWrite()) return;
     try {
       const res = await fetch('/api/collection/bulk', {
         method: 'POST',
@@ -278,15 +322,19 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
         body: JSON.stringify({ entry_ids: [targetEntryId], action: 'add_to_deck', value: deckId })
       });
       const data = await res.json().catch(() => ({}));
-      showToast && showToast(res.ok ? (data.message || t('inspector.addedToDeck')) : (data.error || t('inspector.errAddDeck')), res.ok ? 'success' : 'error');
+      if (!res.ok) throw new Error(data.error || t('inspector.errAddDeck'));
+      setStatus(data.message || t('inspector.addedToDeck'));
+      showToast?.(data.message || t('inspector.addedToDeck'), 'success');
     } catch (err) {
       console.error(err);
-      showToast && showToast(t('inspector.errAddDeckGeneric'), 'error');
+      setMutationError(err.message || t('inspector.errAddDeckGeneric'));
+    } finally {
+      endWrite();
     }
   };
 
   const handleCreateCommanderDeck = async () => {
-    if (creatingCommanderDeckRef.current) return;
+    if (creatingCommanderDeckRef.current || !beginWrite()) return;
     creatingCommanderDeckRef.current = true;
     setCreatingCommanderDeck(true);
     try {
@@ -304,23 +352,26 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
-        showToast?.(`${t('deck.errCreate')}${data?.error ? ` ${data.error}` : ''}`, 'error');
+        setMutationError(`${t('deck.errCreate')}${data?.error ? ` ${data.error}` : ''}`);
         return;
       }
       setDeckListVersion(version => version + 1);
+      setStatus(t('deck.created'));
       showToast?.(t('deck.created'), 'success');
     } catch (error) {
       console.error(error);
-      showToast?.(t('deck.errCreateGeneric'), 'error');
+      setMutationError(t('deck.errCreateGeneric'));
     } finally {
+      endWrite();
       creatingCommanderDeckRef.current = false;
       setCreatingCommanderDeck(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!targetEntryId) return;
+    if (!targetEntryId || writingRef.current || printingPending.current) return;
     if (!window.confirm(t('collection.confirmDeleteCard', { name: card.name }))) return;
+    if (!beginWrite()) return;
     try {
       const res = await fetch(`/api/collection/${targetEntryId}`, { method: 'DELETE' });
       if (res.ok) {
@@ -329,11 +380,13 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
         onUpdate && onUpdate();
         onClose();
       } else {
-        showToast && showToast(t('collection.errDelete'), 'error');
+        setMutationError(t('collection.errDelete'));
       }
     } catch (err) {
       console.error(err);
-      showToast && showToast(t('common.errBackend'), 'error');
+      setMutationError(t('common.errBackend'));
+    } finally {
+      endWrite();
     }
   };
 
@@ -360,7 +413,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
       justifyContent: 'center',
       zIndex: 999
     }} onClick={(event) => { if (event.target === event.currentTarget) handleClose(); }}>
-      <div className={`glass-panel card-inspector ${mode === 'edit' ? 'mode-edit' : ''}`} onClick={(e) => e.stopPropagation()}>
+      <fieldset disabled={writing} aria-busy={writing} className={`glass-panel card-inspector ${mode === 'edit' ? 'mode-edit' : ''}`} style={{ minWidth: 0, margin: 0 }} onClickCapture={(event) => { if (writingRef.current) { event.preventDefault(); event.stopPropagation(); } }} onKeyDownCapture={(event) => { if (writingRef.current && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); event.stopPropagation(); } }} onClick={(e) => e.stopPropagation()}>
         <button ref={closeRef} type="button" aria-label={t('common.close')} className="btn btn-secondary btn-icon-only" onClick={handleClose} style={{
           position: 'absolute',
           top: '1rem',
@@ -419,13 +472,25 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
           <CardArtEditor
             card={activeCard}
             hasProviderArt={!!activeCard.image_url}
-            showToast={showToast}
+            showToast={(message, type) => {
+              if (type === 'error') setMutationError(message);
+              else { setMutationError(''); setStatus(message); showToast?.(message, type); }
+            }}
             onChanged={onUpdate}
+            onBusyChange={(busy) => {
+              if (busy) return beginWrite();
+              endWrite();
+              return true;
+            }}
           />
         </div>
 
         {/* Right side: Information / Edit */}
         <div className="ci-info-col" style={{ flex: '1 1 320px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {writing && <p role="status">{t('inspector.saving')}</p>}
+          {!writing && localizing && <p role="status">{t('common.loading')}</p>}
+          {mutationError && <p role="alert" style={{ color: 'var(--accent-red)' }}>{mutationError}</p>}
+          {!writing && status && <p role="status">{status}</p>}
           <div>
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
               {activeCard.list_type === 'wishlist' && (
@@ -551,12 +616,20 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
 
               <div className="form-group">
                 <label htmlFor="inspector-location">{t('inspector.storageContainer')}</label>
-                <select id="inspector-location" className="select-control" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+                <select id="inspector-location" className="select-control" value={locationId} disabled={locationsLoading || locationsError} onChange={(e) => setLocationId(e.target.value)}>
                   <option value="">{t('bulk.unassignedPile')}</option>
+                  {locationId && !locations.some(loc => String(loc.id) === String(locationId)) && (
+                    <option value={locationId}>{card.location_name || t('inspector.currentStorage')}</option>
+                  )}
                   {locations.slice().sort((a, b) => a.name.localeCompare(b.name)).map((loc) => (
                     <option key={loc.id} value={loc.id}>{loc.storage_unit_name && `${loc.storage_unit_name} · `}{loc.name} ({loc.type})</option>
                   ))}
                 </select>
+                {locationsLoading && <p role="status">{t('common.loading')}</p>}
+                {locationsError && <div role="alert">
+                  <p>{t('inspector.errLocations')}</p>
+                  <button type="button" className="btn btn-secondary" onClick={() => setLocationsVersion(version => version + 1)}>{t('common.retry')}</button>
+                </div>}
               </div>
 
               <div className="form-group">
@@ -573,8 +646,8 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => { printingRequest.current++; printingPending.current = false; setLocalizing(false); setLocalizedCard(null); setLanguage(card.language || 'English'); setMode('view'); }} style={{ flex: 1 }}>{t('common.cancel')}</button>
-                <button type="submit" className="btn btn-primary" disabled={localizing} aria-busy={localizing} style={{ flex: 2 }}>{t('inspector.saveChanges')}</button>
+                <button type="button" className="btn btn-secondary" onClick={resetDraft} style={{ flex: 1 }}>{t('common.cancel')}</button>
+                <button type="submit" className="btn btn-primary" disabled={localizing || writing} aria-busy={localizing || writing} style={{ flex: 2 }}>{t('inspector.saveChanges')}</button>
               </div>
             </form>
           ) : (
@@ -594,7 +667,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                 )}
                 <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.printing}</span></div>
                 <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specLanguage')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.language}</span></div>
-                <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specSupertype')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.supertype}</span></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>{t(activeCard.game === 'mtg' || activeCard.supertype === 'MTG' ? 'inspector.specGame' : 'inspector.specSupertype')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.game === 'mtg' || activeCard.supertype === 'MTG' ? 'Magic: The Gathering' : activeCard.supertype}</span></div>
               </div>
 
               {/* Storage Container details (clickable to view in storage) */}
@@ -636,6 +709,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
               {activeCard.list_type === 'collection' && (
                 <AddToDeckSelect
                   key={deckListVersion}
+                  disabled={writing}
                   onAdd={handleAddToDeck}
                   placeholder={t('inspector.addToDeck')}
                   style={{ fontSize: '0.875rem', padding: '0.5rem', width: '100%' }}
@@ -816,7 +890,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
             </>
           )}
         </div>
-      </div>
+      </fieldset>
 
       {isFullScreen && (
         <CardImageZoom card={activeCard} onClose={() => setIsFullScreen(false)} />

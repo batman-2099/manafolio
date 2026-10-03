@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import Modal from './Modal';
+import CardImage from './CardImage';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
 import { downloadBlob } from '../utils/downloadBlob';
@@ -37,7 +38,7 @@ export default function AcquisitionPlanner({ decks, onClose }) {
     finally { busy.current = false; setPending(false); }
   };
   const money = (value, currency) => value === null ? t('planner.unknown') : `${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
-  const eligible = decks.filter(deck => ['collection', 'arena'].includes(deck.inventory_type));
+  const eligible = decks.filter(deck => deck.inventory_type === 'collection' && deck.purchase_needed?.[preference] > 0);
   return <Modal onClose={close} aria-labelledby="acquisition-title">
     <div className="glass-panel acquisition-planner" aria-busy={pending}>
       <h3 id="acquisition-title">{t('planner.title')}</h3>
@@ -49,10 +50,14 @@ export default function AcquisitionPlanner({ decks, onClose }) {
           <input type="checkbox" checked={selected.includes(deck.id)} onChange={event => {
             reset(); setSelected(event.target.checked ? [...selected, deck.id] : selected.filter(id => id !== deck.id));
           }} />
-          <span>{deck.name} — {t(deck.inventory_type === 'arena' ? 'deck.arena' : 'deck.physical')}</span>
+          <span>{deck.name} — {t('deck.physical')}</span>
         </label>)}</div>
         <label htmlFor="acquisition-preference">{t('planner.preference')}</label>
-        <select id="acquisition-preference" className="input-control" value={preference} onChange={event => { reset(); setPreference(event.target.value); }}>
+        <select id="acquisition-preference" className="input-control" value={preference} onChange={event => {
+          const next = event.target.value;
+          reset(); setPreference(next);
+          setSelected(selected.filter(id => decks.some(deck => deck.id === id && deck.inventory_type === 'collection' && deck.purchase_needed?.[next] > 0)));
+        }}>
           <option value="exact">{t('planner.exact')}</option><option value="any">{t('planner.any')}</option>
         </select>
         <button type="button" className="btn btn-secondary" disabled={!selected.length} onClick={() => request()}>{t('planner.preview')}</button>
@@ -60,18 +65,19 @@ export default function AcquisitionPlanner({ decks, onClose }) {
       {error && <p role="alert" className="deck-source-error">{error}</p>}
       <div role="status">{pending ? t('common.loading') : added !== null ? t('planner.added', { count: added }) : ''}</div>
       {plan && <section aria-label={t('planner.preview')}>
-        <p>{t(plan.inventory === 'arena' ? 'planner.arena' : 'planner.prices')}</p>
+        {plan.inventory === 'arena' && <p>{t('planner.arena')}</p>}
         {!plan.items.length && <p>{t('planner.emptyCards')}</p>}
-        <ul className="acquisition-items">{plan.items.map(item => <li key={item.card_id}>
-          <strong>{item.name}</strong>
-          <div>{item.set_id?.toUpperCase()} {item.number} · {item.language}</div>
-          <dl>{['required', 'owned', 'needed', 'wishlist', 'to_add'].map(key => <div key={key}><dt>{t(`planner.${key}`)}</dt><dd>{item[key]}</dd></div>)}</dl>
+        <ul className="acquisition-items">{plan.items.filter(item => item.needed > 0).map(item => <li key={item.card_id}>
+          <div className="acquisition-card">
+            <CardImage card={item} game="mtg" loading="lazy" />
+            <div><strong>{item.name}</strong><div>{item.set_id?.toUpperCase()} {item.number} · {item.language}</div></div>
+          </div>
+          <dl><div><dt>{t('planner.required')}</dt><dd>{item.required}</dd></div></dl>
           <div>{t('planner.estimate')}: {money(item.estimated_cost, item.currency)}</div>
         </li>)}</ul>
-        <p><strong>{t('planner.estimate')}: </strong>{Object.entries(plan.totals).map(([currency, value]) => money(value, currency)).join(' + ') || '—'}{plan.unknown > 0 && ` · ${t('planner.unpriced', { count: plan.unknown })}`}</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
         {plan.inventory === 'collection' && plan.items.some(item => item.to_add > 0) && (confirm ? <div className="acquisition-confirm">
-          <p>{t('planner.confirm')}</p>
+          <p>{t('planner.confirm', { count: plan.items.reduce((total, item) => total + item.to_add, 0) })}</p>
           <button type="button" className="btn btn-secondary" disabled={pending} onClick={() => setConfirm(false)}>{t('common.cancel')}</button>
           <button type="button" className="btn btn-primary" disabled={pending} onClick={() => request(true)}>{t('planner.add')}</button>
         </div> : <button type="button" className="btn btn-primary" disabled={pending} onClick={() => setConfirm(true)}>{t('planner.add')}</button>)}

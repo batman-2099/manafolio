@@ -868,7 +868,7 @@
   display: grid;
   gap: 0.25rem;
   padding-block: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-glass);
 }
 
 .deck-history-changes .deck-history-card-change {
@@ -883,7 +883,7 @@
 }
 
 .deck-history-card-change--added { --history-change-color: var(--accent-green); }
-.deck-history-card-change--removed { --history-change-color: var(--accent-red); }
+.deck-history-card-change--removed { --history-change-color: var(--text-negative); }
 .deck-history-card-change--changed { --history-change-color: var(--accent-yellow); }
 
 .deck-history-card-change img {

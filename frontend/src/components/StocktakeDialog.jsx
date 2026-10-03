@@ -4,6 +4,7 @@ import CardImage from './CardImage';
 import { useT } from '../utils/i18n';
 import { displayName } from '../utils/languages';
 import { getSlotNumber } from '../utils/getSlotNumber';
+import { useBackGuard } from '../utils/useBackGuard';
 
 export default function StocktakeDialog({ location, onClose, onApplied }) {
   const { t } = useT();
@@ -31,6 +32,12 @@ export default function StocktakeDialog({ location, onClose, onApplied }) {
     entry_id: Number(id), status,
     ...(status === 'missing' ? { missing_quantity: Number(missingQuantities[id]) } : {}),
   }));
+  const close = () => {
+    if (busy) return false;
+    if (selected.length && !window.confirm(t('stocktake.confirmDiscard'))) return false;
+    onClose();
+  };
+  useBackGuard(true, close);
   const validate = () => {
     const invalid = snapshot.entries.some(entry => decisions[entry.entry_id] === 'missing' && (
       !Number.isInteger(Number(missingQuantities[entry.entry_id]))
@@ -57,8 +64,8 @@ export default function StocktakeDialog({ location, onClose, onApplied }) {
       setBusy(false);
     }
   };
-  return <Modal onClose={() => { if (!busy) onClose(); }} aria-labelledby="stocktake-title">
-    <form onSubmit={event => { event.preventDefault(); if (review) apply(); else if (validate()) setReview(true); }} className="glass-panel" style={{ width: '700px', maxWidth: '100%', maxHeight: '90dvh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '1.25rem', background: 'var(--bg-secondary)', overflowWrap: 'anywhere' }}>
+  return <Modal onClose={close} aria-labelledby="stocktake-title">
+    <form onSubmit={event => { event.preventDefault(); if (review) apply(); else if (validate()) setReview(true); }} className="glass-panel dialog-panel-spacing" style={{ width: '700px', maxWidth: '100%', maxHeight: '90dvh', overflowY: 'auto', overscrollBehavior: 'contain', background: 'var(--bg-secondary)', overflowWrap: 'anywhere' }}>
       <h2 id="stocktake-title" ref={heading} tabIndex={-1}>{t(review ? 'stocktake.review' : 'stocktake.title')} — {location.name}</h2>
       <p>{t('stocktake.hint')}</p>
       {error && <p role="alert">{t(error)}</p>}
@@ -103,7 +110,7 @@ export default function StocktakeDialog({ location, onClose, onApplied }) {
         </ul>
       </>}
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-        <button type="button" className="btn btn-secondary" disabled={busy} onClick={onClose}>{t('common.cancel')}</button>
+        <button type="button" className="btn btn-secondary" disabled={busy} onClick={close}>{t('common.cancel')}</button>
         {review && <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setReview(false)}>{t('common.back')}</button>}
         {snapshot && <button type="submit" className="btn btn-primary" disabled={busy || !selected.length}>{t(busy ? 'stocktake.applying' : review ? 'stocktake.apply' : 'stocktake.review')}</button>}
       </div>

@@ -9,6 +9,9 @@
 .acquisition-decks input { width: 24px; height: 24px; flex-shrink: 0; }
 .acquisition-items { list-style: none; padding: 0; margin: 1rem 0; }
 .acquisition-items li { padding: 1rem 0; border-bottom: 1px solid var(--border-glass); }
+.acquisition-card { display: flex; align-items: center; gap: .75rem; }
+.acquisition-card img { width: 72px; aspect-ratio: 5 / 7; object-fit: contain; border-radius: 4px; flex-shrink: 0; }
+.acquisition-card > div { min-width: 0; }
 .acquisition-items dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: .75rem; margin: .75rem 0; }
 .acquisition-items dt { color: var(--text-secondary); }
 .acquisition-items dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }

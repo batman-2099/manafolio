@@ -67,7 +67,7 @@ function ImportLog({ entries }) {
         style={{ maxHeight: 'min(200px, 30dvh)', overflowY: 'auto', overflowWrap: 'anywhere', padding: '0.6rem', marginTop: '0.4rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', fontSize: '0.78rem' }}
       >
         {entries.map(entry => (
-          <div key={entry.id} style={{ padding: '0.2rem 0', color: entry.stage === 'failed' ? 'var(--accent-red)' : 'var(--text-secondary)' }}>
+          <div key={entry.id} role={entry.stage === 'failed' ? 'alert' : undefined} style={{ padding: '0.2rem 0', color: entry.stage === 'failed' ? 'var(--accent-red)' : 'var(--text-secondary)' }}>
             <time dateTime={new Date(entry.time).toISOString()} style={{ color: 'var(--text-muted)' }}>{timeFormat.format(entry.time)}</time>
             {' · '}{t(`importLog.${entry.stage}`, entry)}
             {entry.set ? ` · ${t('importLog.set', { set: entry.set })}` : ''}
@@ -165,6 +165,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   const [localizing, setLocalizing] = useState(false);
   const addPending = useRef(false);
   const [adding, setAdding] = useState(false);
+  const [quickAddError, setQuickAddError] = useState(null);
   useEffect(() => () => {
     drawerGeneration.current++;
     printingRequest.current++;
@@ -508,6 +509,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   const handleLanguageChange = async (newLang) => {
     if (!selectedCard || addPending.current) return;
     setLanguage(newLang);
+    setQuickAddError(null);
     const request = ++printingRequest.current;
     const generation = drawerGeneration.current;
     printingPending.current = true;
@@ -523,9 +525,15 @@ function CardSearch({ onAddSuccess, showToast }) {
           return;
         }
       }
-      if (isCurrent()) setLanguage(selectedCard.language || langName(searchLang));
+      if (isCurrent()) {
+        setLanguage(selectedCard.language || langName(searchLang));
+        setQuickAddError(t('search.errPrinting'));
+      }
     } catch (e) {
-      if (isCurrent()) setLanguage(selectedCard.language || langName(searchLang));
+      if (isCurrent()) {
+        setLanguage(selectedCard.language || langName(searchLang));
+        setQuickAddError(t('search.errPrinting'));
+      }
       console.warn('Could not switch to localized printing:', e);
     } finally {
       if (isCurrent()) {
@@ -543,6 +551,7 @@ function CardSearch({ onAddSuccess, showToast }) {
     setLocalizing(false);
     addPending.current = false;
     setAdding(false);
+    setQuickAddError(null);
     setSelectedCard(card);
     setPurchasePrice(0); // Default to 0 purchase spend
     // The card itself knows which printing it is, so the copy is recorded in that
@@ -582,6 +591,7 @@ function CardSearch({ onAddSuccess, showToast }) {
     if (!selectedCard || addPending.current || printingPending.current) return;
     addPending.current = true;
     setAdding(true);
+    setQuickAddError(null);
     const generation = drawerGeneration.current;
     const action = e.nativeEvent.submitter?.value || 'collection';
     const listType = addToArena && action === 'collection' ? 'arena' : action;
@@ -610,7 +620,7 @@ function CardSearch({ onAddSuccess, showToast }) {
       }
 
       if (response.ok) {
-        showToast(t('search.addedToCollection', { name: displayName(selectedCard) }), 'success');
+        showToast(t(listType === 'wishlist' ? 'search.addedToWishlist' : listType === 'arena' ? 'search.addedToArena' : 'search.addedToCollection', { name: displayName(selectedCard) }), 'success');
         
         // Trigger confetti for rare/valuable cards!
         const rarity = (selectedCard.rarity || '').toLowerCase();
@@ -630,11 +640,11 @@ function CardSearch({ onAddSuccess, showToast }) {
         // A rejected cert number (already in the collection) explains itself; the
         // generic message would send the user back to re-type a correct number.
         const body = await response.json().catch(() => null);
-        if (generation === drawerGeneration.current) showToast(body?.error || t('search.errAddDb'), 'error');
+        if (generation === drawerGeneration.current) setQuickAddError(body?.error || t('search.errAddDb'));
       }
     } catch (err) {
       console.error(err);
-      if (generation === drawerGeneration.current) showToast(t('search.errSave'), 'error');
+      if (generation === drawerGeneration.current) setQuickAddError(t('search.errSave'));
     } finally {
       if (generation === drawerGeneration.current) {
         addPending.current = false;
@@ -724,7 +734,6 @@ function CardSearch({ onAddSuccess, showToast }) {
       if (!controller.signal.aborted) {
         const message = error.message || t('settings.importFailed', { error: '' });
         setCsvPreview(preview => ({ ...preview, stale: true, previewError: message }));
-        showToast(message, 'error');
       }
     } finally {
       if (!controller.signal.aborted) setImportingText(false);
@@ -1297,7 +1306,7 @@ function CardSearch({ onAddSuccess, showToast }) {
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+            <form onSubmit={handleSubmit} onInvalid={event => setQuickAddError(`${event.target.labels?.[0]?.textContent || ''}: ${event.target.validationMessage}`)} style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
               <CardEntryFields
                 quantity={quantity} purchasePrice={purchasePrice} condition={condition} printing={printing} language={language}
                 onQuantity={setQuantity} onPurchasePrice={setPurchasePrice} onCondition={setCondition} onPrinting={setPrinting} onLanguage={handleLanguageChange}
@@ -1306,12 +1315,15 @@ function CardSearch({ onAddSuccess, showToast }) {
                 onGrader={setGrader} onGrade={setGrade} onCertNumber={setCertNumber}
               />
 
-
+              {quickAddError && <p role="alert" style={{ color: 'var(--accent-red)', overflowWrap: 'anywhere' }}>{quickAddError}</p>}
+              <div role="status" aria-live="polite">
+                {(adding || localizing) && <p style={{ color: 'var(--text-secondary)' }}>{t(adding ? 'search.adding' : 'common.loading')}</p>}
+              </div>
               <div className="quick-add-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem' }}>
                 <div className="quick-add-footer-actions">
                   <button type="button" className="btn btn-secondary" onClick={closeDrawer} disabled={adding}>{t('common.cancel')}</button>
-                  <button type="submit" value="wishlist" className="btn btn-secondary" disabled={adding || localizing} aria-busy={adding || localizing}>{t('search.addToWishlist')}</button>
                   <button type="submit" value="collection" className="btn btn-primary" disabled={adding || localizing} aria-busy={adding || localizing}>{t(addToArena ? 'search.addToArena' : 'search.addToCollection')}</button>
+                  <button type="submit" value="wishlist" className="btn btn-secondary" disabled={adding || localizing} aria-busy={adding || localizing}>{t('search.addToWishlist')}</button>
                 </div>
               </div>
             </form>
@@ -1391,7 +1403,7 @@ function CardSearch({ onAddSuccess, showToast }) {
               <button type="button" className="btn btn-secondary" onClick={refreshCsvPreview} disabled={importingText}>{t('csvMapping.refresh')}</button>
             </div>
             {csvPreview.errors.length > 0 && (
-              <div style={{ display: 'grid', gap: '0.4rem' }}>
+              <div role="alert" style={{ display: 'grid', gap: '0.4rem' }}>
                 <strong style={{ color: 'var(--accent-red)', fontSize: '0.85rem' }}>{t('csvPreview.errors')}</strong>
                 <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'grid', gap: '0.35rem' }}>
                   {csvPreview.errors.map((error, index) => (

@@ -8,11 +8,13 @@
 .trade-workbench input, .trade-workbench select { width: 100%; min-width: 0; max-width: 100%; font-size: 1rem; }
 .trade-workbench button { min-height: 44px; white-space: normal; }
 .trade-list { list-style: none; padding: 0; margin: 1rem 0; }
-.trade-list li { border-bottom: 1px solid var(--glass-border); padding-block: 1rem; }
+.trade-list li { border-bottom: 1px solid var(--border-glass); padding-block: 1rem; }
 .trade-results { max-height: 22rem; overflow-y: auto; }
 .trade-fields, .trade-actions { display: flex; align-items: end; flex-wrap: wrap; gap: .75rem; }
 .trade-fields label { flex: 1 1 100px; }
 .trade-actions { margin-top: 1.5rem; }
-.trade-error { color: var(--accent-red); }
+.trade-error { color: var(--text-negative); }
+.trade-pagination { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .75rem; margin-block: 1rem; }
+.trade-pagination span { text-align: center; font-size: .875rem; }
 @media (min-width: 850px) { .trade-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 400px) { .trade-workbench { padding: 1rem; } }

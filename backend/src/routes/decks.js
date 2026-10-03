@@ -10,7 +10,7 @@ const scryfallApi = require('../scryfallApi');
 const { parseManaboxText } = require('../utils/csvMappers');
 const mtgjsonApi = require('../mtgjsonApi');
 const { normalizeCardBack } = require('../utils/cardBack');
-const { acquisitionPlan } = require('../utils/acquisitionPlanner');
+const { acquisitionPlan, acquisitionDeckNeeds } = require('../utils/acquisitionPlanner');
 const { composition, recordRevision } = require('../utils/deckRevisions');
 
 const router = express.Router();
@@ -172,7 +172,8 @@ router.get('/', async (req, res) => {
     `;
     const rows = await db.all(query, [req.user.id]);
     const missing = await deckMissingCards(rows, req.user.id);
-    res.json(rows.map(deck => ({ ...deck, missing_cards: missing.get(deck.id) })));
+    const purchases = await acquisitionDeckNeeds(req.user.id);
+    res.json(rows.map(deck => ({ ...deck, missing_cards: missing.get(deck.id), purchase_needed: purchases.get(deck.id) || { exact: 0, any: 0 } })));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to retrieve decks' });

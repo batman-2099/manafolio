@@ -99,7 +99,7 @@ function ContainerImportReview({ report, onClose, onMove, movingItem, expanded, 
   const cellStyle = { padding: '0.6rem', verticalAlign: 'top', textAlign: 'left', borderBottom: '1px solid var(--border-glass)' };
 
   return (
-    <dialog ref={element => { if (element && !element.open) { element.showModal(); element.querySelector('h2').focus(); } }} onCancel={onClose} aria-labelledby="container-import-review-title" style={{ margin: 'auto', width: 'min(1000px, 94vw)', maxHeight: '90dvh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
+    <dialog className="dialog-panel-spacing" ref={element => { if (element && !element.open) { element.showModal(); element.querySelector('h2').focus(); } }} onCancel={onClose} aria-labelledby="container-import-review-title" style={{ margin: 'auto', width: 'min(1000px, 94vw)', maxHeight: '90dvh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)' }}>
       <h2 id="container-import-review-title" tabIndex={-1} style={{ marginTop: 0 }}>{t('loc.importReview')}</h2>
       <p style={{ overflowWrap: 'anywhere' }}>{report.name}</p>
       {report.error && <p role="alert" style={{ color: 'var(--accent-red)' }}>{report.error}</p>}
@@ -1503,7 +1503,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
   const coverDialog = coverLocation && (
         <Modal onClose={() => { if (!savingCover) setCoverLocation(null); }} aria-labelledby="container-cover-title">
-        <div style={{ width: 'min(700px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
+        <div className="dialog-panel-spacing" style={{ width: 'min(700px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)' }}>
           <h3 id="container-cover-title">{t(coverLocation.isUnit ? 'storageUnit.chooseCover' : 'loc.chooseCover')} — {coverLocation.name}</h3>
           {coverLocation.isUnit && <p>{t('storageUnit.coverHint')}</p>}
           {coverLocation.isUnit && <div style={{ marginBlock: '1rem' }}>
@@ -1684,7 +1684,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           onCancel={event => { event.preventDefault(); closeContainerDeck(); }}
           aria-labelledby="container-deck-title"
           aria-describedby="container-deck-hint"
-          style={{ margin: 'auto', width: 'min(480px, 92vw)', maxHeight: '90dvh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}
+          className="dialog-panel-spacing"
+          style={{ margin: 'auto', width: 'min(480px, 92vw)', maxHeight: '90dvh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)' }}
         >
           <form onSubmit={handleCreateContainerDeck} aria-busy={creatingContainerDeck}>
             <h2 id="container-deck-title" style={{ marginTop: 0 }}>{t('deck.createDeck')}</h2>
@@ -1734,7 +1735,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
       {rulesComp && (
         <Modal onClose={() => setRulesComp(null)} aria-labelledby="compartment-rules-title">
-          <form onSubmit={event => { event.preventDefault(); saveCompartmentRules(); }} className="glass-panel" style={{ width: '480px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-secondary)' }} onClick={(e) => e.stopPropagation()}>
+          <form onSubmit={event => { event.preventDefault(); saveCompartmentRules(); }} className="glass-panel dialog-panel-spacing" style={{ width: '480px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-secondary)' }} onClick={(e) => e.stopPropagation()}>
             <h3 id="compartment-rules-title" style={{ margin: 0 }}>{rulesComp.display_label}: {t('compartment.accepts')}</h3>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0 }}>
               Rules controlling which cards may be filed into this {isBinderType ? 'page' : 'row'}. No rules = accepts anything the container allows.
@@ -1750,7 +1751,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
       {capacityUpdatePending && (
         <Modal onClose={cancelCapacityUpdate} returnFocus={capacityUpdatePending.returnFocus} aria-labelledby="capacity-sync-title">
-          <div className="glass-panel" style={{ width: '400px', maxWidth: '100%', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
+          <div className="glass-panel dialog-panel-spacing" style={{ width: '400px', maxWidth: '100%', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
             <h3 id="capacity-sync-title" style={{ margin: 0 }}>{t('loc.syncCapacity')}</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
               Do you want to apply the capacity <strong>{capacityUpdatePending.capacity}</strong> to ALL compartments in this container, or just this specific one?
@@ -1766,7 +1767,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
       {showRulesModal && selectedLoc && (
         <Modal onClose={() => setShowRulesModal(false)} aria-labelledby="container-settings-title">
-          <form onSubmit={event => { event.preventDefault(); saveContainerSettings(); }} className="glass-panel" style={{ width: '400px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
+          <form onSubmit={event => { event.preventDefault(); saveContainerSettings(); }} className="glass-panel dialog-panel-spacing" style={{ width: '400px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
             <h3 id="container-settings-title" style={{ margin: 0 }}>{t('loc.containerSettings')}</h3>
             <button type="button" className="btn btn-secondary" onClick={() => setCoverLocation(selectedLoc)}>{t('loc.chooseCover')}</button>
             {unitsFeedback}

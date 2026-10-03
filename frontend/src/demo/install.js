@@ -279,6 +279,8 @@ function banner() {
   if (document.getElementById('demo-banner')) return;
   const el = document.createElement('div');
   el.id = 'demo-banner';
+  el.setAttribute('role', 'region');
+  el.setAttribute('aria-label', 'Demo');
   el.innerHTML =
     '<span><strong>Demo</strong> &mdash; sample data, nothing you change is saved. '
     + 'Live features (card scanner, add/search, import &amp; export, price sync) are disabled.</span>'

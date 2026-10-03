@@ -109,10 +109,18 @@ function App() {
   const [moreOpen, setMoreOpen] = useState(false);
   const navRef = useRef(null);
   const moreTriggerRef = useRef(null);
+  const mainRef = useRef(null);
+  const previousTab = useRef(activeTab);
+  useEffect(() => {
+    if (previousTab.current !== activeTab) mainRef.current?.focus();
+    previousTab.current = activeTab;
+  }, [activeTab]);
   // First-run scanning setup. Asked once per session, only for an admin, and only
   // while it is genuinely incomplete — setupNeeded() reads the same endpoints the
   // wizard does so there is one definition of 'set up'.
   const [showSetup, setShowSetup] = useState(false);
+  const [setupProbe, setSetupProbe] = useState('idle');
+  const [setupRetry, setSetupRetry] = useState(0);
   const [selectedLocationId, setSelectedLocationId] = useState(null);
   const [focusEntryId, setFocusEntryId] = useState(null);
   const [storageViewKey, setStorageViewKey] = useState(0);
@@ -345,12 +353,17 @@ function App() {
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
     let cancelled = false;
+    setSetupProbe('loading');
     import('./components/SetupWizard')
       .then(m => m.setupNeeded())
-      .then(needed => { if (needed && !cancelled) setShowSetup(true); })
-      .catch(() => { /* never block the app on the wizard's own probe */ });
+      .then(needed => {
+        if (cancelled) return;
+        setSetupProbe('loaded');
+        if (needed) setShowSetup(true);
+      })
+      .catch(() => { if (!cancelled) setSetupProbe('error'); });
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, setupRetry]);
 
   // Handle automatic logout on 401
   useEffect(() => {
@@ -512,9 +525,10 @@ function App() {
 
   return (
     <div className="app-container">
+      <a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); mainRef.current?.focus(); }}>{t('nav.skipContent')}</a>
       {showSetup && (
         <Suspense fallback={null}>
-          <SetupWizard user={user} onUpdateUser={handleUpdateUser} showToast={showToast} onClose={() => setShowSetup(false)} />
+          <SetupWizard user={user} onUpdateUser={handleUpdateUser} onClose={() => setShowSetup(false)} />
         </Suspense>
       )}
       {/* Premium Header */}
@@ -641,7 +655,12 @@ function App() {
       </header>
 
       {/* Main Content Area */}
-      <main style={{ flex: 1, marginTop: '1rem' }}>
+      <main id="main-content" ref={mainRef} tabIndex={-1} style={{ flex: 1, marginTop: '1rem' }}>
+        {user.role === 'admin' && setupProbe === 'loading' && <p role="status">{t('common.loading')}</p>}
+        {user.role === 'admin' && setupProbe === 'error' && <div role="alert">
+          <p>{t('setup.checkError')}</p>
+          <button type="button" className="btn btn-secondary" onClick={() => setSetupRetry(value => value + 1)}>{t('common.retry')}</button>
+        </div>}
         {/* key on activeTab remounts the boundary per tab, so a crash in one
             view clears when you navigate away instead of persisting until a
             manual reload. */}

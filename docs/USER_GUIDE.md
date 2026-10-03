@@ -33,6 +33,8 @@ Search for a feature or action using **Search the guide**, then open a matching 
 
 The guide text is currently English. Tables scroll horizontally on narrow screens; keyboard users can focus a table and use the arrow keys. Supporting documentation links open separately. The guide is bundled with your installed app, so reading chapters does not contact an external documentation service.
 
+Keyboard users can use **Skip to content** to bypass navigation. Changing the main view moves focus to its content; closing a dialog returns focus to its opener. Forms keep errors beside the affected task and retain entries after failed requests. If account setup, storage choices, or other data cannot load, use **Retry** rather than treating the failure as an empty collection or missing configuration.
+
 ### Your first session
 
 1. Open the address supplied by your server administrator. On a phone, use the server's HTTPS address—not `localhost`, which means the phone itself.
@@ -70,6 +72,8 @@ Open **Trade workbench** in navigation (**More** on a phone). This exchanges you
 4. Choose **Confirm inventory exchange** only after checking both sides. The server rechecks the exact giving entries, quantities, reservations, locks, and receiving identities. It removes only the requested quantities and adds received copies to Physical **Unassigned Pile** in one transaction. Remaining giving copies keep their metadata and placement. Received copies have no recorded purchase price.
 
 **Back** edits an unconfirmed review; **Cancel** clears an unconfirmed draft without inventory changes. Drafts are held only in the current page, with a leave warning. Each side supports up to 100 entries and each line up to 250 copies.
+
+Available Giving entries are paged in groups of 60; changing pages does not clear your selections. A filter with no matches offers **Clear filter**. Refreshing marks changed or unavailable selected entries with a warning: remove and explicitly reselect them before reviewing, so you can check the latest quantity and location.
 
 If a card changed or became unavailable, no side is changed: go back, remove the stale selection, **Refresh available cards**, select again, and review. If a connection drops during confirmation, keep the page open and retry the **same confirmation**: its completed trade ID prevents a second inventory mutation. Do not create another trade to retry an uncertain result. Success reports the given/received quantities. Complete account backups retain private completed-ID receipts (ID, request fingerprint, counts, and time), not a negotiator or price history; restoring an older backup preserves already-known receipt IDs to prevent replay. The static demo explicitly rejects trade operations.
 
@@ -141,6 +145,8 @@ The **Add cards to** selector in **Search & Add** chooses **Collection** (physic
 7. Open Collection in the corresponding inventory and check the new entry. Physical additions are initially unassigned; moving them is a separate step.
 
 **Expected result:** a saved entry for the chosen printing and destination, with the quantity and copy details you supplied.
+
+Pressing **Enter** in the quick-add form submits to the selected Physical or Arena destination; use **Add to Wishlist** explicitly for planned purchases. Check the destination in the success message. While saving, the form blocks repeated submissions and dismissal. If saving fails, the error stays in the form and your quantity and copy details remain available for correction and retry.
 
 Changing the language in an add form can resolve a different printing, rather than merely relabeling the same card. Recheck the artwork and identification after changing it. Finish and condition are choices you make; the application does not inspect a card to determine them.
 
@@ -296,7 +302,7 @@ A trade flag is not another inventory: **For Trade Only** filters flagged entrie
 ### Track set completion
 
 1. Open **Collection → Set completion** (on a phone, choose it in **Inventory**).
-2. Choose a **Set** and either physical **Collection** or **Arena**. The checklist includes only printings the provider marks for that platform; inventories never mix.
+2. Use **Filter sets by name or code** to narrow the **Set** choices, then choose a set and either physical **Collection** or **Arena**. Filtering retains the selected set. The checklist includes only printings the provider marks for that platform; inventories never mix.
 3. Choose your **Goal**:
    - **One of each card:** one copy of each Scryfall card identity from this set. Alternate illustrations share a goal; a reprint from another set does not satisfy it.
    - **Every printing:** one copy per set and collector number. Different collector numbers are separate goals; any language or finish satisfies the printing.
@@ -330,7 +336,7 @@ This does not move cards into one storage pocket or merge their real-world locat
 1. Open a card, checking that it is the copy/entry you mean to change.
 2. Read its printing, language, condition or grade, price information, quantity, and recorded location. Click the artwork for a larger view.
 3. Choose **Edit Card** to change quantity, copy details, purchase price, grading details, **Value for this copy**, **Storage Container**, or **Notes**.
-4. Choose **Save Changes**. **Cancel** leaves the edit form without submitting it.
+4. Choose **Save Changes**. **Cancel** discards every unsaved edit and restores the saved entry. While saving or duplicating, wait for completion before making another change or closing; a failure stays inside the inspector and keeps the draft for correction.
 5. Recheck the entry and location after a quantity, language, or placement change.
 
 **Quantity is not a display preference:** changing it changes recorded inventory. Leave it alone when you only intend to edit notes or condition, and use an unstacked entry when you need to distinguish copies.
@@ -383,7 +389,7 @@ Storage describes where cards are physically kept. It does not create inventory 
 2. Compare each entry's printing, finish, language, condition, page/row, slot, and expected quantity with the cards. Choose **Verified — mark found** when every copy is present, or **Missing — mark missing** when some or all copies are absent.
 3. Choosing **Missing** reveals **How many copies are missing?**, initially set to the entry's full quantity. Enter a whole number from 1 to that quantity. The remaining copies will be marked found. For example, 2 missing out of 5 leaves 3 found. Leave entries you have not fully checked unreviewed.
 4. Entries with any checked-out/reserved copies are shown explicitly and cannot be changed in stocktake. Even a partially reserved quantity-bearing entry stays unchanged. Check in its deck first, then start a fresh stocktake if you need to review it.
-5. Choose **Review decisions**. Check each missing count, remaining found count, and the unchanged-entry count; **Back** lets you edit them. **Cancel**, Escape, or closing the dialog discards the review without changing cards or the container's date.
+5. Choose **Review decisions**. Check each missing count, remaining found count, and the unchanged-entry count; **Back** lets you edit them. **Cancel**, Escape, browser Back, or closing the dialog asks before discarding unsaved decisions. Rejecting that prompt keeps your work. Closing does not change cards or the container's date; dismissal is blocked while applying.
 6. Choose **Apply stocktake** to save. Verified clears the existing Missing flag for every copy; Missing marks only the specified copies missing. A partial quantity splits into found and missing entries while preserving total copies, metadata, placement, reservations, and deck state. Unreviewed entries never become missing automatically. All selected changes and the date are committed together or not at all.
 
 If cards, container configuration, placement, or reservations changed while you were checking, applying is rejected. Close and restart with the current contents. If a connection fails while saving, reopen the container to check the recorded state before retrying.
@@ -611,6 +617,7 @@ An open deck keeps its tools, Description, analytics, commander, private Notes, 
 1. In **Deck Builder**, select **Create Deck**.
 2. Choose **Deck Type → Physical**, **Arena**, or **Graveyard**.
 3. Select **Format** and check **Target Size**. The target accepts 1–300 cards; selecting a Commander format in this creation form sets 100, while Standard/Modern/Pioneer selections set 60. Always check the value before creating.
+   You can clear **Target Size** before typing a replacement; supply a whole number in the supported range before submitting.
 4. Enter **Deck Name**. Optionally select **Deck Category**, **Vault Accent Color**, and enter a description.
 5. Leave the import sections closed for an empty deck, then select **Create Deck**.
 6. Open the created deck from **Your decks** and add cards.
@@ -739,15 +746,17 @@ This deck-creation chooser creates a definition only. It does not buy or add own
 ### Plan acquisitions for several decks
 
 1. Save each deck, return to **Your decks**, and open **Shopping List**.
-2. Select one or more Physical decks, or one or more Arena decks. Mixing inventories is rejected; Graveyard decks are excluded.
+2. Select one or more Physical decks. Only decks with an individual purchase shortfall under the current printing preference appear; fully owned and empty decks are hidden. Reserved copies still count as owned. Arena and Graveyard decks cannot be selected.
 3. Choose **Exact saved printing** or **Any printing — same canonical Magic name**, then **Preview shopping list**. Exact mode matches provider printing IDs. Any mode uses the cached canonical Magic name, not a localized printed name or a partial/fuzzy match. The displayed saved printing is the proposed purchase, not a cheapest-printing recommendation.
-4. Review Required, Owned, Needed, On Wishlist, and Not yet planned. Required sums all selected decks for simultaneous ownership, then subtracts matching owned copies once. Missing copies, Wishlist and Graveyard never supply ownership. Reservations still count as owned: this is acquisition planning, not checkout readiness. Finish, condition, grading and deck source preferences do not restrict matching.
+   Changing the printing preference removes selected decks that no longer need purchases. The list does not offer individually complete decks solely to buy extra copies for simultaneous use.
+4. Review each card's **Deck requirement** and estimated purchase cost. Deck requirement sums all selected decks for simultaneous ownership; it is not the purchase quantity. Purchase costs subtract matching owned copies once. Missing copies, Wishlist and Graveyard never supply ownership. Reservations still count as owned: this is acquisition planning, not checkout readiness. Finish, condition, grading and deck source preferences do not restrict matching.
+   The preview shows only cards with Needed greater than zero, with card thumbnails and per-card cost estimates; there is no bottom aggregate total. Unavailable artwork uses the shared card-back fallback. Fully owned cards are hidden. Needed cards already on Wishlist remain visible because they have not been acquired.
    **Export to text**, beside the Wishlist action, downloads `shopping-list.txt` with all Needed copies, including those already on Wishlist. Exact-printing mode includes set codes and collector numbers in Arena text format; Any printing exports quantity and name only. Fully owned cards are omitted. Export does not change inventory or Wishlist.
-5. For Physical plans, choose **Add deficits to Wishlist**, review the confirmation, then confirm or **Cancel**. Only Not yet planned quantities are added as nonfoil copies of the displayed printings. Existing Wishlist quantities are honored, including other finishes. Decks and owned inventory are unchanged. A changed plan requires a new preview; concurrent/repeated confirmations cannot duplicate its additions. Manage the results under **Collection → Wishlist**.
+5. For Physical plans, choose **Add deficits to Wishlist**, review the exact number of new copies in the confirmation, then confirm or **Cancel**. Only not-yet-planned quantities are added as nonfoil copies of the displayed printings. Existing Wishlist quantities are honored, including other finishes. Decks and owned inventory are unchanged. A changed plan requires a new preview; concurrent/repeated confirmations cannot duplicate its additions. Manage the results under **Collection → Wishlist**.
 
 For example, two decks needing four and three copies of the same card require seven combined. Three eligible owned copies leave four needed; two matching Wishlist copies leave only two new Wishlist additions.
 
-Estimates use cached nonfoil prices for all Needed copies, including copies already on Wishlist. Unknown prices are marked unknown and excluded from totals; USD, EUR and other reported currency units remain separate without conversion. Planning makes no provider request. Arena mode uses only Arena ownership and offers neither physical-market prices nor physical Wishlist additions. The static demo displays an explicit server-required message.
+Estimates use cached nonfoil prices for all Needed copies, including copies already on Wishlist. Unknown prices are marked unknown; currencies are not converted. Planning makes no provider request. The static demo displays an explicit server-required message.
 
 ### Check out a Physical deck for play
 
@@ -1011,6 +1020,8 @@ Commander selections round-trip for Commander/EDH, Brawl, and Historic Brawl dec
 4. Read the confirmation carefully. A recognized complete backup says it will replace all cards, containers, and decks. If the prompt instead says cards will be merged, cancel and verify the file rather than assuming a full restore will occur.
 5. Confirm only when replacement is intended, and wait for the success or error message.
 6. Reopen the affected views and check representative cards, deck quantities, commander selections, records, and checkout status against the source. Keep both the original and pre-restore destination backup until satisfied.
+
+Only one import or restore can run at a time. **Import Backup** stays disabled while the file is read and processed, and progress or failure remains visible in this panel. Wait for completion rather than selecting the file again while a request is pending.
 
 **Expected result:** the signed-in account's covered records are replaced in a transaction after validation; other users' records are not merged into it. A validation failure leaves the existing covered records unchanged. Restoring data does not reconnect AI providers or migrate browser preferences.
 

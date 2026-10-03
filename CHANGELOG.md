@@ -4,6 +4,13 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Fixed card-inspector Cancel to discard the complete edit draft; protected saves, duplication, and artwork changes against repeated submissions, with errors and progress inside the dialog.
+- Made quick-add Enter use the selected Physical/Arena destination, retained explicit Wishlist submission, and corrected destination-specific feedback.
+- Added persistent validation, loading, and retry states to sign-in setup, onboarding, account forms, user lists, and inspector lookups; guarded Settings imports while pending.
+- Preserved native dialog autofocus, added Skip to content and navigation focus handoff, and protected Stocktake decisions and busy storage dialogs from browser Back.
+- Added trade quantity validation, explicit stale-entry reselection, filter empty states, and 60-entry available-card pages; retained the existing 100-entry limit per side.
+- Added set name/code filtering, clarified Shopping List deck requirements and the exact Wishlist addition count, and allowed deck target sizes to be cleared before retyping.
+- Reused semantic border/error tokens and responsive dialog spacing, corrected Magic game metadata labels, and avoided repeated deck snapshot serialization on unrelated renders.
 - Moved container stocktake into **More → Take Stock**, with missing-copy quantities, explicit missing/found review counts, and partial-copy reconciliation that preserves totals and reserved entries.
 - Added card thumbnails to Take Stock decisions and review, using the shared artwork fallback when an image is unavailable.
 - Fixed Trade workbench initialization and reset on HTTP LAN addresses by generating secure random trade identifiers without the HTTPS-only `crypto.randomUUID()` API.

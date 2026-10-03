@@ -152,7 +152,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [newDeckFormat, setNewDeckFormat] = useState(NEW_DECK_DEFAULTS.format);
   const [newDeckCategory, setNewDeckCategory] = useState('Competitive');
   const [newDeckAccentColor, setNewDeckAccentColor] = useState('#eab308');
-  const [newDeckTargetSize, setNewDeckTargetSize] = useState(NEW_DECK_DEFAULTS.targetSize);
+  const [newDeckTargetSize, setNewDeckTargetSize] = useState(String(NEW_DECK_DEFAULTS.targetSize));
   const [newDeckImportText, setNewDeckImportText] = useState('');
   const [newDeckImportFormat, setNewDeckImportFormat] = useState('plain');
   const [showImportDecklistArea, setShowImportDecklistArea] = useState(false);
@@ -242,9 +242,11 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [showDeckContainerModal, setShowDeckContainerModal] = useState(false);
 
   const editorBusy = savingDeck || savingSleeved || savingCardBack || loading || refreshingInventory || comparingImport || checkingOut || showCheckoutModal || showDeckContainerModal;
+  const activeEditorState = useMemo(() => activeDeck ? JSON.stringify(deckEditorState(activeDeck)) : null, [activeDeck]);
+  const draftEditorState = useMemo(() => activeDeck && deckDraft ? JSON.stringify(deckEditorState({ ...activeDeck, ...deckDraft })) : null, [activeDeck, deckDraft]);
   const hasUnsavedChanges = !!activeDeck && (
-    JSON.stringify(deckEditorState(activeDeck)) !== savedEditorState
-    || (!!deckDraft && JSON.stringify(deckEditorState({ ...activeDeck, ...deckDraft })) !== JSON.stringify(deckEditorState(activeDeck)))
+    activeEditorState !== savedEditorState
+    || (!!deckDraft && draftEditorState !== activeEditorState)
   );
   const [savingRecord, setSavingRecord] = useState(false);
 
@@ -411,7 +413,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     setNewDeckFormat(NEW_DECK_DEFAULTS.format);
     setNewDeckCategory('Competitive');
     setNewDeckAccentColor('#eab308');
-    setNewDeckTargetSize(NEW_DECK_DEFAULTS.targetSize);
+    setNewDeckTargetSize(String(NEW_DECK_DEFAULTS.targetSize));
     setNewDeckImportText('');
     setNewDeckImportFormat('plain');
     setNewDeckPreconFile('');
@@ -456,6 +458,11 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const handleCreateDeck = async (e) => {
     e.preventDefault();
     if (creatingDeck || !newDeckName.trim()) return;
+    const targetSize = Number(newDeckTargetSize);
+    if (!Number.isInteger(targetSize) || targetSize < 1 || targetSize > 300) {
+      setCreateDeckError(t('deck.invalidTargetSize'));
+      return;
+    }
     setCreatingDeck(true);
     setCreateDeckError(null);
 
@@ -470,7 +477,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           format: newDeckFormat,
           category: newDeckCategory,
           accent_color: newDeckAccentColor,
-          target_size: newDeckTargetSize,
+          target_size: targetSize,
           decklist_text: newDeckImportText,
           decklist_format: newDeckImportFormat,
           inventory_type: newDeckInventoryType,
@@ -541,15 +548,16 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     setDeckDraft(null);
   };
 
-  const handleSaveDeck = async (deck = activeDeck) => {
-    if (!deck || JSON.stringify(deckEditorState(deck)) === savedEditorState || editorBusy || savingRecord || searching || deckDraft) return;
+  const handleSaveDeck = async () => {
+    const deck = activeDeck;
+    if (!deck || activeEditorState === savedEditorState || editorBusy || savingRecord || searching || deckDraft) return;
     setSavingDeck(true);
     setSaveDeckError(null);
     try {
       const response = await fetch(`/api/decks/${deck.id}/editor`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(deckEditorState(deck))
+        body: activeEditorState
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || t('deck.errSave'));
@@ -2523,8 +2531,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     onChange={(e) => {
                       const selectedFmt = e.target.value;
                       setNewDeckFormat(selectedFmt);
-                      if (selectedFmt.includes('Commander')) setNewDeckTargetSize(100);
-                      else if (selectedFmt.includes('Standard') || selectedFmt.includes('Modern') || selectedFmt.includes('Pioneer')) setNewDeckTargetSize(60);
+                      if (selectedFmt.includes('Commander')) setNewDeckTargetSize('100');
+                      else if (selectedFmt.includes('Standard') || selectedFmt.includes('Modern') || selectedFmt.includes('Pioneer')) setNewDeckTargetSize('60');
                     }}
                     style={{ fontSize: '0.85rem' }}
                   >
@@ -2541,9 +2549,11 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     type="number"
                     min="1"
                     max="300"
+                    required
+                    step="1"
                     className="input-control"
                     value={newDeckTargetSize}
-                    onChange={(e) => setNewDeckTargetSize(parseInt(e.target.value, 10) || 60)}
+                    onChange={(e) => setNewDeckTargetSize(e.target.value)}
                     style={{ fontSize: '0.85rem' }}
                   />
                 </div>
@@ -2659,7 +2669,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         setNewDeckName(deck.name);
                         const preset = preconFormat(deck.type);
                         setNewDeckFormat(preset.format);
-                        setNewDeckTargetSize(preset.targetSize);
+                        setNewDeckTargetSize(String(preset.targetSize));
                         setNewDeckImportText('');
                         setShowImportDecklistArea(false);
                         setShowPreconPicker(false);
@@ -2696,7 +2706,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                           setNewDeckPreconFile('');
                           if (format === 'manabox') {
                             setNewDeckFormat('Commander / EDH');
-                            setNewDeckTargetSize(100);
+                            setNewDeckTargetSize('100');
                           }
                         }}
                         style={{ flex: '1 1 220px', minWidth: 0, minHeight: '48px', fontSize: '1rem', padding: '0.75rem' }}

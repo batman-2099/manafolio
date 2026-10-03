@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, Upload, Trash2, Share2 } from 'lucide-react';
 import { artUrl, noteArtChanged, useCardArtIndex } from '../utils/cardArt';
 import { getRepoUrl, issueUrl } from '../utils/repo';
@@ -16,11 +16,39 @@ const MAX_BYTES = 8 * 1024 * 1024; // matches backend/src/cardArt.js
 
 const btn = { padding: '0.3rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' };
 
-export default function CardArtEditor({ card, hasProviderArt, showToast, onChanged }) {
+export default function CardArtEditor({ card, hasProviderArt, showToast, onChanged, onBusyChange }) {
   const { t } = useT();
   const index = useCardArtIndex();
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const mountedRef = useRef(true);
+  const onBusyChangeRef = useRef(onBusyChange);
+  onBusyChangeRef.current = onBusyChange;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (busyRef.current) {
+        busyRef.current = false;
+        onBusyChangeRef.current?.(false);
+      }
+    };
+  }, []);
+
+  const beginAction = () => {
+    if (busyRef.current || onBusyChangeRef.current?.(true) === false) return false;
+    busyRef.current = true;
+    setBusy(true);
+    return true;
+  };
+  const endAction = () => {
+    if (!busyRef.current) return;
+    busyRef.current = false;
+    onBusyChangeRef.current?.(false);
+    if (mountedRef.current) setBusy(false);
+  };
 
   const cardId = card?.card_id || card?.id;
   if (!cardId) return null;
@@ -32,11 +60,11 @@ export default function CardArtEditor({ card, hasProviderArt, showToast, onChang
   const onFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // so re-picking the same file fires change again
-    if (!file) return;
+    if (!file || busyRef.current) return;
     if (!file.type.startsWith('image/')) return showToast?.(t('art.notAnImage'), 'error');
     if (file.size > MAX_BYTES) return showToast?.(t('art.tooLarge'), 'error');
 
-    setBusy(true);
+    if (!beginAction()) return;
     try {
       const dataUrl = await new Promise((resolve, reject) => {
         const r = new FileReader();
@@ -54,14 +82,14 @@ export default function CardArtEditor({ card, hasProviderArt, showToast, onChang
       onChanged?.();
       showToast?.(t('art.saved'), 'success');
     } catch (err) {
-      showToast?.(t('art.saveFailed', { message: err.message }), 'error');
+      showToast?.(t('art.saveFailed', { error: err.message }), 'error');
     } finally {
-      setBusy(false);
+      endAction();
     }
   };
 
   const onRemove = async () => {
-    setBusy(true);
+    if (!beginAction()) return;
     try {
       const res = await fetch(`/api/card-art/${encodeURIComponent(cardId)}`, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
@@ -72,16 +100,16 @@ export default function CardArtEditor({ card, hasProviderArt, showToast, onChang
       onChanged?.();
       showToast?.(t('art.removed'), 'success');
     } catch (err) {
-      showToast?.(t('art.removeFailed', { message: err.message }), 'error');
+      showToast?.(t('art.removeFailed', { error: err.message }), 'error');
     } finally {
-      setBusy(false);
+      endAction();
     }
   };
 
   // Hand over the normalized PNG the server produced (not the user's original —
   // that is what would be committed) and open the issue form beside it.
   const onContribute = async () => {
-    setBusy(true);
+    if (!beginAction()) return;
     try {
       const blob = await fetch(artUrl(cardId)).then(r => {
         if (!r.ok) throw new Error('art not found');
@@ -117,9 +145,9 @@ export default function CardArtEditor({ card, hasProviderArt, showToast, onChang
         body,
       }), '_blank', 'noopener');
     } catch (err) {
-      showToast?.(t('art.shareFailed', { message: err.message }), 'error');
+      showToast?.(t('art.shareFailed', { error: err.message }), 'error');
     } finally {
-      setBusy(false);
+      endAction();
     }
   };
 

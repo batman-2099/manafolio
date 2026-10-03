@@ -63,6 +63,15 @@ async function run() {
     const after = await request(selection);
     assert.deepStrictEqual(after.body.items.map(item => item.to_add), [0, 0, 0]);
     assert.deepStrictEqual(await db.all("SELECT * FROM collection WHERE list_type != 'wishlist' ORDER BY id"), before.filter(row => row.list_type !== 'wishlist'));
+    await db.run("INSERT INTO decks (id, user_id, name, inventory_type) VALUES (5, 1, 'Owned', 'collection'), (6, 1, 'Alternate printing', 'collection'), (7, 1, 'Empty', 'collection'), (8, 2, 'Other account', 'collection')");
+    await db.run("INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (5, 'a', 2), (6, 'b', 2), (8, 'c', 1)");
+    const deckList = await fetch(base.replace('/acquisition-plan', ''), { headers: { Authorization: 'Bearer owner' } });
+    assert.equal(deckList.status, 200);
+    const needs = new Map((await deckList.json()).map(deck => [deck.id, deck.purchase_needed]));
+    assert.deepStrictEqual([...needs].sort((a, b) => a[0] - b[0]), [
+      [1, { exact: 2, any: 1 }], [2, { exact: 5, any: 3 }], [3, { exact: 5, any: 5 }],
+      [4, { exact: 0, any: 0 }], [5, { exact: 0, any: 0 }], [6, { exact: 1, any: 0 }], [7, { exact: 0, any: 0 }],
+    ], 'purchase needs exclude missing/archived/Wishlist copies and other accounts, but count reserved ownership and alternate printings');
     await db.run("UPDATE deck_cards SET quantity = 10 WHERE deck_id = 1 AND card_id = 'a'");
     assert.equal((await request({ ...selection, confirmed: true, revision: after.body.revision }, 'owner', true)).status, 409);
     console.log('Acquisition planner HTTP regression passed: overlap, inventories, prices, authorization, cancellation, stale plans and concurrent confirmation.');

@@ -26,6 +26,11 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState({});
+  const passwordFormRef = useRef(null);
+  useEffect(() => {
+    if (!passwordLoading) passwordFormRef.current?.querySelector('[aria-invalid="true"], [role="alert"]')?.focus();
+  }, [passwordErrors, passwordLoading]);
   
   const [shareEnabled, setShareEnabled] = useState(user?.share_enabled === 1);
   const [shareLocations, setShareLocations] = useState(user?.share_locations === 1);
@@ -42,6 +47,9 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
   const [bulkNotice, setBulkNotice] = useState(null);
   const mountedRef = useRef(true);
   const importInputRef = useRef(null);
+  const importBusyRef = useRef(false);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importNotice, setImportNotice] = useState(null);
 
   const theme = themes.includes(user?.theme) ? user.theme : 'dark';
   const [themeLoading, setThemeLoading] = useState(false);
@@ -210,19 +218,20 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
 
   const handleImportFile = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-    e.target.value = null;
-
-    let fileData;
+    e.target.value = '';
+    if (!file || importBusyRef.current) return;
+    importBusyRef.current = true;
+    setImportBusy(true);
+    setImportNotice({ key: 'settings.importing' });
     try {
-      fileData = await file.text();
-    } catch {
-      showToast(t('settings.errReadFile'), 'error');
-      return;
-    }
-
-    const filename = file.name.toLowerCase();
-    try {
+      let fileData;
+      try {
+        fileData = await file.text();
+      } catch {
+        setImportNotice({ error: true, key: 'settings.errReadFile' });
+        return;
+      }
+      const filename = file.name.toLowerCase();
       let format = filename.endsWith('.json') ? 'json' : (filename.endsWith('.txt') ? 'manabox' : 'csv');
       let completeBackup = false;
       if (format === 'json') {
@@ -231,25 +240,26 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
           completeBackup = parsed?.format === 'manafolio-backup' && parsed.version === 1;
         } catch { /* The server returns the normal JSON-import error. */ }
       }
-      if (!window.confirm(t(completeBackup ? 'settings.confirmRestore' : 'settings.confirmImport', { file: file.name }))) return;
+      if (!window.confirm(t(completeBackup ? 'settings.confirmRestore' : 'settings.confirmImport', { file: file.name }))) {
+        setImportNotice(null);
+        return;
+      }
       if (completeBackup) format = 'backup';
-
-      showToast(t('settings.importing'), 'status');
       const response = await fetch('/api/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ format, data: fileData })
       });
-
       const result = await response.json();
-      if (response.ok) {
-        showToast(result.message || t('settings.importOk'), 'success');
-      } else {
-        showToast(t('settings.importFailed', { error: result.error || t('settings.unknownError') }), 'error');
-      }
+      setImportNotice(response.ok
+        ? { message: result.message, key: 'settings.importOk' }
+        : { error: true, key: 'settings.importFailed', values: { error: result.error || t('settings.unknownError') } });
     } catch (err) {
       console.error(err);
-      showToast(t('settings.importFailed', { error: err.message }), 'error');
+      setImportNotice({ error: true, key: 'settings.importFailed', values: { error: err.message } });
+    } finally {
+      importBusyRef.current = false;
+      setImportBusy(false);
     }
   };
 
@@ -273,18 +283,13 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
-    if (!currentPassword) {
-      showToast(t('settings.errCurrentPassword'), 'error');
-      return;
-    }
-    if (password.length < 8) {
-      showToast(t('login.errPasswordShort', { count: 8 }), 'error');
-      return;
-    }
-    if (password !== confirmPassword) {
-      showToast(t('login.errPasswordMismatch'), 'error');
-      return;
-    }
+    if (passwordLoading) return;
+    const errors = {};
+    if (!currentPassword) errors.current = t('settings.errCurrentPassword');
+    if (password.length < 8) errors.password = t('login.errPasswordShort', { count: 8 });
+    if (!confirmPassword || password !== confirmPassword) errors.confirm = t('login.errPasswordMismatch');
+    setPasswordErrors(errors);
+    if (Object.keys(errors).length) return;
 
     setPasswordLoading(true);
     try {
@@ -301,11 +306,11 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
         setConfirmPassword('');
       } else {
         const data = await response.json();
-        showToast(data.error || t('settings.errPasswordUpdate'), 'error');
+        setPasswordErrors({ form: data.error || t('settings.errPasswordUpdate') });
       }
     } catch (err) {
       console.error(err);
-      showToast(t('settings.errPasswordUpdateGeneric'), 'error');
+      setPasswordErrors({ form: t('settings.errPasswordUpdateGeneric') });
     } finally {
       setPasswordLoading(false);
     }
@@ -651,7 +656,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
             <h3 id="settings-security" tabIndex={-1} className="section-heading">{t('settings.securityTitle')}</h3>
           </div>
 
-          <form className="settings-password-form" onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <form ref={passwordFormRef} noValidate className="settings-password-form" onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label htmlFor="current-password">{t('settings.currentPassword')}</label>
               <input
@@ -665,7 +670,10 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
                 disabled={passwordLoading}
+                aria-invalid={!!passwordErrors.current}
+                aria-describedby={passwordErrors.current ? 'settings-current-error' : undefined}
               />
+              {passwordErrors.current && <p id="settings-current-error" role="alert" style={{ color: 'var(--text-negative)' }}>{passwordErrors.current}</p>}
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -681,7 +689,10 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={passwordLoading}
+                aria-invalid={!!passwordErrors.password}
+                aria-describedby={passwordErrors.password ? 'settings-password-error' : undefined}
               />
+              {passwordErrors.password && <p id="settings-password-error" role="alert" style={{ color: 'var(--text-negative)' }}>{passwordErrors.password}</p>}
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -697,8 +708,12 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 disabled={passwordLoading}
+                aria-invalid={!!passwordErrors.confirm}
+                aria-describedby={passwordErrors.confirm ? 'settings-confirm-error' : undefined}
               />
+              {passwordErrors.confirm && <p id="settings-confirm-error" role="alert" style={{ color: 'var(--text-negative)' }}>{passwordErrors.confirm}</p>}
             </div>
+            {passwordErrors.form && <p role="alert" tabIndex={-1} style={{ color: 'var(--text-negative)' }}>{passwordErrors.form}</p>}
 
             <button 
               type="submit" 
@@ -706,9 +721,8 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
               disabled={passwordLoading}
               style={{ padding: '0.6rem 1.2rem', alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
-              {passwordLoading ? (
-                <div className="spinner" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }}></div>
-              ) : t('settings.updatePassword')}
+              {passwordLoading && <span className="spinner" aria-hidden="true" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }} />}
+              {t('settings.updatePassword')}
             </button>
           </form>
         </div>
@@ -768,9 +782,8 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 onClick={() => handleAccessKey('create')}
                 style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               >
-                {accessKeyLoading ? (
-                  <div className="spinner" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }}></div>
-                ) : t(accessKey ? 'settings.accessRotate' : 'settings.accessCreate')}
+                {accessKeyLoading && <span className="spinner" aria-hidden="true" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }} />}
+                {t(accessKey ? 'settings.accessRotate' : 'settings.accessCreate')}
               </button>
               {accessKey && (
                 <button
@@ -877,6 +890,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
             <button
               type="button"
               onClick={() => importInputRef.current?.click()}
+              disabled={importBusy}
               className="btn btn-primary"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
             >
@@ -887,10 +901,14 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
               ref={importInputRef}
               type="file"
               accept=".json,.csv,.txt"
+              disabled={importBusy}
               onChange={handleImportFile}
               style={{ display: 'none' }}
             />
           </div>
+          {importNotice && <p role={importNotice.error ? 'alert' : 'status'} style={{ color: importNotice.error ? 'var(--text-negative)' : 'var(--text-secondary)' }}>
+            {importNotice.message || t(importNotice.key, importNotice.values)}
+          </p>}
         </div>
 
         {/* Preferences Panel */}

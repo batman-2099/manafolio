@@ -38,11 +38,14 @@ function Login({ onLoginSuccess, pendingContainer }) {
   // OIDC / SSO status
   const [oidcEnabled, setOidcEnabled] = useState(false);
   const [oidcProviderName, setOidcProviderName] = useState('Single Sign-On');
+  const [configStatus, setConfigStatus] = useState('loading');
+  const [configAttempt, setConfigAttempt] = useState(0);
 
   useEffect(() => {
-    let cancelled = false, tries = 0;
+    let cancelled = false, tries = 0, retryTimer;
     // Retry transient network failures and refetch when the browser tab resumes.
     const load = () => {
+      if (cancelled) return;
       fetch('/api/auth/config')
         .then(res => res.ok ? res.json() : Promise.reject(new Error('config unreachable')))
         .then(data => {
@@ -55,14 +58,20 @@ function Login({ onLoginSuccess, pendingContainer }) {
           // visitor's — see the bootstrap route. Shown read-only rather than
           // hidden, because it is the name they will log in with next time.
           if (data.setupRequired) setUsername(OWNER_USERNAME);
+          setConfigStatus('ready');
         })
-        .catch(() => { if (!cancelled && tries++ < 5) setTimeout(load, 1500); });
+        .catch(() => {
+          if (cancelled) return;
+          setConfigStatus('error');
+          if (tries++ < 5) retryTimer = setTimeout(load, 1500);
+        });
     };
+    setConfigStatus('loading');
     load();
     const onVis = () => { if (document.visibilityState === 'visible') { tries = 0; load(); } };
     document.addEventListener('visibilitychange', onVis);
-    return () => { cancelled = true; document.removeEventListener('visibilitychange', onVis); };
-  }, []);
+    return () => { cancelled = true; clearTimeout(retryTimer); document.removeEventListener('visibilitychange', onVis); };
+  }, [configAttempt]);
 
   // Creating an account (first-run owner, or self-registration) asks for the
   // password twice and validates it; signing in does neither.
@@ -71,6 +80,7 @@ function Login({ onLoginSuccess, pendingContainer }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (configStatus !== 'ready') return;
     setError('');
     // Browser password managers parse the form when the submit lands, and they
     // need to find an <input type="password"> to offer to save anything. Someone
@@ -141,14 +151,14 @@ function Login({ onLoginSuccess, pendingContainer }) {
             <span className="app-version">v{import.meta.env.VITE_APP_VERSION}</span>
           </div>
           <h1 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem' }}>
-            {t(setupRequired ? 'login.setupSubmit' : isRegister ? 'login.register' : 'login.signIn')}
+            {t(configStatus !== 'ready' ? 'login.configTitle' : setupRequired ? 'login.setupSubmit' : isRegister ? 'login.register' : 'login.signIn')}
           </h1>
-          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+          {configStatus === 'ready' && <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
             {t(setupRequired ? 'login.setupTagline' : isRegister ? 'login.taglineRegister' : 'login.taglineLogin')}
-          </p>
+          </p>}
         </header>
 
-        {setupRequired && (
+        {configStatus === 'ready' && setupRequired && (
           <div style={{
             marginBottom: '1.5rem',
             fontSize: '0.9375rem',
@@ -171,6 +181,15 @@ function Login({ onLoginSuccess, pendingContainer }) {
             {error}
           </div>
         )}
+        {configStatus === 'loading' && <p role="status">{t('common.loading')}</p>}
+        {configStatus === 'error' && (
+          <div>
+            <p role="alert" style={{ color: 'var(--accent-red)' }}>{t('login.configError')}</p>
+            <button type="button" className="btn btn-secondary" onClick={() => setConfigAttempt(n => n + 1)}>{t('common.retry')}</button>
+          </div>
+        )}
+
+        {configStatus === 'ready' && <>
 
         {oidcEnabled && !setupRequired && !isRegister && (
           <div style={{ marginBottom: '1.25rem' }}>
@@ -358,6 +377,7 @@ function Login({ onLoginSuccess, pendingContainer }) {
             </button>
           </div>
         )}
+        </>}
       </div>
     </main>
   );
