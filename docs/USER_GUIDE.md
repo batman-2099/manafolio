@@ -279,6 +279,20 @@ Open **Collection**, then use the inventory tabs or **Inventory** selector:
 
 A trade flag is not another inventory: **For Trade Only** filters flagged entries. Missing/Found is also a flag, not deletion or archival; it retains the last known location.
 
+### Track set completion
+
+1. Open **Collection → Set completion** (on a phone, choose it in **Inventory**).
+2. Choose a **Set** and either physical **Collection** or **Arena**. The checklist includes only printings the provider marks for that platform; inventories never mix.
+3. Choose your **Goal**:
+   - **One of each card:** one copy of each Scryfall card identity from this set. Alternate illustrations share a goal; a reprint from another set does not satisfy it.
+   - **Every printing:** one copy per set and collector number. Different collector numbers are separate goals; any language or finish satisfies the printing.
+   - **Foil printings:** one **Holofoil** copy per collector number that Scryfall explicitly offers in foil. Nonfoil-only and etched-only printings are excluded. Arena has no foil goal.
+4. Filter **All**, **Owned**, or **Missing**. Expand a row to see its exact printings and select a printing to inspect its artwork with the existing image viewer.
+
+Progress counts goals, not copies: owning ten copies does not fill ten checklist slots. **Recorded** includes entries marked Missing; **Owned** excludes them, Wishlist, and Graveyard. Reserved copies remain owned. **Free** also excludes deck reservations and copies in unavailable physical storage. These are records, not proof that the card is physically where it was last filed.
+
+The server loads every provider page before showing progress and caches normalized card data through the usual Scryfall path. A loading, incomplete, or failed catalog never becomes a complete collection: use **Retry** after checking connectivity. Zero eligible printings means the goal is not applicable, not 100%. Completion does not change your inventory or save a separate goal record. The read-only demo explicitly reports that its server catalog is unavailable.
+
 ### Find a card and its location
 
 1. Select the appropriate inventory first.

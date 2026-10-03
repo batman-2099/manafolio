@@ -1,0 +1,20 @@
+{
+  "pages": [
+    {
+      "object": "list", "total_cards": 5, "has_more": true,
+      "next_page": "https://api.scryfall.com/cards/search?q=set%3Atst&unique=prints&include_extras=true&order=set&page=2",
+      "data": [
+        { "id": "completion-alpha", "oracle_id": "alpha", "name": "Alpha", "set": "tst", "set_name": "Completion Fixture", "collector_number": "1", "lang": "en", "finishes": ["nonfoil", "foil"], "games": ["paper", "arena"], "type_line": "Creature", "rarity": "common" },
+        { "id": "completion-alpha-alt", "oracle_id": "alpha", "name": "Alpha", "set": "tst", "set_name": "Completion Fixture", "collector_number": "101", "lang": "en", "finishes": ["nonfoil", "foil"], "games": ["paper"], "type_line": "Creature", "rarity": "common" }
+      ]
+    },
+    {
+      "object": "list", "total_cards": 5, "has_more": false,
+      "data": [
+        { "id": "completion-beta", "oracle_id": "beta", "name": "Beta", "set": "tst", "set_name": "Completion Fixture", "collector_number": "2", "lang": "en", "finishes": ["nonfoil"], "games": ["paper", "arena"], "type_line": "Instant", "rarity": "common" },
+        { "id": "completion-gamma", "oracle_id": "gamma", "name": "Gamma", "set": "tst", "set_name": "Completion Fixture", "collector_number": "3", "lang": "en", "finishes": ["nonfoil", "foil"], "games": ["paper", "arena"], "type_line": "Sorcery", "rarity": "rare" },
+        { "id": "completion-delta", "oracle_id": "delta", "name": "Delta", "set": "tst", "set_name": "Completion Fixture", "collector_number": "4", "lang": "en", "finishes": ["etched"], "games": ["paper"], "type_line": "Enchantment", "rarity": "rare" }
+      ]
+    }
+  ]
+}
