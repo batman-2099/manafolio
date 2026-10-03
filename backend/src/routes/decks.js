@@ -10,8 +10,40 @@ const scryfallApi = require('../scryfallApi');
 const { parseManaboxText } = require('../utils/csvMappers');
 const mtgjsonApi = require('../mtgjsonApi');
 const { normalizeCardBack } = require('../utils/cardBack');
+const { composition, recordRevision } = require('../utils/deckRevisions');
 
 const router = express.Router();
+
+router.get('/:id/revisions', async (req, res) => {
+  try {
+    const deck = await db.get("SELECT id FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'", [req.params.id, req.user.id]);
+    if (!deck) return res.status(404).json({ error: 'Deck not found' });
+    const revisions = await db.all('SELECT id, created_at, kind, snapshot FROM deck_revisions WHERE deck_id = ? ORDER BY id DESC', [deck.id]);
+    const cards = await db.all(`SELECT id, name, printed_name, set_name, number FROM card_cache WHERE id IN (
+      SELECT json_extract(card.value, '$.card_id') FROM deck_revisions r, json_each(r.snapshot, '$.cards') card WHERE r.deck_id = ?
+    )`, [deck.id]);
+    res.json({ revisions: revisions.map(row => ({ ...row, snapshot: JSON.parse(row.snapshot) })), cards });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to retrieve deck history' });
+  }
+});
+
+router.post('/:id/revisions/:revisionId/restore', async (req, res) => {
+  try {
+    const deck = await db.get("SELECT * FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'", [req.params.id, req.user.id]);
+    if (!deck) return res.status(404).json({ error: 'Deck not found' });
+    const revision = await db.get('SELECT snapshot FROM deck_revisions WHERE id = ? AND deck_id = ?', [req.params.revisionId, deck.id]);
+    if (!revision) return res.status(404).json({ error: 'Revision not found' });
+    const snapshot = JSON.parse(revision.snapshot);
+    req.body = { ...deck, ...snapshot, cards: snapshot.cards.map(card => ({ ...card, pulled: false })) };
+    req.restoringRevision = true;
+    return saveDeckEditor(req, res);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to restore deck revision' });
+  }
+});
 
 // Share management stays account-scoped; the public capability only grants reading.
 router.route('/:id/share').all((req, res, next) => {
@@ -516,7 +548,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Replace the editor draft as one unit; failed validation rolls every change back.
-router.put('/:id/editor', async (req, res) => {
+async function saveDeckEditor(req, res) {
   const body = req.body;
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return res.status(400).json({ error: 'A complete deck editor draft is required' });
@@ -570,13 +602,17 @@ router.put('/:id/editor', async (req, res) => {
   const { id } = req.params;
   try {
     await db.withTransaction(async () => {
-      const deck = await db.get(`SELECT inventory_type, checked_out FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [id, req.user.id]);
+      const deck = await db.get(`SELECT * FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [id, req.user.id]);
       if (!deck) throw Object.assign(new Error('Deck not found or unauthorized'), { status: 404 });
+      if (req.restoringRevision && deck.checked_out) {
+        throw Object.assign(new Error('Return this deck before restoring a revision'), { status: 400 });
+      }
       const archiving = inventory_type === 'graveyard' && deck.inventory_type !== 'graveyard';
       if (inventory_type === 'graveyard' && !archiving && cards.some(card => card.source_entry_id != null)) {
         throw Object.assign(new Error('Graveyard decks cannot select physical sources'), { status: 400 });
       }
       const savedCards = await db.all(`SELECT card_id, quantity, source_entry_id FROM deck_cards WHERE deck_id = ? AND quantity > 0`, [id]);
+      const before = composition(deck, savedCards);
       const saved = new Map(savedCards.map(card => [card.card_id, card]));
       if (deck.checked_out) {
         if (inventory_type !== deck.inventory_type) {
@@ -590,7 +626,10 @@ router.put('/:id/editor', async (req, res) => {
       await db.run(
         `UPDATE decks SET name = ?, description = ?, notes = COALESCE(?, notes), format = ?, category = ?, accent_color = ?,
           target_size = ?, inventory_type = ?, commander_card_id = ? WHERE id = ? AND user_id = ?`,
-        [name.trim(), description, notes ?? null, format, category, accent_color, target_size, inventory_type, commander_card_id, id, req.user.id]
+        [req.restoringRevision ? deck.name : name.trim(), req.restoringRevision ? deck.description : description,
+          req.restoringRevision ? deck.notes : notes ?? null, format,
+          req.restoringRevision ? deck.category : category, req.restoringRevision ? deck.accent_color : accent_color,
+          target_size, inventory_type, commander_card_id, id, req.user.id]
       );
       if (deck.checked_out) {
         // Preserve the checked-out composition and its reservations, even if inventory has since changed.
@@ -616,13 +655,17 @@ router.put('/:id/editor', async (req, res) => {
           );
         }
       }
+      const updated = await db.get('SELECT * FROM decks WHERE id = ?', [id]);
+      const updatedCards = await db.all('SELECT card_id, quantity, source_entry_id FROM deck_cards WHERE deck_id = ? AND quantity > 0', [id]);
+      await recordRevision(id, before, composition(updated, updatedCards), req.restoringRevision ? 'restore' : 'save');
     });
     res.json({ message: 'Deck updated successfully' });
   } catch (error) {
     if (!error.status) console.error(error);
     res.status(error.status || 500).json({ error: error.status ? error.message : 'Failed to update deck' });
   }
-});
+}
+router.put('/:id/editor', saveDeckEditor);
 
 router.patch('/:id/record', async (req, res) => {
   const body = req.body;

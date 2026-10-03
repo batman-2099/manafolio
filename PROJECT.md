@@ -101,6 +101,7 @@ Missing/Found is a flag on an entry, not deletion or archival. Individual invent
 | `compartment_assignments` | Filing categories assigned to compartments |
 | `decks` | User-owned definition, inventory, format, target size, commander, metadata, checkout state, wins/losses |
 | `deck_cards` | Printing quantities and optional source-entry anchor per deck; `checked_out` here records **Pulled**, not the deck's reservation state |
+| `deck_revisions` | Account-private composition snapshots, timestamped when observed; deck foreign key cascades on deletion |
 | `deck_card_allocations` | Exact collection entries and quantities reserved by checked-out decks |
 | `sets` | Provider set metadata and ordering |
 | `price_history` | Changed card prices over time |
@@ -239,6 +240,8 @@ Physical checkout reserves quantities by setting `decks.checked_out` and `checke
 `GET /api/decks/:id/cards/:cardId/sources` groups available Physical copies by location and compartment. The editor saves nullable `source_entry_id`: null selects automatically; an entry anchors the selected location/compartment, which must supply the entire quantity at checkout. New source assignments validate account/card/Physical identity. Existing stale anchors remain saveable but fail checkout explicitly instead of reverting to automatic selection.
 
 `GET /api/decks/:id/locations` provides specific entries, containers, compartments, slot positions, and missing counts for the pull list. Checkout records exact entries in `deck_card_allocations`; `checkedOutAllocation` uses those records so storage reserves the same copies even after other decks return. Startup materializes legacy reservations. Backup restore remaps source and allocation entry references. **Pulled** remains the per-deck-card checklist state (`deck_cards.checked_out`), distinct from the deck-level reservation flag.
+
+Ordinary complete editor saves record composition changes in `deck_revisions` within the same transaction. `utils/deckRevisions.js` normalizes printing order, quantities, source anchors, commander, format, target size and inventory; identical compositions are skipped. The first changed save captures the immediately preceding state as a present-time baseline, never a backdated history. Metadata-only and Pulled-only saves do not add revisions. `GET /api/decks/:id/revisions` is owner-scoped; `POST /api/decks/:id/revisions/:revisionId/restore` resolves a deck-owned snapshot and delegates to the same validated editor-save path. Its transaction rejects checked-out decks, preserves current non-composition metadata, resets Pulled flags, and records the restore without moving or reserving inventory. Account backup validates snapshots, includes history-only cached printings, and remaps historical source anchors (including stale negative identities). Deck/user deletion cascades history; public shares and duplication exclude it.
 
 Return clears the deck-level reservation state. Checkout/check-in use the same stored location for pulling and re-filing. Return a deck before changing its composition or individually archiving its reserved copies. Whole-container archiving and storage reassignment retain reservations.
 

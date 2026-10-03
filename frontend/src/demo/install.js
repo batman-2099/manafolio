@@ -124,6 +124,9 @@ window.fetch = async (input, opts = {}) => {
     if (Object.hasOwn(body, 'storage_unit_id')) location.storage_unit_name = unit?.name ?? null;
     return Promise.resolve(json(method === 'POST' ? { id: location.id } : { message: 'Container updated.' }, method === 'POST' ? 201 : 200));
   }
+  if (/^\/api\/decks\/\d+\/revisions(?:\/.*)?$/.test(path)) {
+    return Promise.resolve(json({ error: 'Deck history requires a server installation; the demo does not persist deck revisions.' }, 503));
+  }
   if (/^\/api\/decks\/\d+\/share$/.test(path) || path.startsWith('/api/shared/decks/')) {
     return Promise.resolve(json({ error: 'Public deck sharing is unavailable in the demo.' }, 503));
   }

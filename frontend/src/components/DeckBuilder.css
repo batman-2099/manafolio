@@ -825,3 +825,80 @@
   overscroll-behavior: contain;
   padding: 1rem;
 }
+
+.deck-history-panel {
+  display: grid;
+  gap: 1rem;
+  width: 760px;
+  max-width: 100%;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+  padding: 1.25rem;
+}
+
+.deck-history-selectors {
+  display: grid;
+  gap: 1rem;
+}
+
+.deck-history-selectors label {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.deck-history-selectors select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  font-size: 1rem;
+}
+
+.deck-history-changes {
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.deck-history-changes li {
+  display: grid;
+  gap: 0.25rem;
+  padding-block: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.deck-history-changes .deck-history-card-change {
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.75rem;
+  border: 1px solid var(--history-change-color);
+  border-inline-start-width: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+}
+
+.deck-history-card-change--added { --history-change-color: var(--accent-green); }
+.deck-history-card-change--removed { --history-change-color: var(--accent-red); }
+.deck-history-card-change--changed { --history-change-color: var(--accent-yellow); }
+
+.deck-history-card-change img {
+  width: 64px;
+  aspect-ratio: 5 / 7;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.deck-history-card-change > div {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.deck-history-change-label {
+  font-weight: 700;
+}

@@ -38,6 +38,8 @@ The normal scan path processes images in memory rather than adding them to your 
 
 **Uploaded storage-unit images** are also private account attachments, not shared replacement card artwork. The browser resizes your selected PNG, JPEG or WebP locally; your server validates and re-encodes it without source metadata, stores it in the account database, and includes it in complete account backups. Unit images are returned only through authenticated storage endpoints, not public container shares or public card-art URLs. Choosing card artwork or Automatic image replaces the saved upload; copies in earlier backups may remain. Uploading a local file does not send it to an external image provider.
 
+**Deck history** retains saved composition revisions: card printings, quantities, source-entry references, commander, format, target size, inventory and revision timestamps. It does not snapshot private notes, names, descriptions, results or artwork. History is account-authenticated, excluded from public deck shares, included in complete account backups, and deleted with its deck or account. Restoring a revision does not erase later revisions; copies in older exports or server backups can remain after deletion.
+
 ## External network requests
 
 External services receive the network information needed to serve a request, such as the connecting IP address, requested URL, timing, and HTTP headers. Browser requests may also disclose referrer information according to browser policy. The services' own terms, privacy policies, and retention rules apply.

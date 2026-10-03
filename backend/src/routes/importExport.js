@@ -111,6 +111,27 @@ async function parseCompleteBackup(data) {
   const compartmentIds = new Set(backup.compartments.map(compartment => compartment.id));
   const deckIds = new Set(backup.decks.map(deck => deck.id));
   const entries = new Map(backup.collection.map(entry => [entry.id, entry]));
+  const revisions = backup.deck_revisions ?? [];
+  if (!Array.isArray(revisions)) throw new Error('Invalid backup deck history');
+  for (const revision of revisions) {
+    const snapshot = typeof revision.snapshot === 'string' ? JSON.parse(revision.snapshot) : null;
+    if (!deckIds.has(revision.deck_id) || !['baseline', 'save', 'restore'].includes(revision.kind)
+        || typeof revision.created_at !== 'string' || !Number.isFinite(Date.parse(revision.created_at))
+        || !snapshot || typeof snapshot.format !== 'string'
+        || !Number.isInteger(snapshot.target_size) || snapshot.target_size < 1 || snapshot.target_size > 300
+        || !['collection', 'arena', 'graveyard'].includes(snapshot.inventory_type)
+        || !Array.isArray(snapshot.cards)
+        || new Set(snapshot.cards.map(card => card?.card_id)).size !== snapshot.cards.length
+        || snapshot.cards.some(card => !card || !cardIds.has(card.card_id)
+          || !Number.isSafeInteger(card.quantity) || card.quantity < 1
+          || (card.source_entry_id != null && (snapshot.inventory_type !== 'collection'
+            || !Number.isSafeInteger(card.source_entry_id) || card.source_entry_id === 0
+            || (entries.has(card.source_entry_id) && entries.get(card.source_entry_id).card_id !== card.card_id))))
+        || (snapshot.commander_card_id !== null && (!/commander|edh|brawl/i.test(snapshot.format)
+          || !snapshot.cards.some(card => card.card_id === snapshot.commander_card_id)))) {
+      throw new Error('Invalid backup deck history');
+    }
+  }
   const allocations = backup.deck_card_allocations ?? [];
   if (!Array.isArray(allocations)
       || backup.deck_cards.some(card => card.source_entry_id != null && (
@@ -276,6 +297,14 @@ async function restoreCompleteBackup(backup, userId) {
         card.source_entry_id == null ? null : restoredEntryId(card.source_entry_id)
       ]);
     }
+    for (const revision of backup.deck_revisions ?? []) {
+      const snapshot = JSON.parse(revision.snapshot);
+      for (const card of snapshot.cards) {
+        if (card.source_entry_id != null) card.source_entry_id = restoredEntryId(card.source_entry_id);
+      }
+      await db.run('INSERT INTO deck_revisions (deck_id, created_at, kind, snapshot) VALUES (?, ?, ?, ?)',
+        [deckIds.get(revision.deck_id), revision.created_at, revision.kind, JSON.stringify(snapshot)]);
+    }
     for (const source of backup.deck_card_allocations ?? []) {
       await db.run(`INSERT INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
         [deckIds.get(source.deck_id), source.card_id, restoredEntryId(source.entry_id), source.quantity]);
@@ -308,8 +337,11 @@ router.get('/export', async (req, res) => {
             SELECT card_id FROM collection WHERE user_id = ?
             UNION
             SELECT dc.card_id FROM deck_cards dc JOIN decks d ON d.id = dc.deck_id WHERE d.user_id = ?
+            UNION
+            SELECT json_extract(card.value, '$.card_id') FROM deck_revisions r
+              JOIN decks d ON d.id = r.deck_id, json_each(r.snapshot, '$.cards') card WHERE d.user_id = ?
           ) ORDER BY id
-        `, [req.user.id, req.user.id])
+        `, [req.user.id, req.user.id, req.user.id])
       ]);
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', `attachment; filename=manafolio_backup_${new Date().toISOString().slice(0, 10)}.json`);
@@ -325,6 +357,7 @@ router.get('/export', async (req, res) => {
         compartment_assignments: compartmentAssignments,
         decks,
         deck_cards: deckCards,
+        deck_revisions: await db.all('SELECT r.* FROM deck_revisions r JOIN decks d ON d.id = r.deck_id WHERE d.user_id = ? ORDER BY r.id', [req.user.id]),
         deck_card_allocations: await checkedOutSources(req.user.id)
       });
     }

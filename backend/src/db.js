@@ -352,6 +352,17 @@ async function initDb() {
   `);
 
   await run(`
+    CREATE TABLE IF NOT EXISTS deck_revisions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      deck_id INTEGER NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      kind TEXT NOT NULL CHECK(kind IN ('baseline', 'save', 'restore')),
+      snapshot TEXT NOT NULL
+    )
+  `);
+  await run('CREATE INDEX IF NOT EXISTS idx_deck_revisions_deck ON deck_revisions(deck_id, id)');
+
+  await run(`
     CREATE TABLE IF NOT EXISTS deck_cards (
       deck_id INTEGER NOT NULL,
       card_id TEXT NOT NULL,
