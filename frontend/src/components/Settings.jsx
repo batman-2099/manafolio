@@ -6,6 +6,7 @@ import { LOCALES, localeName, useT } from '../utils/i18n';
 import { getRepoUrl, issueUrl } from '../utils/repo';
 import { downloadBlob } from '../utils/downloadBlob';
 import CodexSettings from './CodexSettings';
+import OfflineSettings from './OfflineSettings';
 import themes from '../../../shared/themes.json';
 import './Settings.css';
 
@@ -485,6 +486,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
         {user && <a href="#codex-settings-title">{t('codexSettings.title')}</a>}
         {user?.role === 'admin' && <a href="#settings-bulk-title">{t('settings.bulkTitle')}</a>}
         <a href="#settings-backup">{t('settings.backupTitle')}</a>
+        <a href="#settings-offline">{t('offline.settingsTitle')}</a>
         <a href="#settings-preferences">{t('prefs.title')}</a>
         <a href="#settings-about">{t('settings.aboutTitle')}</a>
       </nav>
@@ -911,6 +913,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
           </p>}
         </div>
 
+        <OfflineSettings key={user?.id} user={user} />
         {/* Preferences Panel */}
         <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

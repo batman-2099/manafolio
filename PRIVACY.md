@@ -1,6 +1,6 @@
 # Manafolio privacy
 
-**Effective date:** October 2, 2026
+**Effective date:** October 3, 2026
 
 Manafolio is a self-hosted Magic: The Gathering collection, storage, and deck manager. Your chosen server holds your account and collection; this repository does not provide a central Manafolio account or hosted collection service. Installing the application does not give its maintainers access to your server.
 
@@ -27,6 +27,10 @@ The server administrator controls the database, persistent files, and access to 
 The browser uses local storage for the sign-in token, account data returned by the server, interface language, and device-specific display/scanner preferences. Returned account settings can include configured provider API keys. Browser caches and downloaded exports may retain additional data on the device.
 
 Signing out removes the application's saved sign-in token and user object, but is not a wipe of all preferences, downloads, caches, or operating-system backups. Clear browser site data and downloaded files when retiring a shared device.
+
+**Optional offline lookup** stores one account-scoped text snapshot in IndexedDB on that browser profile: account ID/name, card identities and printing details, quantities, inventory membership, missing/reserved quantities, and physical storage paths. It excludes artwork, prices, notes, and credentials. The existing browser sign-in token remains necessary to select the account's snapshot, but is not copied into the snapshot or service-worker cache. Enabling the feature also caches the dedicated read-only page, its scripts/styles, and interface dictionaries; API responses and public-share pages are never cached by this service worker.
+
+Refresh is manual and replaces the snapshot only after a successful download and database commit. Clear offline data, signing out, and signing into another account invalidate pending downloads and remove the snapshot; already-open tabs are notified. Public application files may remain cached. If clearing reports a storage error, clear browser site data to remove residual records. Anyone with access to this browser profile may access its local data; snapshots are not encrypted. Remote account deletion or session revocation cannot erase a disconnected device. Browser eviction can remove the snapshot, so it is not a backup.
 
 Container-label sign-in through SSO temporarily stores the intended container ID in this tab's session storage, then removes it when navigation resolves. No label or QR image is saved to the server.
 

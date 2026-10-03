@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import basicSsl from '@vitejs/plugin-basic-ssl'
+import { offlineBuild } from './scripts/offline-build.mjs'
 
 // Bake the version into the bundle. Settings used to learn its own version from
 // /api/settings/version, so any hiccup on that call left it showing "Version …"
@@ -19,7 +20,7 @@ export default defineConfig({
     transformIndexHtml(html) {
       return html.replace('__THEME_KEYS__', JSON.stringify(themes))
     },
-  }],
+  }, ...(!process.env.VITE_DEMO ? [offlineBuild()] : [])],
   // Matches how the app already reads build-time config (VITE_DEMO), so this
   // needs no new global and no eslint exception.
   define: {
@@ -40,6 +41,9 @@ export default defineConfig({
   // is public, so exposing sources costs nothing.
   build: {
     sourcemap: true,
+    rollupOptions: {
+      input: process.env.VITE_DEMO ? 'index.html' : { app: 'index.html', offline: 'offline.html' },
+    },
   },
   server: {
     port: 5173,

@@ -356,8 +356,13 @@ Requests contain eligible card metadata/counts, conversation, and the current dr
 | `DeckBuilder`, `CheckoutWizardModal`, `AiDeckBuilder` | Local deck draft, private deck notes, play/pull list, draw simulation, AI drafts |
 | `Settings`, `CodexSettings`, `AdminPanel`, `CatalogPanel` | Preferences, AI connections, user administration, scan assets |
 | `SharedCollection`, `SharedContainer`, `SharedDeck` | Public read-only sharing |
+| `OfflineSettings`, `OfflineCollection` | Device opt-in and a separate text-only offline lookup entry |
 
 Pricing, sorting, names/languages, printing/rarity, card options, and shuffling reuse the helpers in `frontend/src/utils/`. `I18nProvider` and locale JSON provide translations with English fallback; shared tables and geometry prevent client/server domain drift.
+
+Offline lookup uses `GET /api/collection/offline-snapshot` behind the existing auth gate. One database transaction reads the user's Physical, Arena, and Wishlist text records and existing checkout allocation rules without provider calls. The response is `no-store`; `utils/offlineCollection.js` explicitly commits one account/version/generation-scoped IndexedDB snapshot. Clear/logout invalidates a local generation before asynchronous deletion, so stale downloads cannot restore cleared data.
+
+Production builds include `offline.html` and a generated `offline-worker.js`. `scripts/offline-build.mjs` derives a versioned cache allowlist from the dedicated entry's dependency graph, including locale chunks; it does not cache the editor, API responses, artwork, or models. Registration happens only on explicit snapshot download. The worker falls back from `/` or `/index.html` to the cached read-only page on navigation failure/5xx or a five-second timeout; in an already-open app, failed API requests offer a saved-lookup link in a new tab without discarding drafts. New offline copy currently uses the established English translation fallback. Vite dev and demo builds cannot enable offline lookup.
 
 Private deck notes use `decks.notes`, separate from `description`, and save with the existing atomic deck editor draft. Duplication and complete account backups preserve them; AI prompts and public shares exclude them. The additive migration retains standalone account notes, whose former navigation entry and UI have been removed.
 

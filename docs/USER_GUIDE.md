@@ -952,6 +952,22 @@ Open **Settings** and use its section links to jump to the relevant panel.
 
 **Expected result:** language/currency changes apply in the browser; default views and zoom apply when their screens next open. Language, currency, default views, and zoom are browser-local preferences, unlike the account-saved theme and AI preferences. Changing them on one device is not a promise they will follow you to another browser.
 
+### Look up your collection without your server
+
+1. While connected, open **Settings → Offline collection lookup** (**More → Settings** on a phone).
+2. Read the device-privacy notice, then choose **Enable and download snapshot**. Wait for **Snapshot downloaded and ready for offline lookup** before leaving.
+3. Choose **Open offline lookup**, or bookmark the same server's `/offline.html` address. Opening the app's home address when its server is unreachable also falls back to this read-only page.
+4. Search card/printed name, set name/code, or collector number; every word must match. Select **Physical**, **Arena**, or **Wishlist**, then narrow by color identity, finish, or physical storage location. Entries show quantities, missing/reserved quantities, and saved storage paths.
+5. Check **Snapshot saved** before relying on the results. Even when online, this page shows saved—not live—data. Choose **Refresh snapshot** while connected to replace it; ordinary failed downloads leave the previous snapshot intact.
+6. Use **Return to online app** for editing. Use **Clear offline data** to remove the snapshot from this browser, or sign out of the online app. Signing into another account also clears it.
+
+The feature requires a production build served over browser-trusted HTTPS, or localhost for desktop testing. It is unavailable in Vite development, the demo, and plain HTTP LAN URLs; bypassing a certificate warning may not permit service-worker installation. Enable it independently on each browser/device, using the same server address and browser profile you will use later.
+
+The snapshot contains only Physical, Arena, and Wishlist text records—not Graveyard, artwork, prices, notes, or a full Scryfall catalog. Editing, scanning, trades, checkout, and AI still require your server. No offline changes are queued and refresh is never automatic. New offline interface text currently falls back to English in other interface languages.
+
+Only enable this on a trusted device. Browser-profile access can expose saved data, remote revocation cannot erase a disconnected device, and browser storage can be cleared or evicted. If storage removal fails, clear the site's browser data. Cached public application files may remain after clearing the snapshot. **This is a convenience copy, not a backup.**
+
+
 ## Sharing and security
 
 ### Enable or stop public sharing

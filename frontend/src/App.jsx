@@ -6,6 +6,7 @@ import { pushBackGuard } from './utils/useBackGuard';
 import { useT } from './utils/i18n';
 import themes from '../../shared/themes.json';
 import { pendingContainerLink } from './utils/containerLabel';
+import { clearSnapshot, readSnapshot, OFFLINE_EVENT } from './utils/offlineCollection';
 
 // View components are code-split so heavy deps (recharts in the chart views)
 // load on demand instead of in the initial bundle.
@@ -84,7 +85,13 @@ window.fetch = function (input, options = {}) {
       // Dispatch custom event to trigger logout without page refresh
       window.dispatchEvent(new Event('manafolio_logout'));
     }
+    if (token && url.startsWith('/api/') && response.status >= 500) {
+      window.dispatchEvent(new Event('manafolio_server_unavailable'));
+    }
     return response;
+  }).catch(error => {
+    if (token && url.startsWith('/api/')) window.dispatchEvent(new Event('manafolio_server_unavailable'));
+    throw error;
   });
 };
 
@@ -101,6 +108,39 @@ function App() {
     }
   });
 
+  const [serverUnavailable, setServerUnavailable] = useState(!navigator.onLine);
+  const [snapshotUserId, setSnapshotUserId] = useState(null);
+  useEffect(() => {
+    let revision = 0;
+    const load = async () => {
+      const current = ++revision;
+      setSnapshotUserId(null);
+      try {
+        const snapshot = await readSnapshot();
+        if (revision === current) setSnapshotUserId(snapshot?.user_id ?? null);
+      } catch { /* Settings reports storage errors; this optional shortcut stays hidden. */ }
+    };
+    const unavailable = () => setServerUnavailable(true);
+    const storage = event => {
+      load();
+      if (event.key && !['manafolio_token', 'manafolio_user'].includes(event.key)) return;
+      setToken(localStorage.getItem('manafolio_token'));
+      try { setUser(JSON.parse(localStorage.getItem('manafolio_user') || 'null')); }
+      catch { setUser(null); }
+    };
+    load();
+    window.addEventListener(OFFLINE_EVENT, load);
+    window.addEventListener('storage', storage);
+    window.addEventListener('offline', unavailable);
+    window.addEventListener('manafolio_server_unavailable', unavailable);
+    return () => {
+      revision++;
+      window.removeEventListener(OFFLINE_EVENT, load);
+      window.removeEventListener('storage', storage);
+      window.removeEventListener('offline', unavailable);
+      window.removeEventListener('manafolio_server_unavailable', unavailable);
+    };
+  }, [token, user?.id]);
   const sessionRevision = useRef(0);
   const [pendingContainer, setPendingContainer] = useState(pendingContainerLink);
 
@@ -203,11 +243,12 @@ function App() {
     if (!token || shareToken || deckShareToken) return;
     let cancelled = false;
     const revision = sessionRevision.current;
-    fetch('/api/auth/me')
+    fetch('/api/auth/me', { signal: AbortSignal.timeout(8000) })
       .then(res => res.ok ? res.json() : Promise.reject(new Error('Failed to fetch profile')))
       .then(data => {
         if (cancelled || revision !== sessionRevision.current || token !== localStorage.getItem('manafolio_token')) return;
         setUser(data.user);
+        setServerUnavailable(false);
         localStorage.setItem('manafolio_user', JSON.stringify(data.user));
       })
       .catch(err => { if (!cancelled) console.error('Session refresh failed:', err); });
@@ -265,8 +306,10 @@ function App() {
           headers: { 'Authorization': `Bearer ${oidcToken}` }
         })
           .then(res => res.ok ? res.json() : Promise.reject(new Error('Failed to fetch profile')))
-          .then(data => {
+          .then(async data => {
             if (data.user && revision === sessionRevision.current && !localStorage.getItem('manafolio_token')) {
+              await clearSnapshot();
+              if (revision !== sessionRevision.current || localStorage.getItem('manafolio_token')) return;
               sessionRevision.current += 1;
               setToken(oidcToken);
               setUser(data.user);
@@ -368,6 +411,7 @@ function App() {
   // Handle automatic logout on 401
   useEffect(() => {
     const handleAutoLogout = () => {
+      clearSnapshot().catch(() => showToast(t('offline.storageError'), 'error'));
       if (navigationGuardRef.current?.() === false) return;
       sessionRevision.current += 1;
       setToken(null);
@@ -381,7 +425,10 @@ function App() {
   }, [t, showToast]);
 
 
-  const handleLoginSuccess = (newToken, newUser) => {
+  const handleLoginSuccess = async (newToken, newUser) => {
+    try { await clearSnapshot(); }
+    catch { showToast(t('offline.storageError'), 'error'); return; }
+    setServerUnavailable(false);
     sessionRevision.current += 1;
     setToken(newToken);
     setUser(newUser);
@@ -393,6 +440,7 @@ function App() {
 
   const handleLogout = () => {
     if (navigationGuardRef.current?.() === false) return;
+    clearSnapshot().catch(() => showToast(t('offline.storageError'), 'error'));
     // Revoke token on server asynchronously
     fetch('/api/auth/logout', { method: 'POST' }).catch(err => console.error(err));
 
@@ -657,6 +705,10 @@ function App() {
       {/* Main Content Area */}
       <main id="main-content" ref={mainRef} tabIndex={-1} style={{ flex: 1, marginTop: '1rem' }}>
         {user.role === 'admin' && setupProbe === 'loading' && <p role="status">{t('common.loading')}</p>}
+        {serverUnavailable && snapshotUserId === user.id && <section className="glass-panel" role="status" style={{ padding: '1rem', marginBottom: '1rem' }}>
+          <p>{t('offline.serverUnavailable')}</p>
+          <a className="btn btn-secondary" href="/offline.html" target="_blank" rel="noreferrer">{t('offline.open')}</a>
+        </section>}
         {user.role === 'admin' && setupProbe === 'error' && <div role="alert">
           <p>{t('setup.checkError')}</p>
           <button type="button" className="btn btn-secondary" onClick={() => setSetupRetry(value => value + 1)}>{t('common.retry')}</button>

@@ -494,6 +494,55 @@ router.get('/collection', async (req, res) => {
   }
 });
 
+// A text-only snapshot: keep inventory and exact checkout allocations in one read.
+router.get('/collection/offline-snapshot', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    const snapshot = await db.withTransaction(async () => {
+      const user = await db.get('SELECT id, username FROM users WHERE id = ?', [req.user.id]);
+      if (!user) return null;
+      const rows = await db.all(`
+        SELECT c.id AS entry_id, c.card_id, cc.name, cc.printed_name,
+          cc.set_id, cc.set_name, cc.number, c.quantity, c.list_type,
+          c.printing, c.language, c.condition, cc.color_identity,
+          COALESCE(c.missing, 0) AS missing,
+          l.id AS location_id, l.name AS location_name, su.name AS storage_unit_name,
+          l.type AS location_type, cp.idx AS compartment_idx, cp.label AS compartment_label,
+          CASE WHEN l.id IS NOT NULL THEN c.position ELSE NULL END AS position
+        FROM collection c
+        JOIN card_cache cc ON cc.id = c.card_id AND cc.game = c.game
+        LEFT JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
+          AND c.list_type = 'collection' AND l.inventory_type = 'collection'
+        LEFT JOIN storage_units su ON su.id = l.storage_unit_id AND su.user_id = c.user_id
+        LEFT JOIN compartments cp ON cp.id = c.compartment_id AND cp.location_id = l.id
+        WHERE c.user_id = ? AND c.game = 'mtg'
+          AND c.list_type IN ('collection', 'arena', 'wishlist')
+        ORDER BY c.id
+      `, [user.id]);
+      const allocated = await checkedOutAllocation(user.id);
+      return {
+        version: 1,
+        user_id: user.id,
+        username: user.username,
+        saved_at: new Date().toISOString(),
+        cards: rows.map(row => {
+          const colors = JSON.parse(row.color_identity || '[]');
+          return {
+            ...row,
+            color_identity: Array.isArray(colors) ? colors : [],
+            reserved_quantity: row.list_type === 'collection' ? allocated.get(row.entry_id) || 0 : 0
+          };
+        })
+      };
+    });
+    if (!snapshot) return res.status(401).json({ error: 'Account no longer exists' });
+    res.json(snapshot);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch offline collection snapshot' });
+  }
+});
+
 // Shared by the single add below and the bulk add after it, so one card and two
 // hundred cards travel exactly the same path (cache lookup, compartment
 // resolution, rebalance, price history). Throws AddCardError for caller-visible
