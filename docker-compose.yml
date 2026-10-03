@@ -12,8 +12,8 @@ services:
     ports:
       - "3001:3001"                     # HTTP
       - "3443:3443"                     # HTTPS (self-signed cert unless SSL_CERT_PATH is set)
-    environment: {}
-      # All optional. Uncomment and set as needed.
+    # All optional. Uncomment the environment header AND the desired entries.
+    # environment:
       # - HTTPS_PORT=3443               # Image default. Set to "" to serve plain HTTP only (no camera scanning off-localhost)
       # - SSL_CERT_PATH=                # Your own certificate, e.g. /app/database/certs/fullchain.pem. Omit for an auto-generated self-signed one
       # - SSL_KEY_PATH=                 # Its private key

@@ -124,6 +124,16 @@ async function main() {
   const plain = await loadCompartments(db, locId, userId);
   assert.strictEqual(plain[0].count, 5, `without stacking every copy counts, got ${plain[0].count}`);
   console.log('PASS: with stacking off, occupancy is the card count again');
+
+  const top = await db.run("INSERT INTO locations (name, type, sort_order, user_id) VALUES ('Toploader pockets', 'Toploader Binder', 'custom', ?)", [userId]);
+  const topPage = await db.run('INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 9)', [top.lastID]);
+  const pocketResponse = await fetch(`${base}/api/collection/${loose}/place`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ compartment_id: topPage.lastID, slot: 5 }),
+  });
+  assert.strictEqual(pocketResponse.status, 200);
+  assert.strictEqual((await db.get('SELECT position FROM collection WHERE id = ?', [loose])).position, 5000);
+  assert.strictEqual((await pocketResponse.json()).placement.label, 'Page 1, Pos 5 (in Toploader pockets)');
 }
 
 main()

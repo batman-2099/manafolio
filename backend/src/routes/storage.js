@@ -284,6 +284,12 @@ router.post('/locations', async (req, res) => {
   } catch {
     return res.status(400).json({ error: 'rule_config must be valid JSON' });
   }
+  const plan = compartmentPlan || defaultCompartmentPlan(type);
+  if (!plan || !['count', 'capacity'].every(key =>
+    (typeof plan[key] === 'number' || (typeof plan[key] === 'string' && plan[key].trim() !== '')) &&
+    Number.isSafeInteger(Number(plan[key])) && Number(plan[key]) > 0)) {
+    return res.status(400).json({ error: 'Compartment count and capacity must be positive safe integers' });
+  }
   try {
     await validateStorageUnit(storage_unit_id, req.user.id);
     const existing = await db.get(`SELECT id FROM locations WHERE name = ? AND user_id = ?`, [name, req.user.id]);
@@ -291,13 +297,15 @@ router.post('/locations', async (req, res) => {
       return res.status(400).json({ error: 'A location with this name already exists' });
     }
 
-    const result = await db.run(`
+    const result = await db.withTransaction(async () => {
+    const inserted = await db.run(`
       INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, inventory_type, sleeved, storage_unit_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [name, type, sort_order, foil_sorting || 'normals_first', rule_type, ruleConfigJson, game, req.user.id, inventory_type, sleeved, storage_unit_id ?? null]);
 
-    const plan = compartmentPlan || defaultCompartmentPlan(type);
-    await db.createCompartments(result.lastID, Math.max(1, parseInt(plan.count, 10) || 1), Math.max(1, parseInt(plan.capacity, 10) || 40));
+    await db.createCompartments(inserted.lastID, Number(plan.count), Number(plan.capacity));
+    return inserted;
+    });
 
     res.status(200).json({ message: 'Location created', id: result.lastID });
   } catch (error) {
@@ -512,6 +520,7 @@ router.put('/locations/:id', async (req, res) => {
       }
     }
 
+    const evicted = await db.withTransaction(async () => {
     // Switching to Custom: bake the outgoing scheme into stored positions so the
     // manual order starts from the currently-sorted layout instead of stale
     // positions (which would render jumbled). Must run before the UPDATE, while
@@ -531,7 +540,7 @@ router.put('/locations/:id', async (req, res) => {
         sort_order = COALESCE(?, sort_order),
         foil_sorting = COALESCE(?, foil_sorting),
         rule_type = COALESCE(?, rule_type),
-        rule_config = COALESCE(?, rule_config),
+        rule_config = CASE WHEN ? THEN ? ELSE rule_config END,
         game = COALESCE(?, game),
         locked = COALESCE(?, locked),
         allow_stacking = COALESCE(?, allow_stacking),
@@ -539,7 +548,7 @@ router.put('/locations/:id', async (req, res) => {
         storage_unit_id = CASE WHEN ? THEN ? ELSE storage_unit_id END,
         cover_card_id = CASE WHEN ? THEN ? ELSE cover_card_id END
       WHERE id = ? AND user_id = ?
-    `, [name, type, sort_order, foil_sorting, rule_type, ruleConfigJson, game,
+    `, [name, type, sort_order, foil_sorting, rule_type, rule_config !== undefined ? 1 : 0, ruleConfigJson ?? null, game,
         locked === undefined ? null : (locked ? 1 : 0),
         allow_stacking === undefined ? null : (allow_stacking ? 1 : 0),
         sleeved ?? null,
@@ -568,6 +577,8 @@ router.put('/locations/:id', async (req, res) => {
         }
       }
     }
+    return evicted;
+    });
     res.json({ message: 'Location updated', evicted });
   } catch (error) {
     if (error.status) return res.status(error.status).json({ error: error.message });
@@ -616,7 +627,7 @@ router.post('/locations/:id/compartments', async (req, res) => {
 
     const last = await db.get(`SELECT MAX(idx) as maxIdx, capacity FROM compartments WHERE location_id = ? ORDER BY idx DESC LIMIT 1`, [id]);
     const nextIdx = (last && last.maxIdx ? last.maxIdx : 0) + 1;
-    const capacity = (last && last.capacity) ? last.capacity : (loc.type === 'Binder' ? 9 : 400);
+    const capacity = (last && last.capacity) ? last.capacity : defaultCompartmentPlan(loc.type).capacity;
 
     const result = await db.run(`INSERT INTO compartments (location_id, idx, capacity) VALUES (?, ?, ?)`, [id, nextIdx, capacity]);
     const created = await db.get(`SELECT * FROM compartments WHERE id = ?`, [result.lastID]);
@@ -918,9 +929,10 @@ router.post('/locations/:id/apply-all', async (req, res) => {
 router.post('/locations/:id/resort', async (req, res) => {
   const { id } = req.params;
   try {
+    const results = await db.withTransaction(async () => {
     const location = await db.get(`SELECT * FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
-    if (!location) return res.status(404).json({ error: 'Location not found' });
-    if (location.locked) return res.status(409).json({ error: 'Unlock this container before re-sorting' });
+    if (!location) throw Object.assign(new Error('Location not found'), { status: 404 });
+    if (location.locked) throw Object.assign(new Error('Unlock this container before re-sorting'), { status: 409 });
 
     const cards = await db.all(`
       SELECT c.id as entry_id, c.card_id, c.printing, c.language, c.quantity, c.favorite, c.is_trade, c.list_type,
@@ -933,7 +945,7 @@ router.post('/locations/:id/resort', async (req, res) => {
     `, [id, req.user.id, location.inventory_type]);
     cards.forEach(c => { try { c.types = JSON.parse(c.types || '[]'); } catch { c.types = []; } });
 
-    if (cards.length === 0) return res.json([]);
+    if (cards.length === 0) return [];
 
     await db.run(`UPDATE collection SET compartment_id = NULL, position = 0 WHERE id IN (${cards.map(() => '?').join(',')}) AND user_id = ?`, [...cards.map(card => card.entry_id), req.user.id]);
 
@@ -958,9 +970,12 @@ router.post('/locations/:id/resort', async (req, res) => {
         );
       }
     }
+    return results;
+    });
 
     res.json(results);
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     console.error(error);
     res.status(500).json({ error: 'Failed to re-sort container' });
   }

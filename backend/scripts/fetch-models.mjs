@@ -20,9 +20,15 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
+// Match server startup: existing environment, then CWD .env, then backend/.env.
+require('dotenv').config();
+require('dotenv').config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 
 // Share descriptors, destination and atomic streaming downloads with the admin panel.
-const { MODELS, CATALOGS, LICENSE, MODEL_DIR, fetchAsset } = createRequire(import.meta.url)('../src/utils/modelAssets.js');
+const { MODELS, CATALOGS, LICENSE, MODEL_DIR, fetchAsset } = require('../src/utils/modelAssets.js');
 
 const mb = (n) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 

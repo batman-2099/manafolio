@@ -303,7 +303,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
     const groups = {};
     filteredCollection.forEach(item => {
-      let key = item.card_id;
+      let key = `${item.card_id}-${JSON.stringify([item.grader || 'Raw', item.grade ?? null, item.cert_number ?? null])}`;
       if (stackByCondition) key += `-${item.condition}`;
       if (stackByPrinting) key += `-${item.printing}`;
 

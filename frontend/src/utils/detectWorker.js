@@ -12,9 +12,8 @@
 // touch handling, which is what made the camera freeze the app, so the worker
 // stays.
 //
-// The pixel buffer is TRANSFERRED rather than copied in both directions: a
-// 256x360 RGBA frame is ~370KB, and copying that several times a second is the
-// kind of waste that is invisible until it is not.
+// Transfer each fresh ImageData buffer to the worker without a full-frame copy.
+// Only detection results need to return to the main thread.
 // The CPU-only entry point, NOT 'onnxruntime-web/webgpu' and not the bare
 // 'onnxruntime-web' either. The session below names 'wasm' as its ONLY execution
 // provider, deliberately, for the measured reason spelled out there — so every
@@ -170,7 +169,7 @@ self.onmessage = async (e) => {
     } catch (loadErr) {
       // Degraded, but still answering. The caller can tell the difference.
       const r = detectWithFallback(rgba, w, h, seq, loadErr.message);
-      self.postMessage({ ...r, buf: rgba.buffer }, [rgba.buffer]);
+      self.postMessage(r);
       return;
     }
     // Split so a slow frame says WHERE it was slow: the JS resize+normalise and
@@ -213,7 +212,5 @@ self.onmessage = async (e) => {
   } catch (err) {
     result = { seq, detected: false, error: err?.message || 'detect failed' };
   }
-  // Hand the buffer back so the caller can reuse it instead of allocating a new
-  // one per frame.
-  self.postMessage({ ...result, buf: rgba.buffer }, [rgba.buffer]);
+  self.postMessage(result);
 };

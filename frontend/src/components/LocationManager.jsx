@@ -22,6 +22,13 @@ import { prepareStorageImage } from '../utils/prepareImage';
 import StocktakeDialog from './StocktakeDialog';
 import ContainerLabel from './ContainerLabel';
 
+async function checkStorageResponse(response, fallback) {
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || fallback);
+  }
+}
+
 function GalleryCover({ cover }) {
   return <div style={{ aspectRatio: '1.4', overflow: 'hidden', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
     {cover
@@ -190,6 +197,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const locationsError = locationStatus.inventoryType === inventoryType && locationStatus.error;
   const [activeLocationId, setActiveLocationId] = useState(null);
   const [compartmentData, setCompartmentData] = useState({ locationId: null, inventoryType, items: [] });
+  const [compartmentStatus, setCompartmentStatus] = useState({ locationId: null, inventoryType, loading: false, error: false });
+  const compartmentsLoading = compartmentStatus.locationId !== activeLocationId || compartmentStatus.inventoryType !== inventoryType || compartmentStatus.loading;
+  const compartmentsError = compartmentStatus.locationId === activeLocationId && compartmentStatus.inventoryType === inventoryType && compartmentStatus.error;
   const compartmentsRequest = useRef(0);
   const activeLocationRef = useRef(activeLocationId);
   activeLocationRef.current = activeLocationId;
@@ -295,13 +305,19 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [transferringContainer, setTransferringContainer] = useState(false);
 
   const [capacityUpdatePending, setCapacityUpdatePending] = useState(null);
+  const [capacitySaving, setCapacitySaving] = useState(false);
+  const [capacityError, setCapacityError] = useState('');
+  const [renameFailure, setRenameFailure] = useState(null);
   const cancelCapacityUpdate = () => {
+    if (capacitySaving) return false;
     const input = capacityUpdatePending?.returnFocus;
     if (input) input.value = input.defaultValue;
     setCapacityUpdatePending(null);
   };
   const [showKebabMenu, setShowKebabMenu] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
   const [stocktakeLocation, setStocktakeLocation] = useState(null);
   const [sortDraft, setSortDraft] = useState([]);
   const [filterDraft, setFilterDraft] = useState([]);
@@ -327,7 +343,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   // Per-compartment filing-rule editor.
   const [rulesComp, setRulesComp] = useState(null);
   useBackGuard(!!rulesComp, () => setRulesComp(null));
-  useBackGuard(showRulesModal, () => setShowRulesModal(false));
+  useBackGuard(showRulesModal, () => savingSettings ? false : setShowRulesModal(false));
   useBackGuard(!!capacityUpdatePending, cancelCapacityUpdate);
   useBackGuard(!!selectedLocationId, () => setSelectedLocationId && setSelectedLocationId(null));
   const [compRuleDraft, setCompRuleDraft] = useState([]);
@@ -563,6 +579,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const fetchCompartments = useCallback(async (locId) => {
     if (activeLocationRef.current !== locId || inventoryRef.current !== inventoryType) return;
     const request = ++compartmentsRequest.current;
+    setCompartmentStatus({ locationId: locId, inventoryType, loading: !!locId, error: false });
     if (!locId) {
       setCompartmentData({ locationId: locId, inventoryType, items: [] });
       return;
@@ -573,8 +590,15 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       const items = await res.json();
       if (request === compartmentsRequest.current && activeLocationRef.current === locId && inventoryRef.current === inventoryType) {
         setCompartmentData({ locationId: locId, inventoryType, items });
+        setCompartmentStatus({ locationId: locId, inventoryType, loading: false, error: false });
+        return items;
       }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      if (request === compartmentsRequest.current && activeLocationRef.current === locId && inventoryRef.current === inventoryType) {
+        setCompartmentStatus({ locationId: locId, inventoryType, loading: false, error: true });
+      }
+    }
   }, [inventoryType]);
 
   // The gallery uses summary covers; workspace rules and filing need the full
@@ -897,35 +921,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     }
   };
 
-  const handleUpdateLocationFields = async (fields) => {
-    if (!selectedLoc) return false;
-    if (selectedLoc.locked && !('locked' in fields)) {
-      showToast(t('loc.lockedSettings'), 'error');
-      return false;
-    }
-    try {
-      const res = await fetch(`/api/locations/${selectedLoc.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fields)
-      });
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        showToast(data.evicted ? `Container updated. ${data.evicted} card${data.evicted === 1 ? '' : 's'} moved to Unsorted.` : 'Container updated.', 'success');
-        await refreshAll();
-        onUpdate();
-        return true;
-      } else {
-        const data = await res.json().catch(() => ({}));
-        showToast(data.error || 'Failed to update container.', 'error');
-      }
-    } catch (err) {
-      console.error(err);
-      showToast(t('loc.errUpdateContainer'), 'error');
-    }
-    return false;
-  };
-
   const handleAddCompartment = async () => {
     if (!selectedLoc) return;
     if (selectedLoc.locked) {
@@ -998,26 +993,45 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       return;
     }
     try {
-      await fetch(`/api/compartments/${compartmentId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label }) });
+      setRenameFailure(null);
+      const response = await fetch(`/api/compartments/${compartmentId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label }) });
+      await checkStorageResponse(response, t('loc.errRename'));
       await fetchCompartments(activeLocationId);
-    } catch (err) { console.error(err); showToast(t('loc.errRename'), 'error'); }
+    } catch (err) {
+      console.error(err);
+      const error = err.message || t('loc.errRename');
+      setRenameFailure({ locationId: activeLocationId, compartmentId, label, error });
+      showToast(error, 'error');
+    }
   };
 
   const handleSetCapacity = async (compartmentId, capacity, forceUpdateAll = false, returnFocus = null) => {
+    if (capacitySaving) return;
     if (returnFocus && capacityUpdatePending) return;
     if (selectedLoc?.locked) {
       showToast(t('loc.lockedCapacity'), 'error');
       return;
     }
     if (compartments.length > 1 && !forceUpdateAll && !capacityUpdatePending) {
+      setCapacityError('');
       setCapacityUpdatePending({ id: compartmentId, capacity, returnFocus });
       return;
     }
     const updateAll = forceUpdateAll || false;
+    setCapacitySaving(true);
+    setCapacityError('');
     try {
-      await fetch(`/api/compartments/${compartmentId}${updateAll ? '?updateAll=true' : ''}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capacity }) });
+      const response = await fetch(`/api/compartments/${compartmentId}${updateAll ? '?updateAll=true' : ''}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capacity }) });
+      await checkStorageResponse(response, t('loc.errResize'));
       await fetchCompartments(activeLocationId);
-    } catch (err) { console.error(err); showToast(t('loc.errResize'), 'error'); }
+      setCapacityUpdatePending(null);
+    } catch (err) {
+      console.error(err);
+      setCapacityError(err.message || t('loc.errResize'));
+      showToast(err.message || t('loc.errResize'), 'error');
+    } finally {
+      setCapacitySaving(false);
+    }
   };
 
   const handleMoveCard = async (entryId, compartmentId) => {
@@ -1360,7 +1374,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   // one-shot capacity applied to every row/page. Switching to Custom freezes
   // the current order server-side; a structured sort change offers a re-sort.
   const saveContainerSettings = async () => {
-    if (!selectedLoc) return;
+    if (!selectedLoc || savingSettings) return;
+    if (selectedLoc.locked) {
+      setSettingsError(t('loc.lockedSettings'));
+      return;
+    }
+    setSavingSettings(true);
+    setSettingsError('');
     const newSort = sortDraft.length > 0 ? JSON.stringify(sortDraft) : 'custom';
     const sortChanged = newSort !== selectedLoc.sort_order;
 
@@ -1376,49 +1396,54 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     const trimmedName = (nameDraft || '').trim();
     if (trimmedName && trimmedName !== selectedLoc.name) fields.name = trimmedName;
 
-    if (!await handleUpdateLocationFields(fields)) return;
+    try {
+      // Re-read before each attempt: a previous save may have applied only some pages.
+      const currentCompartments = await fetchCompartments(selectedLoc.id);
+      if (!currentCompartments) throw new Error(t('loc.errLoadCompartments'));
+      const response = await fetch(`/api/locations/${selectedLoc.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields)
+      });
+      await checkStorageResponse(response, t('loc.errUpdateContainer'));
+      const data = await response.json().catch(() => ({}));
 
-    const capNum = parseInt(capacityDraft, 10);
-    if (capNum > 0 && compartments[0] && capNum !== compartments[0].capacity) {
-      try {
-        await fetch(`/api/compartments/${compartments[0].id}?updateAll=true`, {
+      const capNum = parseInt(capacityDraft, 10);
+      if (capNum > 0 && currentCompartments.some(comp => comp.capacity !== capNum)) {
+        const response = await fetch(`/api/compartments/${currentCompartments[0].id}?updateAll=true`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capacity: capNum })
         });
-      } catch (err) { console.error(err); showToast(t('loc.errResizeRows')); }
-    }
+        await checkStorageResponse(response, t('loc.errResizeRows'));
+      }
 
-    const targetCount = parseInt(countDraft, 10);
-    if (!isNaN(targetCount) && targetCount > 0 && targetCount !== compartments.length) {
-      try {
-        if (targetCount > compartments.length) {
-          const toAdd = targetCount - compartments.length;
-          for (let i = 0; i < toAdd; i++) {
-            await fetch(`/api/locations/${selectedLoc.id}/compartments`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({})
-            });
-          }
-        } else if (targetCount < compartments.length) {
-          const trailing = compartments.slice(targetCount);
-          for (const comp of trailing) {
-            await fetch(`/api/locations/${selectedLoc.id}/compartments/${comp.id}`, { method: 'DELETE' });
-          }
+      const targetCount = parseInt(countDraft, 10);
+      if (targetCount > currentCompartments.length) {
+        for (let i = currentCompartments.length; i < targetCount; i++) {
+          const response = await fetch(`/api/locations/${selectedLoc.id}/compartments`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
+          });
+          await checkStorageResponse(response, t('loc.errPageCount'));
         }
-      } catch (err) {
-        console.error(err);
-        showToast(t('loc.errPageCount'));
+      } else if (targetCount > 0 && targetCount < currentCompartments.length) {
+        for (const comp of currentCompartments.slice(targetCount).reverse()) {
+          const response = await fetch(`/api/locations/${selectedLoc.id}/compartments/${comp.id}`, { method: 'DELETE' });
+          await checkStorageResponse(response, t('loc.errPageCount'));
+        }
       }
-    }
 
-    await Promise.all([fetchCompartments(selectedLoc.id), fetchLocations()]);
-
-    setShowRulesModal(false);
-
-    if (sortChanged && newSort !== 'custom' && (selectedLoc.total_cards || 0) > 0) {
-      if (window.confirm(t('loc.confirmResortAfterChange'))) {
-        startResort(true);
+      await refreshAll();
+      onUpdate();
+      showToast(data.evicted ? `Container updated. ${data.evicted} card${data.evicted === 1 ? '' : 's'} moved to Unsorted.` : 'Container updated.', 'success');
+      setShowRulesModal(false);
+      if (sortChanged && newSort !== 'custom' && (selectedLoc.total_cards || 0) > 0) {
+        if (window.confirm(t('loc.confirmResortAfterChange'))) startResort(true);
       }
+    } catch (err) {
+      console.error(err);
+      setSettingsError(err.message || t('loc.errUpdateContainer'));
+      showToast(err.message || t('loc.errUpdateContainer'), 'error');
+      await refreshAll();
+      onUpdate();
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -1756,18 +1781,20 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
               Do you want to apply the capacity <strong>{capacityUpdatePending.capacity}</strong> to ALL compartments in this container, or just this specific one?
             </p>
+            {capacityError && <p role="alert">{capacityError}</p>}
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
-              <button className="btn btn-secondary" onClick={cancelCapacityUpdate}>{t('common.cancel')}</button>
-              <button className="btn btn-secondary" onClick={() => { handleSetCapacity(capacityUpdatePending.id, capacityUpdatePending.capacity, false); setCapacityUpdatePending(null); }}>{t('loc.justThisOne')}</button>
-              <button className="btn btn-primary" onClick={() => { handleSetCapacity(capacityUpdatePending.id, capacityUpdatePending.capacity, true); setCapacityUpdatePending(null); }}>{t('loc.applyToAll')}</button>
+              <button className="btn btn-secondary" disabled={capacitySaving} onClick={cancelCapacityUpdate}>{t('common.cancel')}</button>
+              <button className="btn btn-secondary" disabled={capacitySaving} onClick={() => handleSetCapacity(capacityUpdatePending.id, capacityUpdatePending.capacity, false)}>{t('loc.justThisOne')}</button>
+              <button className="btn btn-primary" disabled={capacitySaving} onClick={() => handleSetCapacity(capacityUpdatePending.id, capacityUpdatePending.capacity, true)}>{t('loc.applyToAll')}</button>
             </div>
           </div>
         </Modal>
       )}
 
       {showRulesModal && selectedLoc && (
-        <Modal onClose={() => setShowRulesModal(false)} aria-labelledby="container-settings-title">
+        <Modal onClose={() => savingSettings ? false : setShowRulesModal(false)} aria-labelledby="container-settings-title">
           <form onSubmit={event => { event.preventDefault(); saveContainerSettings(); }} className="glass-panel dialog-panel-spacing" style={{ width: '400px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
+            <fieldset disabled={savingSettings} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, display: 'contents' }}>
             <h3 id="container-settings-title" style={{ margin: 0 }}>{t('loc.containerSettings')}</h3>
             <button type="button" className="btn btn-secondary" onClick={() => setCoverLocation(selectedLoc)}>{t('loc.chooseCover')}</button>
             {unitsFeedback}
@@ -1880,10 +1907,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             <SortBuilder value={sortDraft} onChange={setSortDraft} />
             <FilterBuilder value={filterDraft} onChange={setFilterDraft} setsList={setsList} fieldOptions={filterFieldOptions} />
 
+            {settingsError && <div role="alert"><p>{settingsError}</p><p>{t('loc.settingsPartialFailure')}</p></div>}
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
               <button type="button" className="btn btn-secondary" onClick={() => setShowRulesModal(false)}>{t('common.cancel')}</button>
               <button type="submit" className="btn btn-primary">{t('admin.saveSettings')}</button>
             </div>
+            </fieldset>
           </form>
         </Modal>
       )}
@@ -2124,6 +2153,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     const uniform = caps.length > 0 && caps.every(c => c === caps[0]);
                     setCapacityDraft(uniform ? String(caps[0]) : '');
 
+                    setSettingsError('');
                     setShowRulesModal(true);
                   }}>
                     <Settings size={16} aria-hidden="true" /> {t('loc.containerSettings')}
@@ -2264,6 +2294,17 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               </div>
             )}
 
+            {compartmentsLoading && <p role="status">{t('common.loading')}</p>}
+            {compartmentsError && <div role="alert">
+              <p>{t('loc.errLoadCompartments')}</p>
+              {compartments.length > 0 && <p>{t('common.showingLastLoaded')}</p>}
+              <button type="button" className="btn btn-secondary" onClick={() => fetchCompartments(activeLocationId)}>{t('common.retry')}</button>
+            </div>}
+            {capacityError && !capacityUpdatePending && <p role="alert">{capacityError}</p>}
+            {renameFailure?.locationId === activeLocationId && <div role="alert">
+              <p>{renameFailure.error}</p>
+              <button type="button" className="btn btn-secondary" onClick={() => handleRenameCompartment(renameFailure.compartmentId, renameFailure.label)}>{t('common.retry')}</button>
+            </div>}
 
             {containerViewMode === 'list' && (
               <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -2480,7 +2521,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   </div>
                 );
               })() : (() => {
-                if (compartments.length === 0) return <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('loc.noCompartments')}</p>;
+                if (compartments.length === 0) return compartmentsLoading || compartmentsError ? null : <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('loc.noCompartments')}</p>;
 
                 const activeComp = compartments.find(c => c.id === activeCompartmentId) || compartments[0];
                 if (!activeComp) return null;

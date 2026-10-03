@@ -20,7 +20,7 @@ const lookup = (dict, key, vars, locale) => {
 // Numbers are locale-formatted, so pass a string for digits that must stay
 // verbatim (set codes, card numbers).
 export const translate = (dict, fallback, locale, key, vars) => {
-  const raw = lookup(dict, key, vars, locale) ?? lookup(fallback, key, vars, locale) ?? key;
+  const raw = lookup(dict, key, vars, locale) ?? lookup(fallback, key, vars, 'en') ?? key;
   if (!vars) return raw;
   return String(raw).replace(/\{(\w+)\}/g, (whole, name) => {
     const v = vars[name];

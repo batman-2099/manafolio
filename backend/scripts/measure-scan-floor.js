@@ -18,6 +18,9 @@
 // prefer a floor near the impostor tail over one hugging the genuine tail.
 //
 // Run: node scripts/measure-scan-floor.js [game] [language] [sampleSize]
+// Match server startup: existing environment, then CWD .env, then backend/.env.
+require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const sharp = require('sharp');
 const db = require('../src/db');
 const cvScan = require('../src/cvScan');

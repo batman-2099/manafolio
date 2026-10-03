@@ -72,7 +72,7 @@ Russian needs four categories:
 
 Japanese needs only `.other`. Add the categories your locale needs and remove English categories it does not use. Preserve placeholders in every form, including `{count}` when the English phrase uses it. Fractional numbers can select categories that whole numbers do not, so do not omit `.other` merely because common integer counts use another form.
 
-You may omit an entire plural group for English fallback. Once you translate it, supply all categories the checker names. Runtime lookup selects the locale's category, then that dictionary's `.other` if present, and finally the English dictionary if no translation resolves. An incomplete group can therefore show a grammatically wrong form or unexpected English rather than a reliably translated phrase.
+You may omit an entire plural group for English fallback. Once you translate it, supply all categories the checker names. Runtime lookup selects the locale's category, then that dictionary's `.other` if present, and finally the English dictionary using English plural rules if no translation resolves. Numeric placeholders still use the selected interface locale. An incomplete group can therefore show a grammatically wrong translated form or unexpected English rather than a reliably translated phrase.
 
 ### Keep product and card identities intact
 

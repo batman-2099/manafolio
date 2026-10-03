@@ -1,6 +1,6 @@
 const axios = require('axios');
 const db = require('./db');
-const { parseCardRow, recordPrice, shouldSweepPrices, markPricesSwept } = require('./utils/priceHelpers');
+const { parseCardRow, parseSqliteUtc, recordPrice, shouldSweepPrices, markPricesSwept } = require('./utils/priceHelpers');
 const { parseSetList } = require('./utils/setQuery');
 const cardSearchSql = require('./utils/cardSearchSql');
 const languages = require('./utils/languages');
@@ -52,6 +52,7 @@ let cooldownUntil = 0;
 // Per-endpoint clocks. The limits are per endpoint, so a search and a /sets call
 // don't have to wait on each other beyond the global 10/second floor.
 const lastByEndpoint = new Map();
+const refreshingPriceIds = new Set();
 
 // Which bucket a URL falls in. Callers pass both relative ('/cards/search?...')
 // and absolute (Scryfall's own next_page links) URLs, so read just the path.
@@ -302,10 +303,16 @@ async function fetchSetScopedRows(rows, onProgress) {
       const exactNames = chunk.map(([name]) => `!"${name.replace(/"/g, '\\"')}"`).join(' or ');
       let url = `/cards/search?q=${encodeURIComponent(`e:${set} (${exactNames})`)}`;
       const resolved = new Set();
+      const visited = new Set();
       while (url) {
+        const parsed = new URL(url, 'https://api.scryfall.com');
+        if (parsed.origin !== 'https://api.scryfall.com' || parsed.pathname !== '/cards/search' || visited.has(parsed.href)) {
+          throw new Error('Invalid set catalog pagination');
+        }
+        visited.add(parsed.href);
         let resp;
         try {
-          resp = await scryGetRetried(url, undefined, undefined, onProgress);
+          resp = await scryGetRetried(url, { maxRedirects: 0 }, undefined, onProgress);
         } catch (error) {
           if (error.response?.status === 404) break;
           throw error;
@@ -317,6 +324,9 @@ async function fetchSetScopedRows(rows, onProgress) {
           resolved.add(name);
           cards.push(norm);
           for (const row of names.get(name)) pairs.push({ row, card: norm });
+        }
+        if (resp.data?.has_more && (typeof resp.data.next_page !== 'string' || !resp.data.next_page)) {
+          throw new Error('Incomplete set catalog pagination');
         }
         url = resp.data?.has_more ? resp.data.next_page : null;
       }
@@ -390,12 +400,20 @@ async function bulkFetchByIdentifier(rows, onProgress, { localFirst = false } = 
     notFound += ((resp.data && resp.data.not_found) || []).length;
     for (const raw of (resp.data && resp.data.data) || []) {
       const norm = normalizeCard(raw);
-      const matchingRows = byKey.get(`id:${String(raw.id).toLowerCase()}`)
-        || byKey.get(`sn:${String(norm.set_id).toLowerCase()}|${String(norm.number).toLowerCase()}`)
-        || byKey.get(`n:${rowName(raw)}`)
-        || byKey.get(`n:${rowName(norm)}`);
-      for (const row of matchingRows || []) pairs.push({ row, card: norm });
-      if (matchingRows?.length) cards.push(norm);
+      let matched = false;
+      for (const key of [
+        `id:${String(raw.id).toLowerCase()}`,
+        `sn:${String(norm.set_id).toLowerCase()}|${String(norm.number).toLowerCase()}`,
+        `n:${rowName(raw)}`,
+        `n:${rowName(norm)}`,
+      ]) {
+        const matchingRows = byKey.get(key);
+        if (!matchingRows) continue;
+        for (const row of matchingRows) pairs.push({ row, card: norm });
+        byKey.delete(key);
+        matched = true;
+      }
+      if (matched) cards.push(norm);
     }
     onProgress?.({ stage: 'lookup', current: i + chunk.length, total: rows.length });
   }
@@ -520,8 +538,10 @@ async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', 
     localResults = await queryLocal();
     if (localResults.length > 0) {
       // Refresh stale prices in the background; return the cached rows instantly.
-      const stale = localResults.filter(r => (Date.now() - new Date(r.last_updated).getTime()) > CACHE_AGE_LIMIT_MS);
+      const stale = localResults.filter(r => !refreshingPriceIds.has(r.id)
+        && (Date.now() - parseSqliteUtc(r.last_updated).getTime()) > CACHE_AGE_LIMIT_MS);
       if (stale.length > 0) {
+        for (const row of stale) refreshingPriceIds.add(row.id);
         // Batched: a page is now up to 250 rows, and one request per stale row
         // was a 250-call burst behind a single search.
         (async () => {
@@ -530,6 +550,8 @@ async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', 
             if (fresh.length) await cacheCards(fresh);
           } catch (e) {
             console.error('MTG background refresh failed:', e.message);
+          } finally {
+            for (const row of stale) refreshingPriceIds.delete(row.id);
           }
         })();
       }
@@ -667,7 +689,7 @@ async function getSetChecklist(setCode) {
       throw new Error('Invalid set catalog pagination');
     }
     visited.add(parsed.href);
-    const { data } = await scryGetRetried(url);
+    const { data } = await scryGetRetried(url, { maxRedirects: 0 });
     if (!Array.isArray(data?.data) || !data.data.length || typeof data.has_more !== 'boolean') throw new Error('Incomplete set catalog');
     if (total === null) total = data.total_cards;
     if (!Number.isInteger(total) || total <= 0 || data.total_cards !== total) throw new Error('Incomplete set catalog total');
@@ -764,10 +786,10 @@ async function updateCollectionPrices(force = false) {
 // the one Scryfall endpoint that takes a language, unlike /cards/collection.
 //
 // Returns null rather than throwing when the card was never printed in that
-// language (Japanese has no Alpha), so callers keep the English card they had.
+// language (Japanese has no Alpha), so callers keep the printing they had.
 async function getPrintingInLang(setCode, number, lang) {
   const code = languages.resolve(lang).scryfall;
-  if (code === 'en' || !setCode || !number) return null;
+  if (!setCode || !number) return null;
   const name = languages.toName(code);
   const cached = await db.get(
     `SELECT * FROM card_cache WHERE game = 'mtg' AND set_id = ? AND number = ? AND language = ? LIMIT 1`,

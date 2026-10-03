@@ -1,4 +1,7 @@
 {
+  "common.showingLastLoaded": "Zuvor geladene Daten werden angezeigt. Sie sind möglicherweise nicht mehr aktuell.",
+  "loc.errLoadCompartments": "Seiten oder Reihen konnten nicht geladen werden. Versuche es erneut, um diesen Behälter zu aktualisieren.",
+  "loc.settingsPartialFailure": "Einige Änderungen wurden möglicherweise bereits gespeichert. Dein Entwurf bleibt erhalten. Prüfe den Behälter und versuche es erneut; vor dem Speichern werden die aktuellen Seiten und Reihen neu geladen.",
   "nav.skipContent": "Zum Inhalt springen",
   "setup.checkError": "Der Einrichtungsstatus konnte nicht geprüft werden. Versuche es erneut.",
   "search.addedToWishlist": "{name} zur Wunschliste hinzugefügt!",

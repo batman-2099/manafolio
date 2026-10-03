@@ -24,6 +24,8 @@ localStorage.setItem('manafolio_user', JSON.stringify(routes['/api/auth/me'].use
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
+const unavailable = () => json({ code: 'DEMO_UNAVAILABLE', error: 'This action requires a server installation; it is unavailable in the demo.' }, 503);
+
 function unitCoverChoices(unitId) {
   const locations = routes['/api/locations'].filter(location => location.storage_unit_id === unitId);
   const cards = routes['/api/collection'].filter(card => card.quantity > 0 && card.game === 'mtg' && card.image_url?.trim() && locations.some(location =>
@@ -50,7 +52,7 @@ window.fetch = async (input, opts = {}) => {
   // Non-API traffic (fonts, Scryfall card images) still hits the network.
   if (!url.includes('/api/')) return orig(input, opts);
 
-  const method = (opts.method || 'GET').toUpperCase();
+  const method = (opts.method || input?.method || 'GET').toUpperCase();
   const path = (url.replace(/^https?:\/\/[^/]+/, '').split('?')[0].replace(/\/+$/, '')) || '/';
   if (path.startsWith('/api/trades/')) {
     return json({ error: 'Trade inventory changes require a server installation; the demo cannot commit trades.' }, 503);
@@ -81,6 +83,7 @@ window.fetch = async (input, opts = {}) => {
     })));
     if (id !== null && !unit) return Promise.resolve(json({ error: 'Storage unit not found.' }, 404));
     if (method === 'GET' && path.endsWith('/cover-choices')) return Promise.resolve(json(unitCoverChoices(id).sort((a, b) => a.name.localeCompare(b.name) || a.card_id.localeCompare(b.card_id))));
+    if (path.endsWith('/cover-choices') || (id === null ? method !== 'POST' : !['PUT', 'DELETE'].includes(method))) return unavailable();
     if (method === 'DELETE' && unit) {
       routes['/api/storage-units'] = units.filter(item => item.id !== id);
       routes['/api/locations'].forEach(location => {
@@ -149,7 +152,7 @@ window.fetch = async (input, opts = {}) => {
     const body = opts.body ? JSON.parse(opts.body) : {};
     const provider = params.get('provider') || body.provider || aiPreferences.provider;
     if (!Object.hasOwn(aiConnections, provider)) return Promise.resolve(json({ error: 'Unknown AI provider.' }, 400));
-    if (path === '/api/ai-decks/preferences') {
+    if (path === '/api/ai-decks/preferences' && ['GET', 'PUT'].includes(method)) {
       if (method === 'PUT') {
         if (body.model && !aiModels[provider].some(model => model.id === body.model)) return Promise.resolve(json({ error: 'Choose an available model.' }, 400));
         if (provider !== 'chatgpt' && !body.model) return Promise.resolve(json({ error: 'Choose a model.' }, 400));
@@ -163,11 +166,11 @@ window.fetch = async (input, opts = {}) => {
       aiConnections[provider] = method === 'PUT';
       return Promise.resolve(json({ ok: true }));
     }
-    if (path === '/api/ai-decks/account') {
+    if (path === '/api/ai-decks/account' && ['GET', 'DELETE'].includes(method)) {
       if (method === 'DELETE') aiConnections.chatgpt = false;
       return Promise.resolve(json({ provider, connected: aiConnections[provider] }));
     }
-    if (path === '/api/ai-decks/models') return Promise.resolve(json({ models: aiConnections[provider] ? aiModels[provider] : [] }));
+    if (path === '/api/ai-decks/models' && method === 'GET') return Promise.resolve(json({ models: aiConnections[provider] ? aiModels[provider] : [] }));
     return Promise.resolve(json({ error: 'Live AI requests are disabled in the demo.' }, 503));
   }
   if (method === 'PATCH' && path === '/api/auth/theme') {
@@ -210,8 +213,9 @@ window.fetch = async (input, opts = {}) => {
     const deck = routes[path.replace(/\/editor$/, '')];
     if (!deck) return Promise.resolve(json({ error: 'Deck not found.' }, 404));
     const body = JSON.parse(opts.body || '{}');
-    if (typeof body.notes === 'string') deck.notes = body.notes;
-    return Promise.resolve(json({ message: 'Demo mode: notes are saved for this session only. Other editor changes are not saved.' }));
+    if (Object.keys(body).some(key => key !== 'notes') || typeof body.notes !== 'string') return unavailable();
+    deck.notes = body.notes;
+    return Promise.resolve(json({ message: 'Demo mode: notes are saved for this session only.' }));
   }
 
   if (method === 'GET' && routes[path]) {
@@ -264,13 +268,7 @@ window.fetch = async (input, opts = {}) => {
     return Promise.resolve(json({ tokens }));
   }
 
-  // Writes and un-captured GETs: never persist. Return a benign empty shape so
-  // views render instead of crashing. List-ish paths get [], everything else {}.
-  if (method === 'GET') {
-    const listish = /\/(collection|locations|decks|sets|search|users|compartments)/.test(path);
-    return Promise.resolve(json(listish ? [] : {}));
-  }
-  return Promise.resolve(json({ message: 'Demo mode: changes are not saved.' }));
+  return unavailable();
 };
 
 // Dismissible notice so it's clear this is a sample build. Injected outside React

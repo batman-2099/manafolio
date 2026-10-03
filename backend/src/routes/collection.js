@@ -502,11 +502,22 @@ class AddCardError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
+function collectionQuantity(value = 1) {
+  const quantity = typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')
+    ? Number(value) : NaN;
+  if (!Number.isSafeInteger(quantity) || quantity < 1) {
+    throw new AddCardError(400, 'quantity must be a positive safe integer');
+  }
+  return quantity;
+}
+
 // Mirrors the collection.grader CHECK constraint in db.js. 'Raw' is the default
 // and means an ungraded card, not a missing value.
 const GRADERS = ['Raw', 'PSA', 'BGS', 'CGC', 'SGC', 'TAG'];
 
-async function addCardToCollection(user, body, preparedCard = null) {
+// Draft/product-deck callers already hold a transaction and supply cached metadata.
+// Ordinary single/bulk adds resolve provider metadata before taking their own lock.
+async function addCardToCollection(user, body, preparedCard = null, inTransaction = false) {
   const {
     card_id,
     quantity = 1,
@@ -524,6 +535,7 @@ async function addCardToCollection(user, body, preparedCard = null) {
     cert_number = null
   } = body;
   const req = { user, body };
+  const requestedQuantity = collectionQuantity(quantity);
 
   if (!card_id) {
     throw new AddCardError(400, 'card_id is required');
@@ -583,6 +595,7 @@ async function addCardToCollection(user, body, preparedCard = null) {
       cardId = localized.id;
     }
     const effectiveGame = 'mtg';
+    const insert = async () => {
 
     if (location_id) {
       const loc = await db.get(`SELECT id FROM locations WHERE id = ? AND user_id = ?`, [location_id, req.user.id]);
@@ -596,7 +609,7 @@ async function addCardToCollection(user, body, preparedCard = null) {
     // (grader, cert_number) would reject on the second insert anyway, after the
     // first had already been written. Collapse it here so the request succeeds with
     // the row the user actually meant.
-    const count = certValue ? 1 : Math.max(1, parseInt(quantity, 10) || 1);
+    const count = certValue ? 1 : requestedQuantity;
     const resolved = await resolveCompartmentAndPosition({
       locationId: location_id,
       listType: list_type,
@@ -662,6 +675,8 @@ async function addCardToCollection(user, body, preparedCard = null) {
         : null,
       rule_rejected: !!resolved.rejected
     };
+    };
+    return inTransaction ? insert() : db.withTransaction(insert);
   }
 }
 
@@ -824,7 +839,7 @@ router.post('/scan-drafts/commit', async (req, res) => {
       let added = 0;
       for (const draft of drafts) {
         // Reviewed printings are cached; committing never needs the provider.
-        await addCardToCollection(req.user, draft, draft);
+        await addCardToCollection(req.user, draft, draft, true);
         await db.run('DELETE FROM scan_drafts WHERE id = ? AND user_id = ?', [draft.draft_id, req.user.id]);
         added += draft.quantity;
       }
@@ -969,6 +984,9 @@ router.post('/collection/bulk-add', async (req, res) => {
   if (shared.cert_number) {
     return res.status(400).json({ error: 'A certification number applies to a single card. Add graded cards one at a time.' });
   }
+  let qty;
+  try { qty = collectionQuantity(shared.quantity); }
+  catch (error) { return res.status(error.status).json({ error: error.message }); }
   // Sequential on purpose: placement resolves against the rows already inserted,
   // so adds must not race each other for the same compartment slot.
   const added = [];
@@ -982,7 +1000,6 @@ router.post('/collection/bulk-add', async (req, res) => {
       failed.push({ card_id, error: error instanceof AddCardError ? error.message : 'Failed to add card' });
     }
   }
-  const qty = Math.max(1, parseInt(shared.quantity, 10) || 1);
   res.status(failed.length && !added.length ? 500 : 200).json({
     message: failed.length
       ? `Added ${added.length} of ${card_ids.length} cards; ${failed.length} failed.`
@@ -1050,6 +1067,10 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
       return res.status(422).json({ error: 'All cards must resolve before creating and checking out a deck.' });
     }
     await scryfallApi.cacheCards(cards);
+    // Resolve language printings before acquiring the write transaction.
+    for (const pair of pairs) {
+      pair.card = await cardApi.printingInLanguage(pair.card, pair.row.language) || pair.card;
+    }
 
     const result = await db.withTransaction(async () => {
     let locationId = null;
@@ -1085,7 +1106,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
           language: row.language,
           game: 'mtg',
           location_id: locationId,
-        });
+        }, card, true);
         if (deckId) {
           const entry = await db.get('SELECT card_id FROM collection WHERE id = ? AND user_id = ?', [addedCard.id, req.user.id]);
           await db.run(
@@ -1096,9 +1117,8 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
         }
         added += row.quantity;
       } catch (error) {
-        if (deckId) throw error;
-        if (!(error instanceof AddCardError)) console.error(error);
-        failed.push({ name: row.name, error: error instanceof AddCardError ? error.message : 'Failed to add card' });
+        if (deckId || !(error instanceof AddCardError)) throw error;
+        failed.push({ name: row.name, error: error.message });
       }
     }
 
@@ -1134,6 +1154,7 @@ router.put('/collection/:id', async (req, res) => {
   } = req.body;
 
   try {
+    const requestedQty = quantity !== undefined ? collectionQuantity(quantity) : null;
     const entry = await db.get(`SELECT * FROM collection WHERE id = ? AND user_id = ?`, [id, req.user.id]);
     if (!entry) return res.status(404).json({ error: 'Collection entry not found' });
     if (entry.game !== 'mtg' || (game !== undefined && game !== entry.game)) {
@@ -1172,7 +1193,6 @@ router.put('/collection/:id', async (req, res) => {
     // Absolute, not additive: see the reconcile below. Deliberately NOT part of
     // the UPDATE — setStackQuantity owns the quantity column so the two can
     // never disagree about how many copies the row stands for.
-    const requestedQty = quantity !== undefined ? Math.max(1, parseInt(quantity, 10) || 1) : null;
     if (condition !== undefined) { updates.push('condition = ?'); params.push(condition); }
     if (printing !== undefined) { updates.push('printing = ?'); params.push(printing); }
     if (language !== undefined) {
@@ -1239,12 +1259,11 @@ router.put('/collection/:id', async (req, res) => {
       }
     }
 
+    await db.withTransaction(async () => {
     if (updates.length > 0) {
       params.push(id, req.user.id);
-      await db.withTransaction(async () => {
-        if (list_type === 'graveyard') await assertArchivable(req.user.id, [id]);
-        await db.run(`UPDATE collection SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`, params);
-      });
+      if (list_type === 'graveyard') await assertArchivable(req.user.id, [id]);
+      await db.run(`UPDATE collection SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`, params);
     }
 
     if (isMoving && finalCompartmentId && finalLocationId) {
@@ -1272,6 +1291,7 @@ router.put('/collection/:id', async (req, res) => {
         }
       }
     }
+    });
 
     const finalPlacement = isMoving && finalCompartmentId ? await describePlacement(db, id, req.user.id) : null;
     res.json({ message: 'Collection entry updated successfully', placement: finalPlacement, rule_rejected: resolvedRejected });

@@ -1,4 +1,7 @@
 {
+  "common.showingLastLoaded": "Showing previously loaded data. It may be out of date.",
+  "loc.errLoadCompartments": "Could not load pages or rows. Retry to refresh this container.",
+  "loc.settingsPartialFailure": "Some changes may already be saved. Your draft is still here. Check the container and retry; current pages and rows will be reloaded before saving.",
   "nav.skipContent": "Skip to content",
   "setup.checkError": "Could not check setup status. Retry to check whether setup is complete.",
   "search.addedToWishlist": "{name} added to wishlist!",

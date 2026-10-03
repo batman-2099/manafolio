@@ -832,15 +832,10 @@ router.post('/:id/duplicate', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    // Verify ownership
-    const deck = await db.get(`SELECT id FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [id, req.user.id]);
-    if (!deck) {
+    const result = await db.run(`DELETE FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [id, req.user.id]);
+    if (!result.changes) {
       return res.status(404).json({ error: 'Deck not found or unauthorized' });
     }
-
-    // Manual cascade deletion
-    await db.run(`DELETE FROM deck_cards WHERE deck_id = ?`, [id]);
-    await db.run(`DELETE FROM decks WHERE id = ?`, [id]);
 
     res.json({ message: 'Deck deleted successfully' });
   } catch (error) {

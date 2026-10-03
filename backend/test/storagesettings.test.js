@@ -185,6 +185,35 @@ async function main() {
   assert.deepStrictEqual(await db.all('SELECT * FROM compartments WHERE location_id = ? ORDER BY id', [loc.lastID]), compartmentsBefore);
   assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), cardsBefore);
   console.log('PASS: container sleeves migrate, validate, persist, and leave storage unchanged');
+
+  const rule = { rules: [{ field: 'printing', operator: 'equals', value: 'Normal' }] };
+  await db.run("UPDATE locations SET rule_type = 'compound', rule_config = ? WHERE id = ?", [JSON.stringify(rule), loc.lastID]);
+  assert.strictEqual((await save(`/locations/${loc.lastID}`, 'PUT', { name: 'Rules retained' })).status, 200);
+  assert.deepStrictEqual(JSON.parse((await db.get('SELECT rule_config FROM locations WHERE id = ?', [loc.lastID])).rule_config), rule);
+  assert.strictEqual((await save(`/locations/${loc.lastID}`, 'PUT', { rule_config: null })).status, 200);
+  assert.strictEqual((await db.get('SELECT rule_config FROM locations WHERE id = ?', [loc.lastID])).rule_config, null);
+
+  const beforeResort = await db.all('SELECT * FROM collection WHERE location_id = ? ORDER BY id', [loc.lastID]);
+  await db.run(`CREATE TRIGGER reject_refiling BEFORE UPDATE OF compartment_id ON collection
+    WHEN NEW.location_id = ${loc.lastID} AND NEW.compartment_id IS NOT NULL
+    BEGIN SELECT RAISE(ABORT, 'injected resort failure'); END`);
+  assert.strictEqual((await save(`/locations/${loc.lastID}/resort`, 'POST', {})).status, 500);
+  assert.deepStrictEqual(await db.all('SELECT * FROM collection WHERE location_id = ? ORDER BY id', [loc.lastID]), beforeResort);
+  await db.run('DROP TRIGGER reject_refiling');
+
+  for (const count of ['2junk', 1.5, 0, -1, null, true, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.strictEqual((await save('/locations', 'POST', {
+      name: 'Invalid compartment count', type: 'Box', compartmentPlan: { count, capacity: 40 },
+    })).status, 400);
+    assert.strictEqual(await db.get("SELECT id FROM locations WHERE name = 'Invalid compartment count'"), undefined);
+  }
+  await db.run(`CREATE TRIGGER reject_second_compartment BEFORE INSERT ON compartments
+    WHEN NEW.idx = 2 BEGIN SELECT RAISE(ABORT, 'injected compartment failure'); END`);
+  assert.strictEqual((await save('/locations', 'POST', {
+    name: 'Atomic compartments', type: 'Box', compartmentPlan: { count: 2, capacity: 40 },
+  })).status, 500);
+  assert.strictEqual(await db.get("SELECT id FROM locations WHERE name = 'Atomic compartments'"), undefined);
+  await db.run('DROP TRIGGER reject_second_compartment');
 }
 
 main()

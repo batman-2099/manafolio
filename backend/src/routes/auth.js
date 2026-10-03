@@ -176,8 +176,8 @@ router.get('/oidc/callback', authLimiter, async (req, res) => {
 const OWNER_USERNAME = 'admin';
 
 router.post('/bootstrap', authLimiter, async (req, res) => {
-  const { password } = req.body;
-  if (!password) {
+  const { password } = req.body || {};
+  if (typeof password !== 'string' || !password) {
     return res.status(400).json({ error: 'A password is required' });
   }
   if (password.length < 8) {
@@ -219,8 +219,8 @@ router.post('/register', authLimiter, async (req, res) => {
   if (!REGISTRATION_ENABLED) {
     return res.status(403).json({ error: 'Registration is disabled. Ask an administrator for an account.' });
   }
-  const { username, password } = req.body;
-  if (!username || !password) {
+  const { username, password } = req.body || {};
+  if (typeof username !== 'string' || typeof password !== 'string' || !username.trim() || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
 
@@ -262,8 +262,8 @@ router.post('/register', authLimiter, async (req, res) => {
 
 // Login user
 router.post('/login', authLimiter, async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
+  const { username, password } = req.body || {};
+  if (typeof username !== 'string' || typeof password !== 'string' || !username.trim() || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
 

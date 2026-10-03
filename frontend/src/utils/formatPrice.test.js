@@ -5,7 +5,6 @@ import {
   getCurrency,
   setCurrency,
   currencySymbol,
-  activeCurrencySymbol,
   formatPrice,
   priceText,
 } from './formatPrice.js';
@@ -37,7 +36,6 @@ test('currency configuration and defaults', () => {
   assert.equal(DEFAULT_CURRENCY, 'USD');
   assert.equal(getCurrency(), 'USD');
   assert.equal(currencySymbol(), '$');
-  assert.equal(activeCurrencySymbol(), '$');
   assert.equal(priceText(5), '$5.00');
 });
 
@@ -48,7 +46,6 @@ test('currency selection and priceText formatting', () => {
   setCurrency('EUR');
   assert.equal(getCurrency(), 'EUR');
   assert.equal(currencySymbol(), '€');
-  assert.equal(activeCurrencySymbol(), '€');
   assert.equal(priceText(19.99), '€19.99');
 
   // Test GBP

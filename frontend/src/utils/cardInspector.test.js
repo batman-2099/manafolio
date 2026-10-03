@@ -11,7 +11,7 @@ test('inspector edit controls contain saved copy data before effects can run', a
     root: fileURLToPath(new URL('../../', import.meta.url)),
     configFile: false,
     plugins: [react()],
-    server: { middlewareMode: true },
+    server: { middlewareMode: true, ws: false },
     appType: 'custom',
     logLevel: 'error',
   });

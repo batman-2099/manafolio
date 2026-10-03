@@ -9,8 +9,12 @@
 //   node scripts/build-catalog.mjs --game mtg
 //   node scripts/build-catalog.mjs --game mtg --skip-cache   # embed what is cached
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
+// Match server startup: existing environment, then CWD .env, then backend/.env.
+require('dotenv').config();
+require('dotenv').config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 const db = require('../src/db');
 const catalog = require('../src/catalog');
 

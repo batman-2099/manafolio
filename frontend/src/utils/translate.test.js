@@ -47,6 +47,12 @@ assert.strictEqual(translate({ 'collection.cardUnit.other': '枚' }, en, 'ja', '
 assert.strictEqual(translate({ 'collection.cardUnit.one': 'Karte' }, en, 'de', 'collection.cardUnit', { count: 1 }), 'Karte');
 assert.strictEqual(translate({ 'collection.cardUnit.one': 'Karte' }, en, 'de', 'collection.cardUnit', { count: 5 }), 'cards');
 
+// English fallback follows English grammar, while numbers retain the UI locale.
+const chapters = { 'results.one': '{count} chapter', 'results.other': '{count} chapters' };
+assert.strictEqual(translate({}, chapters, 'ja', 'results', { count: 1 }), '1 chapter');
+assert.strictEqual(translate({}, chapters, 'ru', 'results', { count: 21 }), '21 chapters');
+assert.strictEqual(translate({}, chapters, 'de', 'results', { count: 12345 }), '12.345 chapters');
+
 // Numbers are locale-formatted so a count reads naturally; strings pass through
 // untouched, which is what set codes and card numbers need.
 assert.strictEqual(translate({ n: '{count} cards' }, en, 'en', 'n', { count: 12345 }), '12,345 cards');

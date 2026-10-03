@@ -123,7 +123,16 @@ async function testSharing() {
     assert.strictEqual((await publicDeck(tokenOf(rotated))).status, 200);
     assert.deepStrictEqual(await manage('GET'), rotated);
     assert.deepStrictEqual(await manage('POST'), rotated);
+    const cardsBeforeDelete = await db.all('SELECT * FROM deck_cards WHERE deck_id = ?', [id]);
+    assert.strictEqual((await request('DELETE', `/decks/${id}`, undefined, 2)).status, 404);
+    await db.run(`CREATE TRIGGER fail_deck_delete BEFORE DELETE ON decks BEGIN SELECT RAISE(ABORT, 'delete failure'); END`);
+    assert.strictEqual((await request('DELETE', `/decks/${id}`)).status, 500);
+    assert.deepStrictEqual(await db.all('SELECT * FROM deck_cards WHERE deck_id = ?', [id]), cardsBeforeDelete,
+      'failed deck deletion must retain its card list');
+    assert.strictEqual((await publicDeck(tokenOf(rotated))).status, 200);
+    await db.run('DROP TRIGGER fail_deck_delete');
     assert.strictEqual((await request('DELETE', `/decks/${id}`)).status, 200);
+    assert.deepStrictEqual(await db.all('SELECT * FROM deck_cards WHERE deck_id = ?', [id]), []);
     assert.strictEqual((await publicDeck(recreated)).status, 404);
     assert.strictEqual((await publicDeck(tokenOf(rotated))).status, 404);
     // Even a hand-edited backup cannot inject credentials into restored definitions.

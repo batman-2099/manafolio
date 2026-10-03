@@ -355,7 +355,7 @@ function normalizeRuleConfig(rule_config) {
 }
 
 // The rows the collection view stacks together with this one: same card, same
-// printing details, same list. Ordered as trim candidates — unplaced copies
+// printing and grading details, same list. Ordered as trim candidates — unplaced copies
 // first, then newest — so a copy already filed into a binder is the last one
 // removed. The edited row itself is excluded: it is never the row deleted.
 async function stackSiblings(dbClient, userId, row, entryId) {
@@ -363,8 +363,10 @@ async function stackSiblings(dbClient, userId, row, entryId) {
     SELECT id, quantity FROM collection
     WHERE user_id = ? AND card_id = ? AND condition = ? AND printing = ?
       AND language = ? AND list_type = ? AND id != ?
+      AND COALESCE(grader, 'Raw') = ? AND grade IS ? AND cert_number IS ?
     ORDER BY (location_id IS NULL) DESC, id DESC
-  `, [userId, row.card_id, row.condition, row.printing, row.language, row.list_type, entryId]);
+  `, [userId, row.card_id, row.condition, row.printing, row.language, row.list_type, entryId,
+    row.grader || 'Raw', row.grade, row.cert_number]);
 }
 
 // Make the number of copies this stack represents equal `target`, keeping the
@@ -379,6 +381,9 @@ async function setStackQuantity(database, userId, entryId, target) {
   const dbClient = database || db;
   const row = await dbClient.get(`SELECT * FROM collection WHERE id = ? AND user_id = ?`, [entryId, userId]);
   if (!row) return 0;
+  if (row.cert_number && target !== 1) {
+    throw Object.assign(new Error('A certification number identifies one physical card'), { status: 400 });
+  }
   const siblings = await stackSiblings(dbClient, userId, row, entryId);
 
   const start = (row.quantity || 1) + siblings.reduce((n, s) => n + (s.quantity || 1), 0);
@@ -388,12 +393,15 @@ async function setStackQuantity(database, userId, entryId, target) {
     await dbClient.run(`
       INSERT INTO collection (
         card_id, user_id, quantity, condition, printing, language, purchase_price,
-        location_id, compartment_id, position, is_trade, favorite, list_type, game
-      ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        location_id, compartment_id, position, is_trade, favorite, list_type, game,
+        grader, grade, notes, missing, market_value, market_value_source, market_value_at
+      ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       row.card_id, userId, row.condition, row.printing, row.language, row.purchase_price,
       row.location_id, row.compartment_id, (row.position || 0) + (i + 1) * 0.001,
-      row.is_trade, row.favorite, row.list_type, row.game
+      row.is_trade, row.favorite, row.list_type, row.game,
+      row.grader || 'Raw', row.grade, row.notes, row.missing,
+      row.market_value, row.market_value_source, row.market_value_at
     ]);
   }
 

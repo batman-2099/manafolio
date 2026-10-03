@@ -42,12 +42,6 @@ export function getLanguagesForGame(game) {
 
 export const getLanguageNamesForGame = (game) => getLanguagesForGame(game).map(l => l.name);
 
-export const isLanguageSupported = (game, lang) => {
-  if (!game || !lang) return true;
-  const code = langCode(lang);
-  return getLanguagesForGame(game).some(l => l.code === code);
-};
-
 import { getCardDisplayName } from './langHelper.js';
 
 // The card name to show: providers give us the localized name (printed_name) for

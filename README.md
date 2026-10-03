@@ -118,7 +118,7 @@ docker compose up -d --build
 
 Open `http://localhost:3001`. Without `DEFAULT_ADMIN_PASSWORD`, the first browser visit creates the owner account; protect access until setup is complete. With it set, startup creates the `admin` account when no users exist, and the first visit is a regular login. Registration is invite-only unless explicitly enabled.
 
-The `manafolio-data` volume contains the SQLite database, automatic backups, TLS material, scan models, and catalogs. Configure optional variables in the Compose service's environment; [`.env.example`](.env.example) documents available settings. Builds use local source, not an assumed published image or binary. After updating your checkout, run `docker compose up -d --build` again. Existing installations must follow the migration instructions first.
+The `manafolio-data` volume contains the SQLite database, automatic backups, TLS material, scan models, and catalogs. To configure optional variables in Compose, uncomment the `environment:` header and the desired entries below it; [`.env.example`](.env.example) documents available settings. Builds use local source, not an assumed published image or binary. After updating your checkout, run `docker compose up -d --build` again. Existing installations must follow the migration instructions first.
 
 ### Migrate an existing installation
 
@@ -147,9 +147,11 @@ Use HTTPS for remote access. The built-in self-signed certificate is generated i
 
 The canonical list is [`.env.example`](.env.example).
 
+For source or downloaded-server installations, copy `.env.example` to `backend/.env` (the release's `app/backend/.env`). The server and maintenance scripts in `backend/scripts/` keep existing process variables first, then load `.env` from the working directory, then `backend/.env` as a fallback. Leave `DB_PATH` unset to retain the source default regardless of working directory. Use an absolute path for an override; existing relative overrides are still resolved from the process's working directory. In Docker, set variables in Compose rather than copying the source example over the image's defaults.
+
 | Variable | Purpose |
 | --- | --- |
-| `DB_PATH` | SQLite database path; Docker uses `/app/database/manafolio.db`. |
+| `DB_PATH` | SQLite database path; unset defaults to `backend/database/manafolio.db`, while Docker supplies `/app/database/manafolio.db`. |
 | `DEFAULT_ADMIN_PASSWORD` | Bootstrap `admin` password only when no users exist. |
 | `PUBLIC_BASE_URL` | External URL for share links and an allowed CORS origin. |
 | `TRUST_PROXY` | Reverse-proxy hop count, commonly `1`. |
@@ -368,7 +370,7 @@ Keys authorize only `GET` requests and cannot access admin endpoints. Useful rou
 
 ## Development
 
-Node 18.20+ and npm 9+ are required; use Node 20 for server/container parity. Shared JSON uses native import attributes.
+Use Node 20.19+ within Node 20, or Node 22.12+ (including newer major versions), and npm 9+. These floors match the locked Vite toolchain and SQLite dependency; prefer a currently supported LTS release. Shared JSON uses native import attributes.
 
 ```bash
 npm run install:all

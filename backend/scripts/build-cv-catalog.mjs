@@ -17,6 +17,9 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Match server startup: existing environment, then CWD .env, then backend/.env.
+require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const sharp = require('sharp');
 const ort = require('onnxruntime-node');
 const db = require('../src/db');

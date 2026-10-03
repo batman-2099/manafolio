@@ -18,7 +18,10 @@ router.get('/notes', async (req, res) => {
 
 // Create note.
 router.post('/notes', async (req, res) => {
-  const { title = '', body = '' } = req.body;
+  const { title = '', body = '' } = req.body || {};
+  if (typeof title !== 'string' || typeof body !== 'string') {
+    return res.status(400).json({ error: 'Note title and body must be strings' });
+  }
   if (!title.trim() && !body.trim()) {
     return res.status(400).json({ error: 'Note is empty' });
   }
@@ -36,10 +39,13 @@ router.post('/notes', async (req, res) => {
 
 // Update note. Only the fields present in the body change.
 router.put('/notes/:id', async (req, res) => {
-  const { title, body, pinned } = req.body;
+  const { title, body, pinned } = req.body || {};
+  if ((title !== undefined && typeof title !== 'string') || (body !== undefined && typeof body !== 'string')) {
+    return res.status(400).json({ error: 'Note title and body must be strings' });
+  }
   const sets = [];
   const params = [];
-  if (title !== undefined) { sets.push('title = ?'); params.push(String(title).trim()); }
+  if (title !== undefined) { sets.push('title = ?'); params.push(title.trim()); }
   if (body !== undefined) { sets.push('body = ?'); params.push(body); }
   if (pinned !== undefined) { sets.push('pinned = ?'); params.push(pinned ? 1 : 0); }
   if (sets.length === 0) {

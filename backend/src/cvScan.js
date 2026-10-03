@@ -546,7 +546,8 @@ async function scoreCards(imageBuffer, game = 'mtg', cards = [], opts = {}) {
         const map = new Map();
         for (let i = 0; i < c.n; i++) {
           const raw = String(c.ids[i]).replace(/_back$/, '');
-          if (!map.has(raw)) map.set(raw, i);
+          if (!map.has(raw)) map.set(raw, []);
+          map.get(raw).push(i);
         }
         c.idMap = map;
       }
@@ -563,8 +564,7 @@ async function scoreCards(imageBuffer, game = 'mtg', cards = [], opts = {}) {
 
       for (const c of cats) {
         for (const pid of possibleIds) {
-          const idx = c.idMap.get(pid);
-          if (idx !== undefined) {
+          for (const idx of c.idMap.get(pid) || []) {
             const off = idx * c.dim;
             let dot = 0;
             for (let d = 0; d < c.dim; d++) {

@@ -36,6 +36,28 @@ async function testDuplicateIdentifiers() {
     assert.strictEqual(cards.length, 1, 'one Scryfall printing is fetched once');
     assert.deepStrictEqual(pairs.map(pair => pair.row), [normal, foil], 'every source row receives the resolved card');
     assert.deepStrictEqual(unmatchedRows, [], 'resolved rows are not reported as failed');
+    const doubleFaced = {
+      id: '22222222-2222-4222-8222-222222222222', name: 'Front // Back',
+      set: 'tst', collector_number: '2', lang: 'en', prices: {},
+      card_faces: [{ name: 'Front', image_uris: {} }, { name: 'Back', image_uris: {} }],
+    };
+    const mixedRows = [
+      { id: `mtg-${doubleFaced.id}`, quantity: 1 },
+      { set_id: 'TST', number: '2', quantity: 2 },
+      { name: 'Front // Back', quantity: 3 },
+      { name: 'Front', quantity: 4 },
+      { name: 'Front', quantity: 5 },
+    ];
+    scryfallApi.client.post = async () => ({
+      data: { data: [doubleFaced, doubleFaced, doubleFaced], not_found: [] },
+    });
+    const resolvedMixed = await scryfallApi.bulkFetchByIdentifier(mixedRows);
+    assert.deepStrictEqual(resolvedMixed.pairs.map(pair => pair.row), mixedRows,
+      'UUID, set/number, full-name and front-name rows each resolve once despite duplicate responses');
+    assert.ok(resolvedMixed.pairs.every(pair => pair.card.id === `mtg-${doubleFaced.id}`));
+    assert.strictEqual(resolvedMixed.pairs.reduce((sum, pair) => sum + pair.row.quantity, 0), 15);
+    assert.deepStrictEqual(resolvedMixed.unmatchedRows, []);
+    assert.strictEqual(resolvedMixed.cards.length, 1);
     let rateLimited = false;
     scryfallApi.client.get = async (url) => {
       const set = url.includes('e%3Avow') ? 'vow' : url.includes('e%3Akhm') ? 'khm' : null;

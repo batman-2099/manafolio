@@ -2,6 +2,16 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Rejected malformed account, note, quantity, and storage-layout inputs before mutation; kept certified slabs distinct during quantity reconciliation and Collection grouping.
+- Made collection add/edit, container creation/settings, and resort writes atomic; exported account backups from one consistent transaction and used SQLite cascades for atomic deck deletion.
+- Fixed Toploader Binder pocket placement, explicit clearing of container rules, and multicolor filing order.
+- Fixed deck source autosave to save the current draft; added deck/compartment load errors with Retry and stale-data notices, and retained container settings after failed writes.
+- Preserved mixed provider identifiers, restored foreign-to-English printing resolution, guarded provider pagination and redirects, deduplicated stale-price refreshes using UTC timestamps, and included back-face vectors in candidate scores.
+- Corrected English fallback plurals and rejected unsupported demo operations instead of reporting simulated success.
+- Removed redundant scanner pixel copying and unused utility exports; corrected CLI environment loading, database/Compose examples, Node requirements, sensitive-file exclusions, and Pages build triggers.
+
 ## 2.3.1
 
 - Separated Trade workbench Giving and Receiving into bordered sections in editing and review, side by side on desktop and stacked on phones.

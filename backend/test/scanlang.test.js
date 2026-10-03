@@ -45,10 +45,18 @@ process.env.DB_PATH = require('path').join(
   assert.strictEqual(ja.printed_name, '祖先の刀', 'printed_name carries the localized name');
   assert.match(ja.image_url, /ja\.jpg$/, 'art must be the Japanese printing');
 
-  // English is already what the catalog returns: no request, nothing to switch to.
+  const { printingInLanguage } = require('../src/utils/cardApi');
+  const en = await printingInLanguage(ja, 'English');
+  assert.strictEqual(en.id, 'mtg-neo-1-en', 'foreign printing resolves back to its English identity');
+  assert.strictEqual(en.language, 'English');
+  assert.match(en.image_url, /en\.jpg$/);
   const before = requested.length;
-  assert.strictEqual(await scryfall.getPrintingInLang('neo', '1', 'English'), null);
-  assert.strictEqual(requested.length, before, 'English must not cost a request');
+  assert.strictEqual(await printingInLanguage(en, 'English'), null);
+  assert.strictEqual(await printingInLanguage(ja, 'Japanese'), null);
+  assert.strictEqual(requested.length, before, 'same-language choices do not request a printing');
+  assert.strictEqual((await printingInLanguage(en, 'Japanese')).id, ja.id);
+  assert.strictEqual((await printingInLanguage(ja, 'English')).id, en.id);
+  assert.strictEqual(requested.length, before, 'both localization directions reuse the cached printing');
 
   // Never printed in that language: null, so the caller keeps the English card
   // rather than showing nothing.

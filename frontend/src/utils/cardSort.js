@@ -33,6 +33,17 @@ export function typeCategory(types) {
   return t[0] || 'Colorless';
 }
 
+function getColorCategory(card) {
+  let identity = card.color_identity;
+  if (typeof identity === 'string') {
+    try { identity = JSON.parse(identity); } catch { identity = [identity]; }
+  }
+  if (!identity || identity.length === 0) return 'Colorless';
+  if (identity.length > 1) return 'Multicolor';
+  const names = { W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green' };
+  return names[identity[0]] || identity[0] || 'Colorless';
+}
+
 
 export function getPrintingRank(printing, foilSorting) {
   const order = foilSorting === 'foils_first' ? cardOrder.printingFoilsFirst : cardOrder.printingNormalsFirst;
@@ -128,18 +139,8 @@ export function sortCardsByOrder(cards, sortOrder, foilSorting, setsList = []) {
           break;
         case 'color_identity':
         case 'color': {
-          let cA = 'Colorless';
-          if (typeof a.color_identity === 'string') {
-            try { const p = JSON.parse(a.color_identity); if (p.length > 0) cA = p[0]; } catch { /* ignore */ }
-          } else if (Array.isArray(a.color_identity) && a.color_identity.length > 0) {
-            cA = a.color_identity[0];
-          }
-          let cB = 'Colorless';
-          if (typeof b.color_identity === 'string') {
-            try { const p = JSON.parse(b.color_identity); if (p.length > 0) cB = p[0]; } catch { /* ignore */ }
-          } else if (Array.isArray(b.color_identity) && b.color_identity.length > 0) {
-            cB = b.color_identity[0];
-          }
+          const cA = getColorCategory(a);
+          const cB = getColorCategory(b);
           cmp = (cardOrder.wubrg[cA] || 99) - (cardOrder.wubrg[cB] || 99);
           if (cmp === 0) cmp = cA.localeCompare(cB);
           break;

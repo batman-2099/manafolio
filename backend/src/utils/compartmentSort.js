@@ -232,7 +232,7 @@ function sortCards(cards, sortOrder, foilSorting) {
 }
 
 function isBinderType(type) {
-  return type === 'Binder';
+  return type === 'Binder' || type === 'Toploader Binder';
 }
 
 function compartmentLabel(comp, locationType) {

@@ -21,18 +21,13 @@ export const DETECT_W = 384;
 let worker = null;
 let pending = false;
 let seq = 0;
-// The pixel buffer is transferred to the worker and handed straight back, so one
-// allocation serves the whole session instead of one per frame.
-let spare = null;
 
 function ensureWorker(onResult) {
   if (worker) return worker;
   worker = new Worker(new URL('./detectWorker.js', import.meta.url), { type: 'module' });
   worker.onmessage = (e) => {
     pending = false;
-    const { buf, ...result } = e.data;
-    spare = buf;                 // reclaim the buffer for the next frame
-    onResult(result);
+    onResult(e.data);
   };
   // Answer even when the worker itself blew up. The caller paces off results —
   // a silent error would stop the detection loop dead, and the outline would
@@ -55,16 +50,7 @@ export function requestDetect(canvas, onResult) {
   if (pending) return false;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const img = ctx.getImageData(0, 0, w, h);
-  // Reuse the returned buffer when it still fits; otherwise let this one be the
-  // new spare after the round trip.
-  let bytes;
-  if (spare && spare.byteLength === img.data.byteLength) {
-    new Uint8ClampedArray(spare).set(img.data);
-    bytes = spare;
-    spare = null;
-  } else {
-    bytes = img.data.buffer;
-  }
+  const bytes = img.data.buffer;
   pending = true;
   seq += 1;
   wk.postMessage({ buf: bytes, w, h, seq }, [bytes]);
@@ -74,7 +60,6 @@ export function requestDetect(canvas, onResult) {
 export function stopDetect() {
   if (worker) { worker.terminate(); worker = null; }
   pending = false;
-  spare = null;
 }
 
 // Exponential smoothing of the quad between detections.

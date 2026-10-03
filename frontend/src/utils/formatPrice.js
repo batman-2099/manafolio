@@ -35,8 +35,6 @@ export const currencySymbol = (currency) => {
   return SYMBOLS[code] || '$';
 };
 
-export const activeCurrencySymbol = () => SYMBOLS[getCurrency()] || '$';
-
 export const formatPrice = (p) => (parseFloat(p) || 0).toFixed(2);
 
 // An explicit source currency labels the original amount; this performs no FX.

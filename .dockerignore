@@ -15,14 +15,18 @@ out
 .gitignore
 
 # Local databases and env — must not leak into the image
-*.db
-*.db-journal
-*.db-wal
-*.db-shm
-*.sqlite
+**/*.db
+**/*.db-journal
+**/*.db-wal
+**/*.db-shm
+**/*.sqlite
+**/*.sqlite-wal
+**/*.sqlite-shm
 backend/database
 .env
 .env.*
+# Per-user credentials may live beside a custom DB_PATH.
+**/codex
 
 # Logs and editor cruft
 *.log

@@ -172,8 +172,8 @@ router.get('/users', async (req, res) => {
 
 // Create a new user from Admin Panel
 router.post('/users', async (req, res) => {
-  const { username, password, role = 'member' } = req.body;
-  if (!username || !password) {
+  const { username, password, role = 'member' } = req.body || {};
+  if (typeof username !== 'string' || typeof password !== 'string' || !username.trim() || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
 

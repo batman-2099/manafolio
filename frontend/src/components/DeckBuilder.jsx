@@ -111,7 +111,10 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [decks, setDecks] = useState([]);
   const [activeDeck, setActiveDeck] = useState(null);
   const [savedEditorState, setSavedEditorState] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [decksLoading, setDecksLoading] = useState(true);
+  const [decksError, setDecksError] = useState(false);
+  const decksRequest = useRef(0);
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'detail'
   
   // Deck View & Display Modes
@@ -241,7 +244,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [savingCardBack, setSavingCardBack] = useState(false);
   const [showDeckContainerModal, setShowDeckContainerModal] = useState(false);
 
-  const editorBusy = savingDeck || savingSleeved || savingCardBack || loading || refreshingInventory || comparingImport || checkingOut || showCheckoutModal || showDeckContainerModal;
+  const editorBusy = savingDeck || savingSleeved || savingCardBack || loading || decksLoading || refreshingInventory || comparingImport || checkingOut || showCheckoutModal || showDeckContainerModal;
   const activeEditorState = useMemo(() => activeDeck ? JSON.stringify(deckEditorState(activeDeck)) : null, [activeDeck]);
   const draftEditorState = useMemo(() => activeDeck && deckDraft ? JSON.stringify(deckEditorState({ ...activeDeck, ...deckDraft })) : null, [activeDeck, deckDraft]);
   const hasUnsavedChanges = !!activeDeck && (
@@ -435,23 +438,26 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   useBackGuard(!!previewCard, () => setPreviewCard(null));
 
   useEffect(() => {
+    const requests = decksRequest;
     fetchDecks();
+    return () => { requests.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchDecks = async () => {
+    const request = ++decksRequest.current;
+    setDecksLoading(true);
+    setDecksError(false);
     try {
-      setLoading(true);
       const response = await fetch('/api/decks');
-      if (response.ok) {
-        const data = await response.json();
-        setDecks(data.filter(deck => isGameEnabled(deck.game)));
-      }
+      if (!response.ok) throw new Error(t('deck.errLoadDecks'));
+      const data = await response.json();
+      if (request === decksRequest.current) setDecks(data.filter(deck => isGameEnabled(deck.game)));
     } catch (err) {
       console.error(err);
-      showToast(t('deck.errLoadDecks'), 'error');
+      if (request === decksRequest.current) setDecksError(true);
     } finally {
-      setLoading(false);
+      if (request === decksRequest.current) setDecksLoading(false);
     }
   };
 
@@ -548,16 +554,16 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     setDeckDraft(null);
   };
 
-  const handleSaveDeck = async () => {
-    const deck = activeDeck;
-    if (!deck || activeEditorState === savedEditorState || editorBusy || savingRecord || searching || deckDraft) return;
+  const handleSaveDeck = async (deck = activeDeck) => {
+    const editorState = deck ? JSON.stringify(deckEditorState(deck)) : null;
+    if (!deck || editorState === savedEditorState || editorBusy || savingRecord || searching || deckDraft) return;
     setSavingDeck(true);
     setSaveDeckError(null);
     try {
       const response = await fetch(`/api/decks/${deck.id}/editor`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: activeEditorState
+        body: editorState
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || t('deck.errSave'));
@@ -1324,9 +1330,13 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           </div>
 
           {/* Decks Display Section */}
-          {loading ? (
-            <div className="spinner" style={{ margin: '3rem auto' }}></div>
-          ) : filteredDecks.length === 0 ? (
+          {decksError && <div role="alert">
+            <p>{t('deck.errLoadDecks')}</p>
+            {decks.length > 0 && <p>{t('common.showingLastLoaded')}</p>}
+            <button type="button" className="btn btn-secondary" onClick={fetchDecks} disabled={decksLoading}>{t('common.retry')}</button>
+          </div>}
+          {decksLoading && <p role="status">{t('common.loading')}</p>}
+          {decks.length === 0 && (decksLoading || decksError) ? null : filteredDecks.length === 0 ? (
             <div className="glass-panel" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-secondary)' }}>
               <Layers size={36} style={{ color: 'var(--text-muted)', marginBottom: '0.75rem', opacity: 0.5 }} />
               <h3 style={{ color: 'var(--text-strong)', fontSize: '1.05rem', marginBottom: '0.25rem' }}>{t('deck.noMatches')}</h3>

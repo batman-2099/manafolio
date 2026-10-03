@@ -10,11 +10,7 @@ assert.strictEqual(getCardDisplayName('Lightning Bolt'), 'Lightning Bolt');
 assert.strictEqual(getCardDisplayName(null), '');
 
 // Game-scoped language filtering in frontend.
-import { getLanguagesForGame, isLanguageSupported } from './languages.js';
-assert.ok(isLanguageSupported('mtg', 'French'));
-assert.ok(isLanguageSupported('mtg', 'fr'));
-assert.ok(isLanguageSupported('mtg', 'Spanish'));
+import { getLanguagesForGame } from './languages.js';
 assert.deepStrictEqual(getLanguagesForGame('unsupported'), []);
-assert.ok(!isLanguageSupported('unsupported', 'en'));
 
 console.log('langHelper.test.js OK');

@@ -2,7 +2,7 @@
 
 A practical guide to managing a Magic: The Gathering collection, finding physical cards, and preparing decks in Manafolio. Instructions use the English interface; translated labels may differ. Open **How-to** in the app, or **More → How-to** on a phone, to read this guide without leaving Manafolio.
 
-**Using a demonstration site?** Demo cards are sample data. The demo is not a place to maintain your collection: changes are not reliably saved, and live search, importing, scanning, and provider features require a server installation.
+**Using a demonstration site?** Demo cards are sample data. Supported changes affect only the current demo session; unsupported actions report that a server installation is required instead of pretending to save. Live search, importing, scanning, and provider features require a server installation.
 
 For installation and upgrades, use the [README](../README.md#install). For how your data is handled, read [Privacy](../PRIVACY.md). For implementation details, see [Architecture](../PROJECT.md).
 
@@ -354,6 +354,8 @@ Useful inspector actions include:
 
 **Prices are estimates.** Purchase price is your acquisition record, not the live market estimate. **Value for this copy** lets you supply a positive per-copy valuation instead of the provider's raw market price; leave it empty to use the card's price. Raw Near Mint prices should not be mistaken for a condition-adjusted or graded-slab appraisal. Switching a graded entry back to raw clears its grade and certification number.
 
+Quantities must be positive whole numbers. Certified slabs stay separate from raw stacks and other certifications; a certified entry represents one copy. Changing a raw stack's quantity does not remove a separately certified copy.
+
 **Related tokens** provides references and inventory-scoped ownership/location information. A same-named token is not necessarily the same rules/stat version; check its artwork and text.
 
 ### Change several entries together
@@ -384,6 +386,8 @@ Both methods account for the number of copies in each entry. Entry shares are al
 ## Storage: keep the app and the cards on your shelf in sync
 
 Storage describes where cards are physically kept. It does not create inventory when you create a box, and changing a recorded placement cannot move a real card for you. Keep the physical container beside you when moving or rearranging.
+
+If pages or rows fail to load, use **Retry**. A load error is not an empty container; any previously loaded contents are marked as potentially out of date.
 
 ### Check a container with Take Stock
 
@@ -538,6 +542,8 @@ Automatic sorting can renumber positions and shift later cards, especially in a 
 - A row/page's **Lock** makes filing skip that compartment. A whole-container lock skips all rows/pages, including individually unlocked ones.
 - A lock is an organization safeguard, not a privacy setting.
 
+If saving **Container Settings** fails, the dialog retains your draft and displays the error. Some earlier requests may already have succeeded. Check the container and retry the same draft; the app reloads the current pages/rows before applying it again.
+
 Deleting a container is not the same as deleting its cards: **Delete Container** returns its contents to Unsorted. In Graveyard, those contents remain archived. Read every delete confirmation before accepting it.
 
 ### Import a ManaBox container layout from a text list
@@ -603,6 +609,8 @@ Choose **More → Create Deck** in a Graveyard container to create an archived d
 ### Understand the deck screen
 
 Open **Deck Builder** to reach **Your decks**. Search by deck name or description, use the status filter, sort the list, and choose **Grid view** or **Table view**. Open a deck by selecting its card/row or **Open**.
+
+If the deck list fails to load, use **Retry** rather than assuming there are no decks. A failed refresh retains previously loaded rows with an out-of-date notice.
 
 A deck uses one **Deck Type**: **Physical**, **Arena**, or **Graveyard**. Each uses only its matching inventory. Wishlist is not deck inventory. A saved deck definition is not a reservation: only a checked-out Physical deck reserves copies.
 
