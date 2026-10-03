@@ -20,6 +20,7 @@ import Modal from './Modal';
 import DeckCardBack from './DeckCardBack';
 import DeckContainerModal from './DeckContainerModal';
 import DeckHistory from './DeckHistory';
+import AcquisitionPlanner from './AcquisitionPlanner';
 import './DeckBuilder.css';
 
 // Basic lands are exempt from the "max 4 of a card" deck rule.
@@ -139,6 +140,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   ];
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showAcquisitionPlanner, setShowAcquisitionPlanner] = useState(false);
   const [creatingDeck, setCreatingDeck] = useState(false);
   const [createDeckError, setCreateDeckError] = useState(null);
   const [showAiBuilder, setShowAiBuilder] = useState(false);
@@ -1168,6 +1170,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {showAcquisitionPlanner && <AcquisitionPlanner decks={decks} onClose={() => setShowAcquisitionPlanner(false)} />}
       
       {showAiBuilder && (
         <AiDeckBuilder
@@ -1196,6 +1199,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               </h2>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowAcquisitionPlanner(true)}>{t('planner.title')}</button>
               {isGameEnabled('mtg') && <button className="btn btn-secondary" onClick={() => { setAiSourceDeck(null); setShowAiBuilder(true); }}>
                 <Zap size={18} /> {t('aiDeck.title')}
               </button>}

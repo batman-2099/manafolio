@@ -56,6 +56,9 @@ window.fetch = async (input, opts = {}) => {
   if (/^\/api\/locations\/\d+\/stocktake$/.test(path)) {
     return Promise.resolve(json({ error: 'Stocktake requires a server installation.', code: 'stocktake.demo' }, 503));
   }
+  if (path.startsWith('/api/decks/acquisition-plan')) {
+    return json({ error: 'Acquisition planning requires a server installation; the demo cannot save a Wishlist.' }, 503);
+  }
   if (path === '/api/storage-units' || /^\/api\/storage-units\/\d+(?:\/cover-choices)?$/.test(path)) {
     const units = routes['/api/storage-units'];
     const id = path === '/api/storage-units' ? null : Number(path.split('/')[3]);

@@ -1,0 +1,16 @@
+.acquisition-planner { width: 760px; max-width: 100%; max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; overflow-wrap: anywhere; }
+.acquisition-planner h3, .acquisition-planner p { margin: 0; }
+.acquisition-planner p { line-height: 1.5; }
+.acquisition-planner fieldset { min-width: 0; border: 1px solid var(--border-glass); padding: .75rem; display: flex; flex-direction: column; gap: .75rem; }
+.acquisition-planner .btn, .acquisition-planner select { min-height: 44px; white-space: normal; }
+.acquisition-planner select { font-size: 1rem; width: 100%; }
+.acquisition-decks { max-height: 220px; overflow-y: auto; }
+.acquisition-decks label { display: flex; align-items: center; gap: .75rem; min-height: 44px; cursor: pointer; }
+.acquisition-decks input { width: 24px; height: 24px; flex-shrink: 0; }
+.acquisition-items { list-style: none; padding: 0; margin: 1rem 0; }
+.acquisition-items li { padding: 1rem 0; border-bottom: 1px solid var(--border-glass); }
+.acquisition-items dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: .75rem; margin: .75rem 0; }
+.acquisition-items dt { color: var(--text-secondary); }
+.acquisition-items dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.acquisition-confirm { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+.acquisition-confirm p { flex-basis: 100%; }
