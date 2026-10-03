@@ -52,6 +52,7 @@ Manafolio was originally forked from [Bindarr](https://github.com/thenotoriousJe
 | Reconcile a box or binder | Open its container → More → Take Stock |
 | Exchange Physical copies | Trade workbench; review both sides before confirming |
 | Compare an earlier deck list | Open the saved deck → Deck history |
+| Find saved cards when the server is unavailable | Settings → Offline collection lookup: enable and download before leaving |
 
 The application uses React, Express, and SQLite. It runs as one Docker service or from source; there is no required hosted Manafolio account or AI subscription.
 
@@ -84,6 +85,12 @@ Find cards through artwork-covered containers and their physical layouts.
 Organize decks and see which inventory supplies them.
 
 ![Manafolio Deck Builder showing sample decks](docs/images/manafolio-decks.webp)
+
+### Trade workbench
+
+Build both sides of an exchange, then adjust selected quantities before review. This snapshot uses **sample data**, not a personal collection or a completed trade.
+
+![Manafolio Trade workbench with Giving and Receiving card panels and selected entries in Cards being traded](docs/images/manafolio-trade-workbench.webp)
 
 ### Customize card back
 
@@ -168,6 +175,32 @@ For source or downloaded-server installations, copy `.env.example` to `backend/.
 Open your server's HTTPS address in your phone's browser and sign in with your server account. The responsive web interface includes collection, storage, decks, and [camera scanning](#card-scanning); scanning requires browser camera permission and the server-side assets described below. Manafolio is web-only, with no packaged Android or iOS clients.
 
 ## Workflows
+
+### Look up cards offline
+
+While connected, open **Settings → Offline collection lookup**, read the device-privacy notice, and choose **Enable and download snapshot**. Wait for confirmation, then use **Open offline lookup** or bookmark your server's `/offline.html`. Search saved Physical, Arena, and Wishlist entries and locations; check **Snapshot saved** and manually **Refresh snapshot** while online before your next outing.
+
+This read-only, text-only feature requires a **production build** over **browser-trusted HTTPS or localhost**; it is unavailable in Vite development, the demo, and plain HTTP LAN access. It includes no artwork or prices and never queues edits or refreshes automatically. Enable it only on a trusted browser/device: anyone with access to that browser profile may see saved records, and remote revocation cannot erase a disconnected copy. **Clear offline data**, signing out, or signing into another account clears the snapshot. It is not a backup. See [offline setup, limits, and privacy](docs/USER_GUIDE.md#look-up-your-collection-without-your-server).
+
+### Exchange Physical cards
+
+Open **Trade workbench** (**More** on a phone). Select exact available entries under **Giving** and search exact printings under **Receiving**; adjust quantities and received-card details in **Cards being traded**. Choose **Review trade**, check both sides and the separate currency estimates, then **Confirm inventory exchange**. Received cards go to Physical **Unassigned Pile**; no other person's account is changed. After refreshing, remove and explicitly reselect changed entries before reviewing. See [trade eligibility, confirmation, and safe retry instructions](docs/USER_GUIDE.md#trade-workbench-exchange-physical-copies).
+
+### Plan purchases with Shopping List
+
+Save your Physical decks, open **Deck Builder → Shopping List**, and select decks with purchase shortfalls. Choose **Exact saved printing** or **Any printing — same canonical Magic name**, then **Preview shopping list**. Review Needed copies, **Export to text**, or choose **Add deficits to Wishlist** and confirm the number of new copies. Existing Wishlist plans reduce new additions; reserved copies still count as owned, so this is not a checkout-readiness check. See [multi-deck acquisition planning](docs/USER_GUIDE.md#plan-acquisitions-for-several-decks).
+
+### Find gaps in a set
+
+Open **Collection → Set completion**, filter sets by name or code, and choose Physical **Collection** or **Arena**. Select **One of each card**, **Every printing**, or the Physical-only **Foil printings** goal, then filter **Missing** to see gaps. Progress counts goals rather than duplicate copies and does not modify inventory. See [set goals and ownership counts](docs/USER_GUIDE.md#track-set-completion).
+
+### Reconcile a container with Take Stock
+
+Open a Physical or Graveyard container and choose **More → Take Stock**. Mark checked entries **Verified** or **Missing**, entering the actual missing quantity for partial losses; leave unchecked entries unreviewed. Choose **Review decisions**, then **Apply stocktake**. Total copies are preserved, and entries containing reserved copies remain unchanged. See [stocktake decisions and conflict handling](docs/USER_GUIDE.md#check-a-container-with-take-stock).
+
+### Compare or restore a deck list
+
+Open a saved deck → **Deck history**, select **From revision (restore this)**, and compare it with the current deck or another revision. To restore, save or discard drafts and return a checked-out Physical deck first, then choose **Restore selected revision** and confirm. Restoration saves the earlier composition while keeping current notes, appearance, and results; current inventory rules still apply. See [revision contents and restoration limits](docs/USER_GUIDE.md#compare-and-restore-deck-revisions).
 
 ### Add physical, Arena, or wishlist cards
 

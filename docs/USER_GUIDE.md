@@ -18,6 +18,7 @@ For installation and upgrades, use the [README](../README.md#install). For how y
 - [Build and manage decks](#build-and-manage-decks)
 - [Optional AI deck help](#optional-ai-deck-help)
 - [Settings and preferences](#settings-and-preferences)
+  - [Offline collection lookup](#look-up-your-collection-without-your-server)
 - [Sharing and security](#sharing-and-security)
 - [Back up, restore, or move account data](#back-up-restore-or-move-account-data)
 - [Keep private Notes](#keep-private-notes)
@@ -53,11 +54,12 @@ Keyboard users can use **Skip to content** to bypass navigation. Changing the ma
 | --- | --- |
 | Dashboard | Quantities, valuation, growth, deck-result summaries, and scan-only Price Check. |
 | Add Cards | Search, rapid entry, collection imports, preconstructed decks, and camera scanning. |
-| Collection | Find and inspect owned, planned, or archived cards; filter and export results. |
+| Collection | Find, inspect, and export cards; track set completion separately for Physical and Arena. |
 | Storage | Physical and archived containers, positions, covers, and moving copies. |
-| Deck Builder | Deck drafts, private deck notes, imports, commander selection, checkout, results, and draw simulation. |
+| Deck Builder | Deck drafts, checkout, Shopping List purchase planning, deck history, results, and draw simulation. |
+| Trade workbench | Select exact Physical copies to give and printings to receive, then review an inventory exchange. |
 | How-to | Searchable chapters and step-by-step instructions from this guide. |
-| Settings | Preferences, sharing, security, API access, AI configuration, and account backup/restore. |
+| Settings | Preferences, sharing, security, AI configuration, backup/restore, and opt-in offline collection lookup. |
 | Admin | Administrator-only account, instance, backup, and catalog management. |
 
 On narrow screens, use **More** for navigation items that are not shown in the bottom bar. The same server account works on desktop and phone. Device-specific preferences can differ between browsers.
@@ -66,10 +68,15 @@ On narrow screens, use **More** for navigation items that are not shown in the b
 
 Open **Trade workbench** in navigation (**More** on a phone). This exchanges your inventory records; it does not negotiate with another person or change their account.
 
+![Trade workbench with sample Giving and Receiving cards and the selected Cards being traded panels](images/manafolio-trade-workbench.webp)
+
+*Sample data from an isolated server, not a personal collection. The selections shown are an unconfirmed draft; no exchange has been committed.*
+
 1. Under **Giving**, filter your available Physical entries and choose the exact printing, finish, condition, language, entry ID, and location. Set the quantity to give. Missing cards, locked containers/compartments, and any entry reserved by a checked-out deck are excluded; return or unlock those cards first. Arena, Wishlist, and Graveyard are never used.
 2. Under **Receiving**, search for an exact printing and language. Search shows up to 60 printings; narrow the name or collector number if necessary. Choose the finish, condition, and quantity for each received raw card. To choose another language, search again rather than relabeling a printing.
-3. Choose **Review trade**. Compare the cached finish-specific market estimates and timestamps. Unknown prices or currencies are explicitly excluded from partial subtotals. Differences are shown separately by currency, never converted; they are not a guaranteed fair-trade, sale, or graded-slab value.
-4. Choose **Confirm inventory exchange** only after checking both sides. The server rechecks the exact giving entries, quantities, reservations, locks, and receiving identities. It removes only the requested quantities and adds received copies to Physical **Unassigned Pile** in one transaction. Remaining giving copies keep their metadata and placement. Received copies have no recorded purchase price.
+3. In **Cards being traded**, check the separate **Giving** and **Receiving** selections. Adjust quantities, choose the received copies' finish and condition, and remove unwanted lines. The browse panels are not the final trade.
+4. Choose **Review trade**. Compare the cached finish-specific market estimates and timestamps. Unknown prices or currencies are explicitly excluded from partial subtotals. Differences are shown separately by currency, never converted; they are not a guaranteed fair-trade, sale, or graded-slab value.
+5. Choose **Confirm inventory exchange** only after checking both sides. The server rechecks the exact giving entries, quantities, reservations, locks, and receiving identities. It removes only the requested quantities and adds received copies to Physical **Unassigned Pile** in one transaction. Remaining giving copies keep their metadata and placement. Received copies have no recorded purchase price.
 
 Selected artwork cards appear in **Cards being traded**, separate from available cards and search results. Its **Giving** and **Receiving** panels contain only the chosen entries. Adjust quantities there, choose finish and condition for received cards, or use **Remove** before reviewing. Empty panels explicitly say no cards are selected; browsing alone never adds a card to the trade.
 
@@ -961,6 +968,10 @@ Open **Settings** and use its section links to jump to the relevant panel.
 5. Check **Snapshot saved** before relying on the results. Even when online, this page shows saved—not live—data. Choose **Refresh snapshot** while connected to replace it; ordinary failed downloads leave the previous snapshot intact.
 6. Use **Return to online app** for editing. Use **Clear offline data** to remove the snapshot from this browser, or sign out of the online app. Signing into another account also clears it.
 
+**Before leaving home:** open the saved lookup once, temporarily disconnect the device from the network, and reload the app's home address. Confirm that the read-only page, saved timestamp, card search, and locations are available. Reconnect afterward. Keep this browser signed in; signing out removes the saved snapshot.
+
+**If the app is already open when a request fails:** the saved-lookup shortcut opens in a new tab so your current page and unsaved work stay open. Offline lookup cannot finish an interrupted trade, import, or other server write. Reconnect and check that operation's result in the online app.
+
 The feature requires a production build served over browser-trusted HTTPS, or localhost for desktop testing. It is unavailable in Vite development, the demo, and plain HTTP LAN URLs; bypassing a certificate warning may not permit service-worker installation. Enable it independently on each browser/device, using the same server address and browser profile you will use later.
 
 The snapshot contains only Physical, Arena, and Wishlist text records—not Graveyard, artwork, prices, notes, or a full Scryfall catalog. Editing, scanning, trades, checkout, and AI still require your server. No offline changes are queued and refresh is never automatic. New offline interface text currently falls back to English in other interface languages.
@@ -1110,6 +1121,16 @@ A failed bulk update retains the previous catalog. Allow disk space for both the
 Automatic snapshots in the same volume do not protect against losing that volume. For offline whole-volume backup, stop every database writer and preserve the database and its WAL/SHM sidecars together. Do not replace or mix SQLite files while the server is running. Follow the [installation and recovery guidance](../README.md#back-up-or-move-an-account); test recovery using an isolated copy before relying on a backup.
 
 ## Troubleshooting
+
+### Offline lookup is unavailable or out of date
+
+| What you see | What to do |
+| --- | --- |
+| Enable is unavailable | Use the production server, not Vite dev or the demo. On a phone, use trusted HTTPS rather than a plain HTTP LAN address. Allow browser storage and service workers. |
+| No offline snapshot available | Connect, sign in, and download it from Settings on this device and browser profile. Logging out, switching accounts, or browser eviction can remove it. |
+| Old quantities or locations | Check **Snapshot saved**, reconnect, then choose **Refresh snapshot**. Changes on the server never update this snapshot automatically. |
+| Refresh failed | Continue searching the previous snapshot, but treat it as stale. Check the connection and storage space before retrying. An expired/revoked sign-in clears access instead of retaining an authenticated snapshot. |
+| Clearing failed | Remove this site's data in your browser settings. This also removes its saved sign-in and browser preferences; it does not delete your account on the server. |
 
 ### A card appears to be missing
 

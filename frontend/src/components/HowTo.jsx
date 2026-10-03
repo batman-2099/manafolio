@@ -4,9 +4,12 @@ import { useT } from '../utils/i18n';
 import { buildGuide } from '../utils/helpGuide';
 import guideSource from '../../../docs/USER_GUIDE.md?raw';
 import storageUnitImage from '../../../docs/images/manafolio-storage-unit.webp';
+import tradeWorkbenchImage from '../../../docs/images/manafolio-trade-workbench.webp';
 import './HowTo.css';
 
-const chapters = buildGuide(guideSource.replace('images/manafolio-storage-unit.webp', new URL(storageUnitImage, window.location.href).href));
+const chapters = buildGuide(guideSource
+  .replace('images/manafolio-storage-unit.webp', new URL(storageUnitImage, window.location.href).href)
+  .replace('images/manafolio-trade-workbench.webp', new URL(tradeWorkbenchImage, window.location.href).href));
 
 export default function HowTo() {
   const { t } = useT();
