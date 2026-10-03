@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, lazy, Suspense } from 'react';
-import { LayoutDashboard, Database, MapPin, Settings as SettingsIcon, LogOut, ShieldAlert, Plus, Swords, BookOpen, MoreHorizontal, X } from 'lucide-react';
+import { LayoutDashboard, Database, ArrowRightLeft, MapPin, Settings as SettingsIcon, LogOut, ShieldAlert, Plus, Swords, BookOpen, MoreHorizontal, X } from 'lucide-react';
 import Login from './components/Login';
 import Logo from './components/Logo';
 import { pushBackGuard } from './utils/useBackGuard';
@@ -20,6 +20,7 @@ const SharedContainer = lazy(() => import('./components/SharedContainer'));
 const SharedDeck = lazy(() => import('./components/SharedDeck'));
 const DeckBuilder = lazy(() => import('./components/DeckBuilder'));
 const HowTo = lazy(() => import('./components/HowTo'));
+const TradeWorkbench = lazy(() => import('./components/TradeWorkbench'));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -170,6 +171,7 @@ function App() {
       dashboard: 'nav.dashboard', 'add-cards': 'nav.addCards', collection: 'nav.collection',
       storage: 'nav.storage', deckbuilder: 'nav.deckBuilder', howto: 'nav.howto',
       settings: 'nav.settings', admin: 'nav.admin',
+      trades: 'trade.title',
     }[activeTab];
     document.title = `${t(titleKey)} · Manafolio`;
   }, [activeTab, token, user, shareToken, deckShareToken, t]);
@@ -462,6 +464,8 @@ function App() {
         );
       case 'deckbuilder':
         return <DeckBuilder key={deckViewKey} showToast={showToast} navigationGuardRef={navigationGuardRef} onOpenAiSettings={() => { if (goTab('settings')) setSettingsSection('codex-settings-title'); }} />;
+      case 'trades':
+        return <TradeWorkbench onUpdate={triggerRefresh} navigationGuardRef={navigationGuardRef} />;
       case 'howto':
         return <HowTo />;
       case 'settings':
@@ -532,7 +536,7 @@ function App() {
           <button
             ref={moreTriggerRef}
             type="button"
-            className={`nav-tab nav-more-trigger ${['deckbuilder', 'howto', 'settings', 'admin'].includes(activeTab) ? 'active' : ''}`}
+            className={`nav-tab nav-more-trigger ${['deckbuilder', 'trades', 'howto', 'settings', 'admin'].includes(activeTab) ? 'active' : ''}`}
             aria-expanded={moreOpen}
             aria-controls="nav-secondary"
             onClick={() => setMoreOpen(open => !open)}
@@ -551,6 +555,10 @@ function App() {
             >
               <Swords size={18} />
               <span>{t('nav.deckBuilder')}</span>
+            </button>
+            <button className={`nav-tab ${activeTab === 'trades' ? 'active' : ''}`}
+              aria-current={activeTab === 'trades' ? 'page' : undefined} onClick={() => goTab('trades')}>
+              <ArrowRightLeft size={18} aria-hidden="true" /><span>{t('trade.title')}</span>
             </button>
 
             <button

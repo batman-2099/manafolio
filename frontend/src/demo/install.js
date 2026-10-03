@@ -52,6 +52,9 @@ window.fetch = async (input, opts = {}) => {
 
   const method = (opts.method || 'GET').toUpperCase();
   const path = (url.replace(/^https?:\/\/[^/]+/, '').split('?')[0].replace(/\/+$/, '')) || '/';
+  if (path.startsWith('/api/trades/')) {
+    return json({ error: 'Trade inventory changes require a server installation; the demo cannot commit trades.' }, 503);
+  }
 
   if (/^\/api\/locations\/\d+\/stocktake$/.test(path)) {
     return Promise.resolve(json({ error: 'Stocktake requires a server installation.', code: 'stocktake.demo' }, 503));

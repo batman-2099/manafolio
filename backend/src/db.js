@@ -280,6 +280,15 @@ async function initDb() {
     )
   `);
   await run(`CREATE INDEX IF NOT EXISTS idx_scan_drafts_user ON scan_drafts(user_id)`);
+  await run(`CREATE TABLE IF NOT EXISTS completed_trades (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    trade_id TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    given INTEGER NOT NULL,
+    received INTEGER NOT NULL,
+    completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, trade_id)
+  )`);
 
   await run(`
     CREATE TABLE IF NOT EXISTS price_history (
