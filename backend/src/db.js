@@ -605,6 +605,9 @@ async function initDb() {
   if (!locationsCols.some(c => c.name === 'storage_unit_id')) {
     await run(`ALTER TABLE locations ADD COLUMN storage_unit_id INTEGER REFERENCES storage_units(id) ON DELETE SET NULL`);
   }
+  if (!locationsCols.some(c => c.name === 'last_checked_at')) {
+    await run(`ALTER TABLE locations ADD COLUMN last_checked_at TEXT`);
+  }
   await run(`CREATE INDEX IF NOT EXISTS idx_locations_storage_unit ON locations(storage_unit_id)`);
 
   const usersCols = await all(`PRAGMA table_info(users)`);

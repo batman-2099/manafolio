@@ -14,6 +14,7 @@ const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, che
 const { normalizeMtgColorIdentity } = require('../utils/mtgColors');
 const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
 const { normalizeUploadedImage } = require('../utils/uploadedImage');
+const { createHash } = require('crypto');
 
 const MANA_SYMBOLS = { White: 'W', Blue: 'U', Black: 'B', Red: 'R', Green: 'G', Colorless: 'C' };
 
@@ -317,6 +318,115 @@ router.get('/locations/:id', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to retrieve location' });
+  }
+});
+
+// A read-only snapshot keeps abandoned/cancelled stocktakes out of persistence.
+async function stocktakeSnapshot(userId, locationId) {
+  const location = await db.get('SELECT * FROM locations WHERE id = ? AND user_id = ?', [locationId, userId]);
+  if (!location) throw Object.assign(new Error('Location not found'), { status: 404 });
+  const compartments = await db.all('SELECT * FROM compartments WHERE location_id = ? ORDER BY id', [location.id]);
+  const rows = await db.all(`SELECT c.*, cc.name, cc.printed_name, cc.set_name, cc.set_id, cc.number, cc.image_url
+    FROM collection c LEFT JOIN card_cache cc ON cc.id = c.card_id
+    WHERE c.user_id = ? AND c.location_id = ? ORDER BY c.compartment_id, c.position, c.id`, [userId, location.id]);
+  if (rows.some(row => row.list_type !== location.inventory_type)) {
+    throw Object.assign(new Error('Container inventory has changed. Correct its placements before checking it.'), { status: 409, code: 'stocktake.stale' });
+  }
+  const ids = new Set(rows.map(row => row.id));
+  const reservations = (await checkedOutSources(userId)).filter(source => ids.has(source.entry_id))
+    .sort((a, b) => a.entry_id - b.entry_id || a.deck_id - b.deck_id || a.card_id.localeCompare(b.card_id));
+  const revision = createHash('sha256').update(JSON.stringify([location, compartments, rows, reservations])).digest('hex');
+  return {
+    location, revision,
+    entries: rows.map(row => ({
+      entry_id: row.id, card_id: row.card_id, name: row.name, printed_name: row.printed_name,
+      set_name: row.set_name, set_id: row.set_id, number: row.number, image_url: row.image_url, game: row.game,
+      quantity: row.quantity, printing: row.printing, language: row.language, condition: row.condition,
+      missing: row.missing, position: row.position,
+      compartment_label: compartmentLabel(compartments.find(comp => comp.id === row.compartment_id), location.type),
+      reserved_quantity: reservations.filter(source => source.entry_id === row.id).reduce((sum, source) => sum + source.quantity, 0),
+    })),
+  };
+}
+
+router.get('/locations/:id/stocktake', async (req, res) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json(await db.withTransaction(() => stocktakeSnapshot(req.user.id, req.params.id)));
+  } catch (error) {
+    if (!error.status) console.error(error);
+    res.status(error.status || 500).json({ error: error.status ? error.message : 'Could not load stocktake', code: error.code });
+  }
+});
+
+router.post('/locations/:id/stocktake', async (req, res) => {
+  const { revision, decisions } = req.body;
+  if (typeof revision !== 'string' || !/^[a-f0-9]{64}$/.test(revision) || !Array.isArray(decisions)
+      || !decisions.length || decisions.some(item => !item || !Number.isSafeInteger(item.entry_id)
+        || !['verified', 'missing'].includes(item.status)
+        || (item.status === 'missing' && (!Number.isSafeInteger(item.missing_quantity) || item.missing_quantity < 1)))
+      || new Set(decisions.map(item => item.entry_id)).size !== decisions.length) {
+    return res.status(400).json({ error: 'Choose entries to verify or mark missing.', code: 'stocktake.invalid' });
+  }
+  try {
+    const result = await db.withTransaction(async () => {
+      const snapshot = await stocktakeSnapshot(req.user.id, req.params.id);
+      if (snapshot.revision !== revision) {
+        throw Object.assign(new Error('Container, cards or reservations changed. Close and restart the stocktake.'), { status: 409, code: 'stocktake.stale' });
+      }
+      const entries = new Map(snapshot.entries.map(entry => [entry.entry_id, entry]));
+      for (const decision of decisions) {
+        const entry = entries.get(decision.entry_id);
+        if (!entry) throw Object.assign(new Error('Entry is not in this container.'), { status: 400, code: 'stocktake.invalid' });
+        if (decision.status === 'missing' && decision.missing_quantity > entry.quantity) {
+          throw Object.assign(new Error('Missing quantity must not exceed the entry quantity.'), { status: 400, code: 'stocktake.invalid' });
+        }
+        // Never review even the unreserved part of a checked-out row.
+        if (entry.reserved_quantity > 0) {
+          throw Object.assign(new Error('Check in the deck before reviewing reserved entries.'), { status: 409, code: 'stocktake.reservedError' });
+        }
+        if (decision.status === 'missing' && decision.missing_quantity < entry.quantity) {
+          const original = await db.get('SELECT cert_number FROM collection WHERE id = ? AND user_id = ?', [entry.entry_id, req.user.id]);
+          if (original.cert_number) {
+            throw Object.assign(new Error('A certified copy cannot be split. Correct its quantity before taking stock.'), { status: 400, code: 'stocktake.invalid' });
+          }
+        }
+      }
+      for (const decision of decisions) {
+        const entry = entries.get(decision.entry_id);
+        const missingQuantity = decision.status === 'missing' ? decision.missing_quantity : 0;
+        if (missingQuantity > 0 && missingQuantity < entry.quantity) {
+          const foundQuantity = entry.quantity - missingQuantity;
+          // Keep the found copies' identity so an unchecked-out deck's selected source stays usable.
+          // A non-stacking row spans quantity slots; stacking copies share the original slot.
+          await db.run(`INSERT INTO collection (
+              card_id, user_id, quantity, condition, printing, language, purchase_price,
+              favorite, is_trade, list_type, game, added_at, notes, grader, grade,
+              cert_number, market_value, market_value_source, market_value_at, missing,
+              location_id, compartment_id, position
+            )
+            SELECT card_id, user_id, ?, condition, printing, language, purchase_price,
+              favorite, is_trade, list_type, game, added_at, notes, grader, grade,
+              cert_number, market_value, market_value_source, market_value_at, 1,
+              location_id, compartment_id, position + ?
+            FROM collection WHERE id = ? AND user_id = ?`,
+          [missingQuantity, snapshot.location.allow_stacking ? 0 : foundQuantity * 1000, entry.entry_id, req.user.id]);
+          await db.run('UPDATE collection SET quantity = ?, missing = 0 WHERE id = ? AND user_id = ?',
+            [foundQuantity, entry.entry_id, req.user.id]);
+        } else {
+          await db.run('UPDATE collection SET missing = ? WHERE id = ? AND user_id = ?',
+            [missingQuantity > 0 ? 1 : 0, entry.entry_id, req.user.id]);
+        }
+      }
+      const lastCheckedAt = new Date().toISOString();
+      await db.run('UPDATE locations SET last_checked_at = ? WHERE id = ? AND user_id = ?',
+        [lastCheckedAt, snapshot.location.id, req.user.id]);
+      return { last_checked_at: lastCheckedAt };
+    });
+    res.json(result);
+  } catch (error) {
+    if (!error.status) console.error(error);
+    res.status(error.status || 500).json({ error: error.status ? error.message : 'Could not apply stocktake', code: error.code });
   }
 });
 

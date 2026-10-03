@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay, MouseSensor, useSensor, useSensors, useDraggable, useDroppable, pointerWithin } from '@dnd-kit/core';
-import { Plus, Minus, Trash2, X, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, Edit3, Download, Search, SlidersHorizontal, Layers } from 'lucide-react';
+import { Plus, Minus, Trash2, X, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, Edit3, Download, Search, SlidersHorizontal, Layers, Check } from 'lucide-react';
 import { sortCardsByOrder, TYPE_ORDER, typeCategory } from '../utils/cardSort';
 import { priceText } from '../utils/formatPrice';
 import { getFoilOverlayClass, getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
@@ -19,6 +19,7 @@ import { useT } from '../utils/i18n';
 import Modal from './Modal';
 import StorageUnitDialog, { StorageUnitSelect } from './StorageUnitDialog';
 import { prepareStorageImage } from '../utils/prepareImage';
+import StocktakeDialog from './StocktakeDialog';
 
 function GalleryCover({ cover }) {
   return <div style={{ aspectRatio: '1.4', overflow: 'hidden', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -299,6 +300,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   };
   const [showKebabMenu, setShowKebabMenu] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [stocktakeLocation, setStocktakeLocation] = useState(null);
   const [sortDraft, setSortDraft] = useState([]);
   const [filterDraft, setFilterDraft] = useState([]);
   const [nameDraft, setNameDraft] = useState('');
@@ -1666,6 +1668,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       onDragEnd={handleDragEnd}
     >
     {importReview}
+    {stocktakeLocation && <StocktakeDialog location={stocktakeLocation} onClose={() => setStocktakeLocation(null)} onApplied={() => {
+      setStocktakeLocation(null);
+      showToast(t('stocktake.saved'), 'success');
+      refreshAll();
+      onUpdate?.();
+    }} />}
     <div className="storage-workspace-grid">
       {containerDeckDraft && (
         <dialog
@@ -1900,6 +1908,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             {selectedLoc && <span className="storage-sleeve-summary" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
               {t('deck.sleeved')}: {t(['deck.sleevedNone', 'deck.sleevedOne', 'deck.sleevedDouble', 'deck.sleevedTriple'][selectedLoc.sleeved ?? 0])}
             </span>}
+            {selectedLoc && <>
+              <span style={{ fontSize: '0.85rem' }}>{t('stocktake.lastChecked', { date: selectedLoc.last_checked_at ? new Date(selectedLoc.last_checked_at).toLocaleString(locale) : t('stocktake.never') })}</span>
+            </>}
             {!isArchive && <input ref={containerImportInput} type="file" accept=".txt,text/plain" disabled={importingContainer} onChange={handleContainerImportFile} style={{ display: 'none' }} />}
             {selectedLoc && !!selectedLoc.locked && (
               <button type="button" onClick={handleToggleContainerLock} title={t('loc.lockedBadgeHint')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.62rem', fontWeight: 800, padding: '0.15rem 0.45rem', borderRadius: '999px', cursor: 'pointer', background: 'rgba(255,193,7,0.15)', border: '1px solid var(--accent-yellow)', color: 'var(--accent-yellow)' }}>
@@ -2057,6 +2068,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     <Download size={14} aria-hidden="true" /> {t(importingContainer ? 'loc.importingContainer' : 'loc.importContainer')}
                   </button>}
                   {selectedLoc && <>
+                  <button type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setStocktakeLocation(selectedLoc); }}>
+                    <Check size={14} aria-hidden="true" /> {t('stocktake.title')}
+                  </button>
                   <button type="button" className="kebab-item" disabled={unitsLoading || unitsError} onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setUnitDraft({ ...selectedLoc, mode: 'move' }); }}>
                     <Layers size={14} aria-hidden="true" /> {t('storageUnit.move')}
                   </button>

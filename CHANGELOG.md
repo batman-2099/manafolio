@@ -4,6 +4,8 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Moved container stocktake into **More → Take Stock**, with missing-copy quantities, explicit missing/found review counts, and partial-copy reconciliation that preserves totals and reserved entries.
+- Added card thumbnails to Take Stock decisions and review, using the shared artwork fallback when an image is unavailable.
 - Fixed frontend test discovery on Node 20 CI by allowing the shell to expand the test-file wildcard.
 - Included guide images in the Docker frontend build stage, fixing the missing storage-unit screenshot import.
 - Fixed API-key masking in command examples, keyboard access to backup import, native-dialog focus and dismissal for Quick Add/imports, grading/filter labels, selected-filter announcements, and box-coverflow focus visibility.

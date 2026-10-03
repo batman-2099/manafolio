@@ -349,6 +349,19 @@ Both methods account for the number of copies in each entry. Entry shares are al
 
 Storage describes where cards are physically kept. It does not create inventory when you create a box, and changing a recorded placement cannot move a real card for you. Keep the physical container beside you when moving or rearranging.
 
+### Check a container with Take Stock
+
+1. Open a Physical or Graveyard container in **Storage**, then choose **More → Take Stock**.
+2. Compare each entry's printing, finish, language, condition, page/row, slot, and expected quantity with the cards. Choose **Verified — mark found** when every copy is present, or **Missing — mark missing** when some or all copies are absent.
+3. Choosing **Missing** reveals **How many copies are missing?**, initially set to the entry's full quantity. Enter a whole number from 1 to that quantity. The remaining copies will be marked found. For example, 2 missing out of 5 leaves 3 found. Leave entries you have not fully checked unreviewed.
+4. Entries with any checked-out/reserved copies are shown explicitly and cannot be changed in stocktake. Even a partially reserved quantity-bearing entry stays unchanged. Check in its deck first, then start a fresh stocktake if you need to review it.
+5. Choose **Review decisions**. Check each missing count, remaining found count, and the unchanged-entry count; **Back** lets you edit them. **Cancel**, Escape, or closing the dialog discards the review without changing cards or the container's date.
+6. Choose **Apply stocktake** to save. Verified clears the existing Missing flag for every copy; Missing marks only the specified copies missing. A partial quantity splits into found and missing entries while preserving total copies, metadata, placement, reservations, and deck state. Unreviewed entries never become missing automatically. All selected changes and the date are committed together or not at all.
+
+If cards, container configuration, placement, or reservations changed while you were checking, applying is rejected. Close and restart with the current contents. If a connection fails while saving, reopen the container to check the recorded state before retrying.
+
+**Last stocktake applied** shows the last successful application, including a partial review; it does **not** certify that every card was verified. The date is preserved in complete account backups; older backups without it restore as **Never**. Draft decisions live only in the open dialog, not in your backup. Stocktake requires a server installation and is explicitly unavailable in the demo.
+
 ### Group containers into storage units
 
 Use a **storage unit** for something holding card containers: a cabinet, shelf, drawer, carrying case, or tote. Keep **container** for a binder, card box, deck box, or tin holding cards directly. Pages/rows and slots remain inside containers. Classify a case by what it holds, not its shape.

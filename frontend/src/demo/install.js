@@ -53,6 +53,9 @@ window.fetch = async (input, opts = {}) => {
   const method = (opts.method || 'GET').toUpperCase();
   const path = (url.replace(/^https?:\/\/[^/]+/, '').split('?')[0].replace(/\/+$/, '')) || '/';
 
+  if (/^\/api\/locations\/\d+\/stocktake$/.test(path)) {
+    return Promise.resolve(json({ error: 'Stocktake requires a server installation.', code: 'stocktake.demo' }, 503));
+  }
   if (path === '/api/storage-units' || /^\/api\/storage-units\/\d+(?:\/cover-choices)?$/.test(path)) {
     const units = routes['/api/storage-units'];
     const id = path === '/api/storage-units' ? null : Number(path.split('/')[3]);

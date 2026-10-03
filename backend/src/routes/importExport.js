@@ -68,6 +68,11 @@ async function parseCompleteBackup(data) {
   if (backup.locations.some(location => location.storage_unit_id != null && !storageUnitIds.has(location.storage_unit_id))) {
     throw new Error('Invalid backup storage unit references');
   }
+  if (backup.locations.some(location => location.last_checked_at != null
+      && (typeof location.last_checked_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(location.last_checked_at)
+        || !Number.isFinite(Date.parse(location.last_checked_at))))) {
+    throw new Error('Invalid backup container stocktake date');
+  }
   if (backup.decks.some(deck => !['collection', 'arena', 'graveyard'].includes(deck.inventory_type ?? 'collection')
       || ((deck.inventory_type ?? 'collection') !== 'collection' && (deck.checked_out || deck.checked_out_at != null)))) {
     throw new Error('Invalid backup deck inventory or checkout state');
@@ -206,12 +211,12 @@ async function restoreCompleteBackup(backup, userId) {
 
     for (const location of backup.locations) {
       const result = await db.run(`
-        INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, locked, allow_stacking, cover_card_id, inventory_type, sleeved, storage_unit_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO locations (name, type, sort_order, foil_sorting, rule_type, rule_config, game, user_id, locked, allow_stacking, cover_card_id, inventory_type, sleeved, storage_unit_id, last_checked_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         location.name, location.type, location.sort_order, location.foil_sorting, location.rule_type, location.rule_config,
         location.game, userId, location.locked || 0, location.allow_stacking || 0, location.cover_card_id || null, location.inventory_type ?? 'collection',
-        location.sleeved ?? 0, location.storage_unit_id == null ? null : storageUnitIds.get(location.storage_unit_id)
+        location.sleeved ?? 0, location.storage_unit_id == null ? null : storageUnitIds.get(location.storage_unit_id), location.last_checked_at ?? null
       ]);
       locationIds.set(location.id, result.lastID);
     }
