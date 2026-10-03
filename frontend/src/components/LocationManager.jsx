@@ -19,6 +19,7 @@ import { useT } from '../utils/i18n';
 import Modal from './Modal';
 import StorageUnitDialog, { StorageUnitSelect } from './StorageUnitDialog';
 import { prepareStorageImage } from '../utils/prepareImage';
+import ContainerLabel from './ContainerLabel';
 
 function GalleryCover({ cover }) {
   return <div style={{ aspectRatio: '1.4', overflow: 'hidden', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -197,6 +198,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [cardsError, setCardsError] = useState(false);
   const cardsRequest = useRef(0);
   const containerMenuButton = useRef(null);
+  const [labelContainer, setLabelContainer] = useState(null);
   const cardsKey = `${inventoryType}:${statsTrigger}`;
   const cardsReady = loadedCardsKey === cardsKey;
   const [setsList, setSetsList] = useState([]);
@@ -1666,6 +1668,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       onDragEnd={handleDragEnd}
     >
     {importReview}
+    {labelContainer && <ContainerLabel container={labelContainer} onClose={() => setLabelContainer(null)} returnFocus={containerMenuButton.current} />}
     <div className="storage-workspace-grid">
       {containerDeckDraft && (
         <dialog
@@ -2057,6 +2060,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     <Download size={14} aria-hidden="true" /> {t(importingContainer ? 'loc.importingContainer' : 'loc.importContainer')}
                   </button>}
                   {selectedLoc && <>
+                  <button type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setLabelContainer(selectedLoc); }}>
+                    <Download size={14} aria-hidden="true" /> {t('containerLabel.title')}
+                  </button>
                   <button type="button" className="kebab-item" disabled={unitsLoading || unitsError} onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setUnitDraft({ ...selectedLoc, mode: 'move' }); }}>
                     <Layers size={14} aria-hidden="true" /> {t('storageUnit.move')}
                   </button>

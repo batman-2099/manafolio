@@ -7,7 +7,7 @@ import Logo from './Logo';
 // ignores whatever username is posted and always creates `admin`.
 const OWNER_USERNAME = 'admin';
 
-function Login({ onLoginSuccess }) {
+function Login({ onLoginSuccess, pendingContainer }) {
   const { t } = useT();
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
@@ -176,6 +176,12 @@ function Login({ onLoginSuccess }) {
           <div style={{ marginBottom: '1.25rem' }}>
             <a
               href="/api/auth/oidc/login"
+              onClick={() => {
+                try {
+                  if (pendingContainer) sessionStorage.setItem('manafolio_login_container', pendingContainer);
+                  else sessionStorage.removeItem('manafolio_login_container');
+                } catch { /* local sign-in retains the URL when browser storage is unavailable */ }
+              }}
               className="btn btn-secondary"
               style={{
                 display: 'flex',

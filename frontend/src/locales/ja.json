@@ -1,4 +1,12 @@
 {
+  "containerLabel.title": "コンテナのラベルを印刷",
+  "containerLabel.privacy": "スキャンするとログイン後にこのコンテナを開きます。このQRコードで公開共有が有効になることはありません。",
+  "containerLabel.printHint": "ラベル幅：70 mm、QR：48 mm。ブラウザーのヘッダーとフッターをオフにして100%で印刷してください。印刷前にスマートフォンからアクセスできるか確認してください。",
+  "containerLabel.destination": "QRのリンク先",
+  "containerLabel.qrAlt": "ログイン後にこのコンテナを開くQRコード",
+  "containerLabel.print": "印刷",
+  "containerLabel.error": "ラベルを生成できませんでした。サーバー接続と設定の公開ベースURLを確認し、プレビューを開き直してください。",
+  "containerLabel.unavailable": "このアカウントではこのコンテナを利用できません。リンクを確認するか、所有者のアカウントでログインしてください。",
   "storageUnit.title": "収納場所",
   "storageUnit.create": "収納場所を作成",
   "storageUnit.edit": "収納場所を編集",

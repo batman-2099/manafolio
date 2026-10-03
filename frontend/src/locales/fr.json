@@ -1,4 +1,12 @@
 {
+  "containerLabel.title": "Imprimer l’étiquette du conteneur",
+  "containerLabel.privacy": "Le scan ouvre ce conteneur après connexion. Ce code QR n’active pas le partage public.",
+  "containerLabel.printHint": "Largeur : 70 mm ; QR : 48 mm. Imprimez à 100 % sans en-têtes ni pieds de page du navigateur. Vérifiez d’abord que votre téléphone peut accéder à la destination.",
+  "containerLabel.destination": "Destination du QR",
+  "containerLabel.qrAlt": "Code QR pour ouvrir ce conteneur après connexion",
+  "containerLabel.print": "Imprimer",
+  "containerLabel.error": "Impossible de générer l’étiquette. Vérifiez la connexion au serveur et l’URL publique dans les paramètres, puis rouvrez l’aperçu.",
+  "containerLabel.unavailable": "Ce conteneur n’est pas disponible pour ce compte. Vérifiez le lien ou connectez-vous avec le compte propriétaire.",
   "storageUnit.title": "Unités de rangement",
   "storageUnit.create": "Créer une unité de rangement",
   "storageUnit.edit": "Modifier l’unité de rangement",

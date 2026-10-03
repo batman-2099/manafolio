@@ -1,6 +1,6 @@
 # Manafolio privacy
 
-**Effective date:** September 30, 2026
+**Effective date:** October 2, 2026
 
 Manafolio is a self-hosted Magic: The Gathering collection, storage, and deck manager. Your chosen server holds your account and collection; this repository does not provide a central Manafolio account or hosted collection service. Installing the application does not give its maintainers access to your server.
 
@@ -24,6 +24,8 @@ The server administrator controls the database, persistent files, and access to 
 The browser uses local storage for the sign-in token, account data returned by the server, interface language, and device-specific display/scanner preferences. Returned account settings can include configured provider API keys. Browser caches and downloaded exports may retain additional data on the device.
 
 Signing out removes the application's saved sign-in token and user object, but is not a wipe of all preferences, downloads, caches, or operating-system backups. Clear browser site data and downloaded files when retiring a shared device.
+
+Container-label sign-in through SSO temporarily stores the intended container ID in this tab's session storage, then removes it when navigation resolves. No label or QR image is saved to the server.
 
 ## Camera and card identification
 
@@ -90,6 +92,8 @@ See the [AI workflow and deployment guidance](README.md#get-an-ai-deck-recommend
 Collection sharing and location sharing are off by default. Enabling collection sharing makes the share-token URL accessible without a login: anyone with that link can view the shared Physical collection, trade list, and Wishlist, including your username, quantities, card details, and public valuations. Purchase prices and private notes are not included. Arena and Graveyard are not exposed by these shared collection views.
 
 Location sharing is a separate opt-in. It exposes container names and allows public container layouts, including compartments and card positions. Treat share links as access credentials; recipients can forward them. Disable sharing or regenerate the share token to invalidate access through the old link. Neither action recalls screenshots, downloads, or copies others have already made.
+
+**Printed container labels are not public shares.** Their QR codes are generated locally in your browser and contain only the installation URL and container ID. They contain no session, API, or share token and do not enable sharing. Opening the link requires sign-in and ownership of the container. The printed container name is visible to whoever sees the label; print jobs, saved PDFs, and browser/server URL history may retain the name or destination. Protect printed labels and exported PDFs accordingly.
 
 Deck sharing is a separate, per-deck opt-in and does not enable collection or location sharing. A deck link discloses your username and that deck's saved name, description, format, category, wins, losses, commander, card printings, artwork, and quantities. Physical, Arena, and Graveyard deck definitions can be shared, including cards you do not own. Private Notes, custom deck backs, storage locations, owned-copy availability, reservations, prices, and purchase details are excluded. Anyone with the link can read and forward it; later saved deck changes appear at the same link. Revoke the individual link or delete the deck to stop access, without recalling copies already retained by recipients.
 

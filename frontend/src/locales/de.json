@@ -1,4 +1,12 @@
 {
+  "containerLabel.title": "Behälteretikett drucken",
+  "containerLabel.privacy": "Scannen öffnet diesen Behälter nach der Anmeldung. Dieser QR-Code aktiviert keine öffentliche Freigabe.",
+  "containerLabel.printHint": "Etikettbreite: 70 mm; QR: 48 mm. Mit 100 % Skalierung und ohne Browser-Kopf- und Fußzeilen drucken. Prüfe vorher, ob dein Handy das Ziel erreicht.",
+  "containerLabel.destination": "QR-Ziel",
+  "containerLabel.qrAlt": "QR-Code zum Öffnen dieses Behälters nach der Anmeldung",
+  "containerLabel.print": "Drucken",
+  "containerLabel.error": "Das Etikett konnte nicht erstellt werden. Prüfe die Serververbindung und die öffentliche Basis-URL in den Einstellungen und öffne die Vorschau erneut.",
+  "containerLabel.unavailable": "Dieser Behälter ist für dieses Konto nicht verfügbar. Prüfe den Link oder melde dich mit dem Eigentümerkonto an.",
   "storageUnit.title": "Aufbewahrungseinheiten",
   "storageUnit.create": "Aufbewahrungseinheit erstellen",
   "storageUnit.edit": "Aufbewahrungseinheit bearbeiten",

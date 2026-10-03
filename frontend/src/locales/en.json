@@ -1,4 +1,12 @@
 {
+  "containerLabel.title": "Print container label",
+  "containerLabel.privacy": "Scanning opens this container after sign-in. This QR code does not enable public sharing.",
+  "containerLabel.printHint": "Label width: 70 mm; QR: 48 mm. Print at 100% scale with browser headers and footers off. Check that your phone can reach the destination before printing.",
+  "containerLabel.destination": "QR destination",
+  "containerLabel.qrAlt": "QR code to open this container after sign-in",
+  "containerLabel.print": "Print",
+  "containerLabel.error": "The label could not be generated. Check the server connection and public base URL in Settings, then reopen this preview.",
+  "containerLabel.unavailable": "This container is unavailable for this account. Check the link or sign in to the account that owns it.",
   "storageUnit.title": "Storage units",
   "storageUnit.create": "Create Storage Unit",
   "storageUnit.edit": "Edit storage unit",

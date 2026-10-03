@@ -1,4 +1,12 @@
 {
+  "containerLabel.title": "打印容器标签",
+  "containerLabel.privacy": "扫描后登录即可打开此容器。此二维码不会启用公开分享。",
+  "containerLabel.printHint": "标签宽度：70 mm；二维码：48 mm。请以100%比例打印，并关闭浏览器页眉和页脚。打印前请确认手机可以访问目标地址。",
+  "containerLabel.destination": "二维码目标地址",
+  "containerLabel.qrAlt": "登录后打开此容器的二维码",
+  "containerLabel.print": "打印",
+  "containerLabel.error": "无法生成标签。请检查服务器连接和设置中的公开基础网址，然后重新打开预览。",
+  "containerLabel.unavailable": "此账户无法访问该容器。请检查链接或使用所属账户登录。",
   "storageUnit.title": "收纳单元",
   "storageUnit.create": "创建收纳单元",
   "storageUnit.edit": "编辑收纳单元",
