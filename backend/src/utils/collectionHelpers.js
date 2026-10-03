@@ -462,6 +462,7 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
 }
 module.exports = {
   defaultCompartmentPlan,
+  physicalCardEntries,
   sourceEntries,
   moveContainerCopies,
   checkedOutAllocation,

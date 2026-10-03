@@ -17,6 +17,7 @@ import PackPriceSplitter from './PackPriceSplitter';
 import CardImage from './CardImage';
 import MultiSelectDropdown from './MultiSelectDropdown';
 import Modal from './Modal';
+import SetCompletion from './SetCompletion';
 
 const labelStyle = { fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-secondary)' };
 const PAGE_SIZE = 60;
@@ -108,6 +109,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   }, [subTab, setSelectedIds, setBulkMoveTarget]);
 
   useEffect(() => {
+    if (subTab === 'completion') return;
     const controller = new AbortController();
     setCollectionState(previous => ({ scope: collectionScope, data: previous?.scope === collectionScope ? previous.data : null, loading: true, error: false }));
     const load = async () => {
@@ -367,17 +369,18 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
           <option value="graveyard">{t('collection.graveyard')}</option>
           <option value="unsorted">{t('bulk.unassignedPile')}</option>
           <option value="wishlist">{t('collection.wishlist')}</option>
+          <option value="completion">{t('completion.title')}</option>
         </select>
       </div>
       <div className="sub-nav-tabs collection-inventory-nav" style={{ marginBottom: '0.75rem' }}>
-        {[['collection', 'nav.collection'], ['arena', 'collection.arena'], ['graveyard', 'collection.graveyard'], ['unsorted', 'bulk.unassignedPile'], ['wishlist', 'collection.wishlist']].map(([value, label]) => (
+        {[['collection', 'nav.collection'], ['arena', 'collection.arena'], ['graveyard', 'collection.graveyard'], ['unsorted', 'bulk.unassignedPile'], ['wishlist', 'collection.wishlist'], ['completion', 'completion.title']].map(([value, label]) => (
           <button key={value} className={`sub-nav-tab ${subTab === value ? 'active' : ''}`} aria-pressed={subTab === value} onClick={() => setSubTab(value)}>
             {t(label)}
           </button>
         ))}
       </div>
 
-
+      {subTab === 'completion' ? <SetCompletion /> : <>
       {/* Filter Panel */}
       <div className="collection-filters" style={{ position: 'relative', zIndex: 40, overflow: 'visible', marginBottom: '0.75rem' }}>
         {/* Always-visible top bar: search + sort + filters toggle */}
@@ -926,6 +929,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
         showToast={showToast}
         onViewStorage={handleViewStorage}
       />
+      </>}
     </div>
   );
 }

@@ -655,6 +655,39 @@ async function getCardsBySet(setCode) {
   }
 }
 
+// Completion must never treat a cached subset (or a failed later page) as a set.
+async function getSetChecklist(setCode) {
+  const rawCards = new Map();
+  let total = null;
+  let url = `/cards/search?q=${encodeURIComponent(`set:${setCode}`)}&unique=prints&include_extras=true&order=set`;
+  const visited = new Set();
+  while (url) {
+    const parsed = new URL(url, 'https://api.scryfall.com');
+    if (parsed.origin !== 'https://api.scryfall.com' || parsed.pathname !== '/cards/search' || visited.has(parsed.href)) {
+      throw new Error('Invalid set catalog pagination');
+    }
+    visited.add(parsed.href);
+    const { data } = await scryGetRetried(url);
+    if (!Array.isArray(data?.data) || !data.data.length || typeof data.has_more !== 'boolean') throw new Error('Incomplete set catalog');
+    if (total === null) total = data.total_cards;
+    if (!Number.isInteger(total) || total <= 0 || data.total_cards !== total) throw new Error('Incomplete set catalog total');
+    for (const raw of data.data) {
+      if (!raw.id || raw.set !== setCode || !raw.collector_number || !Array.isArray(raw.finishes) || !Array.isArray(raw.games)) {
+        throw new Error('Incomplete set card metadata');
+      }
+      rawCards.set(raw.id, raw);
+    }
+    if (data.has_more && !data.next_page) throw new Error('Incomplete set catalog pagination');
+    url = data.has_more ? data.next_page : null;
+  }
+  if (rawCards.size !== total) throw new Error('Incomplete set catalog count');
+  const cards = [...rawCards.values()].map(raw => ({
+    ...normalizeCard(raw), oracle_id: raw.oracle_id || raw.id, finishes: raw.finishes, games: raw.games,
+  }));
+  await cacheCards(cards);
+  return cards;
+}
+
 // Cache Scryfall sets under game-prefixed IDs. Force refreshes an existing catalog.
 async function fetchAndCacheSets(force = false) {
   try {
@@ -842,4 +875,4 @@ async function getRelatedTokens(cardIds) {
 }
 
 // Export the client and fetchWindow for adapter-based tests.
-module.exports = { searchCards, normalizeCard, cacheCards, getCardsBySet, fetchAndCacheSets, updateCollectionPrices, getCardById, getRelatedTokens, getPrintingInLang, scryGetRetried, bulkFetchByIdentifier, client, fetchWindow };
+module.exports = { searchCards, normalizeCard, cacheCards, getCardsBySet, getSetChecklist, fetchAndCacheSets, updateCollectionPrices, getCardById, getRelatedTokens, getPrintingInLang, scryGetRetried, bulkFetchByIdentifier, client, fetchWindow };

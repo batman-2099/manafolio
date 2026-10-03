@@ -190,6 +190,8 @@ The Scryfall bulk catalog lives at `<DB_PATH>.scryfall-bulk.sqlite`. `scryfallBu
 
 MTGJSON provides precon lists, not user ownership. Scryfall supplies token relations. Related-token ownership is inventory-scoped and name-based, including front names of double-faced tokens; same-named tokens can differ in rules or stats, so the UI must not imply an exact printing/rules match. Token references do not count as deck slots or reserve copies.
 
+Set completion (`GET /api/sets/:code/completion?inventory_type=collection|arena`) is authenticated and account-scoped. It fetches a complete paginated Scryfall `unique=prints` set checklist, validates finish/platform metadata and the provider total, and only then writes normalized cards through the existing cache. Partial cache contents never supply a denominator. Card goals group by oracle identity within the selected set; printing goals group by set/collector number across languages; foil goals require provider `foil` availability and a stored `Holofoil` copy. Arena filters to provider `arena` printings and has no foil goal. Missing copies remain recorded but do not complete goals; Physical free-copy quantities reuse storage eligibility and checkout-allocation helpers. No collection data, goals, or completion history is persisted.
+
 ### Names and printing languages
 
 `card_cache.name` is the searchable/canonical name; `printed_name` is the localized name on the card. Display helpers use `printed_name || name`; search considers both. Name-based copy rules, marketplace queries, and exports must not accidentally split the same card solely because its printed name differs.
