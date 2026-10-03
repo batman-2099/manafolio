@@ -53,6 +53,9 @@ window.fetch = async (input, opts = {}) => {
   const method = (opts.method || 'GET').toUpperCase();
   const path = (url.replace(/^https?:\/\/[^/]+/, '').split('?')[0].replace(/\/+$/, '')) || '/';
 
+  if (path.startsWith('/api/decks/acquisition-plan')) {
+    return json({ error: 'Acquisition planning requires a server installation; the demo cannot save a Wishlist.' }, 503);
+  }
   if (path === '/api/storage-units' || /^\/api\/storage-units\/\d+(?:\/cover-choices)?$/.test(path)) {
     const units = routes['/api/storage-units'];
     const id = path === '/api/storage-units' ? null : Number(path.split('/')[3]);

@@ -10,8 +10,41 @@ const scryfallApi = require('../scryfallApi');
 const { parseManaboxText } = require('../utils/csvMappers');
 const mtgjsonApi = require('../mtgjsonApi');
 const { normalizeCardBack } = require('../utils/cardBack');
+const { acquisitionPlan } = require('../utils/acquisitionPlanner');
 
 const router = express.Router();
+
+router.post('/acquisition-plan', async (req, res) => {
+  try {
+    res.json(await db.withTransaction(() => acquisitionPlan(req.user.id, req.body)));
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.status ? error.message : 'Could not calculate the acquisition plan.' });
+  }
+});
+
+router.post('/acquisition-plan/wishlist', async (req, res) => {
+  if (req.body?.confirmed !== true || typeof req.body?.revision !== 'string') {
+    return res.status(400).json({ error: 'Preview and confirm the plan before adding to Wishlist.' });
+  }
+  try {
+    const result = await db.withTransaction(async () => {
+      const plan = await acquisitionPlan(req.user.id, req.body);
+      if (plan.inventory !== 'collection') throw Object.assign(new Error('Arena plans cannot be added to the physical Wishlist.'), { status: 400 });
+      if (plan.revision !== req.body.revision) throw Object.assign(new Error('The plan changed. Preview it again before confirming.'), { status: 409 });
+      let added = 0;
+      for (const item of plan.items) {
+        if (!item.to_add) continue;
+        await db.run(`INSERT INTO collection (card_id, quantity, user_id, game, list_type, printing, language)
+          VALUES (?, ?, ?, 'mtg', 'wishlist', 'Normal', ?)`, [item.card_id, item.to_add, req.user.id, item.language || 'English']);
+        added += item.to_add;
+      }
+      return { added };
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.status ? error.message : 'Could not add the plan to Wishlist.' });
+  }
+});
 
 // Share management stays account-scoped; the public capability only grants reading.
 router.route('/:id/share').all((req, res, next) => {

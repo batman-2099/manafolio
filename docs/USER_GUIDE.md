@@ -675,6 +675,19 @@ This deck-creation chooser creates a definition only. It does not buy or add own
 
 **Expected result:** deck text is copied for use elsewhere. The buylist contains quantities needed beyond what you own, not every copy temporarily unavailable because another deck reserves it. The TCGplayer action opens an external site; it does not place an order. Export is not a complete account backup.
 
+### Plan acquisitions for several decks
+
+1. Save each deck, return to **Your decks**, and open **Shopping List**.
+2. Select one or more Physical decks, or one or more Arena decks. Mixing inventories is rejected; Graveyard decks are excluded.
+3. Choose **Exact saved printing** or **Any printing — same canonical Magic name**, then **Preview shopping list**. Exact mode matches provider printing IDs. Any mode uses the cached canonical Magic name, not a localized printed name or a partial/fuzzy match. The displayed saved printing is the proposed purchase, not a cheapest-printing recommendation.
+4. Review Required, Owned, Needed, On Wishlist, and Not yet planned. Required sums all selected decks for simultaneous ownership, then subtracts matching owned copies once. Missing copies, Wishlist and Graveyard never supply ownership. Reservations still count as owned: this is acquisition planning, not checkout readiness. Finish, condition, grading and deck source preferences do not restrict matching.
+   **Export to text**, beside the Wishlist action, downloads `shopping-list.txt` with all Needed copies, including those already on Wishlist. Exact-printing mode includes set codes and collector numbers in Arena text format; Any printing exports quantity and name only. Fully owned cards are omitted. Export does not change inventory or Wishlist.
+5. For Physical plans, choose **Add deficits to Wishlist**, review the confirmation, then confirm or **Cancel**. Only Not yet planned quantities are added as nonfoil copies of the displayed printings. Existing Wishlist quantities are honored, including other finishes. Decks and owned inventory are unchanged. A changed plan requires a new preview; concurrent/repeated confirmations cannot duplicate its additions. Manage the results under **Collection → Wishlist**.
+
+For example, two decks needing four and three copies of the same card require seven combined. Three eligible owned copies leave four needed; two matching Wishlist copies leave only two new Wishlist additions.
+
+Estimates use cached nonfoil prices for all Needed copies, including copies already on Wishlist. Unknown prices are marked unknown and excluded from totals; USD, EUR and other reported currency units remain separate without conversion. Planning makes no provider request. Arena mode uses only Arena ownership and offers neither physical-market prices nor physical Wishlist additions. The static demo displays an explicit server-required message.
+
 ### Check out a Physical deck for play
 
 1. Save pending changes. Review unavailable-copy warnings and your actual physical cards.

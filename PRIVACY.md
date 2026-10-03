@@ -16,6 +16,7 @@ Depending on the features you use, Manafolio handles:
 - Imported files, exported files, backups, catalog caches, and uploaded replacement card artwork.
 - Camera images sent for identification, and optional AI prompts, draft context, and responses processed during a request.
 - Pending scan drafts and their reviewed copy details. These remain in your account on the server until you discard them or confirm their addition to Collection; they are separate from the transient camera image.
+- Acquisition previews use only your saved decks, inventory and cached card metadata on your server. Preview/cancel does not persist a plan or contact a card provider; explicit confirmation creates ordinary Wishlist entries, subject to the same backup, deletion and opt-in collection-sharing rules as other Wishlist records.
 
 The server administrator controls the database, persistent files, and access to them. Account separation is not encryption against that administrator. Use a server you trust, especially before entering provider credentials or connecting a ChatGPT account.
 
