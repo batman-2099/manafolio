@@ -4,6 +4,9 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Fixed Trade workbench initialization and reset on HTTP LAN addresses by generating secure random trade identifiers without the HTTPS-only `crypto.randomUUID()` API.
+- Added card thumbnails to both sides of trade review, using the shared card-back fallback when artwork is unavailable.
+- Replaced the Trade workbench navigation database icon with exchange arrows on desktop and mobile.
 - Fixed frontend test discovery on Node 20 CI by allowing the shell to expand the test-file wildcard.
 - Included guide images in the Docker frontend build stage, fixing the missing storage-unit screenshot import.
 - Fixed API-key masking in command examples, keyboard access to backup import, native-dialog focus and dismissal for Quick Add/imports, grading/filter labels, selected-filter announcements, and box-coverflow focus visibility.

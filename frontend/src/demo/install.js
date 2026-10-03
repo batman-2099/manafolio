@@ -52,6 +52,9 @@ window.fetch = async (input, opts = {}) => {
 
   const method = (opts.method || 'GET').toUpperCase();
   const path = (url.replace(/^https?:\/\/[^/]+/, '').split('?')[0].replace(/\/+$/, '')) || '/';
+  if (path.startsWith('/api/trades/')) {
+    return json({ error: 'Trade inventory changes require a server installation; the demo cannot commit trades.' }, 503);
+  }
 
   if (path === '/api/storage-units' || /^\/api\/storage-units\/\d+(?:\/cover-choices)?$/.test(path)) {
     const units = routes['/api/storage-units'];

@@ -51,6 +51,16 @@ async function parseCompleteBackup(data) {
   if (!backup || backup.format !== 'manafolio-backup' || backup.version !== 1 || !arrays.every(key => Array.isArray(backup[key]))) {
     throw new Error('Invalid backup file');
   }
+  const trades = backup.completed_trades ?? [];
+  if (!Array.isArray(trades) || trades.some(trade => !trade
+      || typeof trade.trade_id !== 'string' || !/^[a-zA-Z0-9-]{16,80}$/.test(trade.trade_id)
+      || typeof trade.request_hash !== 'string' || !/^[a-f0-9]{64}$/.test(trade.request_hash)
+      || !Number.isSafeInteger(trade.given) || trade.given < 1
+      || !Number.isSafeInteger(trade.received) || trade.received < 1
+      || typeof trade.completed_at !== 'string')
+      || new Set(trades.map(trade => trade.trade_id)).size !== trades.length) {
+    throw new Error('Invalid backup completed trades');
+  }
   const storageUnits = backup.storage_units === undefined ? [] : backup.storage_units;
   if (!Array.isArray(storageUnits) || storageUnits.some(unit => !unit
       || !Number.isSafeInteger(unit.id) || unit.id < 1
@@ -182,6 +192,13 @@ async function restoreCompleteBackup(backup, userId) {
     await db.run('DELETE FROM collection WHERE user_id = ?', [userId]);
     await db.run('DELETE FROM locations WHERE user_id = ?', [userId]);
     await db.run('DELETE FROM storage_units WHERE user_id = ?', [userId]);
+    // Keep existing retry tombstones even when restoring an older account snapshot.
+    for (const trade of backup.completed_trades ?? []) {
+      const existing = await db.get('SELECT request_hash FROM completed_trades WHERE user_id = ? AND trade_id = ?', [userId, trade.trade_id]);
+      if (existing && existing.request_hash !== trade.request_hash) throw new Error('Conflicting completed trade ID');
+      await db.run(`INSERT OR IGNORE INTO completed_trades (user_id, trade_id, request_hash, given, received, completed_at)
+        VALUES (?, ?, ?, ?, ?, ?)`, [userId, trade.trade_id, trade.request_hash, trade.given, trade.received, trade.completed_at]);
+    }
 
     for (const card of backup.card_cache) {
       await db.run(`
@@ -316,6 +333,7 @@ router.get('/export', async (req, res) => {
         card_cache: cardCache,
         locations,
         storage_units: await db.all('SELECT id, name, type, cover_card_id, cover_image FROM storage_units WHERE user_id = ? ORDER BY id', [req.user.id]),
+        completed_trades: await db.all('SELECT trade_id, request_hash, given, received, completed_at FROM completed_trades WHERE user_id = ? ORDER BY completed_at, trade_id', [req.user.id]),
         compartments,
         compartment_assignments: compartmentAssignments,
         decks,

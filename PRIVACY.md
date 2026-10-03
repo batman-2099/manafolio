@@ -16,6 +16,7 @@ Depending on the features you use, Manafolio handles:
 - Imported files, exported files, backups, catalog caches, and uploaded replacement card artwork.
 - Camera images sent for identification, and optional AI prompts, draft context, and responses processed during a request.
 - Pending scan drafts and their reviewed copy details. These remain in your account on the server until you discard them or confirm their addition to Collection; they are separate from the transient camera image.
+- Completed trade retry receipts: a private trade ID, request fingerprint, given/received counts, and completion time. Unconfirmed trade drafts stay in the open page; receiving searches use the existing Scryfall integration. Trade receipts are included in account and server backups, are not publicly shared, and contain no counterparty identity or saved price quote. Account restore preserves already-known receipt IDs to prevent duplicate exchanges; deleting the account removes its live receipts, not copies in earlier backups.
 
 The server administrator controls the database, persistent files, and access to them. Account separation is not encryption against that administrator. Use a server you trust, especially before entering provider credentials or connecting a ChatGPT account.
 

@@ -146,6 +146,7 @@ File names in this table are under `backend/src/routes/`. The table groups actua
 | `/api/decks` | `decks.js` | CRUD, from-container, complete editor save, records, commander, duplicate, cards/Pulled, checkout/return, locations, per-deck share-link management |
 | `/api/ai-decks` | `aiDecks.js` | AI connection/preferences/models, eligible inventory, streamed suggestions, validated create/replace |
 | `/api/settings` | `settings.js` | Effective settings/version, administrator changes and Scryfall bulk download |
+| `/api/trades` | `trades.js` | Eligible exact Physical entries, read-only review, atomic confirmation with account-scoped completed-ID retry receipts |
 
 The built frontend is served from `frontend/dist`. Non-API paths fall back to the SPA. `/models/cornelius.onnx` exposes only the public corner-model weights, not the entire model/catalog directory.
 Vite's hashed `/assets/` files are immutable; stable public/ORT filenames and `/models/cornelius.onnx` revalidate so upgrades do not leave old runtime/model bytes cached for a year.
@@ -166,6 +167,8 @@ The main SQLite connection enables foreign keys, WAL, and a five-second busy tim
 Use this helper for a multi-statement invariant rather than issuing ad hoc `BEGIN`/`COMMIT` calls. Without the queue boundary, another request's statements can enter the same connection's transaction. Keep domain validation and writes that must agree inside the transaction. Checkout validates availability, records exact allocations, and updates its reservation state transactionally.
 
 Current transactional workflows include complete deck editor saves, AI deck saves/replacements, precon import, collection import, account restore, container import/move, Physical/Graveyard whole-container transfer, manual card swaps, and bulk purchase-cost allocation. Settings and admin account updates validate the entire request before a single SQL update. Ordinary collection imports can report individual failures while saving valid entries; precon import with deck creation rejects unresolved cards rather than saving a partial deck.
+
+Trade confirmation accepts a client-generated `trade_id`, exact giving entry IDs/quantities/snapshot fingerprints, and receiving printing IDs/finish/language/condition/quantities. Provider cache hydration happens before the transaction; cached receiving identity, giving snapshots, ownership, locks, missing state, and checkout allocations are revalidated inside it. Any reserved entry is excluded, including partially reserved quantity rows. Giving quantities decrease in place, zero rows are removed, and received raw quantities are inserted into Physical Unassigned Pile with a null purchase price. `completed_trades` stores only account-scoped ID, canonical-request SHA-256, given/received counts, and completion time, atomically with the inventory changes. Exact retry returns the original counts; reuse with another payload is a conflict. Account export includes receipts; restore validates/imports them and retains existing receipt tombstones even for older backups, so old requests cannot replay against remapped entry IDs. Account deletion cascades receipts. Review values are cached finish-specific quotes grouped by explicit USD/EUR, with missing/unsupported currency unknown and no conversion; quotes are not saved as purchase costs.
 
 ### Migration and backup cautions
 

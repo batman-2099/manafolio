@@ -357,6 +357,7 @@ app.use('/api', collectionRoutes);
 app.use('/api', storageRoutes);
 app.use('/api', statsRoutes);
 app.use('/api', importExportRoutes);
+app.use('/api/trades', require('./routes/trades'));
 app.use('/api', notesRoutes);
 app.use('/api/sets', setsRoutes);
 app.use('/api/decks', decksRoutes);
