@@ -333,7 +333,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                     onClick={() => setInspectorCard(card)}
                     className="dashboard-card-clickable dashboard-card-row"
                   >
-                    <CardImage card={card} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px' }} />
+                    <CardImage card={card} thumbnail loading="lazy" width={48} height={67} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px' }} />
                     <div className="dashboard-card-description">
                       <div className="dashboard-card-name">
                         {getCardDisplayName(card.name, card.printed_name)}
@@ -368,7 +368,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                   onClick={() => setInspectorCard(card)}
                   className="dashboard-card-clickable dashboard-card-row"
                 >
-                  <CardImage card={card} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px' }} />
+                  <CardImage card={card} thumbnail loading="lazy" width={48} height={67} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px' }} />
                   <div className="dashboard-card-description">
                     <div className="dashboard-card-name">
                       {getCardDisplayName(card.name, card.printed_name)}

@@ -2,8 +2,9 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.3.2 — 2026-10-04
 
+- Reduced Dashboard artwork transfer with lazy, size-appropriate Scryfall thumbnails while preserving contributed artwork, full-resolution inspection, and image fallbacks. Deferred sleeve catalog downloads until card-back customization opens, with retryable loading that preserves the draft. Overlapped known Physical deck detail/location reads and bounded offline shell preparation to four concurrent downloads without dropping languages.
 - Added opt-in offline collection lookup: account-scoped text snapshots, Physical/Arena/Wishlist filters, storage paths, missing/reserved quantities, saved timestamps, manual refresh, and device-local clearing. A dedicated service-worker-cached read-only page opens when the server is unavailable; failed refreshes preserve the previous snapshot and logout/account changes invalidate pending downloads.
 - Rejected malformed account, note, quantity, and storage-layout inputs before mutation; kept certified slabs distinct during quantity reconciliation and Collection grouping.
 - Made collection add/edit, container creation/settings, and resort writes atomic; exported account backups from one consistent transaction and used SQLite cascades for atomic deck deletion.

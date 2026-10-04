@@ -3,28 +3,13 @@ import Modal from './Modal';
 import { useT } from '../utils/i18n';
 import { useBackGuard } from '../utils/useBackGuard';
 import { prepareImage } from '../utils/prepareImage';
-import dragonShieldSleeves from '../data/dragonShieldSleeves.json';
-import ultimateGuardSleeves from '../data/ultimateGuardSleeves.json';
-import ultraProSleeves from '../data/ultraProSleeves.json';
+import dragonShieldSleevesUrl from '../data/dragonShieldSleeves.json?url';
+import ultimateGuardSleevesUrl from '../data/ultimateGuardSleeves.json?url';
+import ultraProSleevesUrl from '../data/ultraProSleeves.json?url';
 
 // Magic artwork © Wizards of the Coast. Bundled from Scryfall's standard card back:
 // https://backs.scryfall.io/normal/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg
 const DEFAULT_BACK = `${import.meta.env.BASE_URL}mtg-card-back.webp`;
-const sleeves = [
-  ...dragonShieldSleeves,
-  ...ultimateGuardSleeves.map(sleeve => ({ ...sleeve, image: `${import.meta.env.BASE_URL}${sleeve.image}` })),
-  ...ultraProSleeves,
-];
-const sleeveGroups = [
-  { provider: 'Dragon Shield', plain: [], art: [] },
-  { provider: 'Ultimate Guard', plain: [], art: [] },
-  { provider: 'Ultra PRO', plain: [], art: [] },
-];
-for (const sleeve of sleeves) {
-  const provider = sleeve.id.startsWith('ultimate-guard-') ? 1 : sleeve.id.startsWith('ultra-pro-') ? 2 : 0;
-  const group = sleeve.group || (/(?:Classic|Matte|Matte Dual) Sleeves$/.test(sleeve.name) ? 'plain' : 'art');
-  sleeveGroups[provider][group].push(sleeve);
-}
 
 function BackPreview({ color, image, label }) {
   return color
@@ -40,9 +25,46 @@ export default function DeckCardBack({ deck, disabled, onSaved, onBusy }) {
   const [error, setError] = useState(null);
   const [imageUrl, setImageUrl] = useState('');
   const [selectedSleeve, setSelectedSleeve] = useState(null);
+  const [catalog, setCatalog] = useState(null);
+  const [catalogError, setCatalogError] = useState(false);
+  const [catalogRetry, setCatalogRetry] = useState(0);
+  const open = !!draft;
   const generation = useRef(0);
   const download = useRef(null);
   useEffect(() => () => { generation.current += 1; download.current?.abort(); }, []);
+  useEffect(() => {
+    if (!open || catalog) return;
+    const controller = new AbortController();
+    Promise.all([dragonShieldSleevesUrl, ultimateGuardSleevesUrl, ultraProSleevesUrl].map(async url => {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) throw new Error('catalog');
+      return response.json();
+    })).then(([dragonShieldSleeves, ultimateGuardSleeves, ultraProSleeves]) => {
+      if (controller.signal.aborted) return;
+      const sleeves = [
+        ...dragonShieldSleeves,
+        ...ultimateGuardSleeves.map(sleeve => ({ ...sleeve, image: `${import.meta.env.BASE_URL}${sleeve.image}` })),
+        ...ultraProSleeves,
+      ];
+      const groups = [
+        { provider: 'Dragon Shield', plain: [], art: [] },
+        { provider: 'Ultimate Guard', plain: [], art: [] },
+        { provider: 'Ultra PRO', plain: [], art: [] },
+      ];
+      for (const sleeve of sleeves) {
+        const provider = sleeve.id.startsWith('ultimate-guard-') ? 1 : sleeve.id.startsWith('ultra-pro-') ? 2 : 0;
+        const group = sleeve.group || (/(?:Classic|Matte|Matte Dual) Sleeves$/.test(sleeve.name) ? 'plain' : 'art');
+        groups[provider][group].push(sleeve);
+      }
+      setCatalog({ sleeves, groups });
+    }).catch(() => {
+      if (!controller.signal.aborted) {
+        setCatalogError(true);
+        controller.abort();
+      }
+    });
+    return () => controller.abort();
+  }, [open, catalog, catalogRetry]);
   const close = () => {
     if (saving) return false;
     generation.current += 1;
@@ -51,7 +73,7 @@ export default function DeckCardBack({ deck, disabled, onSaved, onBusy }) {
     setProcessing(false);
     setError(null);
   };
-  useBackGuard(!!draft, close);
+  useBackGuard(open, close);
 
   const upload = async event => {
     const file = event.target.files?.[0];
@@ -121,6 +143,7 @@ export default function DeckCardBack({ deck, disabled, onSaved, onBusy }) {
     <button type="button" className="deck-back-button" disabled={disabled} aria-label={t('deck.cardBackEdit')} onClick={() => {
       setDraft({ color: deck.card_back_color ?? null, image: deck.card_back_image ?? null });
       setError(null);
+      setCatalogError(false);
       setImageUrl('');
       setSelectedSleeve(null);
     }}>
@@ -134,15 +157,15 @@ export default function DeckCardBack({ deck, disabled, onSaved, onBusy }) {
         <p>{t('deck.cardBackHint')}</p>
         <fieldset disabled={saving || processing}>
           <label htmlFor="deck-back-sleeve">{t('deck.cardBackSleeve')}</label>
-          <select id="deck-back-sleeve" className="select-control" value={selectedSleeve?.id || ''} onChange={event => {
-            const sleeve = sleeves.find(({ id }) => id === event.target.value);
+          <select id="deck-back-sleeve" className="select-control" disabled={!catalog} aria-busy={!catalog && !catalogError} value={selectedSleeve?.id || ''} onChange={event => {
+            const sleeve = catalog.sleeves.find(({ id }) => id === event.target.value);
             if (sleeve) {
               setImageUrl('');
               importUrl(new URL(sleeve.image, window.location.href).href, sleeve);
             }
           }}>
             <option value="" disabled>{t('deck.cardBackSleeveChoose')}</option>
-            {sleeveGroups.flatMap(({ provider, plain, art }) => [
+            {catalog?.groups.flatMap(({ provider, plain, art }) => [
               plain.length > 0 && <optgroup key={`${provider}-plain`} label={`${provider} — ${t('deck.cardBackSleevePlain')}`}>
                 {plain.map(sleeve => <option key={sleeve.id} value={sleeve.id}>{sleeve.name}</option>)}
               </optgroup>,
@@ -151,6 +174,11 @@ export default function DeckCardBack({ deck, disabled, onSaved, onBusy }) {
               </optgroup>,
             ])}
           </select>
+          {!catalog && !catalogError && <p role="status">{t('common.loading')}</p>}
+          {catalogError && <div className="deck-source-error" role="alert">
+            <p>{t('error.crashed')}</p>
+            <button type="button" className="btn btn-secondary" onClick={() => { setCatalogError(false); setCatalogRetry(value => value + 1); }}>{t('common.retry')}</button>
+          </div>}
           {selectedSleeve && <a href={selectedSleeve.url} target="_blank" rel="noopener noreferrer">{t('deck.cardBackSleeveSource')}</a>}
           <label htmlFor="deck-back-color">{t('deck.cardBackColor')}</label>
           <input id="deck-back-color" type="color" value={draft.color || '#334155'} onChange={event => { setDraft({ color: event.target.value, image: null }); setSelectedSleeve(null); setError(null); }} />

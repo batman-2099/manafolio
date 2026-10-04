@@ -4,12 +4,16 @@ const CACHE = __OFFLINE_CACHE__;
 
 async function prepareCache() {
   const cache = await caches.open(CACHE);
-  for (const path of ASSETS) {
-    if (await cache.match(path)) continue;
-    const response = await fetch(path, { cache: 'reload' });
-    if (!response.ok || response.redirected) throw new Error('Offline asset unavailable');
-    await cache.put(path, response);
-  }
+  const pending = ASSETS.values();
+  // ponytail: four downloads overlap latency without flooding slower devices.
+  await Promise.all(Array.from({ length: Math.min(4, ASSETS.length) }, async () => {
+    for (const path of pending) {
+      if (await cache.match(path)) continue;
+      const response = await fetch(path, { cache: 'reload' });
+      if (!response.ok || response.redirected) throw new Error('Offline asset unavailable');
+      await cache.put(path, response);
+    }
+  }));
 }
 
 self.addEventListener('install', event => {

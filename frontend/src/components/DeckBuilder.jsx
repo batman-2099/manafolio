@@ -115,6 +115,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [decksLoading, setDecksLoading] = useState(true);
   const [decksError, setDecksError] = useState(false);
   const decksRequest = useRef(0);
+  const deckDetailsRequest = useRef(0);
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'detail'
   
   // Deck View & Display Modes
@@ -380,6 +381,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
   const leaveDeck = () => {
     if (!confirmLeaveEditor()) return false;
+    deckDetailsRequest.current++;
     setActiveDeck(null);
     setSavedEditorState(null);
     setDeckDraft(null);
@@ -439,8 +441,9 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
   useEffect(() => {
     const requests = decksRequest;
+    const detailRequests = deckDetailsRequest;
     fetchDecks();
-    return () => { requests.current++; };
+    return () => { requests.current++; detailRequests.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -580,14 +583,24 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   };
 
   const loadDeckDetails = async (deckId) => {
+    const request = ++deckDetailsRequest.current;
+    const knownDeck = activeDeck?.id === deckId ? activeDeck : decks.find(deck => deck.id === deckId);
+    const locationsRequest = knownDeck?.inventory_type === 'collection'
+      ? fetch(`/api/decks/${deckId}/locations`).then(response => ({ response }), error => ({ error }))
+      : null;
     try {
       setLoading(true);
       const response = await fetch(`/api/decks/${deckId}`);
       if (!response.ok) throw new Error(t('deck.errLoadDetails'));
       const data = await response.json();
       if (!isGameEnabled(data.game)) throw new Error(t('deck.errLoadDetails'));
-      const locationsResponse = data.inventory_type === 'collection' ? await fetch(`/api/decks/${deckId}/locations`) : null;
+      const locationResult = data.inventory_type === 'collection'
+        ? await (locationsRequest || fetch(`/api/decks/${deckId}/locations`).then(response => ({ response })))
+        : null;
+      if (locationResult?.error) throw locationResult.error;
+      const locationsResponse = locationResult?.response;
       const locations = locationsResponse?.ok ? await locationsResponse.json() : [];
+      if (request !== deckDetailsRequest.current) return false;
       setDeckLocationsError(data.inventory_type === 'collection' && !locationsResponse?.ok);
       setDeckCardLocations(Object.fromEntries(locations.map(({ card_id, locations: cardLocations }) => [card_id, cardLocations])));
       setActiveDeck(data);
@@ -604,11 +617,12 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
       setViewMode('detail');
       return true;
     } catch (err) {
+      if (request !== deckDetailsRequest.current) return false;
       console.error(err);
       showToast(t('deck.errLoadDetails'), 'error');
       return false;
     } finally {
-      setLoading(false);
+      if (request === deckDetailsRequest.current) setLoading(false);
     }
   };
 
