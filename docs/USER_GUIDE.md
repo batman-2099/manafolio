@@ -13,8 +13,8 @@ For installation and upgrades, use the [README](../README.md#install). For how y
 - [Read the Dashboard](#read-the-dashboard)
 - [Add Cards: build an accurate inventory](#add-cards-build-an-accurate-inventory)
 - [Collection: find, inspect, and export cards](#collection-find-inspect-and-export-cards)
-- [Trade workbench: exchange Physical copies](#trade-workbench-exchange-physical-copies)
 - [Storage: keep the app and the cards on your shelf in sync](#storage-keep-the-app-and-the-cards-on-your-shelf-in-sync)
+- [Trade workbench: exchange Physical copies](#trade-workbench-exchange-physical-copies)
 - [Build and manage decks](#build-and-manage-decks)
 - [Optional AI deck help](#optional-ai-deck-help)
 - [Settings and preferences](#settings-and-preferences)
@@ -63,28 +63,6 @@ Keyboard users can use **Skip to content** to bypass navigation. Changing the ma
 | Admin | Administrator-only account, instance, backup, and catalog management. |
 
 On narrow screens, use **More** for navigation items that are not shown in the bottom bar. The same server account works on desktop and phone. Device-specific preferences can differ between browsers.
-
-## Trade workbench: exchange Physical copies
-
-Open **Trade workbench** in navigation (**More** on a phone). This exchanges your inventory records; it does not negotiate with another person or change their account.
-
-![Trade workbench with sample Giving and Receiving cards and the selected Cards being traded panels](images/manafolio-trade-workbench.webp)
-
-*Sample data from an isolated server, not a personal collection. The selections shown are an unconfirmed draft; no exchange has been committed.*
-
-1. Under **Giving**, filter your available Physical entries and choose the exact printing, finish, condition, language, entry ID, and location. Set the quantity to give. Missing cards, locked containers/compartments, and any entry reserved by a checked-out deck are excluded; return or unlock those cards first. Arena, Wishlist, and Graveyard are never used.
-2. Under **Receiving**, search for an exact printing and language. Search shows up to 60 printings; narrow the name or collector number if necessary. Choose the finish, condition, and quantity for each received raw card. To choose another language, search again rather than relabeling a printing.
-3. In **Cards being traded**, check the separate **Giving** and **Receiving** selections. Adjust quantities, choose the received copies' finish and condition, and remove unwanted lines. The browse panels are not the final trade.
-4. Choose **Review trade**. Compare the cached finish-specific market estimates and timestamps. Unknown prices or currencies are explicitly excluded from partial subtotals. Differences are shown separately by currency, never converted; they are not a guaranteed fair-trade, sale, or graded-slab value.
-5. Choose **Confirm inventory exchange** only after checking both sides. The server rechecks the exact giving entries, quantities, reservations, locks, and receiving identities. It removes only the requested quantities and adds received copies to Physical **Unassigned Pile** in one transaction. Remaining giving copies keep their metadata and placement. Received copies have no recorded purchase price.
-
-Selected artwork cards appear in **Cards being traded**, separate from available cards and search results. Its **Giving** and **Receiving** panels contain only the chosen entries. Adjust quantities there, choose finish and condition for received cards, or use **Remove** before reviewing. Empty panels explicitly say no cards are selected; browsing alone never adds a card to the trade.
-
-**Back** edits an unconfirmed review; **Cancel** clears an unconfirmed draft without inventory changes. Drafts are held only in the current page, with a leave warning. Each side supports up to 100 entries and each line up to 250 copies.
-
-Available Giving entries are paged in groups of 60; changing pages does not clear your selections. A filter with no matches offers **Clear filter**. Refreshing marks changed or unavailable selected entries with a warning: remove and explicitly reselect them before reviewing, so you can check the latest quantity and location.
-
-If a card changed or became unavailable, no side is changed: go back, remove the stale selection, **Refresh available cards**, select again, and review. If a connection drops during confirmation, keep the page open and retry the **same confirmation**: its completed trade ID prevents a second inventory mutation. Do not create another trade to retry an uncertain result. Success reports the given/received quantities. Complete account backups retain private completed-ID receipts (ID, request fingerprint, counts, and time), not a negotiator or price history; restoring an older backup preserves already-known receipt IDs to prevent replay. The static demo explicitly rejects trade operations.
 
 ## Understand your inventories
 
@@ -610,6 +588,28 @@ Choose **More → Create Deck** in a Graveyard container to create an archived d
 | ManaBox container import moved fewer copies than requested | It only moves existing eligible physical copies. Expand the full summary for unresolved printings, other locations, and remaining quantities. |
 | Cards vanished after deleting a container | Look in Unsorted for that inventory. Deleting a container leaves its cards; deleting cards is a different action. |
 
+
+## Trade workbench: exchange Physical copies
+
+Open **Trade workbench** in navigation (**More** on a phone). This exchanges your inventory records; it does not negotiate with another person or change their account.
+
+![Trade workbench with sample Giving and Receiving cards and the selected Cards being traded panels](images/manafolio-trade-workbench.webp)
+
+*Sample data from an isolated server, not a personal collection. The selections shown are an unconfirmed draft; no exchange has been committed.*
+
+1. Under **Giving**, filter your available Physical entries and choose the exact printing, finish, condition, language, entry ID, and location. Set the quantity to give. Missing cards, locked containers/compartments, and any entry reserved by a checked-out deck are excluded; return or unlock those cards first. Arena, Wishlist, and Graveyard are never used.
+2. Under **Receiving**, search for an exact printing and language. Search shows up to 60 printings; narrow the name or collector number if necessary. Choose the finish, condition, and quantity for each received raw card. To choose another language, search again rather than relabeling a printing.
+3. In **Cards being traded**, check the separate **Giving** and **Receiving** selections. Adjust quantities, choose the received copies' finish and condition, and remove unwanted lines. The browse panels are not the final trade.
+4. Choose **Review trade**. Compare the cached finish-specific market estimates and timestamps. Unknown prices or currencies are explicitly excluded from partial subtotals. Differences are shown separately by currency, never converted; they are not a guaranteed fair-trade, sale, or graded-slab value.
+5. Choose **Confirm inventory exchange** only after checking both sides. The server rechecks the exact giving entries, quantities, reservations, locks, and receiving identities. It removes only the requested quantities and adds received copies to Physical **Unassigned Pile** in one transaction. Remaining giving copies keep their metadata and placement. Received copies have no recorded purchase price.
+
+Selected artwork cards appear in **Cards being traded**, separate from available cards and search results. Its **Giving** and **Receiving** panels contain only the chosen entries. Adjust quantities there, choose finish and condition for received cards, or use **Remove** before reviewing. Empty panels explicitly say no cards are selected; browsing alone never adds a card to the trade.
+
+**Back** edits an unconfirmed review; **Cancel** clears an unconfirmed draft without inventory changes. Drafts are held only in the current page, with a leave warning. Each side supports up to 100 entries and each line up to 250 copies.
+
+Available Giving entries are paged in groups of 60; changing pages does not clear your selections. A filter with no matches offers **Clear filter**. Refreshing marks changed or unavailable selected entries with a warning: remove and explicitly reselect them before reviewing, so you can check the latest quantity and location.
+
+If a card changed or became unavailable, no side is changed: go back, remove the stale selection, **Refresh available cards**, select again, and review. If a connection drops during confirmation, keep the page open and retry the **same confirmation**: its completed trade ID prevents a second inventory mutation. Do not create another trade to retry an uncertain result. Success reports the given/received quantities. Complete account backups retain private completed-ID receipts (ID, request fingerprint, counts, and time), not a negotiator or price history; restoring an older backup preserves already-known receipt IDs to prevent replay. The static demo explicitly rejects trade operations.
 
 ## Build and manage decks
 
