@@ -26,15 +26,17 @@ async function main() {
   const cards = [
     card(1, { all_parts: [part(3), part(4), part(3), part(6, 'combo_piece'), part(6, 'meld_result'), part(6, 'meld_part')] }),
     card(2, { all_parts: [part(3)] }),
-    card(3, { name: 'Soldier', type_line: 'Token Creature — Soldier', oracle_text: 'Vigilance',
+    card(3, { name: 'Soldier', type_line: 'Token Creature — Soldier', oracle_text: 'Vigilance', all_parts: [part(3)],
       image_uris: { normal: 'https://cards.scryfall.io/soldier.jpg' }, scryfall_uri: 'https://scryfall.com/card/tst/3' }),
-    card(4, { name: 'Day // Night', card_faces: [{ name: 'Day', type_line: 'Token', oracle_text: 'Daybound',
+    card(4, { name: 'Day // Night', all_parts: [part(4), part(3)], card_faces: [{ name: 'Day', type_line: 'Token', oracle_text: 'Daybound',
       image_uris: { normal: 'https://cards.scryfall.io/day.jpg' } }, { name: 'Night' }] }),
     card(5, { oracle_text: 'Create a token. This text alone is not a relationship.' }),
     card(7, { name: 'Soldier' }),
     card(10, { all_parts: [3, 4, 8, 9, 11, 12, 13, 14, 15].map(n => part(n)) }),
     ...[8, 9, 11, 12, 13, 15].map(n => card(n)),
     card(14, { name: 'Soldier' }),
+    card(16, { name: 'Merfolk', layout: 'token', all_parts: [part(3), part(16)] }),
+    card(17, { name: 'Merfolk // Soldier', layout: 'double_faced_token', all_parts: [part(3), part(17)] }),
   ];
   const expected = { tokens: [
     { id: cardId(3), name: 'Soldier', image_url: 'https://cards.scryfall.io/soldier.jpg', owned: false, locations: [], source_cards: [{ id: cardId(1), name: 'Card 1' }, { id: cardId(2), name: 'Card 2' }] },
@@ -96,6 +98,14 @@ async function main() {
     assert.deepStrictEqual(calls, [1, 2, 3, 4].map(n => `/cards/${id(n)}`),
       'each UUID fetched once, excluding non-token relations and their arbitrary URIs');
     assert.deepStrictEqual(await request({ card_ids: [cardId(5)] }), { tokens: [] });
+    assert.deepStrictEqual(await request({ card_ids: [cardId(3)] }), { tokens: [] },
+      'a token does not list itself as a related token');
+    for (const n of [4, 16, 17]) {
+      assert.deepStrictEqual(await request({ card_ids: [cardId(n)] }), { tokens: [] },
+        'token layouts and token faces do not expose other tokens as their creations');
+    }
+    assert.deepStrictEqual(await request({ card_ids: [cardId(1), cardId(2), cardId(3), cardId(16), cardId(17)] }), expected,
+      'a token included among sources remains related to its actual creators, never itself');
     assert.match((await request({ card_ids: [cardId(6)] }, 404)).error, /Card not found/);
     api.client.get = async () => { throw Object.assign(new Error('Offline'), { response: { status: 503 } }); };
     assert.match((await request({ card_ids: [cardId(1)] }, 502)).error, /Unable to load related tokens/);
@@ -117,6 +127,10 @@ async function main() {
     api.client.get = bulk.client.get = async () => { throw new Error('Provider must not be used with local raw cards'); };
     assert.deepStrictEqual(await request({ card_ids: [cardId(1), cardId(2)] }), expected);
     assert.deepStrictEqual(await request({ card_ids: [cardId(5)] }), { tokens: [] });
+    for (const n of [3, 4, 16, 17]) {
+      assert.deepStrictEqual(await request({ card_ids: [cardId(n)] }), { tokens: [] },
+        'bulk-catalog tokens do not supply related-token lists');
+    }
     assert.deepStrictEqual(await snapshot(), before, 'token references never change cached cards, inventory or deck quantities');
     await api.cacheCards(cards.map(raw => api.normalizeCard(raw)));
     await db.run(`UPDATE card_cache SET image_url = 'https://cards.scryfall.io/owned-soldier.jpg' WHERE id = ?`, [cardId(7)]);

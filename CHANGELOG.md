@@ -2,6 +2,13 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Placed Create Commander Deck and Archive to Graveyard side by side in the card inspector, including on phones.
+- Removed the redundant Game field from the card inspector.
+- Token cards no longer supply Related tokens lists, including other printings and double-faced tokens; normal cards still list the tokens they create.
+- Grouped container sleeve and last-stocktake details into a compact, icon-led summary with a subtle desktop divider and readable mobile wrapping.
+
 ## 2.3.2 — 2026-10-04
 
 - Reduced Dashboard artwork transfer with lazy, size-appropriate Scryfall thumbnails while preserving contributed artwork, full-resolution inspection, and image fallbacks. Deferred sleeve catalog downloads until card-back customization opens, with retryable loading that preserves the draft. Overlapped known Physical deck detail/location reads and bounded offline shell preparation to four concurrent downloads without dropping languages.

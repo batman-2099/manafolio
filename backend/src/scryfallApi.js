@@ -872,12 +872,16 @@ async function getRelatedTokens(cardIds) {
   const sources = await rawCards(sourceIds);
   const producers = new Map();
   for (const id of sourceIds) {
-    const parts = sources.get(id).all_parts;
+    const source = sources.get(id);
+    if (source.layout === 'token' || source.layout === 'double_faced_token'
+      || /\bToken\b/.test(source.type_line) || source.card_faces?.some(face => /\bToken\b/.test(face.type_line))) continue;
+    const parts = source.all_parts;
     if (parts != null && !Array.isArray(parts)) throw new Error('Invalid Scryfall related parts');
     for (const part of parts || []) {
       if (part?.component !== 'token') continue;
       if (typeof part.id !== 'string' || !uuid.test(part.id)) throw new Error('Invalid Scryfall token ID');
       const tokenId = part.id.toLowerCase();
+      if (tokenId === id) continue;
       if (!producers.has(tokenId)) producers.set(tokenId, new Set());
       producers.get(tokenId).add(`mtg-${id}`);
     }

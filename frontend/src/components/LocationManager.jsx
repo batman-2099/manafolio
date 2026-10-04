@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay, MouseSensor, useSensor, useSensors, useDraggable, useDroppable, pointerWithin } from '@dnd-kit/core';
-import { Plus, Minus, Trash2, X, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, Edit3, Download, Search, SlidersHorizontal, Layers, Check } from 'lucide-react';
+import { Plus, Minus, Trash2, X, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, Edit3, Download, Search, SlidersHorizontal, Layers, Check, ClipboardCheck } from 'lucide-react';
 import { sortCardsByOrder, TYPE_ORDER, typeCategory } from '../utils/cardSort';
 import { priceText } from '../utils/formatPrice';
 import { getFoilOverlayClass, getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
@@ -1938,12 +1938,18 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               <option value="" disabled>{t('loc.selectContainer')}</option>
               {locations.slice().sort((a, b) => a.name.localeCompare(b.name)).map(loc => <option key={loc.id} value={loc.id}>{loc.locked ? '🔒 ' : ''}{loc.storage_unit_name && `${loc.storage_unit_name} · `}{loc.name} ({loc.type})</option>)}
             </select>
-            {selectedLoc && <span className="storage-sleeve-summary" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-              {t('deck.sleeved')}: {t(['deck.sleevedNone', 'deck.sleevedOne', 'deck.sleevedDouble', 'deck.sleevedTriple'][selectedLoc.sleeved ?? 0])}
-            </span>}
-            {selectedLoc && <>
-              <span style={{ fontSize: '0.85rem' }}>{t('stocktake.lastChecked', { date: selectedLoc.last_checked_at ? new Date(selectedLoc.last_checked_at).toLocaleString(locale) : t('stocktake.never') })}</span>
-            </>}
+            {selectedLoc && (
+              <div className="storage-container-summary">
+                <span>
+                  <Layers size={16} aria-hidden="true" />
+                  <span>{t('deck.sleeved')}: {t(['deck.sleevedNone', 'deck.sleevedOne', 'deck.sleevedDouble', 'deck.sleevedTriple'][selectedLoc.sleeved ?? 0])}</span>
+                </span>
+                <span>
+                  <ClipboardCheck size={16} aria-hidden="true" />
+                  <span>{t('stocktake.lastChecked', { date: selectedLoc.last_checked_at ? new Date(selectedLoc.last_checked_at).toLocaleString(locale) : t('stocktake.never') })}</span>
+                </span>
+              </div>
+            )}
             {!isArchive && <input ref={containerImportInput} type="file" accept=".txt,text/plain" disabled={importingContainer} onChange={handleContainerImportFile} style={{ display: 'none' }} />}
             {selectedLoc && !!selectedLoc.locked && (
               <button type="button" onClick={handleToggleContainerLock} title={t('loc.lockedBadgeHint')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.62rem', fontWeight: 800, padding: '0.15rem 0.45rem', borderRadius: '999px', cursor: 'pointer', background: 'rgba(255,193,7,0.15)', border: '1px solid var(--accent-yellow)', color: 'var(--accent-yellow)' }}>

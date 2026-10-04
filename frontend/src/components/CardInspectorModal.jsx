@@ -667,7 +667,6 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                 )}
                 <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.printing}</span></div>
                 <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specLanguage')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.language}</span></div>
-                <div><span style={{ color: 'var(--text-muted)' }}>{t(activeCard.game === 'mtg' || activeCard.supertype === 'MTG' ? 'inspector.specGame' : 'inspector.specSupertype')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.game === 'mtg' || activeCard.supertype === 'MTG' ? 'Magic: The Gathering' : activeCard.supertype}</span></div>
               </div>
 
               {/* Storage Container details (clickable to view in storage) */}
@@ -715,17 +714,6 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                   style={{ fontSize: '0.875rem', padding: '0.5rem', width: '100%' }}
                 />
               )}
-              {(activeCard.game === 'mtg' || activeCard.supertype === 'MTG') && ['collection', 'arena'].includes(activeCard.list_type) && (
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleCreateCommanderDeck}
-                  disabled={creatingCommanderDeck}
-                  style={{ width: '100%', fontSize: '0.875rem' }}
-                >
-                  {creatingCommanderDeck ? t('common.loading') : t('inspector.createCommanderDeck')}
-                </button>
-              )}
 
               {activeCard.notes && (
                 <div className="view-section" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 0, paddingTop: '0.75rem' }}>
@@ -733,7 +721,18 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+                {(activeCard.game === 'mtg' || activeCard.supertype === 'MTG') && ['collection', 'arena'].includes(activeCard.list_type) && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleCreateCommanderDeck}
+                    disabled={creatingCommanderDeck}
+                    style={{ fontSize: '0.875rem' }}
+                  >
+                    {creatingCommanderDeck ? t('common.loading') : t('inspector.createCommanderDeck')}
+                  </button>
+                )}
                 {activeCard.list_type === 'graveyard' ? (
                   <>
                     <button type="button" className="btn btn-secondary" onClick={() => handleQuickToggle('list_type', 'collection')}>{t('bulk.restoreToCollection')}</button>
