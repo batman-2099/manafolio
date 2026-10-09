@@ -162,7 +162,8 @@ router.get('/', async (req, res) => {
         COALESCE(SUM(CASE WHEN cc.color_identity LIKE '%"Blue"%' OR cc.color_identity LIKE '%"U"%' THEN dc.quantity ELSE 0 END), 0) AS blue_cards,
         COALESCE(SUM(CASE WHEN cc.color_identity LIKE '%"Black"%' OR cc.color_identity LIKE '%"B"%' THEN dc.quantity ELSE 0 END), 0) AS black_cards,
         COALESCE(SUM(CASE WHEN cc.color_identity LIKE '%"Red"%' OR cc.color_identity LIKE '%"R"%' THEN dc.quantity ELSE 0 END), 0) AS red_cards,
-        COALESCE(SUM(CASE WHEN cc.color_identity LIKE '%"Green"%' OR cc.color_identity LIKE '%"G"%' THEN dc.quantity ELSE 0 END), 0) AS green_cards
+        COALESCE(SUM(CASE WHEN cc.color_identity LIKE '%"Green"%' OR cc.color_identity LIKE '%"G"%' THEN dc.quantity ELSE 0 END), 0) AS green_cards,
+        COALESCE(SUM(CASE WHEN cc.color_identity = '[]' THEN dc.quantity ELSE 0 END), 0) AS colorless_cards
       FROM decks d
       LEFT JOIN deck_cards dc ON d.id = dc.deck_id
       LEFT JOIN card_cache cc ON dc.card_id = cc.id

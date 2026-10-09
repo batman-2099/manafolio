@@ -219,6 +219,7 @@ The scanner displays upper-left title OCR separately from artwork candidates, in
    Using a set filter is highly recommended when you know the sets you are scanning.
 4. Place one card within the guide in even lighting. Keep the name, artwork, and footer readable, reduce sleeve reflections, and hold the card still while identification and verification run. The camera begins scanning automatically; there is no separate manual shutter button.
 5. Check the identified card's name, set, number, artwork, and language. In **Identified Cards Found**, select the correct card to queue it immediately without a second details screen. This queues one Near Mint, non-foil copy with the resolved language and market price as purchase price. Use the manual search field or **Rescan / Try Again** when the suggestions are wrong. A failed save keeps the candidate list open for retry.
+   On phones, matches appear in two columns. Scroll the results dialog itself to browse cards and reach the bottom actions; **See more** expands the remaining matches in the same scroll area.
 6. If the scanner opens **Review scanned card** for a single confirmed match, set quantity, purchase price, condition, printing, and language, then choose **Queue for review**. Candidate selections skip this form.
 7. Remove the queued card before presenting the next one. Each card in **Scan review** has a **Foil** toggle and **Discard** button. Foil switches the whole draft's quantity between foil and non-foil without changing its card identity or other details; the highlighted button means foil. Discard a wrong match and scan it again. Discarding a draft does not touch your collection.
    To discard the whole reviewed batch, choose **Clear** and confirm. This removes only the drafts shown when you clicked Clear, not owned collection cards or newly queued scans.
@@ -622,6 +623,8 @@ If the deck list fails to load, use **Retry** rather than assuming there are no 
 A deck uses one **Deck Type**: **Physical**, **Arena**, or **Graveyard**. Each uses only its matching inventory. Wishlist is not deck inventory. A saved deck definition is not a reservation: only a checked-out Physical deck reserves copies.
 
 Graveyard decks are hidden from the deck list by default. Turn on **Show Graveyard decks**, immediately after **Sort By**, to include them alongside Physical and Arena decks in Grid or Table view. Search, status filters, and sorting still apply.
+
+In Table view, **Color Identity** shows card-copy counts for white, blue, black, red, green, and colorless identities. Colorless uses the diamond mana symbol and counts cards with an empty color identity, not cards whose identity is unknown. Multicolor cards count toward each of their colors.
 
 **Missing cards** appears in red in both Grid and Table view when required copies are unavailable, even if the deck has reached its target size. Physical decks exclude archived copies and other decks' reservations; Arena decks use Arena ownership only; Graveyard decks use archived copies only. A checked-out Physical deck keeps its Return action and reservations, but archived or missing reserved copies still show **Missing cards**. Use the matching status filter to find affected decks; the target-reached filter excludes them.
 

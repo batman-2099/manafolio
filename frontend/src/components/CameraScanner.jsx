@@ -1298,7 +1298,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     let agreement = null;
     const reviewCandidates = [];
     const reasons = new Set();
-    const explain = () => [...reasons].map(reason => t(`scan.safety.${reason}`)).join(' ');
+    const explain = () => [...reasons].filter(reason => reason !== 'ambiguous_printing').map(reason => t(`scan.safety.${reason}`)).join(' ');
 
     try {
       // ponytail: two fresh passes, no voting/retries. Disagreement needs a person.
@@ -1373,7 +1373,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             await applyMatches([topCard], '', true);
           } else {
             await applyMatches(reviewCandidates, explain() || t('scan.noConfidentMatch'), false);
-            setScanStatus(explain() || t('scan.noConfidentMatch'));
+            setScanStatus(explain() || (reviewCandidates.length ? '' : t('scan.noConfidentMatch')));
           }
           return;
         }
@@ -2606,7 +2606,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
           zIndex: 1000,
           padding: '1rem'
         }}>
-          <div className="glass-panel scan-suggestions-modal" style={{ maxWidth: '560px', width: '100%', display: 'flex', flexDirection: 'column', gap: '1.25rem', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="glass-panel scan-suggestions-modal">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
               <h3 style={{ fontSize: '1.1rem', color: 'var(--text-strong)', margin: 0 }}>{t('scan.identifiedTitle')}</h3>
               <button 
@@ -2653,7 +2653,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                     value={manualSearchText}
                     disabled={draftBusy}
                     onChange={(e) => setManualSearchText(e.target.value)}
-                    style={{ width: '100%', padding: '0.4rem 2rem 0.4rem 0.6rem', fontSize: '0.8rem' }}
+                    style={{ width: '100%', padding: '0.4rem 2rem 0.4rem 0.6rem', fontSize: '1rem' }}
                   />
                   {manualSearchText && (
                     <button
@@ -2693,7 +2693,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 the match list. Only the first few are shown: eight cards at
                 once is a wall to read while holding the card you are trying to
                 identify, and the answer is usually near the top. */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.75rem', maxHeight: '350px', overflowY: 'auto', padding: '0.25rem' }}>
+            <div className="scan-suggestions-grid">
               {(showAllMatches ? scanMatches : scanMatches.slice(0, PICKER_PREVIEW)).map(card => (
                 <button type="button" key={card.id} className="tcg-card" disabled={draftBusy || manualSearching || draftsLoading || draftsError || draftAction !== null} onClick={() => priceCheck ? openQuickAdd(card) : autoAddCard(card)} style={{ cursor: 'pointer', background: 'none', border: 0, padding: 0, font: 'inherit' }}>
                   <div className="tcg-card-inner" style={{ border: '1px solid var(--border-glass-hover)' }}>

@@ -30,6 +30,7 @@ async function testDeckManaCounts() {
     assert.deepStrictEqual(res.body[0].green_cards, 3);
     assert.deepStrictEqual(res.body[0].black_cards, 0);
     assert.deepStrictEqual(res.body[0].red_cards, 0);
+    assert.deepStrictEqual(res.body[0].colorless_cards, 5);
   } finally {
     try { db.dbConnection.close(); } catch { /* already closed */ }
     for (const suffix of ['', '-wal', '-shm']) {

@@ -87,6 +87,7 @@ const MANA_SYMBOLS = [
   ['black_cards', 'Black', -265],
   ['red_cards', 'Red', -160],
   ['green_cards', 'Green', -55],
+  ['colorless_cards', 'Colorless', null],
 ];
 
 function ManaCounts({ deck }) {
@@ -94,8 +95,11 @@ function ManaCounts({ deck }) {
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
       {MANA_SYMBOLS.map(([field, name, x]) => deck[field] > 0 && (
         <span key={field} title={`${deck[field]} ${name} card${deck[field] === 1 ? '' : 's'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}>
-          <svg aria-hidden="true" width="16" height="16" viewBox={`${x - 50} 0 100 100`}>
-            <image href="/mana.svg" x="-945" y="-210.002" width="1045" height="730.002" />
+          <svg aria-hidden="true" width="16" height="16" viewBox={x === null ? '0 0 100 100' : `${x - 50} 0 100 100`}>
+            {x === null ? <>
+              <circle cx="50" cy="50" r="50" fill="#CAC5C0" />
+              <path fill="#0D0F0F" fillRule="evenodd" d="M50 10 90 50 50 90 10 50Z M50 30 30 50 50 70 70 50Z" />
+            </> : <image href="/mana.svg" x="-945" y="-210.002" width="1045" height="730.002" />}
           </svg>
           <span style={{ fontSize: 'var(--deck-mana-count-size, 0.875rem)', fontWeight: 700, color: 'var(--text-secondary)' }}>{deck[field]}</span>
         </span>
