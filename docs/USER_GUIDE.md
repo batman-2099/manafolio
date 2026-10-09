@@ -159,6 +159,40 @@ Rapid add is useful when you have a pile from one known set and do not want to r
 
 Use this workflow when you want to **add inventory**. It is different from **Storage → Import ManaBox container**, which moves copies you already own.
 
+#### Step by step: move your ManaBox collection into Manafolio
+
+**1. Export from ManaBox**
+
+1. Open **ManaBox → Collection** on your phone.
+2. To export everything, open the **top-right menu** in Collection and choose the CSV export option. To export only one binder or list, open that binder/list first, then use its top-right menu.
+3. Save the `.csv` file somewhere your Manafolio browser can access, such as your phone's Files/Downloads folder, or transfer it to your computer. Keep an unchanged copy as your source record.
+4. If you export binders separately, give each file a recognizable name. Do not import both the whole collection and its individual binder exports: those files contain overlapping copies.
+
+These export locations follow the [official ManaBox collection export guide](https://manabox.app/guides/collection/import-export/#export). Menu wording can vary by app version.
+
+**2. Import the file into Manafolio**
+
+1. Open **Add Cards → Search & Add**.
+2. In **Add cards to**, choose **Collection** for physical cards, or **Arena** for digital inventory. For a physical ManaBox collection, choose **Collection**.
+3. Under **Import cards**, choose **Choose CSV File** and select the exported `.csv`. Do not use **Choose .txt file** for a CSV, or rename the extension to make it fit.
+4. In **CSV Import Review**, check the destination, card count, and total copies against your export.
+5. Review **Match CSV columns**, especially the card name, quantity, set code, collector number, and foil/printing fields. Do not assume that every property exported by ManaBox transfers automatically.
+6. If you change a mapping, choose **Update preview** and resolve any reported errors before proceeding.
+7. Choose **Import CSV** once. Keep the page open while the import runs, then read **Import Complete**.
+
+**3. Check the result before importing more**
+
+1. Open the destination inventory and check several recognizable cards, including a duplicate and a foil if your export contains them. Compare quantities, sets, collector numbers, and finishes with ManaBox.
+2. If **Cards not added** is nonzero, use **Download failed cards**, correct the unresolved entries, and retry only those entries—not the entire successful export.
+3. If the browser disconnects, inspect Collection before retrying. A disconnected activity log does not mean the server stopped, and importing the same file again can add duplicate copies.
+4. Keep the original export until you have checked the result. This is a one-time import, not ongoing synchronization with ManaBox.
+
+**4. Organize physical storage separately (optional)**
+
+The collection import adds owned copies; do not assume ManaBox binder/list names recreate Manafolio containers. Create your containers in **Storage** and move the imported copies into them. If you also have a ManaBox `.txt` list, follow [Import a ManaBox container layout from a text list](#import-a-manabox-container-layout-from-a-text-list) to place copies you already imported. That storage workflow does **not** add missing inventory.
+
+**Already have a `.txt` export instead?** Follow **ManaBox text export** below. To create a deck definition rather than add owned copies, use **Deck Builder → + Quick Import Decklist → ManaBox text export** instead.
+
 #### ManaBox text export
 
 1. Open **Add Cards → Search & Add**.
