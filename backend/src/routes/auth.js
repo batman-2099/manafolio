@@ -4,6 +4,7 @@ const db = require('../db');
 const { authenticateToken, authLimiter } = require('../middleware/auth');
 const { verifyPassword, generateSession, sanitizeUser } = require('../utils/authHelpers');
 const oidc = require('../utils/oidc');
+const nativeAuth = require('../utils/nativeAuth');
 const themes = require('../../../shared/themes.json');
 
 const router = express.Router();
@@ -28,8 +29,53 @@ router.get('/config', async (req, res) => {
     registrationEnabled: REGISTRATION_ENABLED,
     setupRequired,
     oidcEnabled: oidc.isOidcEnabled(),
+    nativeOidcEnabled: oidc.isOidcEnabled(),
     oidcProviderName: oidc.getProviderName()
   });
+});
+
+// External-browser SSO hands the app an opaque PKCE-bound code, never a session URL.
+router.use('/native', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Referrer-Policy', 'no-referrer');
+  next();
+});
+
+router.get('/native/login', authLimiter, async (req, res) => {
+  if (!oidc.isOidcEnabled()) {
+    return res.status(404).json({ error: 'oidc_disabled' });
+  }
+  const login = nativeAuth.parseLogin(req.query);
+  if (!login) return res.status(400).json({ error: 'invalid_request' });
+  try {
+    const authUrl = await oidc.buildAuthorizationUrl(req, res, login);
+    res.redirect(302, authUrl);
+  } catch (error) {
+    console.error('Native OIDC login initiation failed.');
+    res.status(error.status === 503 ? 503 : 500).json({
+      error: error.status === 503 ? 'server_busy' : 'login_failed'
+    });
+  }
+});
+
+router.post('/native/exchange', authLimiter, async (req, res) => {
+  if (!oidc.isOidcEnabled()) {
+    return res.status(404).json({ error: 'oidc_disabled' });
+  }
+  if (!nativeAuth.validExchange(req.body)) {
+    return res.status(400).json({ error: 'invalid_request' });
+  }
+  const userId = nativeAuth.consumeCode(req.body);
+  if (userId === null) return res.status(400).json({ error: 'invalid_grant' });
+  try {
+    const user = await db.get(`SELECT * FROM users WHERE id = ?`, [userId]);
+    if (!user) return res.status(400).json({ error: 'invalid_grant' });
+    const token = await generateSession(user.id);
+    res.json({ message: 'Login successful', token, user: sanitizeUser(user) });
+  } catch {
+    console.error('Native OIDC session creation failed.');
+    res.status(500).json({ error: 'login_failed' });
+  }
 });
 
 // Initiate OIDC / SSO authorization code flow
@@ -42,7 +88,7 @@ router.get('/oidc/login', authLimiter, async (req, res) => {
     const authUrl = await oidc.buildAuthorizationUrl(req, res);
     res.redirect(302, authUrl);
   } catch (error) {
-    console.error('OIDC login initiation failed:', error.message);
+    console.error('OIDC login initiation failed.');
     res.status(500).json({ error: 'Failed to initiate OIDC login', message: error.message });
   }
 });
@@ -54,17 +100,30 @@ router.get('/oidc/callback', authLimiter, async (req, res) => {
   }
 
   const { code, state, error, error_description } = req.query;
+  res.set('Cache-Control', 'no-store');
+  res.set('Referrer-Policy', 'no-referrer');
+  let nativeLogin = null;
+  try {
+    // Only a signed, unexpired, browser-correlated pending login can return to the app.
+    nativeLogin = oidc.getNativeLogin({ stateToken: state, req, cancel: Boolean(error || !code) });
+  } catch {
+    // Untrusted callbacks retain the existing browser error destination.
+  }
 
-  const frontendRedirect = (params) => {
+  const frontendRedirect = (params, nativeError = 'login_failed') => {
     oidc.clearLoginCookie(req, res);
+    if (nativeLogin) {
+      return res.redirect(302, nativeAuth.callbackUrl(nativeLogin.state, { error: nativeError }));
+    }
     const baseUrl = process.env.PUBLIC_BASE_URL ? process.env.PUBLIC_BASE_URL.replace(/\/+$/, '') : '';
     const qs = new URLSearchParams(params).toString();
     res.redirect(302, `${baseUrl}/?${qs}`);
   };
 
   if (error) {
-    console.error(`OIDC IdP error: ${error} - ${error_description || ''}`);
-    return frontendRedirect({ oidc_error: error_description || error });
+    console.error('OIDC identity provider rejected login.');
+    return frontendRedirect({ oidc_error: error_description || error },
+      error === 'access_denied' ? 'access_denied' : 'login_failed');
   }
 
   if (!code || !state) {
@@ -93,7 +152,7 @@ router.get('/oidc/callback', authLimiter, async (req, res) => {
         console.warn(`OIDC: "${username}" already exists locally and OIDC_ALLOW_USERNAME_LINK is off — not linking.`);
         return frontendRedirect({
           oidc_error: 'A Manafolio account with this username already exists. An administrator must set OIDC_ALLOW_USERNAME_LINK=true to attach single sign-on to it.'
-        });
+        }, 'account_link_required');
       }
       if (existingUser) {
         // An account already bound to a DIFFERENT IdP identity is never re-bound.
@@ -104,7 +163,7 @@ router.get('/oidc/callback', authLimiter, async (req, res) => {
           console.warn(`OIDC: refusing to relink "${username}" — already bound to another identity.`);
           return frontendRedirect({
             oidc_error: 'That username is already linked to a different single sign-on identity. Ask an administrator.'
-          });
+          }, 'identity_conflict');
         }
         await db.run(`UPDATE users SET oidc_sub = ? WHERE id = ?`, [sub, existingUser.id]);
         console.log(`OIDC: linked identity to existing account "${username}" (OIDC_ALLOW_USERNAME_LINK).`);
@@ -152,14 +211,21 @@ router.get('/oidc/callback', authLimiter, async (req, res) => {
       } else {
         return frontendRedirect({
           oidc_error: 'No matching Manafolio account found. Auto-provisioning is disabled; ask an administrator to create your account.'
-        });
+        }, 'provisioning_disabled');
       }
+    }
+
+    if (nativeLogin) {
+      const handoffCode = nativeAuth.issueCode(user.id, nativeLogin);
+      if (!handoffCode) return frontendRedirect({ oidc_error: 'Too many pending logins.' }, 'server_busy');
+      oidc.clearLoginCookie(req, res);
+      return res.redirect(302, nativeAuth.callbackUrl(nativeLogin.state, { code: handoffCode }));
     }
 
     const token = await generateSession(user.id);
     return frontendRedirect({ oidc_token: token });
   } catch (err) {
-    console.error('OIDC callback processing failed:', err.message);
+    console.error('OIDC callback processing failed.');
     return frontendRedirect({ oidc_error: err.message });
   }
 });

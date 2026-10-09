@@ -172,7 +172,13 @@ For source or downloaded-server installations, copy `.env.example` to `backend/.
 
 ### Phone browsers
 
-Open your server's HTTPS address in your phone's browser and sign in with your server account. The responsive web interface includes collection, storage, decks, and [camera scanning](#card-scanning); scanning requires browser camera permission and the server-side assets described below. Manafolio is web-only, with no packaged Android or iOS clients.
+Open your server's HTTPS address in your phone's browser and sign in with your server account. The responsive web interface includes collection, storage, decks, and [camera scanning](#card-scanning); scanning requires browser camera permission and the server-side assets described below.
+
+### Native SSO handoff
+
+The server also supports Android sign-in through an external browser/Custom Tab when the existing OIDC integration is enabled. `GET /api/auth/config` advertises `nativeOidcEnabled`; older servers without that marker do not support this handoff. Keep the identity provider's registered redirect at your server's existing `/api/auth/oidc/callback`, **not** the Android custom URI. No additional IdP client secret belongs in the app, and existing browser sign-in and account provisioning/linking policies are unchanged.
+
+The app supplies its own S256 PKCE challenge and random state to `/api/auth/native/login`, with the only allowed return URI `app.manafolio.app://auth/callback`. After browser sign-in, that callback receives a single-use opaque code, never a reusable session. The app exchanges the code, state, and verifier over your server's trusted HTTPS connection at `/api/auth/native/exchange`. Codes expire after 90 seconds; a server restart or a lost exchange response requires a fresh sign-in. Pending attempts are process-local: run a single backend process, or provide sticky routing for every step before deploying multiple workers. See [the API/security contract](PROJECT.md#native-sso-contract) for payloads, errors, limits, and regression checks.
 
 ## Workflows
 

@@ -3,6 +3,7 @@ const crypto = require('crypto');
 // Secret for HMAC state token signing — stable per process lifetime if not explicitly set
 const STATE_SECRET = process.env.OIDC_SESSION_SECRET || process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const MAX_PENDING_LOGINS = 1000;
 const LOGIN_COOKIE = 'manafolio_oidc';
 // Pending logins are deliberately process-local: a restart requires a fresh login.
 const pendingLogins = new Map();
@@ -304,7 +305,7 @@ function verifyStateToken(token) {
 /**
  * Build the full IdP authorization URL.
  */
-async function buildAuthorizationUrl(req, res) {
+async function buildAuthorizationUrl(req, res, native = null) {
   const discovery = await getDiscovery();
   const clientId = getClientId();
   if (!clientId) {
@@ -331,10 +332,13 @@ async function buildAuthorizationUrl(req, res) {
   url.searchParams.set('code_challenge', codeChallenge);
   url.searchParams.set('code_challenge_method', 'S256');
 
+  prunePendingLogins();
+  if (pendingLogins.size >= MAX_PENDING_LOGINS) {
+    throw Object.assign(new Error('Too many pending OIDC logins. Please try again later.'), { status: 503 });
+  }
   const correlation = crypto.randomBytes(32).toString('base64url');
   res.cookie(LOGIN_COOKIE, correlation, { ...loginCookieOptions(req), maxAge: STATE_TTL_MS });
-  prunePendingLogins();
-  pendingLogins.set(stateToken, { correlation, expires: Date.now() + STATE_TTL_MS });
+  pendingLogins.set(stateToken, { correlation, native, expires: Date.now() + STATE_TTL_MS });
 
   return url.toString();
 }
@@ -353,10 +357,9 @@ function parseJwtPayload(token) {
   }
 }
 
-/**
- * Exchange authorization code at token_endpoint and fetch user claims.
- */
-async function exchangeCode({ code, stateToken, req }) {
+// Share correlation validation with native error callbacks, without consuming a
+// successful attempt before exchangeCode performs its existing one-use check.
+function getPendingLogin({ stateToken, req }) {
   prunePendingLogins();
   const stateData = verifyStateToken(stateToken);
   if (!stateData) {
@@ -370,6 +373,20 @@ async function exchangeCode({ code, stateToken, req }) {
       !crypto.timingSafeEqual(Buffer.from(correlation), Buffer.from(login.correlation))) {
     throw new Error('Missing, mismatched, or reused OIDC login cookie. Please try logging in again.');
   }
+  return { login, stateData };
+}
+
+function getNativeLogin({ stateToken, req, cancel = false }) {
+  const { login } = getPendingLogin({ stateToken, req });
+  if (login.native && cancel) pendingLogins.delete(stateToken);
+  return login.native;
+}
+
+/**
+ * Exchange authorization code at token_endpoint and fetch user claims.
+ */
+async function exchangeCode({ code, stateToken, req }) {
+  const { stateData } = getPendingLogin({ stateToken, req });
   // Consume before the first await, including when the provider later rejects the code.
   pendingLogins.delete(stateToken);
 
@@ -457,7 +474,7 @@ async function exchangeCode({ code, stateToken, req }) {
         userInfoClaims = await userinfoRes.json();
       }
     } catch (err) {
-      console.warn('OIDC userinfo fetch failed, falling back to ID token claims:', err.message);
+      console.warn('OIDC userinfo fetch failed, falling back to ID token claims.');
     }
   }
 
@@ -520,6 +537,7 @@ module.exports = {
   verifyStateToken,
   buildAuthorizationUrl,
   clearLoginCookie,
+  getNativeLogin,
   exchangeCode,
   extractUserIdentity,
   resolveRedirectUri,

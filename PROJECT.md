@@ -122,11 +122,31 @@ Public routes are mounted deliberately **before** the single `app.use('/api', au
 - Authentication resolves a Bearer token to `sessions` and `users`, then populates `req.user`.
 - A token matching `users.api_key` instead is GET-only. `requireAdmin` rejects API keys even for administrator accounts, and `/auth/me` removes provider credentials from API-key responses.
 - AI account/model/preferences and suggestion operations require a browser session. The read-only AI inventory endpoint remains accessible with an API key.
-- Local auth/bootstrap and optional OIDC live in `routes/auth.js` and `utils/oidc.js`. Registration is closed unless `ALLOW_REGISTRATION=true`.
-- OIDC state is HMAC-signed, browser-bound with an HttpOnly SameSite=Lax cookie, and single-use. Pending attempts expire after ten minutes and are process-local; a backend restart requires a new login. HTTPS callbacks use Secure cookies.
+- Local auth/bootstrap and optional OIDC live in `routes/auth.js`, `utils/oidc.js`, and `utils/nativeAuth.js`. Registration is closed unless `ALLOW_REGISTRATION=true`.
+- OIDC state is HMAC-signed, browser-bound with an HttpOnly SameSite=Lax cookie, and single-use. At most 1,000 pending attempts expire after ten minutes and are process-local; a backend restart requires a new login. HTTPS callbacks use Secure cookies.
 - On an empty installation, `DEFAULT_ADMIN_PASSWORD` seeds `admin`; otherwise `/api/auth/bootstrap` creates that account through first-run setup. Protect access until setup is complete. Passwords must not be logged.
 
 `GET /api/health` is public, checks database readiness and a query, and returns `{"status":"ok"}` when healthy or HTTP 503 while unavailable. It is the Docker healthcheck target.
+
+### Native SSO contract
+
+`GET /api/auth/config` includes `nativeOidcEnabled`, equal to `oidcEnabled`. Native clients must require this capability instead of intercepting the browser's reusable `oidc_token` URL. Password login, the browser's `/oidc/login` and website return, provisioning, owner bootstrap, and opt-in username linking retain their existing behavior.
+
+| Request/result | Contract |
+| --- | --- |
+| `GET /api/auth/native/login` | Required query fields: `code_challenge` (canonical unpadded base64url of the 32-byte SHA-256 verifier digest, 43 characters), `state` (32–128 base64url characters, generated randomly by the app), and `redirect_uri` (exactly `app.manafolio.app://auth/callback`, with no extra path/query/fragment). Starts the existing browser-bound OIDC flow; app PKCE/state remain independent of the upstream OIDC PKCE/state. |
+| Native success return | `app.manafolio.app://auth/callback?code=<opaque 43-character code>&state=<original app state>`. No reusable bearer or upstream provider token is generated or returned by this callback. |
+| Native error return | Same fixed URI with `error` and original `state`. Safe codes: `access_denied`, `login_failed`, `account_link_required`, `identity_conflict`, `provisioning_disabled`, `server_busy`. No provider error description is forwarded to the app. |
+| `POST /api/auth/native/exchange` | JSON `{code,state,code_verifier}`. Verifier is 43–128 RFC 7636 unreserved characters (`A–Z`, `a–z`, digits, `-._~`). Success: HTTP 200 `{message:"Login successful",token,user}` with the identical session and sanitized-user contract as password login. Fetch `/api/auth/me` for the account ID. |
+| Native API failures | HTTP 400 `{error:"invalid_request"}` for malformed fields; 400 `{error:"invalid_grant"}` for unknown, expired, consumed, state/PKCE-mismatched codes or deleted accounts; 404 `{error:"oidc_disabled"}` when OIDC is off; 503 `{error:"server_busy"}` on pending-login capacity; 500 `{error:"login_failed"}` for initiation/session failures. The existing shared auth limiter returns 429 `{error:"Too many attempts. Please try again later."}` with retry headers. |
+
+Only a valid signed OIDC state plus the matching browser cookie permits a native redirect. Missing, mismatched, expired, or reused correlation retains the existing website error return, never an untrusted app destination. IdP cancellation consumes a validated native attempt. Native login/exchange and OIDC callbacks use `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
+
+Handoffs expire exactly 90 seconds after issuance; at most 1,000 live handoffs are retained in process memory, separately from the pending OIDC attempts. Capacity rejects new attempts instead of evicting live ones. State hashes and S256 challenges are compared with `crypto.timingSafeEqual`; valid codes are deleted synchronously before the first database/session await. Invalid guesses do **not** consume a legitimate handoff, avoiding an easy code-invalidation attack; the existing 20-attempt/15-minute per-IP auth limiter is shared by native initiation, exchange, browser login/callback, and password auth. A consumed code cannot be retried after a lost response or database failure: start a fresh login. Expiry is pruned on access, and restart loses pending state but not ordinary sessions.
+
+The only callback is a fixed custom-scheme allowlist, not an arbitrary redirect. Another installed app can claim that scheme, but cannot exchange an intercepted code without the initiating app's verifier; interception may still disrupt login. Use trusted HTTPS, do not embed IdP client secrets in native clients, and exclude auth query strings/bodies from proxy logs. Process-local correlation/handoffs require a single backend process or routing that keeps browser **and native exchange** on the same worker; ordinary browser-cookie stickiness alone is insufficient.
+
+Security/regression check: `node backend/test/nativeauth.test.js` from the repository root. It uses Node/assert, temporary SQLite, and a loopback IdP to exercise real consumer routes, PKCE/state validation, fixed redirects, cookie binding, single-use/racing exchanges, expiry/capacity, rate limits, provisioning/linking, safe errors, disabled SSO, and unchanged browser return. It is also discovered by the existing backend test runner; `node backend/test/oidc.test.js` and `node backend/test/e2e/oidc.test.js` cover the existing OIDC flow.
 
 ### Route map
 

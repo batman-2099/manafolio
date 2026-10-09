@@ -1,10 +1,10 @@
 # Manafolio privacy
 
-**Effective date:** October 3, 2026
+**Effective date:** October 5, 2026
 
 Manafolio is a self-hosted Magic: The Gathering collection, storage, and deck manager. Your chosen server holds your account and collection; this repository does not provide a central Manafolio account or hosted collection service. Installing the application does not give its maintainers access to your server.
 
-**Self-hosted does not mean offline or confined to one device.** Your browser exchanges data with your server, loads some resources from external services, and can request optional integrations. This document describes the checked-in web application. Your server administrator is responsible for explaining any additional hosting, proxy, logging, backup, or integration practices.
+**Self-hosted does not mean offline or confined to one device.** Your browser exchanges data with your server, loads some resources from external services, and can request optional integrations. This document describes the checked-in web application and the server's native SSO handoff. Your server administrator is responsible for explaining any additional hosting, proxy, logging, backup, or integration practices.
 
 ## Data held by your installation
 
@@ -33,6 +33,14 @@ Signing out removes the application's saved sign-in token and user object, but i
 Refresh is manual and replaces the snapshot only after a successful download and database commit. Clear offline data, signing out, and signing into another account invalidate pending downloads and remove the snapshot; already-open tabs are notified. Public application files may remain cached. If clearing reports a storage error, clear browser site data to remove residual records. Anyone with access to this browser profile may access its local data; snapshots are not encrypted. Remote account deletion or session revocation cannot erase a disconnected device. Browser eviction can remove the snapshot, so it is not a backup.
 
 Container-label sign-in through SSO temporarily stores the intended container ID in this tab's session storage, then removes it when navigation resolves. No label or QR image is saved to the server.
+
+## Native SSO handoff
+
+Native sign-in opens the configured identity provider in an external browser/Custom Tab; its cookies and account session remain managed by that browser/provider. The server preserves its normal identity claims, account provisioning, and explicit account-linking policy. The app does not receive the server's IdP client secret or upstream IdP tokens.
+
+While sign-in is pending, the server keeps browser correlation and the app's random state and PKCE challenge in process memory for up to ten minutes. After sign-in it keeps a random handoff code, account ID, state hash, and challenge for a 90-second validity window, with at most 1,000 pending handoffs. Expired records are pruned on subsequent authentication activity, and all pending records disappear on restart. The fixed app callback contains only a one-use code and state, or a short error code and state; the ordinary seven-day session is created only after the app proves possession of its PKCE verifier over HTTPS. That session is stored in the existing server session table, just like password sign-in.
+
+Browser history, operating-system link handling, and operator-controlled proxy logs may observe callback URLs. Do not log authentication URLs or request/response bodies, including codes, verifiers, tokens, and passwords. Native auth responses prohibit caching and referrer forwarding; the server does not log provider error bodies or native credentials. Signing out of Manafolio does not sign out of the identity provider's browser session.
 
 ## Camera and card identification
 
