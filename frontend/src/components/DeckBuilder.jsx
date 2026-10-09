@@ -127,7 +127,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [deckCardSortBy, setDeckCardSortBy] = useState('type');
   const [deckCardScale, setDeckCardScale] = useState(() => {
     const scale = Number(localStorage.getItem('card_default_scale'));
-    return scale >= 0.6 && scale <= 2.5 ? scale : 1;
+    return scale >= 0.6 && scale <= 2.5 ? scale : 1.5;
   });
   const deckListImageScale = 1 + Math.max(0, deckCardScale - 1) * 0.25;
   const [previewCard, setPreviewCard] = useState(null);

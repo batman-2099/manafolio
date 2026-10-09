@@ -991,8 +991,8 @@ Open **Settings** and use its section links to jump to the relevant panel.
 2. Use **Language** to choose the interface language. This changes app text, not the language recorded for a printed card.
 3. Choose **Theme**: **Arcane Blue**, **Jenny**, **Plains**, **Island**, **Swamp**, **Mountain**, **Forest**, or **Wastes**. Theme changes save to your account automatically and apply on other devices when you sign in. Obsolete Light/Magic/LCARS preferences fall back to Arcane Blue.
 4. Set **Currency** to USD, EUR, GBP, CAD, AUD, or JPY. Known provider quote currencies take precedence; this preference is only a fallback for amounts without a recognized currency. **It does not perform exchange-rate conversion.** Collection totals separate currencies; other mixed totals are marked explicitly.
-5. Set **Default Views** for the available screens, including **Deck Builder cards → Table view / Grid view**.
-6. Set **Default Card Zoom** from 60% through 250% for card grids.
+5. Set **Default Views** for the available screens, including **Deck Builder cards → Table view / Grid view**. Containers default to **Detail list** when no preference is saved.
+6. Set **Default Card Zoom** from 60% through 250% for card grids. The default is **150%** for containers and deck cards; previously saved zoom preferences remain unchanged.
 
 **Expected result:** language/currency changes apply in the browser; default views and zoom apply when their screens next open. Language, currency, default views, and zoom are browser-local preferences, unlike the account-saved theme and AI preferences. Changing them on one device is not a promise they will follow you to another browser.
 

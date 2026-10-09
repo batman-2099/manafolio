@@ -352,10 +352,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [showUnsortedFilters, setShowUnsortedFilters] = useState(false);
   const [unsortedSort, setUnsortedSort] = useState('scanned-desc');
   const [unsortedViewMode, setUnsortedViewMode] = useState('grid'); // 'grid' | 'detail'
-  const [containerViewMode, setContainerViewMode] = useState(() => localStorage.getItem('storage_default_view') || 'layout'); // 'layout' | 'list'
+  const [containerViewMode, setContainerViewMode] = useState(() => localStorage.getItem('storage_default_view') || 'list'); // 'layout' | 'list'
   const [containerCardScale, setContainerCardScale] = useState(() => {
     const scale = Number(localStorage.getItem('card_default_scale'));
-    return scale >= 0.6 && scale <= 2.5 ? scale : 1;
+    return scale >= 0.6 && scale <= 2.5 ? scale : 1.5;
   });
   const [unsortedBulkLocation, setUnsortedBulkLocation] = useState('');
   const [showContainerFilters, setShowContainerFilters] = useState(false);

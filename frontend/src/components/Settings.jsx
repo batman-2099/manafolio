@@ -69,11 +69,11 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
   const [currency, setCurrencyState] = useState(() => getCurrency());
 
   const [collectionDefaultView, setCollectionDefaultView] = useState(() => localStorage.getItem('collection_default_view') || 'gallery');
-  const [storageDefaultView, setStorageDefaultView] = useState(() => localStorage.getItem('storage_default_view') || 'layout');
+  const [storageDefaultView, setStorageDefaultView] = useState(() => localStorage.getItem('storage_default_view') || 'list');
   const [deckDefaultView, setDeckDefaultView] = useState(() => localStorage.getItem('deck_default_view') || 'list');
   const [defaultCardScale, setDefaultCardScale] = useState(() => {
     const scale = Number(localStorage.getItem('card_default_scale'));
-    return scale >= 0.6 && scale <= 2.5 ? scale : 1;
+    return scale >= 0.6 && scale <= 2.5 ? scale : 1.5;
   });
 
   const [versionInfo, setVersionInfo] = useState(null);
@@ -1035,7 +1035,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 localStorage.setItem('card_default_scale', scale);
               }}
             >
-              {[0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2, 2.2, 2.4, 2.5].map(scale => (
+              {[0.6, 0.8, 1, 1.2, 1.4, 1.5, 1.6, 1.8, 2, 2.2, 2.4, 2.5].map(scale => (
                 <option key={scale} value={scale}>{Math.round(scale * 100)}%</option>
               ))}
             </select>
