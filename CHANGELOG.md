@@ -8,6 +8,7 @@ Release history starts with Manafolio 2.0.
 - Removed the redundant Game field from the card inspector.
 - Token cards no longer supply Related tokens lists, including other printings and double-faced tokens; normal cards still list the tokens they create.
 - Grouped container sleeve and last-stocktake details into a compact, icon-led summary with a subtle desktop divider and readable mobile wrapping.
+- Increased container selection/move toolbar button and dropdown text to 14px at the default text size.
 
 ## 2.3.2 — 2026-10-04
 

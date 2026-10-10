@@ -2199,21 +2199,21 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         {storage.selectMode && (
           <div className="glass-panel" style={{ padding: '0.6rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', background: 'rgba(255,71,71,0.08)' }}>
             <span style={{ fontWeight: 800, color: 'var(--text-strong)', fontSize: '0.8rem' }}>{storage.selectedIds.size} selected</span>
-            <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set(selectableContainerCards.map(c => c.entry_id)))}>Select all ({selectableContainerCards.length})</button>
-            <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set())}>{t('bulk.clear')}</button>
+            <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set(selectableContainerCards.map(c => c.entry_id)))}>Select all ({selectableContainerCards.length})</button>
+            <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set())}>{t('bulk.clear')}</button>
             <div style={{ width: '1px', height: '20px', background: 'var(--border-glass)' }} />
             {!isArchive && (
             <AddToDeckSelect
               onAdd={(id) => storage.runBulk('add_to_deck', id)}
               disabled={!storage.selectedIds.size}
-              style={{ fontSize: '0.68rem', padding: '0.25rem 0.4rem', maxWidth: '160px' }}
+              style={{ fontSize: '0.875rem', padding: '0.25rem 0.4rem', maxWidth: '160px' }}
             />
             )}
             <select
               className="select-control"
               value={storage.bulkMoveTarget}
               onChange={(e) => storage.setBulkMoveTarget(e.target.value)}
-              style={{ fontSize: '0.68rem', padding: '0.25rem 0.4rem', minWidth: '150px' }}
+              style={{ fontSize: '0.875rem', padding: '0.25rem 0.4rem', minWidth: '150px' }}
             >
               <option value="">{t('loc.moveSelectedTo')}</option>
               {locations.filter(location => location.id !== selectedLoc?.id).map(location => (
@@ -2222,7 +2222,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             </select>
             <button
               className="btn btn-secondary"
-              style={{ fontSize: '0.68rem', padding: '0.25rem 0.6rem' }}
+              style={{ fontSize: '0.875rem', padding: '0.25rem 0.6rem' }}
               disabled={!storage.selectedIds.size || !storage.bulkMoveTarget}
               onClick={async () => {
                 const target = locations.find(location => String(location.id) === storage.bulkMoveTarget);
@@ -2234,7 +2234,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             </button>
             <button
               className="btn btn-primary"
-              style={{ fontSize: '0.68rem', padding: '0.25rem 0.6rem' }}
+              style={{ fontSize: '0.875rem', padding: '0.25rem 0.6rem' }}
               disabled={!storage.selectedIds.size}
               onClick={() => storage.runBulk('move', null, t('loc.confirmRemoveFromStorage', { count: storage.selectedIds.size }))}
             >
@@ -2242,29 +2242,29 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             </button>
             {isArchive ? (
               <>
-                <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.6rem' }} disabled={!storage.selectedIds.size} onClick={() => storage.runBulk('list_type', 'collection')}>{t('bulk.restoreToCollection')}</button>
-                <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.6rem' }} disabled={!storage.selectedIds.size} onClick={() => storage.runBulk('list_type', 'arena')}>{t('bulk.restoreToArena')}</button>
+                <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.6rem' }} disabled={!storage.selectedIds.size} onClick={() => storage.runBulk('list_type', 'collection')}>{t('bulk.restoreToCollection')}</button>
+                <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.6rem' }} disabled={!storage.selectedIds.size} onClick={() => storage.runBulk('list_type', 'arena')}>{t('bulk.restoreToArena')}</button>
               </>
             ) : (
-              <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.6rem' }} disabled={!storage.selectedIds.size} onClick={() => storage.runBulk('list_type', 'graveyard')}>
+              <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.6rem' }} disabled={!storage.selectedIds.size} onClick={() => storage.runBulk('list_type', 'graveyard')}>
                 {t('bulk.archive')}
               </button>
             )}
-            <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.6rem' }} disabled={!storage.selectedIds.size} onClick={() => storage.runBulk('missing', true)}>
+            <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.6rem' }} disabled={!storage.selectedIds.size} onClick={() => storage.runBulk('missing', true)}>
               {t('inspector.markMissing')}
             </button>
-            <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.6rem' }} disabled={!storage.selectedIds.size} onClick={() => storage.runBulk('missing', false)}>
+            <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.6rem' }} disabled={!storage.selectedIds.size} onClick={() => storage.runBulk('missing', false)}>
               {t('inspector.markFound')}
             </button>
             <button
               className="btn btn-danger"
-              style={{ fontSize: '0.68rem', padding: '0.25rem 0.6rem' }}
+              style={{ fontSize: '0.875rem', padding: '0.25rem 0.6rem' }}
               disabled={!storage.selectedIds.size}
               onClick={() => storage.runBulk('delete', null, t('loc.confirmDeleteFromCollection', { count: storage.selectedIds.size }))}
             >
               {t('common.delete')}
             </button>
-            <button className="btn btn-secondary" style={{ fontSize: '0.68rem', padding: '0.25rem 0.5rem', marginLeft: 'auto' }} onClick={storage.exitSelectMode}>{t('bulk.done')}</button>
+            <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.5rem', marginLeft: 'auto' }} onClick={storage.exitSelectMode}>{t('bulk.done')}</button>
           </div>
         )}
 
