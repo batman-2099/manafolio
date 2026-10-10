@@ -12,7 +12,7 @@ const { searchLimiter } = require('../middleware/auth');
 const { resolveCardPrice, parseCardRow, recordPrice } = require('../utils/priceHelpers');
 const { parseSetList } = require('../utils/setQuery');
 const { compartmentLabel, isBinderType, rebalanceCompartmentByScheme, stackKey } = require('../utils/compartmentSort');
-const { checkedOutAllocation, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, setStackQuantity, defaultCompartmentPlan } = require('../utils/collectionHelpers');
+const { checkedOutAllocation, physicalCardEntries, sourceEntries, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, setStackQuantity, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { splitPrice } = require('../utils/splitPrice');
 
@@ -465,7 +465,7 @@ router.get('/collection', async (req, res) => {
         SELECT dc.card_id, d.user_id, GROUP_CONCAT(d.name, ', ') AS deck_names
         FROM deck_cards dc
         JOIN decks d ON d.id = dc.deck_id
-        WHERE d.user_id = ? AND d.checked_out = 1
+        WHERE d.user_id = ? AND d.inventory_type = 'collection' AND (d.checked_out = 1 OR dc.checked_out = 1)
         GROUP BY dc.card_id, d.user_id
       ) checked_out_decks ON checked_out_decks.card_id = c.card_id AND checked_out_decks.user_id = c.user_id
       ${filterSql}
@@ -474,11 +474,33 @@ router.get('/collection', async (req, res) => {
     const rows = await db.all(query, [req.user.id, ...filterParams]);
 
     const alloc = listType === 'collection' ? await checkedOutAllocation(req.user.id) : new Map();
+    // Display pulled copies without turning a pull flag into a reservation.
+    const inDeck = new Map(alloc);
+    if (listType === 'collection') {
+      const pulled = await db.all(`
+        SELECT dc.*, d.game FROM deck_cards dc JOIN decks d ON d.id = dc.deck_id
+        WHERE d.user_id = ? AND d.inventory_type = 'collection'
+          AND d.checked_out = 0 AND dc.checked_out = 1 AND dc.quantity > 0
+        ORDER BY (dc.source_entry_id IS NOT NULL) DESC, d.id, dc.card_id
+      `, [req.user.id]);
+      const entries = pulled.length ? await physicalCardEntries(req.user.id) : [];
+      for (const card of pulled) {
+        let needed = card.quantity;
+        for (const entry of sourceEntries(entries, card, card.game)) {
+          const used = inDeck.get(entry.entry_id) || 0;
+          const take = Math.min(needed, Math.max(0, entry.quantity - used));
+          if (take > 0) inDeck.set(entry.entry_id, used + take);
+          needed -= take;
+          if (needed <= 0) break;
+        }
+      }
+    }
 
     const formatted = rows.map(row => ({
       ...parseCardRow(row),
       price_trend: resolveCardPrice(row),
       checked_out_qty: alloc.get(row.entry_id) || 0,
+      in_deck_qty: inDeck.get(row.entry_id) || 0,
       compartment_display_label: row.compartment_id
         ? compartmentLabel({ idx: row.compartment_idx, label: row.compartment_label }, row.location_type)
         : null,

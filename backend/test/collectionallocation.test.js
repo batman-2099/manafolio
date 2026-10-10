@@ -44,6 +44,18 @@ async function main() {
     await db.run('UPDATE decks SET checked_out = 0 WHERE id = 1');
     assert.deepStrictEqual(await checkedOutAllocation(1), new Map([[102, 1], [105, 1]]), 'returning one deck does not reassign another deck');
     assert.deepStrictEqual(await checkedOutAllocation(2), new Map(), 'another owner does not inherit reservations');
+    await db.run("INSERT INTO decks (id, user_id, name, checked_out, game) VALUES (4, 1, 'Draft', 0, 'mtg')");
+    await db.run("INSERT INTO deck_cards (deck_id, card_id, quantity, source_entry_id) VALUES (4, 'card', 2, 106)");
+    await getCollection({ query: {}, user: { id: 1 } }, res);
+    assert.strictEqual(res.body.find(row => row.entry_id === 106).in_deck_qty, 0, 'deck membership alone is not in deck');
+    await db.run('UPDATE deck_cards SET checked_out = 1 WHERE deck_id = 4');
+    await getCollection({ query: {}, user: { id: 1 } }, res);
+    assert.strictEqual(res.body.find(row => row.entry_id === 106).in_deck_qty, 2, 'pulled copies are shown in deck');
+    assert.strictEqual(res.body.find(row => row.entry_id === 106).checked_out_qty, 0, 'pulled status does not reserve inventory');
+    assert.strictEqual(res.body.find(row => row.entry_id === 102).in_deck_qty, 1, 'checkout shows unpulled copies in deck');
+    await db.run('UPDATE deck_cards SET checked_out = 0 WHERE deck_id = 4');
+    await getCollection({ query: {}, user: { id: 1 } }, res);
+    assert.strictEqual(res.body.find(row => row.entry_id === 106).in_deck_qty, 0, 'clearing pulled removes the indicator');
     console.log('Historical checkout allocation SQLite regression passed');
   } finally {
     await new Promise((resolve, reject) => db.dbConnection.close(error => error ? reject(error) : resolve()));

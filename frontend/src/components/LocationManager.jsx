@@ -712,7 +712,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       && (!unsortedFilters.condition || card.condition === unsortedFilters.condition)
       && (!unsortedFilters.printing || card.printing === unsortedFilters.printing)
       && (!unsortedFilters.language || card.language === unsortedFilters.language)
-      && (!unsortedFilters.deckStatus || (unsortedFilters.deckStatus === 'inPlay' ? card.checked_out_qty > 0 : !(card.checked_out_qty > 0)))
+      && (!unsortedFilters.deckStatus || (unsortedFilters.deckStatus === 'inPlay' ? card.in_deck_qty > 0 : !(card.in_deck_qty > 0)))
     );
     return sortCardsByOrder(cards, unsortedSort, selectedLoc?.foil_sorting, setsList);
   }, [unsortedCollection, unsortedFilters, unsortedSort, selectedLoc, setsList]);
@@ -1170,7 +1170,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         && (!containerFilters.condition || card.condition === containerFilters.condition)
         && (!containerFilters.printing || card.printing === containerFilters.printing)
         && (!containerFilters.language || card.language === containerFilters.language)
-        && (!containerFilters.deckStatus || (containerFilters.deckStatus === 'inPlay' ? card.checked_out_qty > 0 : !(card.checked_out_qty > 0)))
+        && (!containerFilters.deckStatus || (containerFilters.deckStatus === 'inPlay' ? card.in_deck_qty > 0 : !(card.in_deck_qty > 0)))
       )
       .sort((a, b) =>
         (compartmentIndex.get(a.compartment_id) ?? Infinity) - (compartmentIndex.get(b.compartment_id) ?? Infinity)
@@ -1193,6 +1193,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       else {
         groups[key].quantity += card.quantity;
         groups[key].foil_quantity += foilQuantity;
+        groups[key].in_deck_qty = (groups[key].in_deck_qty || 0) + (card.in_deck_qty || 0);
       }
     });
     return Object.values(groups);
@@ -2401,9 +2402,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                           {getPrintingBadgeLabel('Holofoil')}{foilQuantity < card.quantity && ` ${foilQuantity}/${card.quantity}`}
                         </span>
                       )}
-                      {card.checked_out_qty > 0 && (
+                      {card.in_deck_qty > 0 && (
                         <span title={`${t('loc.inPlay')}: ${card.deck_names}`} style={{ position: 'absolute', right: '0.35rem', bottom: '1.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.45rem', borderRadius: '999px', background: 'rgba(0,0,0,0.85)', border: '2px solid var(--accent-red)', color: 'white', fontSize: '0.85rem', fontWeight: 800 }}>
-                          <Layers size={14} /> {card.checked_out_qty < card.quantity ? `${card.checked_out_qty}/${card.quantity} Out` : t('loc.inPlay')}
+                          <Layers size={14} /> {card.in_deck_qty < card.quantity ? `${card.in_deck_qty}/${card.quantity} Out` : t('loc.inPlay')}
                         </span>
                       )}
                       {card.missing ? (

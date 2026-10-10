@@ -222,6 +222,7 @@ window.fetch = async (input, opts = {}) => {
     let data = routes[path];
     if (path === '/api/collection') data = data.map(card => ({
       ...card,
+      in_deck_qty: card.checked_out_qty || 0,
       storage_unit_name: routes['/api/locations'].find(location => location.id === card.location_id)?.storage_unit_name ?? null,
     }));
     if (/^\/api\/decks\/\d+\/locations$/.test(path)) data = data.map(card => ({

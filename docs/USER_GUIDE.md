@@ -405,6 +405,8 @@ Both methods account for the number of copies in each entry. Entry shares are al
 
 ## Storage: keep the app and the cards on your shelf in sync
 
+Container **In Deck** indicators and deck-status filters count physical copies whose deck is checked out or whose **Pulled** switch has been saved as on. Merely adding a card to a deck list does not mark it In Deck. Partial stacks show the affected copy count. Pulled status alone does not reserve copies; checkout still controls reservations and availability.
+
 Storage describes where cards are physically kept. It does not create inventory when you create a box, and changing a recorded placement cannot move a real card for you. Keep the physical container beside you when moving or rearranging.
 
 If pages or rows fail to load, use **Retry**. A load error is not an empty container; any previously loaded contents are marked as potentially out of date.

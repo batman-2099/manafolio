@@ -32,11 +32,12 @@ function stackPocketCards(cards, highlightSet, pulledSet) {
       continue;
     }
     held.quantity += card.quantity || 1;
+    held.in_deck_qty = (held.in_deck_qty || 0) + (card.in_deck_qty || 0);
     // In pull mode represent an actionable physical copy, not an unrelated
     // first row. Keep the shared pocket's position and combined quantity.
     if (priority(card) > priority(held)) {
-      const { quantity, position } = held;
-      Object.assign(held, card, { quantity, position });
+      const { quantity, position, in_deck_qty } = held;
+      Object.assign(held, card, { quantity, position, in_deck_qty });
     }
     // Whichever copy is actually filed decides where the stack sits; an unplaced
     // one joining it must not drag the pocket back to "no position".
@@ -682,10 +683,10 @@ export default function CompartmentView({
                       &times;{card.quantity}
                     </span>
                   )}
-                  {(pullMode ? pulledSet.has(card.entry_id) : card.checked_out_qty > 0) && (
+                  {(pullMode ? pulledSet.has(card.entry_id) : card.in_deck_qty > 0) && (
                     <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.62)', borderRadius: '4px', zIndex: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                       <span style={{ fontSize: '0.5rem', fontWeight: 900, letterSpacing: '0.04em', color: 'var(--text-strong)', background: 'var(--accent-red)', padding: '2px 5px', borderRadius: '4px', transform: 'rotate(-8deg)', textTransform: 'uppercase' }}>
-                        {pullMode ? 'Pulled' : (card.checked_out_qty < card.quantity ? `${card.checked_out_qty}/${card.quantity} Out` : t('loc.inPlay'))}
+                        {pullMode ? 'Pulled' : (card.in_deck_qty < card.quantity ? `${card.in_deck_qty}/${card.quantity} Out` : t('loc.inPlay'))}
                       </span>
                     </div>
                   )}
@@ -989,10 +990,10 @@ export default function CompartmentView({
                     {absOffset <= IMG_WINDOW && <CardImage card={card} decoding="async" />}
                     {getFoilOverlayClass(card.printing) && <div className={getFoilOverlayClass(card.printing)} style={{ borderRadius: '4.5px' }} />}
                     <PrintingBadge printing={card.printing} />
-                    {(pullMode ? pulledSet.has(card.entry_id) : card.checked_out_qty > 0) && (
+                    {(pullMode ? pulledSet.has(card.entry_id) : card.in_deck_qty > 0) && (
                       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.62)', borderRadius: '5px', zIndex: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                         <span style={{ fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.04em', color: 'var(--text-strong)', background: 'var(--accent-red)', padding: '3px 8px', borderRadius: '4px', transform: 'rotate(-8deg)', textTransform: 'uppercase' }}>
-                          {pullMode ? 'Pulled' : (card.checked_out_qty < card.quantity ? `${card.checked_out_qty}/${card.quantity} Out` : t('loc.inPlay'))}
+                          {pullMode ? 'Pulled' : (card.in_deck_qty < card.quantity ? `${card.in_deck_qty}/${card.quantity} Out` : t('loc.inPlay'))}
                         </span>
                       </div>
                     )}
