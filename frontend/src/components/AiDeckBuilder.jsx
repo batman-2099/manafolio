@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, LoaderCircle, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, LoaderCircle, Sparkles, Trash2, Check, X, Square } from 'lucide-react';
 import { useT } from '../utils/i18n';
 import { readProgressStream } from '../utils/importStream';
 import MultiSelectDropdown from './MultiSelectDropdown';
@@ -46,6 +46,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   const [inventory, setInventory] = useState([]);
   const [colors, setColors] = useState([]);
   const [sets, setSets] = useState([]);
+  const [excludedSets, setExcludedSets] = useState([]);
   const [setSymbols, setSetSymbols] = useState({});
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [inventoryError, setInventoryError] = useState('');
@@ -156,7 +157,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
     card.color_identity.length ? card.color_identity : card.color_identity_known ? ['Colorless'] : []
   )])).sort().map(color => ({ value: color, label: color === 'Colorless' ? t('inspector.colorless') : color })), [inventory, colors, t]);
   const setOptions = useMemo(() => Array.from(new Map([
-    ...sets.map(id => [id, { value: id, label: id }]),
+    ...[...sets, ...excludedSets].map(id => [id, { value: id, label: id }]),
     ...inventory.filter(card => card.set_id).map(card => [
       card.set_id, { value: card.set_id, label: `${card.set_name || card.set_id} (${card.set_id})` },
     ]),
@@ -166,18 +167,18 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
       {setSymbols[option.value.replace(/^mtg-/, '')] && <img src={setSymbols[option.value.replace(/^mtg-/, '')]} alt="" width="20" height="20" loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
       {option.label}
     </span>,
-  })), [inventory, sets, locale, setSymbols]);
+  })), [inventory, sets, excludedSets, locale, setSymbols]);
   const containerOptions = useMemo(() => locations.map(location => ({
     value: location.id, label: location.name,
   })).sort((a, b) => a.label.localeCompare(b.label, locale)), [locations, locale]);
   const filteredInventory = useMemo(() => inventory.flatMap(card => {
-    const matchesFilters = (sets.length === 0 || sets.includes(card.set_id))
+    const matchesFilters = !excludedSets.includes(card.set_id) && (sets.length === 0 || sets.includes(card.set_id))
       && (colors.length === 0 || colors.some(color => color === 'Colorless'
         ? card.color_identity_known && card.color_identity.length === 0
         : card.color_identity.includes(color)));
     if (matchesFilters) return [card];
     return card.source_qty > 0 ? [{ ...card, available_qty: Math.min(card.available_qty, card.source_qty) }] : [];
-  }), [inventory, colors, sets]);
+  }), [inventory, colors, sets, excludedSets]);
   const cardById = useMemo(() => new Map(filteredInventory.map(card => [String(card.id), card])), [filteredInventory]);
   const counts = useMemo(() => filteredInventory.reduce((sum, card) => ({
     owned: sum.owned + card.owned_qty, available: sum.available + card.available_qty, locked: sum.locked + card.locked_qty,
@@ -225,7 +226,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
       const response = await fetch('/api/ai-decks/suggest', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' }, signal,
         body: JSON.stringify({
-          inventory_type: inventoryType, format, target_size: targetSize, prompt: content, colors, sets,
+          inventory_type: inventoryType, format, target_size: targetSize, prompt: content, colors, sets, excluded_sets: excludedSets,
           deck_type: deckType, power_level: powerLevel,
           messages,
           current_draft: draft ? {
@@ -319,7 +320,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
           <div style={{ ...rowStyle, alignItems: 'start' }}>
             <div className="form-group" style={{ flex: '1 1 180px' }}>
               <label htmlFor="ai-inventory">{t('aiDeck.inventory')}</label>
-              <select id="ai-inventory" className="input-control" disabled={!!sourceDeck} value={inventoryType} onChange={event => { clearInventory(); setContainerIds([]); setColors([]); setSets([]); setIncludeCheckedOut(false); setInventoryType(event.target.value); setFormat(event.target.value === 'arena' ? 'Standard' : 'Commander / EDH'); setTargetSize(event.target.value === 'arena' ? 60 : 100); }}>
+              <select id="ai-inventory" className="input-control" disabled={!!sourceDeck} value={inventoryType} onChange={event => { clearInventory(); setContainerIds([]); setColors([]); setSets([]); setExcludedSets([]); setIncludeCheckedOut(false); setInventoryType(event.target.value); setFormat(event.target.value === 'arena' ? 'Standard' : 'Commander / EDH'); setTargetSize(event.target.value === 'arena' ? 60 : 100); }}>
                 <option value="collection">{t('aiDeck.physical')}</option><option value="arena">MTG Arena</option>
               </select>
             </div>
@@ -425,9 +426,15 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
                   label={t('collection.fSet')}
                   allLabel={t('collection.allSets')}
                   value={sets}
+                  excludedValue={excludedSets}
                   options={setOptions}
-                  onChange={value => { if (!busy) { clearDraft(); setSets(value); } }}
+                  onChange={(value, excluded) => { if (!busy) { clearDraft(); setSets(value); setExcludedSets(excluded); } }}
                 />
+                <p style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                  <span><Check size={14} aria-hidden="true" /> {t('filter.require')}</span>
+                  <span><X size={14} aria-hidden="true" /> {t('filter.exclude')}</span>
+                  <span><Square size={14} aria-hidden="true" /> {t('bulk.clear')}</span>
+                </p>
               </div>
             </div>
           </fieldset>
@@ -437,7 +444,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
           <div>
           <p role="status">{inventoryLoading ? t('common.loading') : t('aiDeck.matchingCounts', counts)}</p>
           {inventoryError && <p role="alert">{inventoryError} <button type="button" className="btn btn-secondary" onClick={() => { clearInventory(); setInventoryRevision(value => value + 1); }}>{t('aiDeck.retry')}</button></p>}
-          {!inventoryLoading && !inventoryError && counts.available === 0 && <p>{t(colors.length || sets.length || containerIds.length ? 'aiDeck.emptyFilters' : 'aiDeck.emptyInventory')}</p>}
+          {!inventoryLoading && !inventoryError && counts.available === 0 && <p>{t(colors.length || sets.length || excludedSets.length || containerIds.length ? 'aiDeck.emptyFilters' : 'aiDeck.emptyInventory')}</p>}
             {inventoryType === 'collection' && (
               <p id="ai-checked-out-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.includeCheckedOutHint')}</p>
             )}

@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useId } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Check, X, Square } from 'lucide-react';
 import { useT } from '../utils/i18n';
 
 // A reusable checklist dropdown, standing in for a native <select> wherever
 // a filter should allow choosing several values at once instead of one.
-// `value` is always an array; an empty array means "no filter applied" (same
-// meaning as '' on the single-select version it replaces).
-export default function MultiSelectDropdown({ label, options, value, onChange, allLabel }) {
+// Empty selections mean no filter. Optional excludedValue enables
+// the include → exclude → clear cycle; ordinary checklists stay binary.
+export default function MultiSelectDropdown({ label, options, value, onChange, allLabel, excludedValue }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -22,6 +22,12 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
   }, []);
 
   const toggle = (optValue) => {
+    if (excludedValue) {
+      if (value.includes(optValue)) onChange(value.filter(v => v !== optValue), [...excludedValue, optValue]);
+      else if (excludedValue.includes(optValue)) onChange(value, excludedValue.filter(v => v !== optValue));
+      else onChange([...value, optValue], excludedValue);
+      return;
+    }
     onChange(
       value.includes(optValue)
         ? value.filter(v => v !== optValue)
@@ -29,7 +35,9 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
     );
   };
 
-  const summary = value.length === 0
+  const summary = excludedValue?.length
+    ? `${t('filter.require')}: ${value.length} · ${t('filter.exclude')}: ${excludedValue.length}`
+    : value.length === 0
     ? allLabel
     : value.length === 1
       ? (options.find(o => o.value === value[0])?.label ?? value[0])
@@ -71,19 +79,32 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
             borderRadius: 'var(--radius-sm)', padding: '0.35rem', boxShadow: 'var(--shadow-glow)'
           }}
         >
-          {value.length > 0 && (
+          {(value.length > 0 || excludedValue?.length > 0) && (
             <button
               type="button"
               className="btn btn-secondary"
               style={{ width: '100%', fontSize: '0.72rem', padding: '0.3rem', marginBottom: '0.3rem' }}
-              onClick={() => onChange([])}
+              onClick={() => excludedValue ? onChange([], []) : onChange([])}
             >
               {t('bulk.clear')}
             </button>
           )}
-          {/* Native checkboxes rather than a styled div: keyboard reachable and
-              announced without a roving-tabindex listbox of our own. */}
-          {options.map(opt => (
+          {/* Native controls preserve keyboard activation and focus. */}
+          {options.map(opt => excludedValue ? (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => toggle(opt.value)}
+              aria-describedby={`${groupId}-${opt.value}-state`}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', minHeight: 44, padding: '0.35rem 0.4rem', border: 0, borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', font: 'inherit', textAlign: 'left' }}
+            >
+              {value.includes(opt.value) ? <Check size={18} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--accent-green)' }} />
+                : excludedValue.includes(opt.value) ? <X size={18} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--accent-red)' }} />
+                  : <Square size={18} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--text-secondary)' }} />}
+              {opt.label}
+              <span id={`${groupId}-${opt.value}-state`} hidden>{value.includes(opt.value) ? t('filter.require') : excludedValue.includes(opt.value) ? t('filter.exclude') : allLabel}</span>
+            </button>
+          ) : (
             <label
               key={opt.value}
               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.35rem 0.4rem', borderRadius: '5px', cursor: 'pointer', fontSize: '0.82rem' }}

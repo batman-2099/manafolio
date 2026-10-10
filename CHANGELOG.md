@@ -11,6 +11,7 @@ Release history starts with Manafolio 2.0.
 - Increased container selection/move toolbar button and dropdown text to 14px at the default text size.
 - Increased container filter dropdowns, sorting, stacking labels, and Clear filters text to 14px at the default text size.
 - Sorted the container Move selected to dropdown alphabetically by container name.
+- AI Deck Builder set choices now cycle through include (check), exclude (X), and clear, with server-enforced exclusions and preserved source-deck quantities when improving a deck.
 
 ## 2.3.2 — 2026-10-04
 

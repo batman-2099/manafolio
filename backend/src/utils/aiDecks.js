@@ -112,8 +112,8 @@ function preferencesRequest(body) {
 }
 
 function suggestionRequest(body) {
-  object(body, ['inventory_type', 'format', 'target_size', 'deck_type', 'power_level', 'prompt', 'colors', 'sets', 'include_checked_out', 'source_deck_id', 'container_ids', 'messages', 'current_draft'], 'suggestion request');
-  const { colors = [], sets = [], source_deck_id, messages = [], current_draft = null } = body;
+  object(body, ['inventory_type', 'format', 'target_size', 'deck_type', 'power_level', 'prompt', 'colors', 'sets', 'excluded_sets', 'include_checked_out', 'source_deck_id', 'container_ids', 'messages', 'current_draft'], 'suggestion request');
+  const { colors = [], sets = [], excluded_sets = [], source_deck_id, messages = [], current_draft = null } = body;
   const deckType = DECK_TYPES.find(type => type.id === body.deck_type);
   if (Object.hasOwn(body, 'deck_type') && !deckType) fail('Choose one supported deck type.');
   const powerLevel = POWER_LEVELS.find(target => target.level === body.power_level);
@@ -125,9 +125,11 @@ function suggestionRequest(body) {
     || colors.some(color => !['White', 'Blue', 'Black', 'Red', 'Green', 'Colorless'].includes(color))) {
     fail('Colors must be a list of at most six supported Magic colors.');
   }
-  if (!Array.isArray(sets) || sets.length > 1000
-    || sets.some(set => typeof set !== 'string' || !/^[a-z0-9]{1,10}$/.test(set))) {
-    fail('Sets must be a list of at most 1000 Magic set codes, each 1–10 lowercase letters or digits.');
+  for (const [label, codes] of [['Sets', sets], ['Excluded sets', excluded_sets]]) {
+    if (!Array.isArray(codes) || codes.length > 1000
+      || codes.some(set => typeof set !== 'string' || !/^[a-z0-9]{1,10}$/.test(set))) {
+      fail(`${label} must be a list of at most 1000 Magic set codes, each 1–10 lowercase letters or digits.`);
+    }
   }
   if (!Array.isArray(messages) || messages.length > 40) fail('Conversation must contain at most 40 messages.');
   const history = messages.map(message => {
@@ -146,7 +148,7 @@ function suggestionRequest(body) {
   }
   return {
     ...settings(body), prompt: text(body.prompt, 'Prompt', 4000),
-    colors: [...new Set(colors)], sets: [...new Set(sets)],
+    colors: [...new Set(colors)], sets: [...new Set(sets)], excluded_sets: [...new Set(excluded_sets)],
     container_ids: containerIds(body.container_ids, body.inventory_type),
     messages: history, current_draft: currentDraft,
     ...(source_deck_id === undefined ? {} : { source_deck_id }),
@@ -284,12 +286,12 @@ async function cardRules(cards) {
   });
 }
 
-function filterInventory(cards, { colors = [], sets = [] }) {
-  if (!colors.length && !sets.length) return cards;
+function filterInventory(cards, { colors = [], sets = [], excluded_sets = [] }) {
+  if (!colors.length && !sets.length && !excluded_sets.length) return cards;
   const eligible = [];
   for (const card of cards) {
     const identity = card.color_identity;
-    const matches = (!sets.length || sets.includes(card.set_id)) && (!colors.length || (identity.length
+    const matches = !excluded_sets.includes(card.set_id) && (!sets.length || sets.includes(card.set_id)) && (!colors.length || (identity.length
       ? identity.some(color => colors.includes(color))
       : card.color_identity_known && colors.includes('Colorless')));
     if (matches) eligible.push(card);
@@ -367,7 +369,7 @@ function modelRequest(request, cards, sourceDeck) {
     + `Commander and Brawl require exactly 100 cards, a single eligible commander in the cards list, singleton nonbasics and its color identity. A legendary creature or a card with explicit commander rules is eligible; Brawl also permits planeswalkers. Other formats require commander_card_id=null. Use cached legality where present; warn when metadata is incomplete. Do not claim guaranteed tournament legality.\n`
     + `If no valid deck is possible or more information is needed, return draft=null and explain or ask in message; never invent cards or quantities.\n`
     + `Catalog rows are [id,name,available_qty,type_line,mana_cost,mana_value,color_identity,oracle_text,format_legality]. Empty rules text means unavailable metadata, not a card without abilities. Exact IDs distinguish printings; never merge their available quantities.\n`
-    + (sourceDeck ? `When there is no current_draft, improve source_deck rather than building an unrelated deck. The eligible catalog already includes its owned, nonmissing cards up to source quantities even outside selected colors, sets or containers, without counting copies twice. Its own checkout is allowed for planning; other decks' reservations remain excluded unless explicitly included. Source context never grants copies missing from the catalog or overrides format legality. The original saved deck and checkout state are retained.\n` : '')
+    + (sourceDeck ? `When there is no current_draft, improve source_deck rather than building an unrelated deck. The eligible catalog already includes its owned, nonmissing cards up to source quantities even outside selected colors, sets or containers or within excluded_sets, without counting copies twice. Its own checkout is allowed for planning; other decks' reservations remain excluded unless explicitly included. Source context never grants copies missing from the catalog or overrides format legality. The original saved deck and checkout state are retained.\n` : '')
     + JSON.stringify({ request: modelSettings, catalog, ...(sourceDeck ? { source_deck: sourceContext } : {}) });
   if (Buffer.byteLength(prompt, 'utf8') > MAX_PROMPT_BYTES) {
     fail(`This inventory exceeds the ${MAX_PROMPT_BYTES}-byte AI request limit; no cards were omitted or sent.`, 413);
