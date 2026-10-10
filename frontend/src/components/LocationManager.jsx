@@ -2216,7 +2216,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               style={{ fontSize: '0.875rem', padding: '0.25rem 0.4rem', minWidth: '150px' }}
             >
               <option value="">{t('loc.moveSelectedTo')}</option>
-              {locations.filter(location => location.id !== selectedLoc?.id).map(location => (
+              {locations.filter(location => location.id !== selectedLoc?.id).sort((a, b) => a.name.localeCompare(b.name)).map(location => (
                 <option key={location.id} value={location.id}>{location.name}</option>
               ))}
             </select>
@@ -2323,7 +2323,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   <button className={`btn ${showContainerFilters ? 'btn-primary' : 'btn-secondary'}`} aria-expanded={showContainerFilters} onClick={() => setShowContainerFilters(show => !show)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                     <SlidersHorizontal size={13} /> {t('collection.filters')}
                   </button>
-                  <select className="select-control" value={containerSortBy} onChange={(e) => setContainerSortBy(e.target.value)} style={{ maxWidth: '150px', fontSize: '0.72rem', padding: '0.35rem 0.5rem' }} aria-label={t('collection.sortBy')}>
+                  <select className="select-control" value={containerSortBy} onChange={(e) => setContainerSortBy(e.target.value)} style={{ maxWidth: '150px', fontSize: '0.875rem', padding: '0.35rem 0.5rem' }} aria-label={t('collection.sortBy')}>
                     <option value="storage">{t('loc.storageOrder')}</option>
                     {['name-asc', 'name-desc', 'price-desc', 'price-asc', 'set-asc', 'type-asc', 'rarity-desc'].map(key => <option key={key} value={key}>{t(`collection.sort.${key}`)}</option>)}
                   </select>
@@ -2331,17 +2331,17 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <input type="checkbox" id="stackContainerCardsOpt" checked={stackContainerCards} onChange={(e) => setStackContainerCards(e.target.checked)} />
-                    <label htmlFor="stackContainerCardsOpt" style={{ cursor: 'pointer', margin: 0, fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)' }}>{t('collection.stackDuplicates')}</label>
+                    <label htmlFor="stackContainerCardsOpt" style={{ cursor: 'pointer', margin: 0, fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-strong)' }}>{t('collection.stackDuplicates')}</label>
                   </div>
                   {stackContainerCards && (
                     <>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <input type="checkbox" id="stackContainerByConditionOpt" checked={stackContainerByCondition} onChange={(e) => setStackContainerByCondition(e.target.checked)} />
-                        <label htmlFor="stackContainerByConditionOpt" style={{ cursor: 'pointer', margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{t('collection.splitByCondition')}</label>
+                        <label htmlFor="stackContainerByConditionOpt" style={{ cursor: 'pointer', margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t('collection.splitByCondition')}</label>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <input type="checkbox" id="stackContainerByPrintingOpt" checked={stackContainerByPrinting} onChange={(e) => setStackContainerByPrinting(e.target.checked)} />
-                        <label htmlFor="stackContainerByPrintingOpt" style={{ cursor: 'pointer', margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{t('collection.splitByPrinting')}</label>
+                        <label htmlFor="stackContainerByPrintingOpt" style={{ cursor: 'pointer', margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{t('collection.splitByPrinting')}</label>
                       </div>
                     </>
                   )}
@@ -2357,17 +2357,17 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       ['printing', t('collection.allPrintings'), containerFilterOptions.printings],
                       ['language', t('collection.allLanguages'), containerFilterOptions.languages]
                     ].map(([key, label, options]) => (
-                      <select key={key} className="select-control" aria-label={label} value={containerFilters[key]} onChange={(e) => setContainerFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
+                      <select key={key} className="select-control" aria-label={label} value={containerFilters[key]} onChange={(e) => setContainerFilters(filters => ({ ...filters, [key]: e.target.value }))} style={{ fontSize: '0.875rem', padding: '0.3rem' }}>
                         <option value="">{label}</option>
                         {options.map(option => <option key={option} value={option}>{option}</option>)}
                       </select>
                     ))}
-                    <select className="select-control" aria-label={t('loc.allDeckStatuses')} value={containerFilters.deckStatus} onChange={(e) => setContainerFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>
+                    <select className="select-control" aria-label={t('loc.allDeckStatuses')} value={containerFilters.deckStatus} onChange={(e) => setContainerFilters(filters => ({ ...filters, deckStatus: e.target.value }))} style={{ fontSize: '0.875rem', padding: '0.3rem' }}>
                       <option value="">{t('loc.allDeckStatuses')}</option>
                       <option value="inPlay">{t('loc.inPlay')}</option>
                       <option value="notInPlay">{t('loc.notInPlay')}</option>
                     </select>
-                    <button className="btn btn-secondary" onClick={() => setContainerFilters({ search: '', set: '', type: '', color: '', rarity: '', condition: '', printing: '', language: '', deckStatus: '' })} style={{ fontSize: '0.72rem', padding: '0.3rem' }}>{t('collection.clearFilters')}</button>
+                    <button className="btn btn-secondary" onClick={() => setContainerFilters({ search: '', set: '', type: '', color: '', rarity: '', condition: '', printing: '', language: '', deckStatus: '' })} style={{ fontSize: '0.875rem', padding: '0.3rem' }}>{t('collection.clearFilters')}</button>
                   </div>
                 )}
               </div>

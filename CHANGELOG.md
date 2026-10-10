@@ -9,6 +9,8 @@ Release history starts with Manafolio 2.0.
 - Token cards no longer supply Related tokens lists, including other printings and double-faced tokens; normal cards still list the tokens they create.
 - Grouped container sleeve and last-stocktake details into a compact, icon-led summary with a subtle desktop divider and readable mobile wrapping.
 - Increased container selection/move toolbar button and dropdown text to 14px at the default text size.
+- Increased container filter dropdowns, sorting, stacking labels, and Clear filters text to 14px at the default text size.
+- Sorted the container Move selected to dropdown alphabetically by container name.
 
 ## 2.3.2 — 2026-10-04
 
