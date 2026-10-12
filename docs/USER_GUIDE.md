@@ -127,11 +127,13 @@ The **Add cards to** selector in **Search & Add** chooses **Collection** (physic
 2. Enter a name in **Card name**, or use **Card number (optional)** with a set code. Choose **Language** for the printing you are looking for—not the interface language.
 3. Use **Sets (optional, comma-separated)** to narrow the search, for example `fdn`, or multiple comma-separated set codes. The suggestions can help identify the correct set.
 4. Choose **Search cards**. Open a result; a search with exactly one result can open its add form directly. Compare the artwork, set, collector number, and language.
-5. In **Add Card to Collection**, set **Quantity**, **Purchase Price**, **Condition**, **Printing**, and **Language**. Use the grading fields if this is a slab; leave the grader as raw for an ordinary card.
+5. In **Add Card to Collection**, set **Quantity**, **Purchase Price**, **Condition**, **Printing**, and **Language**. Use the grading fields if this is a slab; leave the grader as raw for an ordinary card. For Physical additions, choose a **Container** or keep **Unassigned Pile**, the default each time the form opens. Containers are alphabetical; existing filing rules choose the page/row and position.
 6. Choose **Add to Collection** or **Add to Arena**, matching your selected destination, or **Add to Wishlist** if you do not own it yet.
-7. Open Collection in the corresponding inventory and check the new entry. Physical additions are initially unassigned; moving them is a separate step.
+7. Open Collection in the corresponding inventory and check the new entry. If the selected container cannot accept the card, it is added to Unassigned Pile and the confirmation says so. Arena and Wishlist additions never use the selected container.
 
 **Expected result:** a saved entry for the chosen printing and destination, with the quantity and copy details you supplied.
+
+The add form shows **Already in Physical Collection** or **Already in Arena** for the exact selected printing (set, collector number, and language), summed across finishes and conditions. This is the recorded count, including missing or reserved copies—not checkout availability. Wishlist, Graveyard, other printings, and other accounts are excluded. The count refreshes when you open the form or change language; a failed lookup offers **Retry** instead of showing zero.
 
 Pressing **Enter** in the quick-add form submits to the selected Physical or Arena destination; use **Add to Wishlist** explicitly for planned purchases. Check the destination in the success message. While saving, the form blocks repeated submissions and dismissal. If saving fails, the error stays in the form and your quantity and copy details remain available for correction and retry.
 

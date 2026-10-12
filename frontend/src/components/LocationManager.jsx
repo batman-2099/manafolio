@@ -2781,7 +2781,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', padding: '0.25rem 0.4rem', flex: 1, minWidth: 0 }}
                   >
                     <option value="">{t('loc.fileSelectedTo')}</option>
-                    {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    {locations.slice().sort((a, b) => a.name.localeCompare(b.name)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
                   <button
                     type="button"

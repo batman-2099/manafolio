@@ -166,6 +166,56 @@ function CardSearch({ onAddSuccess, showToast }) {
   const addPending = useRef(false);
   const [adding, setAdding] = useState(false);
   const [quickAddError, setQuickAddError] = useState(null);
+  const [existingCopies, setExistingCopies] = useState(null);
+  const [countRefresh, setCountRefresh] = useState(0);
+  const [addLocation, setAddLocation] = useState('');
+  const [addLocations, setAddLocations] = useState(null);
+  const [locationsFailed, setLocationsFailed] = useState(false);
+  const [locationsRefresh, setLocationsRefresh] = useState(0);
+  useEffect(() => {
+    if (!isDrawerOpen || addToArena) return;
+    const controller = new AbortController();
+    setAddLocations(null);
+    setLocationsFailed(false);
+    fetch('/api/locations?inventory_type=collection', { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then(rows => {
+        if (!controller.signal.aborted) setAddLocations(rows.slice().sort((a, b) => a.name.localeCompare(b.name)));
+      })
+      .catch(() => { if (!controller.signal.aborted) setLocationsFailed(true); });
+    return () => controller.abort();
+  }, [isDrawerOpen, addToArena, locationsRefresh]);
+  const countScope = `${selectedCard?.id}:${addToArena ? 'arena' : 'collection'}`;
+  useEffect(() => {
+    if (!isDrawerOpen || !selectedCard?.id) {
+      setExistingCopies(null);
+      return;
+    }
+    const controller = new AbortController();
+    setExistingCopies(null);
+    const params = new URLSearchParams({
+      card_id: selectedCard.id,
+      list_type: addToArena ? 'arena' : 'collection',
+    });
+    fetch(`/api/collection?${params}`, { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then(rows => {
+        if (!controller.signal.aborted) setExistingCopies({
+          scope: countScope,
+          count: rows.reduce((total, row) => total + row.quantity, 0),
+        });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setExistingCopies({ scope: countScope, error: true });
+      });
+    return () => controller.abort();
+  }, [isDrawerOpen, selectedCard?.id, addToArena, countScope, countRefresh]);
   useEffect(() => () => {
     drawerGeneration.current++;
     printingRequest.current++;
@@ -552,6 +602,7 @@ function CardSearch({ onAddSuccess, showToast }) {
     addPending.current = false;
     setAdding(false);
     setQuickAddError(null);
+    setAddLocation('');
     setSelectedCard(card);
     setPurchasePrice(0); // Default to 0 purchase spend
     // The card itself knows which printing it is, so the copy is recorded in that
@@ -607,7 +658,7 @@ function CardSearch({ onAddSuccess, showToast }) {
           printing,
           language,
           purchase_price: parseFloat(purchasePrice) || 0,
-          location_id: null,
+          location_id: listType === 'collection' && addLocation ? Number(addLocation) : null,
           list_type: listType,
           grader,
           grade: grade === '' ? null : parseFloat(grade),
@@ -620,7 +671,14 @@ function CardSearch({ onAddSuccess, showToast }) {
       }
 
       if (response.ok) {
-        showToast(t(listType === 'wishlist' ? 'search.addedToWishlist' : listType === 'arena' ? 'search.addedToArena' : 'search.addedToCollection', { name: displayName(selectedCard) }), 'success');
+        const saved = await response.json();
+        if (listType === 'collection' && addLocation) {
+          showToast(saved.placement
+            ? t('search.addedToContainer', { name: displayName(selectedCard), location: saved.placement.label })
+            : t('search.addedUnassigned', { name: displayName(selectedCard) }), 'success');
+        } else {
+          showToast(t(listType === 'wishlist' ? 'search.addedToWishlist' : listType === 'arena' ? 'search.addedToArena' : 'search.addedToCollection', { name: displayName(selectedCard) }), 'success');
+        }
         
         // Trigger confetti for rare/valuable cards!
         const rarity = (selectedCard.rarity || '').toLowerCase();
@@ -1275,6 +1333,14 @@ function CardSearch({ onAddSuccess, showToast }) {
                   {!isEnglish(selectedCard.language) && setCode(selectedCard) ? ` / ${setCode(selectedCard)}` : ''}
                   {' • '}#{selectedCard.number})
                 </p>
+                <div role="status" aria-live="polite" style={{ marginTop: '0.5rem', fontSize: '1rem', color: 'var(--text-secondary)' }}>
+                  {localizing || existingCopies?.scope !== countScope ? t('common.loading') : existingCopies.error ? (
+                    <>
+                      {t('search.existingCountError')}{' '}
+                      <button type="button" className="btn btn-secondary" onClick={() => setCountRefresh(value => value + 1)}>{t('common.retry')}</button>
+                    </>
+                  ) : t(addToArena ? 'search.existingArenaCount' : 'search.existingPhysicalCount', { count: existingCopies.count })}
+                </div>
               </div>
               <button type="button" aria-label={t('common.close')} className="btn btn-secondary btn-icon-only" onClick={closeDrawer} disabled={adding} style={{ borderRadius: '50%', flexShrink: 0 }}>
                 <X size={18} />
@@ -1314,6 +1380,18 @@ function CardSearch({ onAddSuccess, showToast }) {
                 grader={grader} grade={grade} certNumber={certNumber}
                 onGrader={setGrader} onGrade={setGrade} onCertNumber={setCertNumber}
               />
+              {!addToArena && (
+                <div className="form-group">
+                  <label htmlFor="quick-add-container">{t('search.container')}</label>
+                  <select id="quick-add-container" className="select-control" value={addLocation} onChange={event => setAddLocation(event.target.value)} disabled={adding}>
+                    <option value="">{t('bulk.unassignedPile')}</option>
+                    {(addLocations || []).map(location => <option key={location.id} value={location.id}>{location.name}</option>)}
+                  </select>
+                  {!addLocations && <div role="status">
+                    {locationsFailed ? <>{t('search.containersError')}{' '}<button type="button" className="btn btn-secondary" onClick={() => setLocationsRefresh(value => value + 1)}>{t('common.retry')}</button></> : t('common.loading')}
+                  </div>}
+                </div>
+              )}
 
               {quickAddError && <p role="alert" style={{ color: 'var(--accent-red)', overflowWrap: 'anywhere' }}>{quickAddError}</p>}
               <div role="status" aria-live="polite">

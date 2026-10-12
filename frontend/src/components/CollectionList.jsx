@@ -313,8 +313,11 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
         groups[key].quantity += item.quantity;
       }
     });
-    return Object.values(groups);
-  }, [filteredCollection, stackCards, stackByCondition, stackByPrinting]);
+    const stacked = Object.values(groups);
+    // Quantity order must use the totals shown after stacking.
+    if (sortBy === 'qty-desc') stacked.sort((a, b) => b.quantity - a.quantity);
+    return stacked;
+  }, [filteredCollection, stackCards, stackByCondition, stackByPrinting, sortBy]);
 
   // In select mode, render the unstacked list so every entry is individually
   // selectable and bulk actions hit real entry_ids (stacking merges rows).

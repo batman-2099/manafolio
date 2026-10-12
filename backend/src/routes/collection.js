@@ -387,11 +387,19 @@ router.get('/collection', async (req, res) => {
   try {
     const listType = req.query.list_type || 'collection';
     if (!LIST_TYPES.includes(listType)) return res.status(400).json({ error: 'Invalid list_type' });
+    const cardId = req.query.card_id;
+    if (cardId !== undefined && (typeof cardId !== 'string' || !cardId.trim())) {
+      return res.status(400).json({ error: 'Invalid card_id' });
+    }
     const isTrade = req.query.is_trade;
     const compId = req.query.compartment_id;
 
     let filterSql = `WHERE c.user_id = ? AND c.list_type = ? AND cc.game = 'mtg'`;
     let filterParams = [req.user.id, listType];
+    if (cardId !== undefined) {
+      filterSql += ` AND c.card_id = ?`;
+      filterParams.push(cardId);
+    }
 
     if (isTrade !== undefined) {
       filterSql += ` AND c.is_trade = ?`;

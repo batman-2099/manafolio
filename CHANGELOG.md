@@ -2,6 +2,13 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Fixed Quantity (High-Low) sorting in Collection and public collection views to use displayed stack totals after combining duplicate entries, including when splitting by condition or printing.
+- Added a fresh exact-printing count to the Add Card to Collection dialog, scoped to Physical or Arena, with loading and retry states and updates when the selected language changes.
+- Sorted the Unassigned Pile's File selected to dropdown alphabetically by container name.
+- Added an alphabetical Container selector to the add-card dialog for Physical additions, defaulting to Unassigned Pile on every opening and reporting filing fallbacks without assigning Arena or Wishlist cards to storage.
+
 ## 2.3.3 — 2026-10-12
 
 - Placed Create Commander Deck and Archive to Graveyard side by side in the card inspector, including on phones.

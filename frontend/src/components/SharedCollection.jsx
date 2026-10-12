@@ -135,8 +135,11 @@ function SharedCollection({ shareToken }) {
         groups[key].quantity = (groups[key].quantity || 1) + (item.quantity || 1);
       }
     });
-    return Object.values(groups);
-  }, [filteredCollection, stackCards, stackByCondition, stackByPrinting]);
+    const stacked = Object.values(groups);
+    // Quantity order must use the totals shown after stacking.
+    if (sortBy === 'qty-desc') stacked.sort((a, b) => b.quantity - a.quantity);
+    return stacked;
+  }, [filteredCollection, stackCards, stackByCondition, stackByPrinting, sortBy]);
 
   const { owner, stats } = loadedData || {};
   const { summary, types = [], rarities = [], sets = [] } = stats || {};
