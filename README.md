@@ -60,8 +60,6 @@ The [how-to guide](docs/USER_GUIDE.md) covers these workflows in the app and on 
 
 ## Screenshots
 
-These screenshots use bundled **sample data**, not a personal collection. Names, quantities, prices, history, and deck records are illustrative; the demo does not save changes, and camera scanning requires a server installation.
-
 ### Dashboard
 
 An overview of your collection, its value, and inventory breakdowns.
@@ -84,7 +82,7 @@ Find cards through artwork-covered containers and their physical layouts.
 
 Organize decks and see which inventory supplies them.
 
-![Manafolio Deck Builder showing sample decks](docs/images/manafolio-decks.webp)
+![Manafolio Deck Builder showing decks](docs/images/manafolio-decks.webp)
 
 ### Trade workbench
 
@@ -94,7 +92,7 @@ Build both sides of an exchange, then adjust selected quantities before review. 
 
 ### Customize card back
 
-Preview a sleeve design, solid color, or custom image, then save it for your deck. This dialog uses a sample deck and shows an Ultra PRO Chocobo sleeve.
+Preview a sleeve design, solid color, or custom image, then save it for your deck. This dialog shows an Ultra PRO Chocobo sleeve.
 
 ![Manafolio Customize card back dialog showing an Ultra PRO Chocobo sleeve preview, image controls, and Save and Cancel buttons](docs/images/manafolio-card-back.webp)
 
