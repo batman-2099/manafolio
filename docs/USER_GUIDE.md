@@ -563,6 +563,8 @@ To add selected quantities to an existing deck without moving the cards, select 
 
 Automatic sorting can renumber positions and shift later cards, especially in a binder. Use Custom order for a fixed pocket layout. If you choose to re-sort after changing structured sorting, the **Re-sort: Move Guide** reflects positions already saved in the app: move each physical card to the displayed spot and choose **Next →**. Exiting that guide is not an undo of the re-sort.
 
+To apply the container card view's selected order physically, choose the order (for example, **Set** for sets A–Z, then card names A–Z) and use **More → Re-sort Container**. Confirming saves that order as the container's sorting rule and applies it to future filing too. Select **Storage order** before re-sorting to retain the existing saved rules. Changing sorting rules in Container Settings and accepting its re-sort prompt applies those settings instead of the view selection.
+
 ### Capacity, stacking, and locks
 
 - **Add Page** or **Add Compartment** expands a container. **Container Settings** also exposes its page/row count and capacity; a row/page has **Change capacity** controls.

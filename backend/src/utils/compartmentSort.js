@@ -177,6 +177,9 @@ function sortCards(cards, sortOrder, foilSorting) {
         case 'price':
           cmp = (a.price_trend || 0) - (b.price_trend || 0);
           break;
+        case 'set_name':
+          cmp = (a.set_name || '').localeCompare(b.set_name || '');
+          break;
         case 'set': {
           const setAIndex = setsCache.findIndex(s => s.name === a.set_name);
           const setBIndex = setsCache.findIndex(s => s.name === b.set_name);
@@ -511,6 +514,7 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
           'type': 'Type',
           'name': 'Name',
           'set': 'Set',
+          'set_name': 'Set Name',
           'price': 'Price',
           'rarity': 'Rarity',
           'number': 'Number',
@@ -646,6 +650,7 @@ function getSortCategory(card, sortOrder) {
   const primary = dividers.length > 0 ? dividers[0].by : criteria[0].by;
 
   if (primary === 'name') return card.name ? card.name.charAt(0).toUpperCase() : '?';
+  if (primary === 'set_name') return card.set_name || 'Unknown Set';
   if (primary === 'set') {
     if (!card.set_name) return 'Unknown Set';
     if (!setsCache || setsCache.length === 0) return card.set_name;

@@ -933,6 +933,28 @@ router.post('/locations/:id/resort', async (req, res) => {
     const location = await db.get(`SELECT * FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
     if (!location) throw Object.assign(new Error('Location not found'), { status: 404 });
     if (location.locked) throw Object.assign(new Error('Unlock this container before re-sorting'), { status: 409 });
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'sort_order')) {
+      const override = req.body.sort_order;
+      const allowed = [
+        [['name', 'asc'], ['number', 'asc']],
+        [['name', 'desc']],
+        [['price', 'desc']],
+        [['price', 'asc']],
+        [['set_name', 'asc'], ['name', 'asc']],
+        [['type', 'asc'], ['name', 'asc']],
+        [['rarity', 'desc'], ['name', 'asc']],
+      ];
+      const valid = Array.isArray(override) && allowed.some(scheme =>
+        scheme.length === override.length && scheme.every(([by, dir], index) => {
+          const criterion = override[index];
+          return criterion && Object.keys(criterion).length === 2 &&
+            criterion.by === by && criterion.dir === dir;
+        })
+      );
+      if (!valid) throw Object.assign(new Error('Invalid container sort_order'), { status: 400 });
+      location.sort_order = JSON.stringify(override);
+      await db.run('UPDATE locations SET sort_order = ? WHERE id = ? AND user_id = ?', [location.sort_order, id, req.user.id]);
+    }
 
     const cards = await db.all(`
       SELECT c.id as entry_id, c.card_id, c.printing, c.language, c.quantity, c.favorite, c.is_trade, c.list_type,

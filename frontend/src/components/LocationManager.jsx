@@ -47,7 +47,7 @@ const CONTAINER_LIST_SORTS = {
   'name-desc': [{ by: 'name', dir: 'desc' }],
   'price-desc': [{ by: 'price', dir: 'desc' }],
   'price-asc': [{ by: 'price', dir: 'asc' }],
-  'set-asc': [{ by: 'set', dir: 'asc' }, { by: 'name', dir: 'asc' }],
+  'set-asc': [{ by: 'set_name', dir: 'asc' }, { by: 'name', dir: 'asc' }],
   'type-asc': [{ by: 'type', dir: 'asc' }, { by: 'name', dir: 'asc' }],
   'rarity-desc': [{ by: 'rarity', dir: 'desc' }, { by: 'name', dir: 'asc' }]
 };
@@ -1352,11 +1352,15 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     } catch (err) { console.error(err); showToast(t('loc.errFileCardGeneric'), 'error'); }
   };
 
-  const startResort = async (skipConfirm = false) => {
+  const startResort = async (skipConfirm = false, useViewOrder = false) => {
     if (!selectedLoc) return;
-    if (!skipConfirm && !window.confirm(t('loc.confirmResort', { name: selectedLoc.name }))) return;
+    const sortOrder = useViewOrder ? CONTAINER_LIST_SORTS[containerSortBy] : undefined;
+    if (!skipConfirm && !window.confirm(t(sortOrder ? 'loc.confirmResortView' : 'loc.confirmResort', { name: selectedLoc.name }))) return;
     try {
-      const res = await fetch(`/api/locations/${selectedLoc.id}/resort`, { method: 'POST' });
+      const res = await fetch(`/api/locations/${selectedLoc.id}/resort`, {
+        method: 'POST',
+        ...(sortOrder && { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: sortOrder }) })
+      });
       if (res.ok) {
         const data = await res.json();
         await refreshAll();
@@ -2171,7 +2175,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   >
                     <Trash2 size={14} /> {t(isBinderType ? 'loc.removeLastPage' : 'loc.removeLastCompartment')}
                   </button>
-                  <button className="kebab-item" onClick={() => { setShowKebabMenu(false); startResort(); }} disabled={!!selectedLoc.locked || (selectedLoc.total_cards || 0) === 0}>
+                  <button className="kebab-item" onClick={() => { setShowKebabMenu(false); startResort(false, true); }} disabled={!!selectedLoc.locked || (selectedLoc.total_cards || 0) === 0}>
                     <RefreshCw size={14} /> Re-sort Container
                   </button>
                   <button className="kebab-item" onClick={() => { setShowKebabMenu(false); handleToggleContainerLock(); }} title={t('loc.lockKebabHint')}>

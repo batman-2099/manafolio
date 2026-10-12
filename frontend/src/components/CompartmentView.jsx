@@ -51,6 +51,8 @@ function categoryForField(card, field, setsList = []) {
   switch (field) {
     case 'name':
       return card.name ? card.name.charAt(0).toUpperCase() : '?';
+    case 'set_name':
+      return card.set_name || 'Unknown Set';
     case 'set': {
       if (!card.set_name) return 'Unknown Set';
       if (!setsList || setsList.length === 0) return card.set_name;

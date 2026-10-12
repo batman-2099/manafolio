@@ -37,7 +37,7 @@ function SortableItem({ id, children }) {
 // per key ("sort.by.price", "sort.dir.price.asc"), because what a direction
 // actually does differs per field and nobody should be guessing what "Asc" means
 // — cheapest-first, A-Z and common-first are all "ascending".
-const SORT_KEYS = ['favorite', 'name', 'price', 'set', 'number', 'printing', 'type', 'color', 'cmc', 'rarity', 'language', 'added_at', 'entry_id'];
+const SORT_KEYS = ['favorite', 'name', 'price', 'set', 'set_name', 'number', 'printing', 'type', 'color', 'cmc', 'rarity', 'language', 'added_at', 'entry_id'];
 
 export function SortBuilder({ value, onChange }) {
   const { t } = useT();

@@ -53,6 +53,7 @@ function startApp(userId) {
   app.use(express.json());
   app.use((req, res, next) => { req.user = { id: userId, role: 'admin' }; next(); });
   app.use('/api', require('../src/routes/storage'));
+  app.use('/api', require('../src/routes/collection'));
   return new Promise(resolve => {
     server = http.createServer(app).listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}`));
   });
@@ -197,7 +198,11 @@ async function main() {
   await db.run(`CREATE TRIGGER reject_refiling BEFORE UPDATE OF compartment_id ON collection
     WHEN NEW.location_id = ${loc.lastID} AND NEW.compartment_id IS NOT NULL
     BEGIN SELECT RAISE(ABORT, 'injected resort failure'); END`);
-  assert.strictEqual((await save(`/locations/${loc.lastID}/resort`, 'POST', {})).status, 500);
+  assert.strictEqual((await save(`/locations/${loc.lastID}/resort`, 'POST', {
+    sort_order: [{ by: 'set_name', dir: 'asc' }, { by: 'name', dir: 'asc' }],
+  })).status, 500);
+  assert.strictEqual((await db.get('SELECT sort_order FROM locations WHERE id = ?', [loc.lastID])).sort_order, 'custom',
+    'failed re-filing must roll back the sort override as well as positions');
   assert.deepStrictEqual(await db.all('SELECT * FROM collection WHERE location_id = ? ORDER BY id', [loc.lastID]), beforeResort);
   await db.run('DROP TRIGGER reject_refiling');
 
@@ -214,6 +219,78 @@ async function main() {
   })).status, 500);
   assert.strictEqual(await db.get("SELECT id FROM locations WHERE name = 'Atomic compartments'"), undefined);
   await db.run('DROP TRIGGER reject_second_compartment');
+
+  const { loadSetsCache, sortCards, getSortCategory } = require('../src/utils/compartmentSort');
+  await db.run(`INSERT INTO sets (id, name, release_date) VALUES
+    ('resort-z', 'Zebra Set', '2000-01-01'), ('resort-a', 'Alpha Set', '2020-01-01')`);
+  await loadSetsCache(db);
+  const alphabetical = [{ by: 'set_name', dir: 'asc' }, { by: 'name', dir: 'asc' }];
+  const sortedBox = await db.run(
+    `INSERT INTO locations (name, type, sort_order, user_id) VALUES ('Resort box', 'Box', 'set-number', ?)`, [userId]
+  );
+  const sortedId = sortedBox.lastID;
+  const firstRow = await db.run('INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 3)', [sortedId]);
+  const secondRow = await db.run('INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 2, 3)', [sortedId]);
+  const fixtures = [
+    ['za', 'Alpha', 'Zebra Set', '99'],
+    ['zz', 'Zebra', 'Zebra Set', '1'],
+    ['aa', 'Alpha', 'Alpha Set', '99'],
+    ['az', 'Zebra', 'Alpha Set', '1'],
+    ['zm', 'Middle', 'Zebra Set', '50'],
+  ];
+  for (const [key, name, setName, number] of fixtures) {
+    await db.run(`INSERT INTO card_cache (id, name, set_name, number, game, types)
+      VALUES (?, ?, ?, ?, 'mtg', '[]')`, [`resort-${key}`, name, setName, number]);
+    if (key !== 'zm') {
+      await db.run(`INSERT INTO collection (card_id, quantity, printing, language, location_id, compartment_id, position, user_id)
+        VALUES (?, 1, 'Normal', 'English', ?, ?, ?, ?)`,
+      [`resort-${key}`, sortedId, key[0] === 'z' ? firstRow.lastID : secondRow.lastID, key[1] === 'a' ? 1000 : 2000, userId]);
+    }
+  }
+  const layout = () => db.all(`SELECT c.card_id, cp.idx, c.position FROM collection c
+    JOIN compartments cp ON cp.id = c.compartment_id WHERE c.location_id = ? ORDER BY cp.idx, c.position, c.id`, [sortedId]);
+  const scheme = async () => (await db.get('SELECT sort_order FROM locations WHERE id = ?', [sortedId])).sort_order;
+  assert.strictEqual((await save(`/locations/${sortedId}/resort`, 'POST', { sort_order: alphabetical })).status, 200);
+  assert.deepStrictEqual(await layout(), [
+    { card_id: 'resort-aa', idx: 1, position: 1000 },
+    { card_id: 'resort-az', idx: 1, position: 2000 },
+    { card_id: 'resort-za', idx: 1, position: 3000 },
+    { card_id: 'resort-zz', idx: 2, position: 1000 },
+  ], 'persisted positions must use lexical sets then card names, not release dates or collector numbers');
+  assert.deepStrictEqual(JSON.parse(await scheme()), alphabetical);
+  assert.strictEqual(getSortCategory({ set_name: 'Alpha Set' }, alphabetical), 'Alpha Set');
+  assert.strictEqual(getSortCategory({}, alphabetical), 'Unknown Set');
+  const setCards = fixtures.map(([, name, set_name, number]) => ({ name, set_name, number }));
+  assert.strictEqual(sortCards(setCards, [{ by: 'set', dir: 'asc' }])[0].set_name, 'Zebra Set',
+    'the existing set criterion must retain release chronology');
+
+  assert.strictEqual((await save('/collection', 'POST', { card_id: 'resort-zm', location_id: sortedId })).status, 200);
+  const filedLayout = await layout();
+  assert.deepStrictEqual(filedLayout.slice(3), [
+    { card_id: 'resort-zm', idx: 2, position: 1000 },
+    { card_id: 'resort-zz', idx: 2, position: 2000 },
+  ], 'subsequent filing must use the persisted alphabetical scheme and leave distinct positions');
+  assert.strictEqual(filedLayout.length, 5);
+  assert.strictEqual((await fetch(`${base}/api/locations/${sortedId}/resort`, { method: 'POST' })).status, 200);
+  assert.deepStrictEqual(await layout(), filedLayout, 'no-body resort must reuse saved rules');
+  assert.deepStrictEqual(JSON.parse(await scheme()), alphabetical);
+
+  for (const invalid of [null, 'name-asc', [], {}, [{ by: 'set', dir: 'asc' }],
+    [{ by: 'name', dir: 'sideways' }], [...alphabetical].reverse(),
+    [{ by: 'name', dir: 'desc', divider: true }]]) {
+    assert.strictEqual((await save(`/locations/${sortedId}/resort`, 'POST', { sort_order: invalid })).status, 400);
+    assert.deepStrictEqual(await layout(), filedLayout);
+    assert.deepStrictEqual(JSON.parse(await scheme()), alphabetical);
+  }
+  await db.run('UPDATE locations SET locked = 1 WHERE id = ?', [sortedId]);
+  const descending = [{ by: 'name', dir: 'desc' }];
+  assert.strictEqual((await save(`/locations/${sortedId}/resort`, 'POST', { sort_order: descending })).status, 409);
+  assert.deepStrictEqual(await layout(), filedLayout);
+  assert.deepStrictEqual(JSON.parse(await scheme()), alphabetical);
+  const foreignBefore = await db.get('SELECT * FROM locations WHERE id = ?', [otherLocation.lastID]);
+  assert.strictEqual((await save(`/locations/${otherLocation.lastID}/resort`, 'POST', { sort_order: descending })).status, 404);
+  assert.deepStrictEqual(await db.get('SELECT * FROM locations WHERE id = ?', [otherLocation.lastID]), foreignBefore);
+  console.log('PASS: resort persists alphabetical rules atomically and subsequent filing preserves physical order');
 }
 
 main()

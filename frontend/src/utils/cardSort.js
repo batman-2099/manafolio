@@ -100,6 +100,9 @@ export function sortCardsByOrder(cards, sortOrder, foilSorting, setsList = []) {
         case 'price':
           cmp = (a.price_trend || 0) - (b.price_trend || 0);
           break;
+        case 'set_name':
+          cmp = (a.set_name || '').localeCompare(b.set_name || '');
+          break;
         case 'set': {
           // Set identity only. Ties (same set) fall through to the next
           // criterion so schemes like Set > Color > CMC aren't pre-empted by

@@ -30,3 +30,28 @@ test('filing color order groups multicolor identities after mono-green', async (
     await server.close();
   }
 });
+
+test('alphabetical set filing differs from chronological collection sorting', async () => {
+  const server = await createServer({
+    root: fileURLToPath(new URL('../../', import.meta.url)),
+    configFile: false,
+    server: { middlewareMode: true, ws: false },
+    appType: 'custom',
+    logLevel: 'error',
+  });
+  try {
+    const { sortCardsByOrder } = await server.ssrLoadModule('/src/utils/cardSort.js');
+    const sets = [{ name: 'Zeta' }, { name: 'Alpha' }];
+    const cards = [
+      { name: 'Zebra', set_name: 'Alpha', number: '1' },
+      { name: 'Apple', set_name: 'Alpha', number: '99' },
+      { name: 'Birch', set_name: 'Zeta', number: '1' },
+    ];
+    assert.deepEqual(sortCardsByOrder([...cards], [{ by: 'set_name' }, { by: 'name' }], undefined, sets).map(card => card.name),
+      ['Apple', 'Zebra', 'Birch']);
+    assert.deepEqual(sortCardsByOrder([...cards], [{ by: 'set' }, { by: 'number' }], undefined, sets).map(card => card.name),
+      ['Birch', 'Zebra', 'Apple']);
+  } finally {
+    await server.close();
+  }
+});
