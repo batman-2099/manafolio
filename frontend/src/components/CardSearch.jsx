@@ -168,12 +168,13 @@ function CardSearch({ onAddSuccess, showToast }) {
   const [quickAddError, setQuickAddError] = useState(null);
   const [existingCopies, setExistingCopies] = useState(null);
   const [countRefresh, setCountRefresh] = useState(0);
+  const [defaultAddLocation, setDefaultAddLocation] = useState('');
   const [addLocation, setAddLocation] = useState('');
   const [addLocations, setAddLocations] = useState(null);
   const [locationsFailed, setLocationsFailed] = useState(false);
   const [locationsRefresh, setLocationsRefresh] = useState(0);
   useEffect(() => {
-    if (!isDrawerOpen || addToArena) return;
+    if (addToArena) return;
     const controller = new AbortController();
     setAddLocations(null);
     setLocationsFailed(false);
@@ -602,7 +603,7 @@ function CardSearch({ onAddSuccess, showToast }) {
     addPending.current = false;
     setAdding(false);
     setQuickAddError(null);
-    setAddLocation('');
+    setAddLocation(defaultAddLocation);
     setSelectedCard(card);
     setPurchasePrice(0); // Default to 0 purchase spend
     // The card itself knows which printing it is, so the copy is recorded in that
@@ -997,6 +998,19 @@ function CardSearch({ onAddSuccess, showToast }) {
           </select>
           <p id="search-destination-hint">{t('search.destinationHint')}</p>
         </div>
+        {!addToArena && (
+          <div className="search-destination">
+            <label className="control-label" htmlFor="search-default-container">{t('search.defaultContainer')}</label>
+            <select id="search-default-container" className="select-control" value={defaultAddLocation} onChange={event => setDefaultAddLocation(event.target.value)}>
+              <option value="">{t('bulk.unassignedPile')}</option>
+              {(addLocations || []).map(location => <option key={location.id} value={location.id}>{location.name}</option>)}
+            </select>
+            <p>{t('search.defaultContainerHint')}</p>
+            {!addLocations && <div role="status">
+              {locationsFailed ? <>{t('search.containersError')}{' '}<button type="button" className="btn btn-secondary" onClick={() => setLocationsRefresh(value => value + 1)}>{t('common.retry')}</button></> : t('common.loading')}
+            </div>}
+          </div>
+        )}
         <section className="search-import-actions" aria-labelledby="search-import-title">
           <h3 id="search-import-title" className="section-heading">{t('search.importTitle')}</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
