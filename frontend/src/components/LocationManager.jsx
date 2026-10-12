@@ -1572,6 +1572,93 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         </div>
         </Modal>
       );
+  const filingGuide = filingMode && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', height: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong style={{ fontSize: 'max(0.85rem, var(--unsorted-text-min, 0rem))' }}>{t(filingReadOnly ? 'loc.refileGuide' : 'loc.filingMode')}</strong>
+              <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => { setFilingMode(false); setFilingReadOnly(false); refreshAll(); }} style={{ padding: '0.2rem 0.5rem', width: 'auto', fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))' }}>
+                {t(filingReadOnly ? 'bulk.done' : 'common.cancel')}
+              </button>
+            </div>
+            {filingReadOnly && (
+              <div style={{ textAlign: 'center', fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)' }}>
+                {t('loc.resortGuideHint')}
+              </div>
+            )}
+            
+            <div style={{ textAlign: 'center', fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-muted)' }}>
+              {t('loc.filingCardProgress', { current: filingIndex + 1, total: filingQueue.length })}
+            </div>
+            
+            {filingQueue[filingIndex] && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem' }}>
+                <CardImage card={filingQueue[filingIndex].entry} style={{ width: 'min(120px, 26vh)', borderRadius: '5px', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }} />
+                
+                <div style={{ textAlign: 'center' }}>
+                  <strong style={{ fontSize: '1rem', display: 'block' }}>{displayName(filingQueue[filingIndex].entry)}</strong>
+                  <span style={{ fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)' }}>{filingQueue[filingIndex].entry.set_name} • {filingQueue[filingIndex].entry.printing}</span>
+                </div>
+                
+                {(() => {
+                  const rec = filingQueue[filingIndex].recommended;
+                  if (!rec) {
+                    return (
+                      <div style={{ background: 'rgba(255, 71, 71, 0.15)', border: '1px solid #ff4747', borderRadius: 'var(--radius-sm)', padding: '0.75rem', width: '100%', textAlign: 'center' }}>
+                        <strong style={{ fontSize: 'max(0.9rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-strong)' }}>
+                          {t('loc.noEligibleCompartment')}
+                        </strong>
+                        <div style={{ fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                          {t('loc.skipRejected')}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div 
+                      style={{ background: 'rgba(255, 193, 7, 0.15)', border: '1px solid #ffc107', borderRadius: 'var(--radius-sm)', padding: '0.75rem', width: '100%', textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 193, 7, 0.25)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 193, 7, 0.15)'; }}
+                      onClick={() => locateRecommendedSpot(rec)}
+                      title={t('loc.snapToSlot')}
+                    >
+                      <div style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', color: '#ffc107', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold', marginBottom: '0.25rem' }}>{t('loc.clickToLocate')}</div>
+                      <strong style={{ fontSize: 'max(0.9rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-strong)', display: 'block' }}>{rec.label}</strong>
+                      <strong style={{ fontSize: '1.2rem', color: '#ffc107', display: 'block', marginTop: '0.25rem' }}>{t('loc.slotNumber', { n: Math.floor(rec.position / 1000) })}</strong>
+                      {rec.after ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '0.4rem' }}>
+                          <CardImage card={rec.after} style={{ width: '26px', borderRadius: '3px' }} />
+                          <span style={{ fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)' }}>{t('loc.fileAfter')} <strong style={{ color: 'var(--text-strong)' }}>{displayName(rec.after)}</strong></span>
+                        </div>
+                      ) : rec.before ? (
+                        <div style={{ fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>{t('loc.fileBefore')} <strong style={{ color: 'var(--text-strong)' }}>{displayName(rec.before)}</strong></div>
+                      ) : (
+                        <div style={{ fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>{t('loc.firstInSection')}</div>
+                      )}
+                    </div>
+                  );
+                })()}
+                
+                <div style={{ display: 'flex', gap: '0.5rem', width: '100%', marginTop: '0.5rem' }}>
+                  <button type="button" className="btn btn-secondary" onClick={advanceFiling} style={{ flex: 1, padding: '0.6rem' }}>
+                    {t('loc.skip')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={!filingQueue[filingIndex].recommended}
+                    onClick={() => {
+                      const rec = filingQueue[filingIndex].recommended;
+                      handleFilingPlaced(filingQueue[filingIndex].entry.entry_id, rec.location_id, rec.compartment_id, rec.position);
+                    }}
+                    style={{ flex: 2, padding: '0.6rem', fontSize: 'max(0.9rem, var(--unsorted-text-min, 0rem))', fontWeight: 'bold' }}
+                  >
+                    {filingReadOnly ? t('loc.next') : t('loc.placed')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+  );
   if (showGallery) return (
     <section>
       <header className="page-heading" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
@@ -2272,6 +2359,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           <p style={{ color: 'var(--text-secondary)' }}>{t('loc.selectPrompt')}</p>
         ) : (
           <>
+            {filingMode && filingReadOnly && <section className="view-section">{filingGuide}</section>}
             {!!selectedLoc.locked && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'rgba(255,193,7,0.12)', border: '1px solid var(--accent-yellow)', padding: '0.55rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
                 <Lock size={16} color="var(--accent-yellow)" style={{ flexShrink: 0 }} />
@@ -2638,93 +2726,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       </div>
 
       {/* Unsorted queue */}
-      <div className="view-section location-unsorted-col" style={{ minWidth: 0, display: isStacked && filingMode ? 'none' : 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div className="view-section location-unsorted-col" style={{ minWidth: 0, display: filingReadOnly || (isStacked && filingMode) ? 'none' : 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         {filingMode ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', height: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong style={{ fontSize: 'max(0.85rem, var(--unsorted-text-min, 0rem))' }}>{t(filingReadOnly ? 'loc.refileGuide' : 'loc.filingMode')}</strong>
-              <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => { setFilingMode(false); setFilingReadOnly(false); refreshAll(); }} style={{ padding: '0.2rem 0.5rem', width: 'auto', fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))' }}>
-                {t(filingReadOnly ? 'bulk.done' : 'common.cancel')}
-              </button>
-            </div>
-            {filingReadOnly && (
-              <div style={{ textAlign: 'center', fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)' }}>
-                {t('loc.resortGuideHint')}
-              </div>
-            )}
-            
-            <div style={{ textAlign: 'center', fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-muted)' }}>
-              {t('loc.filingCardProgress', { current: filingIndex + 1, total: filingQueue.length })}
-            </div>
-            
-            {filingQueue[filingIndex] && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem' }}>
-                <CardImage card={filingQueue[filingIndex].entry} style={{ width: 'min(120px, 26vh)', borderRadius: '5px', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }} />
-                
-                <div style={{ textAlign: 'center' }}>
-                  <strong style={{ fontSize: '1rem', display: 'block' }}>{displayName(filingQueue[filingIndex].entry)}</strong>
-                  <span style={{ fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)' }}>{filingQueue[filingIndex].entry.set_name} • {filingQueue[filingIndex].entry.printing}</span>
-                </div>
-                
-                {(() => {
-                  const rec = filingQueue[filingIndex].recommended;
-                  if (!rec) {
-                    return (
-                      <div style={{ background: 'rgba(255, 71, 71, 0.15)', border: '1px solid #ff4747', borderRadius: 'var(--radius-sm)', padding: '0.75rem', width: '100%', textAlign: 'center' }}>
-                        <strong style={{ fontSize: 'max(0.9rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-strong)' }}>
-                          {t('loc.noEligibleCompartment')}
-                        </strong>
-                        <div style={{ fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                          {t('loc.skipRejected')}
-                        </div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div 
-                      style={{ background: 'rgba(255, 193, 7, 0.15)', border: '1px solid #ffc107', borderRadius: 'var(--radius-sm)', padding: '0.75rem', width: '100%', textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 193, 7, 0.25)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 193, 7, 0.15)'; }}
-                      onClick={() => locateRecommendedSpot(rec)}
-                      title={t('loc.snapToSlot')}
-                    >
-                      <div style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', color: '#ffc107', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold', marginBottom: '0.25rem' }}>{t('loc.clickToLocate')}</div>
-                      <strong style={{ fontSize: 'max(0.9rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-strong)', display: 'block' }}>{rec.label}</strong>
-                      <strong style={{ fontSize: '1.2rem', color: '#ffc107', display: 'block', marginTop: '0.25rem' }}>{t('loc.slotNumber', { n: Math.floor(rec.position / 1000) })}</strong>
-                      {rec.after ? (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '0.4rem' }}>
-                          <CardImage card={rec.after} style={{ width: '26px', borderRadius: '3px' }} />
-                          <span style={{ fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)' }}>{t('loc.fileAfter')} <strong style={{ color: 'var(--text-strong)' }}>{displayName(rec.after)}</strong></span>
-                        </div>
-                      ) : rec.before ? (
-                        <div style={{ fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>{t('loc.fileBefore')} <strong style={{ color: 'var(--text-strong)' }}>{displayName(rec.before)}</strong></div>
-                      ) : (
-                        <div style={{ fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>{t('loc.firstInSection')}</div>
-                      )}
-                    </div>
-                  );
-                })()}
-                
-                <div style={{ display: 'flex', gap: '0.5rem', width: '100%', marginTop: '0.5rem' }}>
-                  <button type="button" className="btn btn-secondary" onClick={advanceFiling} style={{ flex: 1, padding: '0.6rem' }}>
-                    {t('loc.skip')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={!filingQueue[filingIndex].recommended}
-                    onClick={() => {
-                      const rec = filingQueue[filingIndex].recommended;
-                      handleFilingPlaced(filingQueue[filingIndex].entry.entry_id, rec.location_id, rec.compartment_id, rec.position);
-                    }}
-                    style={{ flex: 2, padding: '0.6rem', fontSize: 'max(0.9rem, var(--unsorted-text-min, 0rem))', fontWeight: 'bold' }}
-                  >
-                    {filingReadOnly ? t('loc.next') : t('loc.placed')}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          !filingReadOnly && filingGuide
         ) : (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3066,7 +3070,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           shows what to file, where, and which physical card it goes behind, and
           carries Locate / Placed / Skip. Replaces the full desktop guide so the
           container and the guide share one screen. */}
-      {isStacked && filingMode && filingQueue[filingIndex] && (
+      {isStacked && filingMode && !filingReadOnly && filingQueue[filingIndex] && (
         <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))', zIndex: 90, padding: '0 0.6rem' }}>
           <div className="glass-panel" style={{ padding: '0.7rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'var(--bg-secondary)', boxShadow: '0 -6px 20px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
