@@ -40,7 +40,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
   const backButtonRef = useRef(null);
   const wasPriceCheckOpen = useRef(false);
   const gameFilter = defaultGameFilter();
-  const [inventoryFilter, setInventoryFilter] = useState('all');
+  const [inventoryFilter, setInventoryFilter] = useState('collection');
   const isArchive = inventoryFilter === 'graveyard';
   const valueColor = isArchive ? '#8b5cf6' : 'var(--accent-green)';
   
@@ -116,7 +116,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
       </header>
       <div className="view-toolbar">
       <div className="sub-nav-tabs dashboard-filters" style={{ margin: 0 }}>
-        {[['all', t('dash.allCards')], ['collection', t('dash.physical')], ['arena', t('dash.arena')], ['graveyard', t('collection.graveyard')]].map(([value, label]) => (
+        {[['collection', t('dash.physical')], ['arena', t('dash.arena')], ['graveyard', t('collection.graveyard')], ['all', t('dash.allCards')]].map(([value, label]) => (
           <button key={value} type="button" className={`sub-nav-tab ${inventoryFilter === value ? 'active' : ''}`}
             aria-pressed={inventoryFilter === value}
             onClick={() => setInventoryFilter(value)}>
