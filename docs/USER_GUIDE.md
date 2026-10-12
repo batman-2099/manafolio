@@ -159,7 +159,7 @@ Rapid add is useful when you have a pile from one known set and do not want to r
 
 ### Import a collection file
 
-Use this workflow when you want to **add inventory**. It is different from **Storage → Import ManaBox container**, which moves copies you already own.
+Use this workflow when you want to **add inventory**. It is different from **Storage → Create Container → Import ManaBox container**, which moves copies you already own.
 
 #### Step by step: move your ManaBox collection into Manafolio
 
@@ -581,7 +581,7 @@ Deleting a container is not the same as deleting its cards: **Delete Container**
 
 This workflow is for **moving cards already in physical Collection**. It does not add missing copies.
 
-1. In physical **Storage**, choose **Import ManaBox container** and select a ManaBox `.txt` export.
+1. In physical **Storage**, choose **Create Container**, then **Import ManaBox container**, and select a ManaBox `.txt` export.
 2. The app creates a box named after the file and tries to move matching, already-owned copies from Unsorted into its first row.
 3. Read **Container import review**. Expand **Show full summary** to compare **Requested**, **Moved**, **Not moved**, and **Other locations / inventory**.
 4. For remaining quantities, review the available locations and choose **Move** where offered. This can bring eligible copies from other unlocked containers or Unsorted.

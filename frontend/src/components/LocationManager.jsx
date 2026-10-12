@@ -821,10 +821,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       const data = await response.json();
       if (Array.isArray(data.items)) {
         setContainerImportExpanded(false);
+        setShowCreate(false);
         setContainerImportReport(data);
       }
       if (!response.ok) throw new Error(data.error || t('loc.errCreate'));
       showToast(data.message, 'success');
+      setShowCreate(false);
       setActiveLocationId(data.id);
       await refreshAll();
       onUpdate();
@@ -1479,6 +1481,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     expanded={containerImportExpanded}
     onExpandedChange={setContainerImportExpanded}
   />;
+  const containerImportControls = !isArchive && <>
+    <button type="button" className="btn btn-secondary" disabled={importingContainer} aria-busy={importingContainer} onClick={() => containerImportInput.current?.click()}><Download size={16} aria-hidden="true" /> {t(importingContainer ? 'loc.importingContainer' : 'loc.importContainer')}</button>
+    <input ref={containerImportInput} type="file" accept=".txt,text/plain" disabled={importingContainer} onChange={handleContainerImportFile} style={{ display: 'none' }} />
+  </>;
 
   const locationsFeedback = locationsError ? (
     <div className={`read-state read-state-error${locationsReady ? '' : ' read-state-initial'}`}>
@@ -1586,6 +1592,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         {[['all', t('storageUnit.all')], ['none', t('storageUnit.none')], ['units', t('storageUnit.title')]].map(([value, label]) => <button key={value} ref={value === 'none' ? ungroupedButton : undefined} type="button" className={`btn ${unitFilter === value ? 'btn-primary' : 'btn-secondary'}`} aria-current={unitFilter === value ? 'page' : undefined} onClick={() => { setUnitFilter(value); setGallerySearch(''); }}>{label}</button>)}
         {selectedUnit && <strong style={{ overflowWrap: 'anywhere' }}>{selectedUnit.name}</strong>}
         </div>
+        <button type="button" className="btn btn-secondary" onClick={() => { setActiveLocationId(null); setShowGallery(false); }}>{t('bulk.unassignedPile')}</button>
       </nav>
       {unitsFeedback}
       {unitFilter === 'units' && !unitsLoading && !unitsError && <>
@@ -1670,14 +1677,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         ))}
       </div>
       </>}
-      <footer style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.5rem' }}>
-        <button className="btn btn-secondary" onClick={() => setShowGallery(false)}>{t('bulk.unassignedPile')}</button>
-        {!isArchive && <>
-        <button type="button" className="btn btn-secondary" disabled={importingContainer} aria-busy={importingContainer} onClick={() => containerImportInput.current?.click()}><Download size={16} /> {t(importingContainer ? 'loc.importingContainer' : 'loc.importContainer')}</button>
-        <input ref={containerImportInput} type="file" accept=".txt,text/plain" disabled={importingContainer} onChange={handleContainerImportFile} style={{ display: 'none' }} />
-        </>}
-      </footer>
-      {showCreate && <CreateContainerModal onClose={() => setShowCreate(false)} onCreate={handleCreateLocation} setsList={setsList} filterFieldOptions={filterFieldOptions} storageUnits={storageUnits} initialStorageUnitId={selectedUnit?.id ?? null} storageUnitsLoading={unitsLoading} storageUnitsError={unitsError} onRetryStorageUnits={fetchStorageUnits} />}
+      {showCreate && <CreateContainerModal onClose={() => setShowCreate(false)} onCreate={handleCreateLocation} setsList={setsList} filterFieldOptions={filterFieldOptions} storageUnits={storageUnits} initialStorageUnitId={selectedUnit?.id ?? null} storageUnitsLoading={unitsLoading} storageUnitsError={unitsError} onRetryStorageUnits={fetchStorageUnits}>{containerImportControls}</CreateContainerModal>}
       {unitDialog}
       {coverDialog}
       {importReview}
@@ -1756,7 +1756,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           storageUnitsLoading={unitsLoading}
           storageUnitsError={unitsError}
           onRetryStorageUnits={fetchStorageUnits}
-        />
+        >{containerImportControls}</CreateContainerModal>
       )}
 
       {rulesComp && (
@@ -1951,7 +1951,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 </span>
               </div>
             )}
-            {!isArchive && <input ref={containerImportInput} type="file" accept=".txt,text/plain" disabled={importingContainer} onChange={handleContainerImportFile} style={{ display: 'none' }} />}
             {selectedLoc && !!selectedLoc.locked && (
               <button type="button" onClick={handleToggleContainerLock} title={t('loc.lockedBadgeHint')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.62rem', fontWeight: 800, padding: '0.15rem 0.45rem', borderRadius: '999px', cursor: 'pointer', background: 'rgba(255,193,7,0.15)', border: '1px solid var(--accent-yellow)', color: 'var(--accent-yellow)' }}>
                 <Lock size={11} /> Locked
@@ -2104,9 +2103,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   <button type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setShowCreate(true); }}>
                     <Plus size={14} aria-hidden="true" /> {t('loc.createContainer')}
                   </button>
-                  {!isArchive && <button type="button" className="kebab-item" disabled={importingContainer} aria-busy={importingContainer} onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); containerImportInput.current?.click(); }}>
-                    <Download size={14} aria-hidden="true" /> {t(importingContainer ? 'loc.importingContainer' : 'loc.importContainer')}
-                  </button>}
                   {selectedLoc && <>
                   <button type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setStocktakeLocation(selectedLoc); }}>
                     <Check size={14} aria-hidden="true" /> {t('stocktake.title')}

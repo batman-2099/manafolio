@@ -32,7 +32,7 @@ const compartmentKind = (type) => (isBinderType(type) ? 'page' : 'row');
 
 const STEPS = ['type', 'layout', 'sort', 'filing'];
 
-export default function CreateContainerModal({ onClose, onCreate, setsList = [], filterFieldOptions = {}, storageUnits = [], initialStorageUnitId = null, storageUnitsLoading = false, storageUnitsError = false, onRetryStorageUnits }) {
+export default function CreateContainerModal({ onClose, onCreate, setsList = [], filterFieldOptions = {}, storageUnits = [], initialStorageUnitId = null, storageUnitsLoading = false, storageUnitsError = false, onRetryStorageUnits, children }) {
   const { t } = useT();
   const [step, setStep] = useState(0);
   const [type, setType] = useState('Binder');
@@ -85,6 +85,7 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
           <h3 id="create-container-title" style={{ margin: 0 }}>{t('container.newTitle')}</h3>
           <button className="btn btn-secondary btn-icon-only" aria-label={t('common.close')} onClick={onClose} style={{ width: '44px', height: '44px', padding: 0 }}><X size={15} /></button>
         </div>
+        {step === 0 && children}
         <div style={{ display: 'flex', gap: '0.4rem' }}>
           {STEPS.map((s, i) => (
             <div key={s} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>

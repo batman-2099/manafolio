@@ -11,6 +11,7 @@ Release history starts with Manafolio 2.0.
 - Added a Foil toggle before Undo on Rapid Add receipts, updating only the added entry and preventing overlapping finish changes and undo requests.
 - Rapid Add now uses the main page's default container for Physical cards, retaining Unassigned Pile as the default and reporting filing fallbacks. Arena additions remain unassigned.
 - Made Physical cards the Dashboard's initial inventory and moved All Cards to the end of its inventory tabs.
+- Moved Unassigned Pile beside the Storage Units navigation and moved Import ManaBox container into the first step of New Storage Container.
 
 ## 2.3.3 — 2026-10-12
 
