@@ -76,7 +76,7 @@
   "search.existingCountError": "Could not load the existing card count.",
   "search.container": "Container",
   "search.defaultContainer": "Default container",
-  "search.defaultContainerHint": "Sets the container when opening an add-card dialog. You can change it for each card.",
+  "search.defaultContainerHint": "Used for rapid add and when opening an add-card dialog. You can change it for each card in the dialog.",
   "search.foil": "Foil",
   "search.errRapidFinish": "Could not change the finish. Try again.",
   "search.containersError": "Could not load containers. You can still add to Unassigned Pile.",

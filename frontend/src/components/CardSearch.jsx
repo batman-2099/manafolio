@@ -459,6 +459,7 @@ function CardSearch({ onAddSuccess, showToast }) {
         purchase_price: parseFloat(purchasePrice) || 0,
         game,
         stackable: true,
+        location_id: !addToArena && defaultAddLocation ? Number(defaultAddLocation) : null,
         list_type: addToArena ? 'arena' : 'collection'
       })
     });
@@ -521,6 +522,11 @@ function CardSearch({ onAddSuccess, showToast }) {
       }
 
       const result = await addCardNow(hit);
+      if (!addToArena && defaultAddLocation) {
+        showToast(result.placement
+          ? t('search.addedToContainer', { name: displayName(hit), location: result.placement.label })
+          : t('search.addedUnassigned', { name: displayName(hit) }), 'success');
+      }
       setRapidLog(prev => [{ entryId: result.id, card: hit, qty: parseInt(quantity, 10) || 1, printing }, ...prev].slice(0, 25));
       setRapidNumber('');
       // Keep the owned badge honest if the card is also on screen.
