@@ -2,7 +2,7 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.3.3 — 2026-10-12
 
 - Placed Create Commander Deck and Archive to Graveyard side by side in the card inspector, including on phones.
 - Removed the redundant Game field from the card inspector.
@@ -12,6 +12,11 @@ Release history starts with Manafolio 2.0.
 - Increased container filter dropdowns, sorting, stacking labels, and Clear filters text to 14px at the default text size.
 - Sorted the container Move selected to dropdown alphabetically by container name.
 - AI Deck Builder set choices now cycle through include (check), exclude (X), and clear, with server-enforced exclusions and preserved source-deck quantities when improving a deck.
+- Added secure native SSO handoff with PKCE, single-use codes, and documented deployment constraints.
+- Added colorless deck counts and improved scan-match scrolling.
+- Defaulted containers to the detail-list view and card zoom to 150 percent.
+- Made container In Deck indicators include pulled or checked-out copies without treating Pulled status as a reservation.
+- Expanded ManaBox import instructions and reorganized the README into a concise quick start with linked installation, workflow, and API documentation.
 
 ## 2.3.2 — 2026-10-04
 
