@@ -8,6 +8,7 @@ Release history starts with Manafolio 2.0.
 - Added a fresh exact-printing count to the Add Card to Collection dialog, scoped to Physical or Arena, with loading and retry states and updates when the selected language changes.
 - Sorted the Unassigned Pile's File selected to dropdown alphabetically by container name.
 - Added alphabetical container selectors to the main Add Cards page and its add-card dialog. The page default starts at Unassigned Pile and initializes each dialog; per-card overrides leave it unchanged. Physical additions report filing fallbacks without assigning Arena or Wishlist cards to storage.
+- Added a Foil toggle before Undo on Rapid Add receipts, updating only the added entry and preventing overlapping finish changes and undo requests.
 
 ## 2.3.3 — 2026-10-12
 

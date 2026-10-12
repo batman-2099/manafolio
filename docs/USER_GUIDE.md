@@ -151,7 +151,7 @@ Rapid add is useful when you have a pile from one known set and do not want to r
 4. Check the condition, printing/finish, and **Copies added per Enter**. These settings apply to subsequent rapid additions.
 5. Type a collector number in **Card number, then Enter** and press Enter.
 6. If the lookup identifies one printing, it saves immediately and clears the number field for the next card. If several printings match, pick the correct result instead of assuming one was added.
-7. Review **Added this session** as you work. It shows the latest rapid additions and offers **Undo**; check Collection after correcting an addition, especially when you entered multiple copies.
+7. Review **Added this session** as you work. Each receipt has a **Foil** toggle before **Undo**. Toggle it to change that addition between foil and nonfoil; it affects all copies in that receipt, not the finish for future additions. Both controls are disabled while a change saves. A failed change keeps the previous finish and can be retried. **Undo** removes that addition; check Collection after correcting an addition, especially when you entered multiple copies.
 
 **Warning:** Enter is a save action, not just a search. Verify the set and copy count before the first number, and update the set before starting a different pile.
 

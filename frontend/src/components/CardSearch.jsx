@@ -124,6 +124,7 @@ function CardSearch({ onAddSuccess, showToast }) {
   const [rapidNumber, setRapidNumber] = useState('');
   const [rapidBusy, setRapidBusy] = useState(false);
   const [rapidLog, setRapidLog] = useState([]);
+  const rapidEdits = useRef(new Set());
   const rapidInputRef = useRef(null);
   const textImportInput = useRef(null);
   const csvImportInput = useRef(null);
@@ -520,7 +521,7 @@ function CardSearch({ onAddSuccess, showToast }) {
       }
 
       const result = await addCardNow(hit);
-      setRapidLog(prev => [{ entryId: result.id, card: hit, qty: parseInt(quantity, 10) || 1 }, ...prev].slice(0, 25));
+      setRapidLog(prev => [{ entryId: result.id, card: hit, qty: parseInt(quantity, 10) || 1, printing }, ...prev].slice(0, 25));
       setRapidNumber('');
       // Keep the owned badge honest if the card is also on screen.
       if (!addToArena) {
@@ -541,7 +542,32 @@ function CardSearch({ onAddSuccess, showToast }) {
     }
   };
 
+  const toggleRapidFoil = async (entry) => {
+    if (rapidEdits.current.has(entry.entryId)) return;
+    rapidEdits.current.add(entry.entryId);
+    setRapidLog(prev => prev.map(item => item.entryId === entry.entryId ? { ...item, busy: true } : item));
+    const nextPrinting = entry.printing === 'Holofoil' ? 'Normal' : 'Holofoil';
+    try {
+      const response = await fetch(`/api/collection/${entry.entryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ printing: nextPrinting }),
+      });
+      if (!response.ok) throw new Error();
+      setRapidLog(prev => prev.map(item => item.entryId === entry.entryId ? { ...item, printing: nextPrinting } : item));
+      onAddSuccess();
+    } catch {
+      showToast(t('search.errRapidFinish'), 'error');
+    } finally {
+      rapidEdits.current.delete(entry.entryId);
+      setRapidLog(prev => prev.map(item => item.entryId === entry.entryId ? { ...item, busy: false } : item));
+    }
+  };
+
   const undoRapidAdd = async (entry) => {
+    if (rapidEdits.current.has(entry.entryId)) return;
+    rapidEdits.current.add(entry.entryId);
+    setRapidLog(prev => prev.map(item => item.entryId === entry.entryId ? { ...item, busy: true } : item));
     try {
       const res = await fetch(`/api/collection/${entry.entryId}`, { method: 'DELETE' });
       if (!res.ok) { showToast(t('search.errUndo'), 'error'); return; }
@@ -554,6 +580,9 @@ function CardSearch({ onAddSuccess, showToast }) {
     } catch (err) {
       console.error(err);
       showToast(t('search.errUndoGeneric'), 'error');
+    } finally {
+      rapidEdits.current.delete(entry.entryId);
+      setRapidLog(prev => prev.map(item => item.entryId === entry.entryId ? { ...item, busy: false } : item));
     }
   };
 
@@ -1103,7 +1132,18 @@ function CardSearch({ onAddSuccess, showToast }) {
                   </span>
                   <button
                     type="button"
+                    className={`btn ${entry.printing === 'Holofoil' ? 'btn-primary' : 'btn-secondary'}`}
+                    aria-pressed={entry.printing === 'Holofoil'}
+                    disabled={entry.busy}
+                    onClick={() => toggleRapidFoil(entry)}
+                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', minHeight: '44px', justifyContent: 'center' }}
+                  >
+                    {t('search.foil')}
+                  </button>
+                  <button
+                    type="button"
                     className="btn btn-secondary"
+                    disabled={entry.busy}
                     style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', marginTop: 'auto', justifyContent: 'center' }}
                     onClick={() => undoRapidAdd(entry)}
                   >
