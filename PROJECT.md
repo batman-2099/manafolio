@@ -112,6 +112,16 @@ Missing/Found is a flag on an entry, not deletion or archival. Individual invent
 
 ## Backend and API boundaries
 
+### API access
+
+Create a read-only key in **Settings → API Keys** and pass it as a Bearer token:
+
+```bash
+curl -H "Authorization: Bearer <key>" http://localhost:3001/api/stats/networth
+```
+
+Keys authorize only `GET` requests and cannot access admin endpoints. Useful routes include `/api/stats/networth` for valuation, `/api/stats` for dashboard data, and `/api/collection` for collection entries. The unauthenticated `/api/health` returns `{"status":"ok"}` when healthy.
+
 ### Request lifecycle and authentication
 
 `server.js` applies security headers, CORS, body parsers, and compression before routing. The default JSON limit is 1 MB; `/api/import`, `/api/scan-match`, and `/api/search` receive a 15 MB parser. Do not infer that every import-related URL has the larger allowance.
@@ -197,7 +207,7 @@ Trade confirmation accepts a client-generated `trade_id`, exact giving entry IDs
 
 ### Migration and backup cautions
 
-Use [the offline migration procedure](README.md#migrate-an-existing-installation) before changing an existing deployment. Preserve the entire stopped data directory, mount identity, ownership, and matching WAL/SHM sidecars; a WAL can contain committed data not yet in the main file. Never treat an unexpected setup screen as permission to initialize a replacement database.
+Use [the offline migration procedure](docs/INSTALLATION.md#migrate-an-existing-installation) before changing an existing deployment. Preserve the entire stopped data directory, mount identity, ownership, and matching WAL/SHM sidecars; a WAL can contain committed data not yet in the main file. Never treat an unexpected setup screen as permission to initialize a replacement database.
 
 Startup does not rename previous database files; complete the offline procedure before restarting. **Very old schemas containing `collection.sub_location_1` trigger a destructive collection/location reset in `initDb`.** Back up and inspect such databases before starting this version; automatic initialization is not a lossless upgrade for that schema.
 
@@ -284,13 +294,13 @@ Return clears the deck-level reservation state. Checkout/check-in use the same s
 - Import preview is validation and mapping, not a committed save. Progress distinguishes lookup/preparation from saving; losing the progress connection does not roll back an in-flight import. Check the destination before retrying.
 - Ordinary CSV/JSON imports require integer quantities in `1..2147483647`; missing quantities default to one. Invalid rows retain their original quantity in error reporting rather than being truncated or coerced.
 - Collection-view export represents matching entries across pages, including inventory, filters, and ordering. CSV uses underlying entries regardless of display stacking; TXT aggregates matching name/set/collector-number quantities. Neither replaces a whole-account backup.
-- Complete account backup uses the `manafolio-backup` format and reads all included tables inside one transaction, so concurrent mutations cannot create mismatched records. Restore replaces the signed-in user's collection, storage, and decks in a transaction rather than merging. Preserve the original export before any explicit format-marker conversion; see [account backup instructions](README.md#back-up-or-move-an-account).
+- Complete account backup uses the `manafolio-backup` format and reads all included tables inside one transaction, so concurrent mutations cannot create mismatched records. Restore replaces the signed-in user's collection, storage, and decks in a transaction rather than merging. Preserve the original export before any explicit format-marker conversion; see [account backup instructions](docs/USER_GUIDE.md#back-up-restore-or-move-account-data).
 - Account JSON contains collection/storage/deck data and cached card metadata, not login/provider credentials or the entire server. Whole-volume backups have a different scope and can contain Codex credentials and TLS private keys.
 - Precon import is handled in `collection.js`: Scryfall resolves MTGJSON entries, optional storage is sized for the cards, and optional deck creation checks out the imported Physical deck. With deck creation requested, unresolved entries fail the operation rather than producing a partial deck.
 
 ## Image identification pipeline
 
-Scanning is a beta artwork-matching workflow with informational title OCR and footer verification, not general card OCR or condition/foil detection. It needs the optional models, a usable catalog, and native OCR. Source and Docker setup steps are in [README.md](README.md#card-scanning).
+Scanning is a beta artwork-matching workflow with informational title OCR and footer verification, not general card OCR or condition/foil detection. It needs the optional models, a usable catalog, and native OCR. Source and Docker setup steps are in the [installation guide](docs/INSTALLATION.md#card-scanning).
 
 ### Capture and match
 
@@ -359,7 +369,7 @@ Ollama uses the selected HTTP(S) address or `OLLAMA_BASE_URL`, defaults to serve
 
 Gemini and OpenRouter use fixed official API endpoints and per-user/provider keys stored in the users table. Browser-session-only credential endpoints never return keys; account JSON exports omit them, while SQLite/volume backups include them. Users explicitly select a model; hosted requests do not fall back to a different model/provider. Structured responses still pass the shared inventory and draft validation before review or saving.
 
-Requests contain eligible card metadata/counts, conversation, and the current draft, including editable descriptions and strategies. Keep storage identities, saved private notes, other users' records, and saved source-deck descriptions out of provider context. Model drafts require a nonempty `strategy` of at most 8,000 characters. Saving a new draft writes strategy to `decks.notes`; replacement appends it transactionally without overwriting existing notes or repeating an identical suffix. Suggestions are limited by cached rule data and provider output quality; invalid/incomplete or oversized requests are rejected, not silently trimmed into a different deck. See [the AI workflow and security instructions](README.md#get-an-ai-deck-recommendation).
+Requests contain eligible card metadata/counts, conversation, and the current draft, including editable descriptions and strategies. Keep storage identities, saved private notes, other users' records, and saved source-deck descriptions out of provider context. Model drafts require a nonempty `strategy` of at most 8,000 characters. Saving a new draft writes strategy to `decks.notes`; replacement appends it transactionally without overwriting existing notes or repeating an identical suffix. Suggestions are limited by cached rule data and provider output quality; invalid/incomplete or oversized requests are rejected, not silently trimmed into a different deck. See [the AI workflow and security instructions](docs/USER_GUIDE.md#optional-ai-deck-help).
 
 ## Frontend and Arcane Blue
 

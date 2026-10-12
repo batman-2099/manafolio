@@ -4,7 +4,7 @@ A practical guide to managing a Magic: The Gathering collection, finding physica
 
 **Using a demonstration site?** Demo cards are sample data. Supported changes affect only the current demo session; unsupported actions report that a server installation is required instead of pretending to save. Live search, importing, scanning, and provider features require a server installation.
 
-For installation and upgrades, use the [README](../README.md#install). For how your data is handled, read [Privacy](../PRIVACY.md). For implementation details, see [Architecture](../PROJECT.md).
+For installation and upgrades, use the [installation guide](INSTALLATION.md). For how your data is handled, read [Privacy](../PRIVACY.md). For implementation details, see [Architecture](../PROJECT.md).
 
 ## Contents
 
@@ -46,7 +46,7 @@ Keyboard users can use **Skip to content** to bypass navigation. Changing the ma
 6. Create a storage container if you are organizing physical cards. You can create a deck before owning its cards; resolve missing Physical copies before checkout.
 7. Download a complete account backup after checking your initial data.
 
-**Unexpected owner-creation screen after an upgrade?** Stop. Do not create a replacement account. Ask the administrator to check the database path and persistent-volume mount against the [migration procedure](../README.md#migrate-an-existing-installation).
+**Unexpected owner-creation screen after an upgrade?** Stop. Do not create a replacement account. Ask the administrator to check the database path and persistent-volume mount against the [migration procedure](INSTALLATION.md#migrate-an-existing-installation).
 
 ### Where to go
 
@@ -92,11 +92,11 @@ On narrow screens, use **More** for navigation items that are not shown in the b
 ### What the numbers mean
 
 - Collection growth uses current quantities of retained owned records, grouped by original addition month over the last 12 UTC calendar months. Editing or deleting old entries can change earlier months; this is not a permanent transaction ledger.
-- Deck performance uses manually saved wins and losses. No recorded games means no win rate; fewer than ten games is a small sample. Match dates, opponents, and matchups are not a match-history feature.
+- Deck performance uses manually saved wins and losses, games, and win rate, scoped to inventory. No recorded games means no win rate; fewer than ten games is a small sample. Match dates, opponents, and matchups are not a match-history feature.
 - Ownership-versus-deck comparisons count saved deck slots. A card used in multiple deck definitions appears in each, so deck-slot totals can exceed available physical copies.
 - Multicolor cards contribute to each applicable identity color. Mana-value charts exclude lands, distinguish zero from unknown, and group values of seven or more.
-- Graveyard figures describe archived records separately. Original addition dates are not archive dates, and history is not a reconstruction of past archive membership.
-- Prices depend on printing and provider data. A graded copy's per-copy value can replace its raw market value. Manafolio does not convert currencies; mixed-currency totals must not be read as a converted single-currency sum.
+- Graveyard shows archived quantities, value, costs, and history separately, without deck-performance comparisons. Growth uses original addition dates, not archive dates; history values currently archived cards rather than reconstructing past archive membership.
+- Prices depend on the exact printing and provider data, primarily Scryfall, TCGplayer, and Cardmarket. A graded copy's per-copy value replaces its raw market value in totals and exports. Manafolio does not convert currencies; Collection separates currency subtotals, while Dashboard and public mixed totals are marked rather than presented as converted money.
 
 ### Check a card's price without adding it
 
@@ -216,12 +216,14 @@ The collection import adds owned copies; do not assume ManaBox binder/list names
 
 Quantities must be whole numbers from 1 to 2,147,483,647. Missing quantities default to one; malformed, fractional, zero, or negative values are reported as errors rather than silently changed.
 
+**Import activity** reports lookups, provider rate-limit waits, preparation, and saving. Collection, deck, precon, and container imports resolve printings through the local Scryfall bulk catalog first, with API fallback for unresolved cards.
+
 **Important import warning:** lookup/preparation is not the same as saving. Leaving the page disconnects the activity log but does not roll back a server import already in progress. There are no automatic import retries. After a lost connection, inspect the destination before submitting the same file again; repeating a successful import can add unwanted copies.
 
 ### Add cards from a published preconstructed product
 
 1. Open **Add Cards → Precon Deck**.
-2. Search by deck name, set code, or type using at least two characters, then choose **Search decks**.
+2. Search the MTGJSON product catalog by deck name, set code, or type using at least two characters, then choose **Search decks**.
 3. Choose **More details** on the matching product and inspect the listed contents.
 4. Review **Create Storage Container** and **Create Deck**. Both start enabled. Turn either off if you do not want that additional result.
 5. Choose **Add deck** and confirm the prompt to add all cards.
@@ -244,6 +246,8 @@ PSA lookup requires a configured PSA integration. The certificate number is sent
 ### Scan physical cards with a camera
 
 Scanning helps identify a printing; it does **not** determine condition, foil/finish, or a slab's grade. Exact-printing verification is heuristic, so check cards with reprinted artwork, difficult footers, sleeves, glare, or unusual treatments particularly carefully.
+
+Scanning uses local ONNX artwork matching and title/footer OCR; the footer verifies set code and collector number. It requires a server installation, scan models, a language catalog, and native Tesseract with English data. Ask your administrator to follow the [scanner installation instructions](INSTALLATION.md#card-scanning), then build the relevant language catalog under **Admin → Catalogs**. Downloading data and fingerprinting artwork can take hours.
 
 The scanner displays upper-left title OCR separately from artwork candidates, including low-confidence text marked **uncertain**, or “No readable name” when no title text is available. This reading is informational: it is never compared against artwork candidates or used to allow or block automatic queuing. Artwork, footer, reprint, image-quality, catalog, and two-photo safety checks still apply. The English OCR engine may not reliably read non-English names or unusual title layouts.
 
@@ -280,6 +284,7 @@ If saving or clearing reports a connection error, reload Scan review before retr
 - **Turbo** removes that countdown; it does not remove the requirement for two fresh photos to agree and pass safety checks.
 - Hold the same card still through verification. Changing settings, pausing, or leaving cancels pending verification.
 - A set/language fallback, missing catalog coverage, or conflicting verification can require manual selection. Do not treat a confident artwork candidate as proof of the printing.
+- Missing or failed footer OCR blocks automatic queuing. An unreadable footer supplies no corroborating evidence but is not, by itself, an unconditional block: artwork and ambiguity checks still apply. Set/language filters narrow candidates but do not prove a match.
 - Automatic queuing initially uses Near Mint/Normal settings and the resolved market price as purchase price. Use **Foil** in Scan review to change the finish. Set other copy details when the details form is shown, or edit the owned card after adding the reviewed batch to Collection.
 
 If **Same card scanned again** appears, decide whether it is genuinely another physical copy. Choose **Queue … more** only for additional copies. **Discard — same card, keep scanning** ignores the repeat and continues; **Done — that was another photo of the same card** ignores it and pauses scanning.
@@ -300,7 +305,7 @@ For a comfortable scanning rhythm, wait for the saved-card confirmation, lift th
 | Recognition cannot start or reports missing scan resources | Ask the server administrator to check the models, a usable language catalog, and card-text OCR. The static demo does not support scanning. |
 | It stays at “Hold still” or “Move closer” | Improve lighting and focus, remove glare, and make the whole card large enough in the guide. Scan settings include detection/steadiness controls and diagnostics if you need to investigate. |
 | Wrong set or language | Check **Card language** and **Filter by set**, compare the printed footer, and select manually. Correct the draft before adding it to your collection. |
-| Zoom or torch fails | Those features depend on the device/browser. Move the camera instead of relying on unsupported native zoom; not every browser supports a torch. |
+| Zoom or torch fails | Those features depend on the device/browser. Move the camera instead of relying on unsupported native zoom; there is no simulated digital crop. Not every browser supports a torch. |
 | A scan request seems stuck | Switch to **Paused**, then resume or rescan. Check the connection and server if it continues. |
 
 Camera frames/crops are sent to **your Manafolio server** for artwork matching and local title/footer OCR, not to a cloud image-recognition service or the project's maintainers. Normal scanning processes them in memory, but your server operator or proxy may have separate logging policies. Card identification and artwork can still involve external card-data services. Use a server you trust; self-hosted does not mean offline.
@@ -543,6 +548,8 @@ To change the location of several stored entries:
 
 To take cards out of a container but keep the records, select them and choose **Remove from Storage**. They return to Unsorted in the same inventory. Collection also provides **Move to container… → Apply Move**, including **Unassigned Pile**.
 
+To add selected quantities to an existing deck without moving the cards, select them in an unlocked container and choose **Add to Deck…**.
+
 **Do not confuse these actions:** removing from storage preserves inventory; deleting cards removes inventory; archiving preserves records but removes them from owned totals.
 
 ### Arrange fixed positions manually
@@ -666,6 +673,8 @@ In Table view, **Color Identity** shows card-copy counts for white, blue, black,
 
 An open deck keeps its tools, Description, analytics, commander, private Notes, sleeves, card back, and wins/losses visible above **Add Cards to Deck**, **Deck Cards**, and **Tokens**. These top sections are not collapsible. Properties, imports, exports, and other deck actions are directly available beneath the header. Some charts appear only when the deck contains relevant cards.
 
+Below Description, the summary panel groups **Supertype Breakdown**, **Color & Land Distribution**, **Containers needed**, and **Deck Health & Rules**. Labeled, color-coded bars show exact counts relative to the deck's total card count; multicolor cards can contribute to more than one color. The panel stacks on phones. For Physical decks, **Containers needed** lists source containers, Unassigned Pile, and unavailable-copy counts from the saved pull-list plan (reserved locations when checked out). Save draft changes to refresh it; Arena decks have no physical-container list.
+
 **Target reached** means the deck has reached its configured target count. It does not certify tournament legality, correct color identity, or a complete sideboard. Review format rules separately.
 
 ### Create an empty deck
@@ -683,6 +692,8 @@ An open deck keeps its tools, Description, analytics, commander, private Notes, 
 While creation is saving, wait for it to finish before closing the dialog. A failure appears inside the dialog and keeps your entries for correction and retry. Physical, Arena, and Graveyard deck creation can include unowned cards: imports must still resolve valid card identities and satisfy the applicable deck rules. Missing copies remain visible without adding inventory or reservations.
 
 **Expected result:** a saved deck profile, initially without cards and not checked out. Creating a deck does not create owned copies.
+
+To start from storage instead, open a nonempty Physical or Graveyard container and choose **Create Deck**. This combines printing quantities from its complete saved contents, not just the filters or selection, and uses the container's inventory and full count as the target size. Missing or checked-out copies can be included, even in a locked container. The container and reservations stay unchanged and the new deck is not checked out. Review format, size, and commander; resolve unavailable Physical copies before checkout.
 
 ### Choose where a deck's copies come from
 
@@ -745,6 +756,8 @@ To archive a deck, choose **Deck Type → Graveyard**, **Apply Properties**, the
 
 The commander is one existing deck-card entry, not an additional copy outside the list. The UI supports a single commander selection; do not assume partner commanders, sideboard zones, or comprehensive Commander legality checks.
 
+The card inspector's **Create Commander Deck** shortcut starts a deck with a 100-card target and that card as commander, using its inventory without moving or checking out copies. Review format legality yourself.
+
 ### Customize a deck's card back
 
 1. In the deck's top overview, select **Customize card back** beneath its back image.
@@ -753,7 +766,11 @@ The commander is one existing deck-card entry, not an additional copy outside th
 
 The dropdown contains selected designs from the official [Dragon Shield](https://www.dragonshield.com/collections/card-sleeves), [Ultimate Guard](https://ultimateguard.com/en/Card-Sleeves/), and [Ultra PRO Magic Deck Protectors](https://ultrapro.com/collections/magic-the-gathering-deck-protectors) collections, not live shop inventories. Packaging, transparent sleeves showing sample cards, and incompatible sizes are excluded. Dragon Shield and Ultra PRO images are cropped when loaded; sideways Ultra PRO sleeves are rotated to fit the portrait card back without cutting off the artwork. The 67 Ultimate Guard previews (38 plain and 29 Magic art designs) are bundled, cropped and straightened from the complete frontmost sleeve in official product images; Katana, Cortex and Cortex Matte colors are included. Product links identify the original designs, and sleeve artwork remains the property of its respective rights holders.
 
+Dragon Shield offers plain-color and art designs, Ultimate Guard offers plain-color and Magic art designs, and Ultra PRO offers Magic: The Gathering art sleeves.
+
 Selecting a Dragon Shield or Ultra PRO sleeve contacts its image CDN. Ultimate Guard previews load from your Manafolio server because the shop's image server does not permit cross-origin browser downloads; only following its official-shop link contacts Ultimate Guard. If loading fails, the previous preview stays intact; select the sleeve again to retry. Saving stores a resized image with the deck, so displaying the saved back does not require another provider download. Card-back changes do not save other deck drafts.
+
+For a custom back, upload a PNG, JPEG, or WebP, or enter a direct **Image URL** and choose **Load image** before saving. The browser downloads and resizes the image; your server does not fetch arbitrary URLs. If the host blocks cross-origin downloads, download the file yourself and upload it instead. The default option restores the Magic card back. Saved custom images live with the deck in the database and survive deck duplication and complete account backups.
 
 ### Import while creating a deck
 
@@ -763,7 +780,7 @@ Use this path when starting a deck definition from text or a published precon.
 2. Open **+ Quick Import Decklist**.
 3. Choose **Plain decklist** or **ManaBox text export**:
    - Plain text uses quantity and name, for example `4 Lightning Bolt`. This creation path matches names already in the server's card catalog; unmatched or unrecognized lines can be omitted. It is not the existing-deck comparison workflow.
-   - For ManaBox text, paste the export or use **Choose .txt file**. This path resolves set/collector-number printings rather than selecting a printing solely by name. Selecting ManaBox in the format menu sets Commander / EDH and a 100-card target; check those fields for your actual deck.
+   - For ManaBox or MTG Arena-style text, paste printing-specific lines such as `4 Llanowar Elves (FDN) 227`, or use **Choose .txt file** for an export. This path resolves set/collector-number printings rather than selecting a printing solely by name. Selecting ManaBox in the format menu sets Commander / EDH and a 100-card target; check those fields for your actual deck.
 4. Select **Create Deck**.
 5. The saved deck opens automatically. Compare its names, quantities, printings, total, and commander against your original list.
 
@@ -855,6 +872,8 @@ Arena and Graveyard decks cannot be checked out, even if a checkout control is v
 
 **Expected result:** related-token references and inventory information. This panel does not add tokens to your collection or deck, and it does not promise how many token copies a game will require. An empty result means no related tokens were returned, not a general ruling on every possible card interaction.
 
+The card inspector's **Related tokens** and AI drafts offer the same references. Ownership matches names case-insensitively, including double-faced tokens' front names. Decks prefer the commander's set or corresponding token set, then any set in their inventory. Same-named tokens can have different rules or stats: check artwork and text. Wishlist does not count, and Graveyard token ownership stays separate from Physical and Arena. Scryfall supplies the relations; tokens do not affect deck size, reserve copies, or enter deck exports.
+
 ### Create a container from a deck
 
 1. Open a saved, nonempty Physical or Graveyard deck and save any editor changes.
@@ -884,6 +903,8 @@ Partial availability still creates the box and reports shortages. Use a differen
 
 **Expected result:** each adjustment saves independently, without the deck toolbar's Save. The overview shows the updated record. These are aggregate counters, not a match history: no opponent, matchup, or date is recorded. Dashboard deck-performance statistics derive from these counters; a small sample should not be treated as a reliable performance forecast.
 
+Under Wins and Losses, **Sleeved** records **None**, **Single**, **Double**, or **Triple** for the deck. It saves immediately without saving or discarding other deck edits, and survives duplication and complete account backups.
+
 ### Duplicate or delete a deck
 
 1. In **Your decks**, select **Duplicate deck** to make an editable separate definition.
@@ -902,8 +923,8 @@ AI is not required for ordinary deck editing. Configure it only if you want to s
 1. Open **Settings → AI connection & preferences**, or choose **Open AI settings** in AI Deck Builder to jump directly to that section.
 2. Under **AI provider**, choose one provider and complete its connection:
    - **ChatGPT:** select **Connect ChatGPT**, open the verification link, enter the **Verification code**, and complete OpenAI's device flow. Your account needs Codex access; device-code authorization may need enabling in ChatGPT security settings. Return to Manafolio and wait for the connected state. If verification expires, connect again.
-   - **Ollama:** enter **Ollama server address**, or leave it blank for the server default. Select **Check connection** and choose an installed model. Models are not downloaded for you. The address is reached from the Manafolio server, so `localhost` is that server/container, not your browser.
-   - **Gemini** or **OpenRouter:** obtain a key using the provider-management link, enter the provider's **API key**, and select **Save API key**. Select an available model after the key is accepted.
+   - **Ollama:** run [Ollama](https://docs.ollama.com/) and install a structured-output model, for example `ollama pull granite4.1:8b`. Enter its HTTP(S) **Ollama server address**, or leave it blank for `OLLAMA_BASE_URL` (default `http://127.0.0.1:11434`). Select **Check connection** and choose an installed model. Models are not downloaded for you. The address is reached from the Manafolio server, so `localhost` is that server/container, not your browser; see [deployment instructions](INSTALLATION.md#ollama-deployment) for host access from Docker.
+   - **Gemini** or **OpenRouter:** obtain a key from [Google AI Studio](https://aistudio.google.com/apikey) or [OpenRouter](https://openrouter.ai/settings/keys), enter the provider's **API key**, and select **Save API key**. Select an available model after the key is accepted; OpenRouter requires a structured-output model.
 3. Select **Model**. For ChatGPT, choose a supported **Thinking level** if wanted.
 4. Select **Save AI preferences**.
 
@@ -912,6 +933,12 @@ AI is not required for ordinary deck editing. Configure it only if you want to s
 **Privacy and cost:** read **Privacy, trust and costs** before connecting. Requests include eligible card metadata and counts, the conversation, and the current draft—including its name, description, and strategy, with your edits. Storage identities, container names/IDs, saved private notes, other users' records, and an improved source deck's saved description are excluded. Do not paste secrets into the conversation or draft.
 
 ChatGPT uses your Codex access and usage limits. Gemini's free-tier data-use terms and quotas apply where relevant. OpenRouter forwards data to the chosen model provider, whose policies also matter; paid models can consume credits. Ollama may be local or remote and may use cloud services, depending on its configuration. Only connect to a trusted Manafolio server: its administrators can access persisted credentials. **Disconnect** removes local ChatGPT connection data. **Remove API key** removes that hosted provider's key from Manafolio, but you must revoke it at the provider to invalidate it externally. Account JSON backups omit these credentials; server/database backups can include them.
+
+Gemini quotas and free-tier availability depend on your account and model; OpenRouter free models also depend on availability and quotas. Review Google's data-use terms and both OpenRouter's and its selected upstream provider's policies. Adding a provider does not change your saved provider choice.
+
+The official [Codex app-server](https://developers.openai.com/codex/app-server/) integration requires a Unix server, including Docker, and disables model access to host files, commands, and external tools. Credentials are separated per user under `<database-directory>/codex/<user-id>/`; **Disconnect** removes that user's local Codex data. Gemini/OpenRouter keys are stored separately per user and provider in the server database and are not returned to the browser. Removing one provider's key leaves other providers unchanged. Administrators and whole-volume/database backups can access the credentials they contain; protect those backups. AI endpoints require browser sessions, not read-only API keys.
+
+**Ollama deployment security:** signed-in users can request server-accessible HTTP(S) addresses, including localhost and private/LAN services. Invite only trusted users and restrict outbound access with your firewall; URL validation is not an access allowlist. Manafolio adds no Ollama authentication. Do not expose Ollama's port publicly.
 
 ### Ask questions and create a suggested deck
 
@@ -972,7 +999,7 @@ The reviewed strategy is saved to the new deck's **Notes**. You can edit it befo
 
 Changing inventory, format, target size, deck type, target power level, checked-out inclusion, or filters clears the conversation and draft. The selected deck type and power level accompany every request, including follow-up questions and improvements, but do not change a saved deck's inventory or category. Leaving the builder clears the session conversation and cancels an active request. **Clear conversation, keep draft** is the explicit way to reset the conversation without discarding the current draft. Each request permits up to 4,000 characters; the session limit is 40 messages. The request log records progress, not private model reasoning.
 
-If no eligible cards match, adjust filters or ask questions without generating a deck. For oversized requests, narrow the pool; Ollama may need a larger configured model context. Review every suggestion: cached rules may be missing or stale, and the AI is not a guarantee of tournament legality. Partner commanders and sideboards are not supported.
+If no eligible cards match, adjust filters or ask questions without generating a deck. Oversized inventories and incomplete or invalid responses are rejected rather than silently trimmed or partially saved. Narrow the pool for oversized requests; Ollama may need a larger configured model context. Review every suggestion: cached rules may be missing or stale, and the AI is not a guarantee of tournament legality. Partner commanders and sideboards are not supported.
 
 ### Improve an existing deck
 
@@ -999,6 +1026,8 @@ Open **Settings** and use its section links to jump to the relevant panel.
 6. Set **Default Card Zoom** from 60% through 250% for card grids. The default is **150%** for containers and deck cards; previously saved zoom preferences remain unchanged.
 
 **Expected result:** language/currency changes apply in the browser; default views and zoom apply when their screens next open. Language, currency, default views, and zoom are browser-local preferences, unlike the account-saved theme and AI preferences. Changing them on one device is not a promise they will follow you to another browser.
+
+Supported interface languages are English, Brazilian Portuguese, French, German, Italian, Japanese, Korean, Russian, Simplified Chinese, Traditional Chinese, and Spanish. Scryfall supplies cards, sets, artwork, printings, and prices; Manafolio retains exact printing identities and card languages independently of this interface setting.
 
 ### Look up your collection without your server
 
@@ -1048,6 +1077,8 @@ Public data includes the account username, card names/printings, quantities, con
 Each deck has its own bearer link. Physical, Arena, and Graveyard deck definitions can be shared independently of **Share My Library** and **Show Card Locations**; changing those collection controls does not revoke deck links. Anyone with a deck link can forward it or retain a copy. Revocation and deck deletion stop new access, not copies already made.
 
 Duplicated decks and decks restored from an account JSON backup start without share links. Full database backups retain links and can restore their prior state. The demonstration site cannot create public deck links.
+
+Deck links use the root URL currently open in your browser, including protocol and port. Open Manafolio through an address recipients can reach before copying the link.
 
 ### Change your local password
 
@@ -1103,9 +1134,9 @@ Only one import or restore can run at a time. **Import Backup** stays disabled w
 
 **Expected result:** the signed-in account's covered records are replaced in a transaction after validation; other users' records are not merged into it. A validation failure leaves the existing covered records unchanged. Restoring data does not reconnect AI providers or migrate browser preferences.
 
-The current format is top-level `format: "manafolio-backup"`, `version: 1`, with the required backup arrays. Only Magic integrations are supported. Backups with unsupported game identities—or a destination account containing unsupported records that would be replaced—are rejected before data changes. Preserve those originals for a compatible older deployment; never relabel card IDs or game fields to force a restore.
+The current format is top-level `format: "manafolio-backup"`, `version: 1`, with the required backup arrays. Only Magic integrations are supported. Records from removed integrations are not automatically deleted or relabeled, and account exports retain them. Backups with unsupported game identities—or a destination account containing unsupported records that would be replaced—are rejected before data changes. Preserve those originals for a compatible older deployment; never relabel card IDs or game fields to force a restore.
 
-For an older, otherwise compatible export with a retired format marker, follow the README's migration guidance: preserve the original, make a copy, and change only the copy's top-level format marker to `manafolio-backup`. This is not a schema conversion; leave version and records intact, and expect normal compatibility validation. Do not apply this to arbitrary JSON.
+For an older, otherwise compatible export with a retired format marker, preserve the original outside the deployment, make a copy, and change only the copy's top-level format marker to `manafolio-backup`. This is not a schema conversion; leave version and records intact, and expect normal compatibility validation. Do not apply this to arbitrary JSON.
 
 For full server recovery, ask the operator to maintain protected persistent-data backups outside the server volume. Automatic snapshots in the same volume cannot protect against losing that volume; whole-server backups may include credentials and TLS private keys and need stricter protection than an account export.
 
@@ -1150,6 +1181,8 @@ Settings cannot be saved until their initial load succeeds. If loading fails, ch
 
 The price-refresh schedule controls refreshing card prices. **Settings → Scryfall bulk data** controls the persistent card-data snapshot used by lookups/imports. **Admin → Catalogs** manages artwork-matching catalogs for scanning. These are different resources; refreshing prices does not install scan models or build a scan catalog.
 
+Administrators set the bulk catalog's daily UTC refresh under **Settings → Scryfall bulk data** (10:00 UTC by default), or choose **Download now**. A missing catalog warms in the background without blocking imports. Scheduled checks download changed snapshots; manual download forces a refresh. The separate `<DB_PATH>.scryfall-bulk.sqlite` file is rebuildable card data, not a collection backup. Imported prices initially reflect this snapshot; scheduled price sweeps and stale-cache refreshes use the live API.
+
 A failed bulk update retains the previous catalog. Allow disk space for both the current catalog and its replacement. Stopped or failed artwork builds retain the working catalog and downloaded card data, but discard uncommitted embeddings. The next build reuses unchanged vectors from the last successful publication. Catalog/setup progress polling resumes after transient connection failures.
 
 ### Take a server backup
@@ -1159,7 +1192,7 @@ A failed bulk update retains the previous catalog. Allow disk space for both the
 3. Download the backup and keep a protected copy outside the server's persistent volume.
 4. Also plan backups of files outside SQLite, such as TLS material, provider credentials stored on disk, and uploaded artwork. A database snapshot alone is not a copy of the entire deployment.
 
-Automatic snapshots in the same volume do not protect against losing that volume. For offline whole-volume backup, stop every database writer and preserve the database and its WAL/SHM sidecars together. Do not replace or mix SQLite files while the server is running. Follow the [installation and recovery guidance](../README.md#back-up-or-move-an-account); test recovery using an isolated copy before relying on a backup.
+Automatic snapshots in the same volume do not protect against losing that volume. For offline whole-volume backup, stop every database writer and preserve the database and its WAL/SHM sidecars together. Do not replace or mix SQLite files while the server is running. Follow the [installation and recovery guidance](INSTALLATION.md#migrate-an-existing-installation); test recovery using an isolated copy before relying on a backup.
 
 ## Troubleshooting
 
@@ -1240,7 +1273,7 @@ Never post passwords, API keys, session tokens, private share links, database fi
 
 ## Further reference
 
-- [Installation, configuration, migration, and workflows](../README.md)
+- [Installation, configuration, and migration](INSTALLATION.md)
 - [Environment-variable reference](../.env.example)
 - [Data handling and external providers](../PRIVACY.md)
 - [Architecture and domain rules](../PROJECT.md)

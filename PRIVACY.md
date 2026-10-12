@@ -102,7 +102,7 @@ Account deletion stops that user's local Codex processes and removes the credent
 
 Gemini and OpenRouter API keys are stored per user/provider in the server database. They are never returned in account or preferences responses and are excluded from account JSON exports, but database snapshots and whole-volume backups include them. Administrators can access them. Removing a key deletes the current stored copy, not older backups or provider records; revoke the key at its provider when necessary.
 
-See the [AI workflow and deployment guidance](README.md#get-an-ai-deck-recommendation) before enabling a provider.
+See the [AI workflow](docs/USER_GUIDE.md#optional-ai-deck-help) and [deployment guidance](docs/INSTALLATION.md#optional-ai-server-configuration) before enabling a provider.
 
 ## Opt-in public sharing and exports
 
@@ -130,7 +130,7 @@ Operators should:
 - Explain the deployment's hosting, proxy, SSO, AI, logging, and backup arrangements to users, and handle applicable privacy obligations and requests.
 - Review what is being shared before making an instance, collection, or artwork publicly accessible.
 
-Follow the [backup and restore guidance](README.md#back-up-or-move-an-account) rather than deleting or moving live database files casually. Removing the only database or volume without a verified backup can permanently destroy the collection.
+Follow the [backup and restore guidance](docs/USER_GUIDE.md#back-up-restore-or-move-account-data) and [server backup precautions](docs/USER_GUIDE.md#take-a-server-backup) rather than deleting or moving live database files casually. Removing the only database or volume without a verified backup can permanently destroy the collection.
 
 ## Children's privacy
 
