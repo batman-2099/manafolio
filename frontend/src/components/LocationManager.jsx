@@ -47,7 +47,7 @@ const CONTAINER_LIST_SORTS = {
   'name-desc': [{ by: 'name', dir: 'desc' }],
   'price-desc': [{ by: 'price', dir: 'desc' }],
   'price-asc': [{ by: 'price', dir: 'asc' }],
-  'set-asc': [{ by: 'set', dir: 'asc' }, { by: 'number', dir: 'asc' }],
+  'set-asc': [{ by: 'set', dir: 'asc' }, { by: 'name', dir: 'asc' }],
   'type-asc': [{ by: 'type', dir: 'asc' }, { by: 'name', dir: 'asc' }],
   'rarity-desc': [{ by: 'rarity', dir: 'desc' }, { by: 'name', dir: 'asc' }]
 };
@@ -1180,8 +1180,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       );
     return containerSortBy === 'storage'
       ? cards
-      : sortCardsByOrder(cards, CONTAINER_LIST_SORTS[containerSortBy], undefined, setsList);
-  }, [cardsInActiveLocation, compartments, containerFilters, containerSortBy, setsList]);
+      : sortCardsByOrder(cards, CONTAINER_LIST_SORTS[containerSortBy]);
+  }, [cardsInActiveLocation, compartments, containerFilters, containerSortBy]);
 
   const processedContainerListCards = useMemo(() => {
     if (!stackContainerCards) return containerListCards;
@@ -1209,13 +1209,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     if (!field) return [{ label: null, cards: displayContainerListCards }];
     const sections = [];
     for (const card of displayContainerListCards) {
-      const label = getSortCategories(card, [{ by: field, divider: true }], setsList)[0]?.label || 'Other';
+      const label = getSortCategories(card, [{ by: field, divider: true }])[0]?.label || 'Other';
       const section = sections.at(-1);
       if (!section || section.label !== label) sections.push({ label, cards: [card] });
       else section.cards.push(card);
     }
     return sections;
-  }, [containerSortBy, displayContainerListCards, setsList]);
+  }, [containerSortBy, displayContainerListCards]);
 
   const openCompartmentRules = (comp) => {
     let draft = [];
