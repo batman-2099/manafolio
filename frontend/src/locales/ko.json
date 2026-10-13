@@ -55,7 +55,6 @@
   "completion.loading": "전체 세트 카탈로그를 불러오는 중…",
   "completion.empty": "이 인벤토리와 목표에 해당하는 인쇄본이 없습니다. 다른 세트나 목표를 선택하세요. 100% 완성을 의미하지 않습니다.",
   "completion.progress": "{total}종 중 {owned}종 보유",
-  "completion.copies": "기록: {recorded} · 보유: {owned} · 여유: {available}",
   "completion.noMatches": "필터에 맞는 카드가 없습니다. 전체를 선택하여 목록을 확인하세요.",
   "trade.title": "카드 교환 작업대",
   "trade.intro": "실물 카드만 교환합니다. 재고 변경 전에 양쪽을 검토하세요.",

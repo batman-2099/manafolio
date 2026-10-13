@@ -55,7 +55,6 @@
   "completion.loading": "正在加载完整系列目录…",
   "completion.empty": "此库存和目标没有符合条件的版本。请选择其他系列或目标；这不表示已完成 100%。",
   "completion.progress": "已拥有 {owned} / {total}",
-  "completion.copies": "记录：{recorded} · 拥有：{owned} · 空闲：{available}",
   "completion.noMatches": "没有符合筛选条件的卡牌。选择全部查看清单。",
   "trade.title": "换牌工作台",
   "trade.intro": "仅交换实体卡。更改库存前请核对双方。",

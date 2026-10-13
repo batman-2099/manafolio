@@ -55,7 +55,6 @@
   "completion.loading": "完全なセットカタログを読み込み中…",
   "completion.empty": "この在庫と目標に該当する印刷版はありません。別のセットか目標を選んでください。100%達成ではありません。",
   "completion.progress": "{total}種類中{owned}種類を所持",
-  "completion.copies": "記録: {recorded} · 所持: {owned} · 空き: {available}",
   "completion.noMatches": "該当するカードはありません。「すべて」で一覧を表示できます。",
   "trade.title": "トレード作業台",
   "trade.intro": "現物カードのみ交換します。在庫変更前に双方を確認してください。",

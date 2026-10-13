@@ -55,7 +55,6 @@
   "completion.loading": "Chargement du catalogue complet…",
   "completion.empty": "Aucune impression admissible pour cet inventaire et cet objectif. Choisissez une autre extension ou un autre objectif ; ce n’est pas une complétion à 100 %.",
   "completion.progress": "{owned} sur {total} possédées",
-  "completion.copies": "Enregistrés : {recorded} · Possédés : {owned} · Libres : {available}",
   "completion.noMatches": "Aucune carte ne correspond. Choisissez Toutes pour voir la liste.",
   "trade.title": "Atelier d’échange",
   "trade.intro": "Échangez uniquement des exemplaires physiques. Vérifiez les deux côtés avant de modifier l’inventaire.",

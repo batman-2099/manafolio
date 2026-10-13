@@ -1,20 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../utils/i18n';
 import CardImageZoom from './CardImageZoom';
+import CardImage from './CardImage';
+import { priceText } from '../utils/formatPrice';
+import { getPrintingPrice } from '../utils/resolveCardPrice';
+import MultiSelectDropdown from './MultiSelectDropdown';
 
 export default function SetCompletion() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const [sets, setSets] = useState(null);
   const [code, setCode] = useState('');
-  const [setQuery, setSetQuery] = useState('');
   const [inventory, setInventory] = useState('collection');
-  const [goal, setGoal] = useState('cards');
-  const [filter, setFilter] = useState('all');
+  const [goal, setGoal] = useState('printings');
+  const [filter, setFilter] = useState('missing');
   const [state, setState] = useState(null);
   const [retry, setRetry] = useState(0);
   const [setsError, setSetsError] = useState(false);
   const [card, setCard] = useState(null);
   const [page, setPage] = useState(1);
+  const [wishlistAction, setWishlistAction] = useState(null);
+  const wishlistPending = useRef(false);
   const scope = `${code}:${inventory}:${retry}`;
 
   useEffect(() => {
@@ -41,10 +46,20 @@ export default function SetCompletion() {
   }, [code, inventory, scope]);
 
   const current = state?.scope === scope ? state : null;
-  const query = setQuery.trim().toLowerCase();
-  const visibleSets = (sets || []).filter(set => set.id === code || set.name.toLowerCase().includes(query) || set.id.toLowerCase().includes(query));
+  const setOptions = useMemo(() => [...(sets || [])]
+    .sort((a, b) => (b.release_date || '').localeCompare(a.release_date || '') || a.name.localeCompare(b.name, locale))
+    .map(set => ({
+      value: set.id,
+      searchText: `${set.name} ${set.id}`,
+      label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
+        {set.symbol_url && <img src={set.symbol_url} alt="" width={20} height={20} loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+        <span>{set.name} ({set.id.replace(/^mtg-/, '').toUpperCase()})</span>
+      </span>,
+    })), [sets, locale]);
   const result = current?.data?.goals[goal];
-  const rows = result?.rows.filter(row => filter === 'all' || row.owned === (filter === 'owned')) || [];
+  const rows = result?.rows
+    .filter(row => filter === 'all' || row.owned === (filter === 'owned'))
+    .flatMap(row => row.printings.map(printing => ({ printing, owned: row.owned }))) || [];
   const pages = Math.max(1, Math.ceil(rows.length / 60));
   const currentPage = Math.min(page, pages);
   const select = (setter, value) => { setter(value); setPage(1); };
@@ -54,20 +69,42 @@ export default function SetCompletion() {
     <button className="btn btn-secondary" disabled={currentPage === pages} onClick={() => setPage(currentPage + 1)}>{t('collection.nextPage')}</button>
   </nav>;
 
+  const addToWishlist = async printing => {
+    if (wishlistPending.current) return;
+    wishlistPending.current = true;
+    const key = `${printing.id}:${goal}`;
+    setWishlistAction({ key, pending: true });
+    try {
+      const response = await fetch('/api/collection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          card_id: printing.id, quantity: 1, list_type: 'wishlist',
+          printing: goal === 'foil' ? 'Holofoil' : 'Normal',
+          language: printing.language || 'English',
+        }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        setWishlistAction({ key, error: body?.error || t('search.errAddCard') });
+        return;
+      }
+      setWishlistAction({ key });
+    } catch {
+      setWishlistAction({ key, error: t('completion.wishlistError') });
+    } finally {
+      wishlistPending.current = false;
+    }
+  };
+
   return <section aria-labelledby="completion-title">
     <h2 id="completion-title">{t('completion.title')}</h2>
     <p style={{ color: 'var(--text-secondary)', maxWidth: '75ch' }}>{t('completion.rules')}</p>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '1rem', marginBlock: '1rem' }}>
       <div className="form-group">
-        <label htmlFor="completion-set-search">{t('completion.filterSets')}</label>
-        <input id="completion-set-search" type="search" className="input-control" value={setQuery} onChange={event => setSetQuery(event.target.value)} />
-      </div>
-      <div className="form-group">
-        <label htmlFor="completion-set">{t('completion.set')}</label>
-        <select id="completion-set" className="select-control" value={code} onChange={event => { setState(null); select(setCode, event.target.value); }}>
-          <option value="">{t('completion.choose')}</option>
-          {visibleSets.map(set => <option key={set.id} value={set.id}>{set.name} ({set.id.replace(/^mtg-/, '').toUpperCase()})</option>)}
-        </select>
+        <label>{t('completion.set')}</label>
+        <MultiSelectDropdown label={t('completion.set')} allLabel={t('completion.choose')} options={setOptions} value={code ? [code] : []}
+          searchable singleSelect onChange={values => { setState(null); select(setCode, values[0] || ''); }} />
       </div>
       <div className="form-group">
         <label htmlFor="completion-inventory">{t('collection.inventory')}</label>
@@ -101,18 +138,25 @@ export default function SetCompletion() {
     {result && <>
       {pagination}
       {result.total > 0 && !rows.length && <p>{t('completion.noMatches')}</p>}
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {rows.slice((currentPage - 1) * 60, currentPage * 60).map(row => <li key={row.id} style={{ borderBottom: '1px solid var(--border-glass)', paddingBlock: '0.75rem', overflowWrap: 'anywhere' }}>
-          <details>
-            <summary style={{ cursor: 'pointer', minHeight: '44px', paddingBlock: '0.5rem' }}>
-              <strong>{row.name}</strong>{goal !== 'cards' && ` · #${row.printings[0].number}`} — {t(row.owned ? 'completion.owned' : 'completion.missing')}
-            </summary>
-            {row.printings.map(printing => <div key={printing.id} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBlock: '0.5rem' }}>
-              <button className="btn btn-secondary" onClick={() => setCard(printing)} style={{ minHeight: '44px', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{printing.name} · #{printing.number}</button>
-              <span>{t('completion.copies', { recorded: printing.recorded, owned: printing.owned, available: printing.available })}</span>
-            </div>)}
-          </details>
-        </li>)}
+      <ul className="card-grid" style={{ listStyle: 'none', padding: 0 }}>
+        {rows.slice((currentPage - 1) * 60, currentPage * 60).map(({ printing, owned }) => {
+          const price = getPrintingPrice(printing, goal === 'foil' ? 'Holofoil' : 'Normal');
+          const actionKey = `${printing.id}:${goal}`;
+          return <li key={printing.id} style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowWrap: 'anywhere' }}>
+            <button type="button" aria-label={`${t('inspector.zoomHint')}: ${printing.name} · #${printing.number}`} aria-haspopup="dialog" onClick={() => setCard(printing)} style={{ width: '100%', padding: 0, border: 0, background: 'transparent', cursor: 'zoom-in', borderRadius: 'var(--radius-sm)' }}>
+              <CardImage card={printing} loading="lazy" style={{ display: 'block', width: '100%', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
+            </button>
+            <strong>{printing.name} · #{printing.number}</strong>
+            <span style={{ color: owned ? 'var(--text-positive)' : 'var(--text-secondary)' }}>{t(owned ? 'completion.owned' : 'completion.missing')}</span>
+            <span style={{ color: 'var(--accent-yellow)', fontWeight: 600 }}>{price === null ? t('priceCheck.unavailable') : `${t('priceCheck.estimate')}: ${priceText(price, printing.price_currency)}`}</span>
+            <button type="button" className="btn btn-secondary" disabled={!!wishlistAction?.pending} aria-busy={wishlistAction?.key === actionKey && !!wishlistAction.pending} onClick={() => addToWishlist(printing)} style={{ minHeight: '44px', width: '100%', whiteSpace: 'normal' }}>
+              {t(wishlistAction?.key === actionKey && wishlistAction.pending ? 'search.adding' : 'search.addToWishlist')}
+            </button>
+            {wishlistAction?.key === actionKey && !wishlistAction.pending && <p role={wishlistAction.error ? 'alert' : 'status'} style={{ margin: 0, fontSize: '0.875rem', color: wishlistAction.error ? 'var(--text-negative)' : 'var(--text-positive)' }}>
+              {wishlistAction.error || t('search.addedToWishlist', { name: printing.name })}
+            </p>}
+          </li>;
+        })}
       </ul>
       {pagination}
     </>}

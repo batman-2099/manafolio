@@ -205,10 +205,17 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
     () => Array.from(new Set(collection.map(item => item.rarity).filter(Boolean))).sort(),
     [collection]
   );
-  const uniqueSets = useMemo(
-    () => Array.from(new Set(collection.map(item => item.set_name).filter(Boolean))).sort(),
-    [collection]
-  );
+  const setOptions = useMemo(() => {
+    const symbols = new Map(setsList.map(set => [set.name, set.symbol_url]));
+    return Array.from(new Set(collection.map(item => item.set_name).filter(Boolean))).sort().map(name => ({
+      searchText: name,
+      value: name,
+      label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+        {symbols.get(name) && <img src={symbols.get(name)} alt="" width="20" height="20" loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+        {name}
+      </span>,
+    }));
+  }, [collection, setsList]);
   const uniqueTypes = useMemo(
     () => Array.from(new Set(collection.flatMap(item => item.subtypes || []).filter(Boolean))).sort(),
     [collection]
@@ -454,10 +461,11 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
               <Field label={t('collection.fSet')}>
                 <MultiSelectDropdown
                   label={t('collection.fSet')}
+                  searchable
                   allLabel={t('collection.allSets')}
                   value={setFilter}
                   onChange={setSetFilter}
-                  options={uniqueSets.map(s => ({ value: s, label: s }))}
+                  options={setOptions}
                 />
               </Field>
 
@@ -474,6 +482,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
               <Field label={t('collection.fType')}>
                 <MultiSelectDropdown
                   label={t('collection.fType')}
+                  searchable
                   allLabel={t('collection.allTypes')}
                   value={typeFilter}
                   onChange={setTypeFilter}

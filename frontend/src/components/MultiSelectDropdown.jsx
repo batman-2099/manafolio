@@ -6,9 +6,11 @@ import { useT } from '../utils/i18n';
 // a filter should allow choosing several values at once instead of one.
 // Empty selections mean no filter. Optional excludedValue enables
 // the include → exclude → clear cycle; ordinary checklists stay binary.
-export default function MultiSelectDropdown({ label, options, value, onChange, allLabel, excludedValue }) {
-  const { t } = useT();
+export default function MultiSelectDropdown({ label, options, value, onChange, allLabel, excludedValue, searchable = false, singleSelect = false }) {
+  const { t, locale } = useT();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const searchRef = useRef(null);
   const ref = useRef(null);
   const triggerRef = useRef(null);
   const groupId = useId();
@@ -21,7 +23,22 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (open) searchRef.current?.focus();
+  }, [open]);
+
+  const search = searchable ? query.trim().toLocaleLowerCase(locale) : '';
+  const matchingOptions = search
+    ? options.filter(option => String(option.searchText ?? option.label ?? option.value).toLocaleLowerCase(locale).includes(search))
+    : options;
+
   const toggle = (optValue) => {
+    if (singleSelect) {
+      onChange([optValue]);
+      setOpen(false);
+      triggerRef.current?.focus();
+      return;
+    }
     if (excludedValue) {
       if (value.includes(optValue)) onChange(value.filter(v => v !== optValue), [...excludedValue, optValue]);
       else if (excludedValue.includes(optValue)) onChange(value, excludedValue.filter(v => v !== optValue));
@@ -56,7 +73,7 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
         ref={triggerRef}
         type="button"
         className="select-control"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => { setQuery(''); setOpen(o => !o); }}
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', textAlign: 'left' }}
         aria-controls={open ? groupId : undefined}
         aria-expanded={open}
@@ -79,6 +96,19 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
             borderRadius: 'var(--radius-sm)', padding: '0.35rem', boxShadow: 'var(--shadow-glow)'
           }}
         >
+          {searchable && <div style={{ position: 'sticky', top: '-0.35rem', background: 'var(--bg-secondary)', paddingBlock: '0.35rem', zIndex: 1 }}>
+            <input
+              ref={searchRef}
+              type="search"
+              className="input-control"
+              aria-label={t('filter.searchOptions', { label })}
+              placeholder={t('filter.searchOptions', { label })}
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              onKeyDown={event => { if (event.key === 'Enter') event.preventDefault(); }}
+              style={{ width: '100%', minWidth: 0, minHeight: 44, fontSize: '1rem' }}
+            />
+          </div>}
           {(value.length > 0 || excludedValue?.length > 0) && (
             <button
               type="button"
@@ -90,7 +120,7 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
             </button>
           )}
           {/* Native controls preserve keyboard activation and focus. */}
-          {options.map(opt => excludedValue ? (
+          {matchingOptions.map(opt => excludedValue ? (
             <button
               key={opt.value}
               type="button"
@@ -107,10 +137,11 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
           ) : (
             <label
               key={opt.value}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.35rem 0.4rem', borderRadius: '5px', cursor: 'pointer', fontSize: '0.82rem' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minHeight: singleSelect ? 44 : undefined, padding: '0.35rem 0.4rem', borderRadius: '5px', cursor: 'pointer', fontSize: singleSelect ? '1rem' : '0.82rem' }}
             >
               <input
-                type="checkbox"
+                type={singleSelect ? 'radio' : 'checkbox'}
+                name={singleSelect ? groupId : undefined}
                 checked={value.includes(opt.value)}
                 onChange={() => toggle(opt.value)}
                 style={{ width: '14px', height: '14px', flexShrink: 0, cursor: 'pointer', accentColor: 'var(--accent-red)' }}
@@ -118,6 +149,7 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
               {opt.label}
             </label>
           ))}
+          {matchingOptions.length === 0 && <p role="status" style={{ margin: '0.5rem', color: 'var(--text-secondary)' }}>{t('filter.noMatchingOptions')}</p>}
         </div>
       )}
     </div>

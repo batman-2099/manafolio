@@ -331,22 +331,25 @@ A trade flag is not another inventory: **For Trade Only** filters flagged entrie
 ### Track set completion
 
 1. Open **Collection → Set completion** (on a phone, choose it in **Inventory**).
-2. Use **Filter sets by name or code** to narrow the **Set** choices, then choose a set and either physical **Collection** or **Arena**. Filtering retains the selected set. The checklist includes only printings the provider marks for that platform; inventories never mix.
-3. Choose your **Goal**:
+2. Choose a set from the searchable **Set** dropdown, which shows set symbols and matches names or codes. Sets always appear newest to oldest by release date, with names A–Z for matching dates and undated sets last. Select physical **Collection** or **Arena**; inventories never mix.
+3. Choose your **Goal** (defaults to **Every printing**):
    - **One of each card:** one copy of each Scryfall card identity from this set. Alternate illustrations share a goal; a reprint from another set does not satisfy it.
    - **Every printing:** one copy per set and collector number. Different collector numbers are separate goals; any language or finish satisfies the printing.
    - **Foil printings:** one **Holofoil** copy per collector number that Scryfall explicitly offers in foil. Nonfoil-only and etched-only printings are excluded. Arena has no foil goal.
-4. Filter **All**, **Owned**, or **Missing**. Expand a row to see its exact printings and select a printing to inspect its artwork with the existing image viewer.
+4. The card grid defaults **Show** to **Missing**. Choose **All** or **Owned** when needed. Every printing appears as a separate tile with its collector number, artwork, price, and Wishlist button. Click an image to enlarge that printing. Pages contain up to 60 printing tiles. Goal progress and the Owned/Missing filter still follow the selected goal: **One of each card** groups alternate illustrations for ownership, while **Every printing** tracks each collector number separately.
+5. **Add to Wishlist** adds one copy of the displayed printing in its catalog language, as nonfoil for card/printing goals or foil for **Foil printings**. Wait for confirmation before adding another copy. This does not add owned cards or advance completion progress. If the connection fails, check Wishlist before retrying.
+   Card tiles show the catalog's price estimate for that finish and its source currency. Missing quotes display **Price unavailable**; estimates are not live marketplace offers.
 
-Progress counts goals, not copies: owning ten copies does not fill ten checklist slots. **Recorded** includes entries marked Missing; **Owned** excludes them, Wishlist, and Graveyard. Reserved copies remain owned. **Free** also excludes deck reservations and copies in unavailable physical storage. These are records, not proof that the card is physically where it was last filed.
+Progress counts goals, not copies: owning ten copies does not fill ten checklist slots. **Owned** excludes copies marked Missing, Wishlist, and Graveyard. Reserved copies remain owned. These are records, not proof that the card is physically where it was last filed.
 
-The server loads every provider page before showing progress and caches normalized card data through the usual Scryfall path. A loading, incomplete, or failed catalog never becomes a complete collection: use **Retry** after checking connectivity. Zero eligible printings means the goal is not applicable, not 100%. Completion does not change your inventory or save a separate goal record. The read-only demo explicitly reports that its server catalog is unavailable.
+The server loads every provider page before showing progress and caches normalized card data through the usual Scryfall path. A loading, incomplete, or failed catalog never becomes a complete collection: use **Retry** after checking connectivity. Zero eligible printings means the goal is not applicable, not 100%. Viewing completion does not change inventory or save a separate goal record; only the explicit **Add to Wishlist** action adds a record. The read-only demo explicitly reports that its server catalog is unavailable.
 
 ### Find a card and its location
 
 1. Select the appropriate inventory first.
 2. Enter a name, set name, or collector number in **Search Cards**. Search also checks the localized printed name.
 3. Choose **Filters** to narrow by Location, Set, Color, Type, Rarity, Condition, Printing, Grader, Mana Value, Language, or price bounds. Several filter values can be selected; different filter categories combine to narrow the result.
+   Open the **Set** or **Type** filter dropdown and type in its search field to narrow the options. Searching does not change selected values, including selections hidden by the search. Set choices retain their symbols. Closing and reopening a dropdown clears its search; **Clear** removes its selections. Other filter dropdowns do not show a search field.
 4. Use **Favorites Only**, **For Trade Only**, or, in physical views, **Not in a checked-out deck** when appropriate.
 5. Choose **Done** to close the filter panel. Change **Sort By** to name, value, quantity, set, collector number, or another offered order.
 6. Use **Gallery View** for artwork or **List Table View** for a compact list. **Previous page** and **Next page** navigate longer results.

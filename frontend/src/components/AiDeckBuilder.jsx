@@ -163,6 +163,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
     ]),
   ]).values()).sort((a, b) => a.label.localeCompare(b.label, locale)).map(option => ({
     ...option,
+    searchText: option.label,
     label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
       {setSymbols[option.value.replace(/^mtg-/, '')] && <img src={setSymbols[option.value.replace(/^mtg-/, '')]} alt="" width="20" height="20" loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
       {option.label}
@@ -424,6 +425,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
                 <MultiSelectDropdown
                   key={inventoryType}
                   label={t('collection.fSet')}
+                  searchable
                   allLabel={t('collection.allSets')}
                   value={sets}
                   excludedValue={excludedSets}

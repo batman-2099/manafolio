@@ -55,7 +55,6 @@
   "completion.loading": "正在載入完整系列目錄…",
   "completion.empty": "此庫存和目標沒有符合條件的版本。請選擇其他系列或目標；這不表示已完成 100%。",
   "completion.progress": "已擁有 {owned} / {total}",
-  "completion.copies": "記錄：{recorded} · 擁有：{owned} · 空閒：{available}",
   "completion.noMatches": "沒有符合篩選條件的卡牌。選擇全部查看清單。",
   "trade.title": "換牌工作台",
   "trade.intro": "僅交換實體卡。變更庫存前請核對雙方。",

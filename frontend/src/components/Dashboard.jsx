@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, Text } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { getCardDisplayName } from '../utils/langHelper';
 import { priceText, currencySymbol } from '../utils/formatPrice';
@@ -34,6 +34,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
   const money = (n) => (n || 0).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const [statsState, setStatsState] = useState(null);
   const [statsRefresh, setStatsRefresh] = useState(0);
+  const [setSymbols, setSetSymbols] = useState({});
   const [timePeriod, setTimePeriod] = useState('30d');
   const [priceCheckOpen, setPriceCheckOpen] = useState(false);
   const priceCheckButtonRef = useRef(null);
@@ -64,6 +65,17 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
     else if (wasPriceCheckOpen.current) priceCheckButtonRef.current?.focus();
     wasPriceCheckOpen.current = priceCheckOpen;
   }, [priceCheckOpen]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/sets', { signal: controller.signal })
+      .then(response => response.ok ? response.json() : [])
+      .then(sets => {
+        if (!controller.signal.aborted) setSetSymbols(Object.fromEntries(sets.map(set => [set.id, set.symbol_url])));
+      })
+      .catch(() => {}); // Optional artwork must not block chart values or labels.
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -429,7 +441,16 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={sets} role="img" aria-labelledby="dashboard-set-title" layout="vertical" margin={{ left: 10, right: 30, top: 10, bottom: 10 }}>
                   <XAxis type="number" stroke="var(--text-secondary)" tickFormatter={(v) => `${quoteSymbol}${v}`} />
-                  <YAxis dataKey="name" type="category" width={120} stroke="var(--text-secondary)" tickLine={false} axisLine={false} style={{ fontSize: '0.8rem' }} />
+                  <YAxis dataKey="name" type="category" width={150} stroke="var(--text-secondary)" tickLine={false} axisLine={false}
+                    tick={({ x, y, index, payload }) => (
+                      <g>
+                        <Text x={x - 32} y={y} width={112} textAnchor="end" verticalAnchor="middle" fill="var(--text-secondary)" fontSize="0.8rem">{payload.value}</Text>
+                        {setSymbols[sets[index]?.id] && <foreignObject x={x - 26} y={y - 12} width={24} height={24} aria-hidden="true">
+                          <img src={setSymbols[sets[index].id]} alt="" width={24} height={24} style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px' }} onError={event => { event.currentTarget.style.display = 'none'; }} />
+                        </foreignObject>}
+                      </g>
+                    )}
+                  />
                   <Tooltip 
                     contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }}
                     labelStyle={{ color: 'var(--text-primary)' }}

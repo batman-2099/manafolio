@@ -55,7 +55,6 @@
   "completion.loading": "Cargando el catálogo completo…",
   "completion.empty": "No hay impresiones aptas para este inventario y objetivo. Elige otra expansión u objetivo; esto no significa un 100 % completado.",
   "completion.progress": "{owned} de {total} en propiedad",
-  "completion.copies": "Registradas: {recorded} · Propias: {owned} · Libres: {available}",
   "completion.noMatches": "Ninguna carta coincide. Elige Todas para ver la lista.",
   "trade.title": "Mesa de intercambio",
   "trade.intro": "Intercambia solo copias físicas. Revisa ambos lados antes de cambiar el inventario.",

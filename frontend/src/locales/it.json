@@ -55,7 +55,6 @@
   "completion.loading": "Caricamento del catalogo completo…",
   "completion.empty": "Nessuna stampa idonea per inventario e obiettivo. Scegli un’altra espansione o obiettivo: non è un completamento al 100%.",
   "completion.progress": "{owned} su {total} possedute",
-  "completion.copies": "Registrate: {recorded} · Possedute: {owned} · Libere: {available}",
   "completion.noMatches": "Nessuna carta corrisponde. Scegli Tutte per vedere l’elenco.",
   "trade.title": "Banco degli scambi",
   "trade.intro": "Scambia solo copie fisiche. Controlla entrambi i lati prima di modificare l’inventario.",

@@ -28,6 +28,14 @@ Release history starts with Manafolio 2.0.
 - Added an In Deck label to reserved-copy tiles in Take Stock without disabling Verified or Missing.
 - Display Last verified as a locale-formatted date without the time in Take Stock and container views; stored timestamps remain unchanged.
 - Outlined missing Take Stock card tiles in red, clearing the outline when verified and retaining it when reopening saved missing copies.
+- Added set symbols beside Collection set-filter options and the single-selected set, retaining text-only fallback when artwork is unavailable.
+- Added type-to-filter search to Collection's Set and Type dropdowns and AI Deck Builder's Set dropdown, preserving hidden selections, set symbols, and include/exclude behavior. Other filter dropdowns remain search-free.
+- Added set symbols alongside names in Dashboard's Collection Value by Set chart, preserving text labels when symbols are unavailable.
+- Changed Set completion to a card-image grid with Show defaulting to Missing, retaining goal filters, printing details, pagination, and image enlargement.
+- Replaced Set completion copy-count text with per-card Add to Wishlist buttons, including pending/error feedback and foil additions for the foil goal.
+- Showed finish-specific catalog price estimates on Set completion cards, preserving source currency and displaying Price unavailable when no quote exists.
+- Added symbols and name/code search to Set completion's single-set dropdown, always ordered newest to oldest by release date, with alphabetical ties and undated sets last.
+- Displayed every Set completion printing as a separate card tile with its own artwork, collector number, price, and Wishlist action; made Every printing the default goal and retained Show missing.
 
 ## 2.3.3 — 2026-10-12
 
