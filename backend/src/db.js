@@ -588,6 +588,9 @@ async function initDb() {
   if (!collectionCols.some(c => c.name === 'missing')) {
     await run(`ALTER TABLE collection ADD COLUMN missing INTEGER DEFAULT 0`);
   }
+  if (!collectionCols.some(c => c.name === 'last_verified_at')) {
+    await run(`ALTER TABLE collection ADD COLUMN last_verified_at TEXT`);
+  }
   // A cert number identifies one physical slab, so entering it twice is a mistake
   // rather than a second copy — unlike raw cards, where two identical rows are
   // normal and `quantity` exists for exactly that reason.

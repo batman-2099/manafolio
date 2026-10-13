@@ -433,6 +433,7 @@ router.get('/collection', async (req, res) => {
         c.market_value_source,
         c.market_value_at,
         c.missing,
+        c.last_verified_at,
         cc.name,
         -- The localized name for a non-English printing, so every view that
         -- renders a collection card can show it as the card actually reads.

@@ -83,6 +83,11 @@ async function parseCompleteBackup(data) {
         || !Number.isFinite(Date.parse(location.last_checked_at))))) {
     throw new Error('Invalid backup container stocktake date');
   }
+  if (backup.collection.some(card => card.last_verified_at != null
+      && (typeof card.last_verified_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(card.last_verified_at)
+        || !Number.isFinite(Date.parse(card.last_verified_at))))) {
+    throw new Error('Invalid backup card verification date');
+  }
   if (backup.decks.some(deck => !['collection', 'arena', 'graveyard'].includes(deck.inventory_type ?? 'collection')
       || ((deck.inventory_type ?? 'collection') !== 'collection' && (deck.checked_out || deck.checked_out_at != null)))) {
     throw new Error('Invalid backup deck inventory or checkout state');
@@ -281,15 +286,15 @@ async function restoreCompleteBackup(backup, userId) {
         INSERT INTO collection (
           card_id, quantity, condition, printing, language, purchase_price, location_id, compartment_id,
           position, favorite, is_trade, list_type, game, added_at, notes, grader, grade, cert_number,
-          market_value, market_value_source, market_value_at, missing, user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          market_value, market_value_source, market_value_at, missing, user_id, last_verified_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         card.card_id, card.quantity, card.condition, card.printing, card.language, card.purchase_price,
         card.location_id == null ? null : locationIds.get(card.location_id),
         card.compartment_id == null ? null : compartmentIds.get(card.compartment_id),
         card.position, card.favorite || 0, card.is_trade || 0, card.list_type, card.game, card.added_at,
         card.notes || '', card.grader || 'Raw', card.grade, card.cert_number, card.market_value,
-        card.market_value_source, card.market_value_at, card.missing || 0, userId
+        card.market_value_source, card.market_value_at, card.missing || 0, userId, card.last_verified_at ?? null
       ]);
       entryIds.set(card.id, result.lastID);
     }

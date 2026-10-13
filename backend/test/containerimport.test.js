@@ -164,7 +164,8 @@ async function testContainerImport() {
     await db.run(`
       UPDATE collection SET condition = 'Lightly Played', language = 'German', purchase_price = 4.25,
         favorite = 1, is_trade = 1, added_at = '2099-01-01', notes = 'Keep provenance', grader = 'PSA',
-        grade = 9, market_value = 50, market_value_source = 'manual', market_value_at = '2026-09-20'
+        grade = 9, market_value = 50, market_value_source = 'manual', market_value_at = '2026-09-20',
+        last_verified_at = '2024-01-02T03:04:05.000Z'
       WHERE id = ?
     `, [stack]);
     const originalStack = await db.get('SELECT * FROM collection WHERE id = ?', [stack]);

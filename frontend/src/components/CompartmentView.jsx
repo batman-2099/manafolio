@@ -210,20 +210,25 @@ function PrintingBadge({ printing }) {
 // Detail banner for the currently focused card. Shared by the box coverflow and
 // the binder grid so both surfaces describe a selection the same way.
 export function FocusedCardInfo({ card, slotNumber, moveSelect = null }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   if (!card) return null;
   const isEmpty = !!card.__empty;
   const isDivider = !!card.__divider;
   const isGhost = !!card.__ghost;
 
   return (
-    <div className="focused-card-info-panel" style={{ marginTop: '0.5rem', height: '96px', overflow: 'hidden' }}>
+    <div className="focused-card-info-panel" style={{ marginTop: '0.5rem', minHeight: '96px', height: 'auto', overflow: 'visible' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.7rem', borderRadius: 'var(--radius-sm)', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
           <div style={{ minWidth: 0 }}>
             <strong style={{ fontSize: '0.85rem' }}>
               #{slotNumber || 1} | {isEmpty ? t('compartment.emptySlot') : isDivider ? (card.label || t('compartment.divider')) : isGhost ? t('compartment.recommendedSpot') : displayName(card)}
             </strong>
+            {!isEmpty && !isDivider && !isGhost && card.last_verified_at !== undefined && (
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                {t('stocktake.lastVerified', { date: card.last_verified_at ? new Date(card.last_verified_at).toLocaleDateString(locale) : t('stocktake.never') })}
+              </div>
+            )}
             <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
               {isEmpty ? t('compartment.emptySlotHint') : isDivider ? t('compartment.dividerHint') : isGhost ? t('compartment.ghostHint') : `${card.set_name || ''} ${card.number ? `• #${card.number}` : ''}`}
             </div>

@@ -1188,6 +1188,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         groups[key].quantity += card.quantity;
         groups[key].foil_quantity += foilQuantity;
         groups[key].in_deck_qty = (groups[key].in_deck_qty || 0) + (card.in_deck_qty || 0);
+        if (!card.last_verified_at || !groups[key].last_verified_at) groups[key].last_verified_at = null;
+        else if (card.last_verified_at < groups[key].last_verified_at) groups[key].last_verified_at = card.last_verified_at;
       }
     });
     return Object.values(groups);
@@ -1767,7 +1769,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       onDragEnd={handleDragEnd}
     >
     {importReview}
-    {stocktakeLocation && <StocktakeDialog location={stocktakeLocation} onClose={() => setStocktakeLocation(null)} onApplied={() => {
+    {stocktakeLocation && <StocktakeDialog location={stocktakeLocation} onClose={() => { setStocktakeLocation(null); refreshAll(); onUpdate(); }} onApplied={() => {
       setStocktakeLocation(null);
       showToast(t('stocktake.saved'), 'success');
       refreshAll();
@@ -2465,6 +2467,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       )}
                       <span style={{ width: '100%', marginTop: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-strong)', fontSize: '0.65rem', fontWeight: 700 }}>
                         {displayName(card)}
+                      </span>
+                      <span style={{ width: '100%', marginTop: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.875rem', overflowWrap: 'anywhere' }}>
+                        {t('stocktake.lastVerified', { date: card.last_verified_at ? new Date(card.last_verified_at).toLocaleDateString(locale) : t('stocktake.never') })}
                       </span>
                       {foilQuantity > 0 && (
                         <span style={{ position: 'absolute', top: '0.35rem', left: '0.35rem', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, ...getPrintingBadgeStyle('Holofoil') }}>

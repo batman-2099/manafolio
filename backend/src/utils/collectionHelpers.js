@@ -455,13 +455,13 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
           card_id, user_id, quantity, condition, printing, language, purchase_price,
           favorite, is_trade, list_type, game, added_at, notes, grader, grade,
           cert_number, market_value, market_value_source, market_value_at, missing,
-          location_id, compartment_id, position
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          location_id, compartment_id, position, last_verified_at
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         entry.card_id, userId, entry.condition, entry.printing, entry.language, entry.purchase_price,
         entry.favorite, entry.is_trade, entry.list_type, entry.game, entry.added_at, entry.notes, entry.grader,
         entry.grade, entry.cert_number, entry.market_value, entry.market_value_source, entry.market_value_at, entry.missing,
-        locationId, compartmentId, ++slot * 1000
+        locationId, compartmentId, ++slot * 1000, entry.last_verified_at
       ]);
     }
     if (entry.compartment_id) sources.add(entry.compartment_id);

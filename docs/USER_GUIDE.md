@@ -421,15 +421,19 @@ If pages or rows fail to load, use **Retry**. A load error is not an empty conta
 ### Check a container with Take Stock
 
 1. Open a Physical or Graveyard container in **Storage**, then choose **More → Take Stock**.
-2. Compare each entry's printing, finish, language, condition, page/row, slot, and expected quantity with the cards. Choose **Verified — mark found** when every copy is present, or **Missing — mark missing** when some or all copies are absent.
-3. Choosing **Missing** reveals **How many copies are missing?**, initially set to the entry's full quantity. Enter a whole number from 1 to that quantity. The remaining copies will be marked found. For example, 2 missing out of 5 leaves 3 found. Leave entries you have not fully checked unreviewed.
-4. Entries with any checked-out/reserved copies are shown explicitly and cannot be changed in stocktake. Even a partially reserved quantity-bearing entry stays unchanged. Check in its deck first, then start a fresh stocktake if you need to review it.
-5. Choose **Review decisions**. Check each missing count, remaining found count, and the unchanged-entry count; **Back** lets you edit them. **Cancel**, Escape, browser Back, or closing the dialog asks before discarding unsaved decisions. Rejecting that prompt keeps your work. Closing does not change cards or the container's date; dismissal is blocked while applying.
-6. Choose **Apply stocktake** to save. Verified clears the existing Missing flag for every copy; Missing marks only the specified copies missing. A partial quantity splits into found and missing entries while preserving total copies, metadata, placement, reservations, and deck state. Unreviewed entries never become missing automatically. All selected changes and the date are committed together or not at all.
+2. The unstacked grid shows one tile per **physical copy**, even when copies share an entry or container slot. Each tile shows the card name and Last verified date. Card images can be enlarged without leaving the stocktake.
+3. Click the green **Verified** button when that copy is present, or the red **Missing** button when it is absent. **Each click saves immediately.** Only the selected copy changes; other copies keep their status and verification date. There is no missing-quantity field, review step, or Apply button.
+4. Reserved copies can also be marked **Verified** or **Missing** without checking in their deck. Stocktake preserves their reservations and return locations; it does not release copies or change deck contents.
+5. Wait for **Saving…** to finish before marking another copy. A successful save persists the copy's status and the container's stocktake date together. Where necessary, a quantity-bearing entry splits around the selected copy while preserving total copies, metadata, physical slots, reservations, and deck state. Certified entries containing multiple copies cannot be split and are rejected explicitly.
+6. Close the dialog when finished. Saved changes remain saved; there is no discard prompt or final confirmation. Closing, Escape, and browser Back are blocked while a save is pending. Copies you do not mark remain unchanged and never become missing automatically.
 
-If cards, container configuration, placement, or reservations changed while you were checking, applying is rejected. Close and restart with the current contents. If a connection fails while saving, reopen the container to check the recorded state before retrying.
+If cards, container configuration, placement, or reservations changed while you were checking, the next save is rejected. Use **Reload stocktake** to get the current contents. If a connection fails while saving, the change may already have reached the server: reload to check the saved state before trying again. Changes are not retried automatically.
 
-**Last stocktake applied** shows the last successful application, including a partial review; it does **not** certify that every card was verified. The date is preserved in complete account backups; older backups without it restore as **Never**. Draft decisions live only in the open dialog, not in your backup. Stocktake requires a server installation and is explicitly unavailable in the demo.
+**Last stocktake saved** shows the last successfully saved copy change; it does **not** certify that every card was verified. The date is preserved in complete account backups; older backups without it restore as **Never**. Each successful click persists independently, so closing and reopening retains your progress. Stocktake requires a server installation and is explicitly unavailable in the demo.
+
+**Last verified**, beneath each card name, records when that physical copy was last confirmed present. Clicking **Verified** clears its Missing flag and records a new verification timestamp. Clicking **Missing** preserves its previous verification timestamp, as do untouched copies. Existing copies without recorded verification show **Never**. These timestamps are included in complete account backups.
+
+Container card views also show **Last verified**. With **Stack Duplicates** enabled, a stack shows its oldest verification date, or **Never** if any included entry has not been verified. Turn stacking off to see each entry's individual date.
 
 ### Group containers into storage units
 

@@ -18,7 +18,15 @@ Release history starts with Manafolio 2.0.
 - Increased New Storage Container text to 16px across all four steps, including sorting and filing controls, with a larger dialog title.
 - Alphabetized the storage More menu by displayed labels, including conditional Lock/Unlock and Archive/Restore actions.
 - Widened Container Settings to 640px on larger screens while preserving mobile width constraints and scrolling.
-- Added clickable, keyboard-accessible card image enlargement in Take Stock, preserving review decisions when the enlarged image closes.
+- Added clickable, keyboard-accessible card image enlargement in Take Stock without leaving the stocktake.
+- Widened Take Stock to 1000px on desktop while retaining screen-fitting mobile width and vertical scrolling.
+- Added Last verified beneath card names in Take Stock, recording per-entry confirmation dates and preserving them through account backup/restore.
+- Showed Last verified in container card grids and selected-card layout details; duplicate stacks use the oldest date and remain unverified if any included entry is unverified.
+- Replaced Take Stock decision dropdowns and review/apply steps with an unstacked grid containing one tile per physical copy. Green Verified and red Missing buttons save each click immediately, update only that copy, and provide explicit reload recovery after save failures.
+- Simplified Take Stock tiles by removing printing/condition metadata, row/slot details, and the reserved-copy explanation.
+- Allowed reserved copies to be verified or marked missing in Take Stock without checking in their deck, preserving reservations and return locations.
+- Added an In Deck label to reserved-copy tiles in Take Stock without disabling Verified or Missing.
+- Display Last verified as a locale-formatted date without the time in Take Stock and container views; stored timestamps remain unchanged.
 
 ## 2.3.3 — 2026-10-12
 
