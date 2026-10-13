@@ -79,7 +79,7 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
 
   return (
     <Modal onClose={onClose} aria-labelledby="create-container-title">
-      <div className="glass-panel" style={{ width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }} onClick={(e) => e.stopPropagation()}>
+      <div className="glass-panel create-container-dialog" style={{ width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }} onClick={(e) => e.stopPropagation()}>
         {/* Header + step indicator */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h3 id="create-container-title" style={{ margin: 0 }}>{t('container.newTitle')}</h3>

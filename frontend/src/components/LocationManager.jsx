@@ -2191,23 +2191,24 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               </button>
               {showKebabMenu && (
                 <div className="kebab-dropdown">
-                  <button type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setShowCreate(true); }}>
+                  {[
+                  <button key={t('loc.createContainer')} type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setShowCreate(true); }}>
                     <Plus size={14} aria-hidden="true" /> {t('loc.createContainer')}
-                  </button>
-                  {selectedLoc && <>
-                  <button type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setStocktakeLocation(selectedLoc); }}>
+                  </button>,
+                  ...(selectedLoc ? [
+                  <button key={t('stocktake.title')} type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setStocktakeLocation(selectedLoc); }}>
                     <Check size={14} aria-hidden="true" /> {t('stocktake.title')}
-                  </button>
-                  <button type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setLabelContainer(selectedLoc); }}>
+                  </button>,
+                  <button key={t('containerLabel.title')} type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setLabelContainer(selectedLoc); }}>
                     <Download size={14} aria-hidden="true" /> {t('containerLabel.title')}
-                  </button>
-                  <button type="button" className="kebab-item" disabled={unitsLoading || unitsError} onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setUnitDraft({ ...selectedLoc, mode: 'move' }); }}>
+                  </button>,
+                  <button key={t('storageUnit.move')} type="button" className="kebab-item" disabled={unitsLoading || unitsError} onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setUnitDraft({ ...selectedLoc, mode: 'move' }); }}>
                     <Layers size={14} aria-hidden="true" /> {t('storageUnit.move')}
-                  </button>
-                  <button type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setContainerDeckError(''); setContainerDeckDraft({ location_id: selectedLoc.id, name: selectedLoc.name, format: 'Casual' }); }}>
+                  </button>,
+                  <button key={t('deck.createDeck')} type="button" className="kebab-item" onClick={() => { containerMenuButton.current?.focus(); setShowKebabMenu(false); setContainerDeckError(''); setContainerDeckDraft({ location_id: selectedLoc.id, name: selectedLoc.name, format: 'Casual' }); }}>
                     <Layers size={14} aria-hidden="true" /> {t('deck.createDeck')}
-                  </button>
-                  <button type="button" className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => {
+                  </button>,
+                  <button key={t('loc.containerSettings')} type="button" className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => {
                     containerMenuButton.current?.focus();
                     setShowKebabMenu(false);
                     let sDraft = [];
@@ -2251,32 +2252,33 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     setShowRulesModal(true);
                   }}>
                     <Settings size={16} aria-hidden="true" /> {t('loc.containerSettings')}
-                  </button>
-                  <button className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => { setShowKebabMenu(false); handleAddCompartment(); }}>
+                  </button>,
+                  <button key={t(isBinderType ? 'loc.addPage' : 'loc.addCompartment')} className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => { setShowKebabMenu(false); handleAddCompartment(); }}>
                     <Plus size={14} /> {t(isBinderType ? 'loc.addPage' : 'loc.addCompartment')}
-                  </button>
-                  <button className="kebab-item" 
+                  </button>,
+                  <button key={t(isBinderType ? 'loc.removeLastPage' : 'loc.removeLastCompartment')} className="kebab-item"
                           disabled={!!selectedLoc.locked || compartments.length <= 1 || (cardsByCompartment.get(compartments[compartments.length-1]?.id) || []).length > 0} 
                           onClick={() => { setShowKebabMenu(false); handleRemoveCompartment(compartments[compartments.length-1].id); }}
                           title={t(selectedLoc.locked ? 'loc.containerLockedShort' : 'loc.removeLastHint')}
                   >
                     <Trash2 size={14} /> {t(isBinderType ? 'loc.removeLastPage' : 'loc.removeLastCompartment')}
-                  </button>
-                  <button className="kebab-item" onClick={() => { setShowKebabMenu(false); startResort(false, true); }} disabled={!!selectedLoc.locked || (selectedLoc.total_cards || 0) === 0}>
+                  </button>,
+                  <button key="Re-sort Container" className="kebab-item" onClick={() => { setShowKebabMenu(false); startResort(false, true); }} disabled={!!selectedLoc.locked || (selectedLoc.total_cards || 0) === 0}>
                     <RefreshCw size={14} /> Re-sort Container
-                  </button>
-                  <button className="kebab-item" onClick={() => { setShowKebabMenu(false); handleToggleContainerLock(); }} title={t('loc.lockKebabHint')}>
+                  </button>,
+                  <button key={t(selectedLoc.locked ? 'loc.unlockContainer' : 'loc.lockContainer')} className="kebab-item" onClick={() => { setShowKebabMenu(false); handleToggleContainerLock(); }} title={t('loc.lockKebabHint')}>
                     <Lock size={14} /> {t(selectedLoc.locked ? 'loc.unlockContainer' : 'loc.lockContainer')}
-                  </button>
-                  <button className="kebab-item" disabled={containerTransferLocked || transferringContainer} aria-busy={transferringContainer}
+                  </button>,
+                  <button key={t(isArchive ? 'loc.restoreContainer' : 'loc.archiveContainer')} className="kebab-item" disabled={containerTransferLocked || transferringContainer} aria-busy={transferringContainer}
                     title={containerTransferLocked ? t('loc.lockedTransferContainer') : undefined}
                     onClick={() => { setShowKebabMenu(false); handleTransferContainer(); }}>
                     <RefreshCw size={14} /> {t(isArchive ? 'loc.restoreContainer' : 'loc.archiveContainer')}
-                  </button>
-                  <button className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => { setShowKebabMenu(false); handleDeleteLocation(selectedLoc.id, selectedLoc.name); }} style={{ color: 'var(--accent-red)' }}>
+                  </button>,
+                  <button key="Delete Container" className="kebab-item" disabled={!!selectedLoc.locked} onClick={() => { setShowKebabMenu(false); handleDeleteLocation(selectedLoc.id, selectedLoc.name); }} style={{ color: 'var(--accent-red)' }}>
                     <Trash2 size={14} /> Delete Container
                   </button>
-                  </>}
+                  ] : [])
+                  ].sort((a, b) => a.key.localeCompare(b.key, locale))}
                 </div>
               )}
             </div>
