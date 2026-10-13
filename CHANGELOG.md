@@ -2,7 +2,7 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.3.4 — 2026-10-13
 
 - Corrected bulk-add partial-success handling: failed cards remain selected with errors for retry, and only successful Physical additions update Physical counts. Invalid bulk quantities and container layout counts are rejected instead of silently replaced.
 - Kept scanner language and printing identity together after failed lookups, preserved scan drafts on save errors, and exposed the scan-only 1–250 quantity limit. Camera retry now starts one request; advanced sliders have associated labels.

@@ -1,7 +1,7 @@
 {
   "name": "manafolio-frontend",
   "private": true,
-  "version": "2.3.3",
+  "version": "2.3.4",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
