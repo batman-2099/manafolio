@@ -17,6 +17,7 @@ Release history starts with Manafolio 2.0.
 - Moved the Re-sort: Move Guide above container cards on desktop and mobile, retaining its progress and Next, Skip, and Done actions.
 - Increased New Storage Container text to 16px across all four steps, including sorting and filing controls, with a larger dialog title.
 - Alphabetized the storage More menu by displayed labels, including conditional Lock/Unlock and Archive/Restore actions.
+- Widened Container Settings to 640px on larger screens while preserving mobile width constraints and scrolling.
 
 ## 2.3.3 — 2026-10-12
 
