@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Camera, Search, Award, BookOpen } from 'lucide-react';
 import CameraScanner from './CameraScanner';
 import CardSearch from './CardSearch';
@@ -6,9 +6,15 @@ import SlabLookup from './SlabLookup';
 import MtgDeckImport from './MtgDeckImport';
 import { useT } from '../utils/i18n';
 
-function AddCards({ onAddSuccess, showToast, setActiveTab, initialMode = 'search' }) {
+function AddCards({ onAddSuccess, showToast, setActiveTab, navigationGuardRef, initialMode = 'search' }) {
   const { t } = useT();
   const [mode, setMode] = useState(initialMode);
+  const localNavigationGuardRef = useRef(null);
+  const modeGuardRef = navigationGuardRef || localNavigationGuardRef;
+  const changeMode = nextMode => {
+    if (nextMode !== mode && modeGuardRef.current?.() === false) return;
+    setMode(nextMode);
+  };
 
   // Demo build has no backend: the camera scanner and live card search can't
   // work, so show a notice instead of a broken UI.
@@ -30,28 +36,28 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, initialMode = 'search
         <div className="sub-nav-tabs" style={{ width: '100%', maxWidth: '520px', margin: 0 }}>
           <button
             className={`sub-nav-tab ${mode === 'search' ? 'active' : ''}`}
-            onClick={() => setMode('search')}
+            onClick={() => changeMode('search')}
           >
             <Search size={18} />
             <span>{t('addCards.search')}</span>
           </button>
           <button
             className={`sub-nav-tab ${mode === 'deck' ? 'active' : ''}`}
-            onClick={() => setMode('deck')}
+            onClick={() => changeMode('deck')}
           >
             <BookOpen size={18} />
             <span>{t('addCards.deck')}</span>
           </button>
           <button
             className={`sub-nav-tab ${mode === 'scan' ? 'active' : ''}`}
-            onClick={() => setMode('scan')}
+            onClick={() => changeMode('scan')}
           >
             <Camera size={18} />
             <span>{t('addCards.scan')}</span>
           </button>
           <button
             className={`sub-nav-tab ${mode === 'slab' ? 'active' : ''}`}
-            onClick={() => setMode('slab')}
+            onClick={() => changeMode('slab')}
           >
             <Award size={18} />
             <span>{t('addCards.slab')}</span>
@@ -61,7 +67,7 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, initialMode = 'search
 
       <div>
         {mode === 'scan' && <CameraScanner onAddSuccess={onAddSuccess} showToast={showToast} setActiveTab={setActiveTab} />}
-        {mode === 'search' && <CardSearch onAddSuccess={onAddSuccess} showToast={showToast} />}
+        {mode === 'search' && <CardSearch onAddSuccess={onAddSuccess} showToast={showToast} navigationGuardRef={modeGuardRef} />}
         {mode === 'slab' && <SlabLookup onAddSuccess={onAddSuccess} showToast={showToast} />}
         {mode === 'deck' && <MtgDeckImport onAddSuccess={onAddSuccess} showToast={showToast} />}
       </div>

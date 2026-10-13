@@ -315,9 +315,7 @@ async function embedPhase(job) {
     prev = null;
   }
 
-  const session = await ort.InferenceSession.create(path.join(MODEL_DIR, 'milo.onnx'), {
-    intraOpNumThreads: 1, interOpNumThreads: 1, executionMode: 'sequential',
-  });
+  let session;
 
   const ids = [], vecs = [], srcs = {};
   let built = 0, reused = 0, failed = 0;
@@ -354,47 +352,54 @@ async function embedPhase(job) {
     }
   };
 
-  pump();
-  while (inflight.size) {
-    const settled = await Promise.race(inflight.values());
-    inflight.delete(settled.row.id);
-    if (settled.err) failed++;
-    else {
-      try {
-        const { data } = await sharp(settled.buf).resize(SIZE, SIZE, { fit: 'fill' })
-          .removeAlpha().raw().toBuffer({ resolveWithObject: true });
-        const out = await session.run({ image: cvScan.toTensor(data, SIZE) });
-        vecs.push(out.embedding.data);
-        ids.push(settled.row.id);
-        srcs[settled.row.id] = settled.row.image_url;
-        built++;
-      } catch { failed++; }
-    }
-    job.done++;
-    job.message = `${built + reused}/${rows.length}`;
+  try {
     pump();
-  }
-
-  if (scoped && prev) {
-    for (const { id, vec, src } of keptFromPrev(prev, ids)) {
-      ids.push(id); vecs.push(vec);
-      if (src) srcs[id] = src;
-      reused++;
+    while (inflight.size) {
+      const settled = await Promise.race(inflight.values());
+      inflight.delete(settled.row.id);
+      if (settled.err) failed++;
+      else {
+        try {
+          const { data } = await sharp(settled.buf).resize(SIZE, SIZE, { fit: 'fill' })
+            .removeAlpha().raw().toBuffer({ resolveWithObject: true });
+          session ||= await ort.InferenceSession.create(path.join(MODEL_DIR, 'milo.onnx'), {
+            intraOpNumThreads: 1, interOpNumThreads: 1, executionMode: 'sequential',
+          });
+          const out = await session.run({ image: cvScan.toTensor(data, SIZE) });
+          vecs.push(out.embedding.data);
+          ids.push(settled.row.id);
+          srcs[settled.row.id] = settled.row.image_url;
+          built++;
+        } catch { failed++; }
+      }
+      job.done++;
+      job.message = `${built + reused}/${rows.length}`;
+      pump();
     }
-  }
 
-  // Only complete builds replace the working catalog. Cached card data survives
-  // cancellation; uncommitted embeddings are deliberately discarded.
-  if (job.cancelled) return { built, reused, failed, wrote: false };
-  if (failed) throw new Error(`${failed} card(s) failed to embed; catalog unchanged`);
-  if (!vecs.length) return { built, reused, failed, wrote: false };
-  const dim = vecs[0].length;
-  publishCatalog(metaPath(job.game, job.lang), {
-    dim, ids, srcs, game: job.game, lang: job.lang,
-    model: 'milo1', views: 1, builtAt: new Date().toISOString(),
-  }, vecs);
-  cvScan.reload(job.game, job.lang);
-  return { built, reused, failed, wrote: true, rows: ids.length };
+    if (scoped && prev) {
+      for (const { id, vec, src } of keptFromPrev(prev, ids)) {
+        ids.push(id); vecs.push(vec);
+        if (src) srcs[id] = src;
+        reused++;
+      }
+    }
+
+    // Only complete builds replace the working catalog. Cached card data survives
+    // cancellation; uncommitted embeddings are deliberately discarded.
+    if (job.cancelled) return { built, reused, failed, wrote: false };
+    if (failed) throw new Error(`${failed} card(s) failed to embed; catalog unchanged`);
+    if (!vecs.length) return { built, reused, failed, wrote: false };
+    const dim = vecs[0].length;
+    publishCatalog(metaPath(job.game, job.lang), {
+      dim, ids, srcs, game: job.game, lang: job.lang,
+      model: 'milo1', views: 1, builtAt: new Date().toISOString(),
+    }, vecs);
+    cvScan.reload(job.game, job.lang);
+    return { built, reused, failed, wrote: true, rows: ids.length };
+  } finally {
+    if (session) await session.release();
+  }
 }
 
 function start(game, lang = 'English', opts = {}) {

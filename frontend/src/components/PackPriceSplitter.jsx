@@ -6,18 +6,23 @@ import { useT } from '../utils/i18n';
 // server-side in POST /api/collection/bulk (action 'purchase_split'); this is
 // just the total input + method picker shared by the collection bulk bar and
 // the scanner's recent-scans panel.
-export default function PackPriceSplitter({ entryIds, onApplied, showToast, style }) {
+export default function PackPriceSplitter({ entryIds, onApplied, showToast, style, runBulk, pending = false }) {
   const { t } = useT();
   const [total, setTotal] = useState('');
   const [method, setMethod] = useState('weighted');
   const [busy, setBusy] = useState(false);
 
   const apply = async () => {
+    if (pending || busy) return;
     const amount = parseFloat(total);
     if (!(amount >= 0)) { showToast(t('split.errNoTotal'), 'error'); return; }
     if (!entryIds.length) { showToast(t('split.errNoCards'), 'error'); return; }
     setBusy(true);
     try {
+      if (runBulk) {
+        if (await runBulk('purchase_split', { total: amount, method })) setTotal('');
+        return;
+      }
       const res = await fetch('/api/collection/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -38,6 +43,7 @@ export default function PackPriceSplitter({ entryIds, onApplied, showToast, styl
       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{t('split.totalPaid')} $</span>
       <input
         type="number" step="0.01" min="0" value={total}
+        disabled={pending || busy}
         onChange={(e) => setTotal(e.target.value)}
         placeholder="0.00"
         onKeyDown={(e) => { if (e.key === 'Enter') apply(); }}
@@ -45,13 +51,14 @@ export default function PackPriceSplitter({ entryIds, onApplied, showToast, styl
       />
       <select
         className="select-control" value={method} onChange={(e) => setMethod(e.target.value)}
+        disabled={pending || busy}
         style={{ fontSize: '0.72rem', padding: '0.3rem 0.4rem', maxWidth: '130px' }}
         title={t('split.methodHint')}
       >
         <option value="weighted">{t('split.byValue')}</option>
         <option value="equal">{t('split.evenly')}</option>
       </select>
-      <button className="btn btn-primary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} disabled={busy || !entryIds.length} onClick={apply}>
+      <button className="btn btn-primary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} disabled={pending || busy || !entryIds.length} onClick={apply}>
         {t('split.splitAcross', { count: entryIds.length })}
       </button>
     </div>

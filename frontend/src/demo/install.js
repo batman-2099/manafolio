@@ -59,7 +59,7 @@ window.fetch = async (input, opts = {}) => {
   }
 
   if (/^\/api\/locations\/\d+\/stocktake$/.test(path)) {
-    return Promise.resolve(json({ error: 'Stocktake requires a server installation.', code: 'stocktake.demo' }, 503));
+    return json({ error: 'Stocktake requires a server installation.', code: 'stocktake.demo' }, 503);
   }
   if (path.startsWith('/api/decks/acquisition-plan')) {
     return json({ error: 'Acquisition planning requires a server installation; the demo cannot save a Wishlist.' }, 503);
@@ -75,21 +75,21 @@ window.fetch = async (input, opts = {}) => {
     const units = routes['/api/storage-units'];
     const id = path === '/api/storage-units' ? null : Number(path.split('/')[3]);
     const unit = units.find(item => item.id === id);
-    if (method === 'GET' && id === null) return Promise.resolve(json(units.map(item => {
+    if (method === 'GET' && id === null) return json(units.map(item => {
       const choices = unitCoverChoices(item.id);
       return { ...item, cover_card_id: item.cover_card_id ?? null, cover_image: item.cover_image ?? null,
         cover: item.cover_image ? { card_id: null, name: item.name, game: 'mtg', image_url: item.cover_image } : choices.find(card => card.card_id === item.cover_card_id) || choices[0] || null,
         container_count: routes['/api/locations'].filter(location => location.storage_unit_id === item.id).length };
-    })));
-    if (id !== null && !unit) return Promise.resolve(json({ error: 'Storage unit not found.' }, 404));
-    if (method === 'GET' && path.endsWith('/cover-choices')) return Promise.resolve(json(unitCoverChoices(id).sort((a, b) => a.name.localeCompare(b.name) || a.card_id.localeCompare(b.card_id))));
+    }));
+    if (id !== null && !unit) return json({ error: 'Storage unit not found.' }, 404);
+    if (method === 'GET' && path.endsWith('/cover-choices')) return json(unitCoverChoices(id).sort((a, b) => a.name.localeCompare(b.name) || a.card_id.localeCompare(b.card_id)));
     if (path.endsWith('/cover-choices') || (id === null ? method !== 'POST' : !['PUT', 'DELETE'].includes(method))) return unavailable();
     if (method === 'DELETE' && unit) {
       routes['/api/storage-units'] = units.filter(item => item.id !== id);
       routes['/api/locations'].forEach(location => {
         if (location.storage_unit_id === id) Object.assign(location, { storage_unit_id: null, storage_unit_name: null });
       });
-      return Promise.resolve(json({ message: 'Storage unit deleted; containers retained.' }));
+      return json({ message: 'Storage unit deleted; containers retained.' });
     }
     if (method === 'POST' || method === 'PUT') {
       const { name, type, cover_card_id, cover_image } = JSON.parse(opts.body || '{}');
@@ -103,9 +103,9 @@ window.fetch = async (input, opts = {}) => {
           return json({ error: 'Choose a static PNG, JPEG or WebP image.' }, 400);
         }
       }
-      if (type !== undefined && !storageUnitTypes.includes(type)) return Promise.resolve(json({ error: 'Choose a valid storage unit type.' }, 400));
-      if ((method === 'POST' || name !== undefined) && (typeof name !== 'string' || !name.trim() || name.trim().length > 200)) return Promise.resolve(json({ error: 'Enter a name of up to 200 characters.' }, 400));
-      if (cover_card_id != null && !unitCoverChoices(id).some(card => card.card_id === cover_card_id)) return Promise.resolve(json({ error: 'Choose a card from this storage unit.' }, 400));
+      if (type !== undefined && !storageUnitTypes.includes(type)) return json({ error: 'Choose a valid storage unit type.' }, 400);
+      if ((method === 'POST' || name !== undefined) && (typeof name !== 'string' || !name.trim() || name.trim().length > 200)) return json({ error: 'Enter a name of up to 200 characters.' }, 400);
+      if (cover_card_id != null && !unitCoverChoices(id).some(card => card.card_id === cover_card_id)) return json({ error: 'Choose a card from this storage unit.' }, 400);
       if (unit) {
         if (name !== undefined) unit.name = name.trim();
         if (cover_card_id !== undefined) Object.assign(unit, { cover_card_id, cover_image: null });
@@ -114,18 +114,18 @@ window.fetch = async (input, opts = {}) => {
         routes['/api/locations'].forEach(location => {
           if (location.storage_unit_id === id) location.storage_unit_name = unit.name;
         });
-        return Promise.resolve(json({ message: 'Storage unit updated.' }));
+        return json({ message: 'Storage unit updated.' });
       }
       const created = { id: Math.max(0, ...units.map(item => item.id)) + 1, name: name.trim(), type: type ?? 'Other', container_count: 0, cover_card_id: null, cover_image: null, cover: null };
       units.push(created);
-      return Promise.resolve(json(created, 201));
+      return json(created, 201);
     }
-    return Promise.resolve(json({ error: 'Unsupported storage unit request.' }, 405));
+    return json({ error: 'Unsupported storage unit request.' }, 405);
   }
   if ((method === 'PUT' && /^\/api\/locations\/\d+$/.test(path)) || (method === 'POST' && path === '/api/locations')) {
     const body = JSON.parse(opts.body || '{}');
     const unit = routes['/api/storage-units'].find(item => item.id === body.storage_unit_id);
-    if (body.storage_unit_id != null && !unit) return Promise.resolve(json({ error: 'Storage unit not found.' }, 404));
+    if (body.storage_unit_id != null && !unit) return json({ error: 'Storage unit not found.' }, 404);
     let location = routes['/api/locations'].find(item => item.id === Number(path.split('/').pop()));
     if (method === 'POST') {
       const { count = 1, capacity = 9 } = body.compartmentPlan || {};
@@ -135,87 +135,87 @@ window.fetch = async (input, opts = {}) => {
         id: location.id * 1000 + index, location_id: location.id, idx: index + 1, capacity, locked: 0, display_label: String(index + 1),
       }));
     }
-    if (!location) return Promise.resolve(json({ error: 'Container not found.' }, 404));
+    if (!location) return json({ error: 'Container not found.' }, 404);
     Object.assign(location, body);
     if (Object.hasOwn(body, 'storage_unit_id')) location.storage_unit_name = unit?.name ?? null;
-    return Promise.resolve(json(method === 'POST' ? { id: location.id } : { message: 'Container updated.' }, method === 'POST' ? 201 : 200));
+    return json(method === 'POST' ? { id: location.id } : { message: 'Container updated.' }, method === 'POST' ? 201 : 200);
   }
   if (/^\/api\/decks\/\d+\/revisions(?:\/.*)?$/.test(path)) {
-    return Promise.resolve(json({ error: 'Deck history requires a server installation; the demo does not persist deck revisions.' }, 503));
+    return json({ error: 'Deck history requires a server installation; the demo does not persist deck revisions.' }, 503);
   }
   if (/^\/api\/decks\/\d+\/share$/.test(path) || path.startsWith('/api/shared/decks/')) {
-    return Promise.resolve(json({ error: 'Public deck sharing is unavailable in the demo.' }, 503));
+    return json({ error: 'Public deck sharing is unavailable in the demo.' }, 503);
   }
 
   if (path.startsWith('/api/ai-decks/')) {
     const params = new URL(url, window.location.origin).searchParams;
     const body = opts.body ? JSON.parse(opts.body) : {};
     const provider = params.get('provider') || body.provider || aiPreferences.provider;
-    if (!Object.hasOwn(aiConnections, provider)) return Promise.resolve(json({ error: 'Unknown AI provider.' }, 400));
+    if (!Object.hasOwn(aiConnections, provider)) return json({ error: 'Unknown AI provider.' }, 400);
     if (path === '/api/ai-decks/preferences' && ['GET', 'PUT'].includes(method)) {
       if (method === 'PUT') {
-        if (body.model && !aiModels[provider].some(model => model.id === body.model)) return Promise.resolve(json({ error: 'Choose an available model.' }, 400));
-        if (provider !== 'chatgpt' && !body.model) return Promise.resolve(json({ error: 'Choose a model.' }, 400));
+        if (body.model && !aiModels[provider].some(model => model.id === body.model)) return json({ error: 'Choose an available model.' }, 400);
+        if (provider !== 'chatgpt' && !body.model) return json({ error: 'Choose a model.' }, 400);
         aiPreferences = { provider, model: body.model || null, reasoning_effort: provider === 'chatgpt' ? body.reasoning_effort || null : null, ollama_url: body.ollama_url || null };
       }
-      return Promise.resolve(json(aiPreferences));
+      return json(aiPreferences);
     }
     if (path === '/api/ai-decks/credentials' && ['PUT', 'DELETE'].includes(method)) {
-      if (!['gemini', 'openrouter'].includes(provider)) return Promise.resolve(json({ error: 'Choose an API-key provider.' }, 400));
+      if (!['gemini', 'openrouter'].includes(provider)) return json({ error: 'Choose an API-key provider.' }, 400);
       // Store connection state only: even sample keys never enter fixtures or storage.
       aiConnections[provider] = method === 'PUT';
-      return Promise.resolve(json({ ok: true }));
+      return json({ ok: true });
     }
     if (path === '/api/ai-decks/account' && ['GET', 'DELETE'].includes(method)) {
       if (method === 'DELETE') aiConnections.chatgpt = false;
-      return Promise.resolve(json({ provider, connected: aiConnections[provider] }));
+      return json({ provider, connected: aiConnections[provider] });
     }
-    if (path === '/api/ai-decks/models' && method === 'GET') return Promise.resolve(json({ models: aiConnections[provider] ? aiModels[provider] : [] }));
-    return Promise.resolve(json({ error: 'Live AI requests are disabled in the demo.' }, 503));
+    if (path === '/api/ai-decks/models' && method === 'GET') return json({ models: aiConnections[provider] ? aiModels[provider] : [] });
+    return json({ error: 'Live AI requests are disabled in the demo.' }, 503);
   }
   if (method === 'PATCH' && path === '/api/auth/theme') {
     const { theme } = JSON.parse(opts.body || '{}');
-    if (!themes.includes(theme)) return Promise.resolve(json({ error: 'Invalid theme' }, 400));
+    if (!themes.includes(theme)) return json({ error: 'Invalid theme' }, 400);
     routes['/api/auth/me'].user.theme = theme;
-    return Promise.resolve(json({ theme }));
+    return json({ theme });
   }
   if (method === 'PATCH' && /^\/api\/decks\/\d+\/card-back$/.test(path)) {
     const deck = routes[path.replace(/\/card-back$/, '')];
-    if (!deck || deck.game !== 'mtg') return Promise.resolve(json({ error: 'Deck not found.' }, 404));
+    if (!deck || deck.game !== 'mtg') return json({ error: 'Deck not found.' }, 404);
     const body = JSON.parse(opts.body || '{}');
     const { color, image } = body;
     if (Object.keys(body).length !== 2 || !Object.hasOwn(body, 'color') || !Object.hasOwn(body, 'image')
       || !(color === null || (typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color)))
       || !(image === null || (typeof image === 'string' && image.length < 500_000 && /^data:image\/webp;base64,/.test(image)))
       || (color !== null && image !== null)) {
-      return Promise.resolve(json({ error: 'Invalid card back.' }, 400));
+      return json({ error: 'Invalid card back.' }, 400);
     }
     const back = { card_back_color: color, card_back_image: image };
     Object.assign(deck, back);
     const listedDeck = routes['/api/decks'].find(item => item.id === deck.id);
     if (listedDeck) Object.assign(listedDeck, back);
-    return Promise.resolve(json(back));
+    return json(back);
   }
   if (method === 'PATCH' && /^\/api\/decks\/\d+\/sleeved$/.test(path)) {
     const deckPath = path.replace(/\/sleeved$/, '');
     const deck = routes[deckPath];
-    if (!deck) return Promise.resolve(json({ error: 'Deck not found.' }, 404));
+    if (!deck) return json({ error: 'Deck not found.' }, 404);
     const { sleeved } = JSON.parse(opts.body || '{}');
     if (!Number.isInteger(sleeved) || sleeved < 0 || sleeved > 3) {
-      return Promise.resolve(json({ error: 'Invalid sleeve setting.' }, 400));
+      return json({ error: 'Invalid sleeve setting.' }, 400);
     }
     deck.sleeved = sleeved;
     const listedDeck = routes['/api/decks'].find(item => item.id === deck.id);
     if (listedDeck) listedDeck.sleeved = sleeved;
-    return Promise.resolve(json({ sleeved }));
+    return json({ sleeved });
   }
   if (method === 'PUT' && /^\/api\/decks\/\d+\/editor$/.test(path)) {
     const deck = routes[path.replace(/\/editor$/, '')];
-    if (!deck) return Promise.resolve(json({ error: 'Deck not found.' }, 404));
+    if (!deck) return json({ error: 'Deck not found.' }, 404);
     const body = JSON.parse(opts.body || '{}');
     if (Object.keys(body).some(key => key !== 'notes') || typeof body.notes !== 'string') return unavailable();
     deck.notes = body.notes;
-    return Promise.resolve(json({ message: 'Demo mode: notes are saved for this session only.' }));
+    return json({ message: 'Demo mode: notes are saved for this session only.' });
   }
 
   if (method === 'GET' && routes[path]) {
@@ -256,7 +256,7 @@ window.fetch = async (input, opts = {}) => {
         });
       }
     }
-    return Promise.resolve(json(data));
+    return json(data);
   }
 
   if (method === 'POST' && path === '/api/cards/related-tokens') {
@@ -266,7 +266,7 @@ window.fetch = async (input, opts = {}) => {
       ...token,
       source_cards: token.source_cards.filter(card => cardIds.has(card.id)),
     })).filter(token => token.source_cards.length > 0);
-    return Promise.resolve(json({ tokens }));
+    return json({ tokens });
   }
 
   return unavailable();

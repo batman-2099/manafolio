@@ -251,17 +251,15 @@ router.post('/bootstrap', authLimiter, async (req, res) => {
   }
 
   try {
-    const row = await db.get(`SELECT COUNT(*) as count FROM users`);
-    if (row.count > 0) {
-      return res.status(409).json({ error: 'This instance is already set up. Log in instead.' });
-    }
-
     const passwordHash = db.hashPassword(password);
     const shareToken = crypto.randomBytes(16).toString('hex');
     const result = await db.run(`
       INSERT INTO users (username, password_hash, role, share_token, share_enabled)
-      VALUES (?, ?, ?, ?, ?)
+      SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM users)
     `, [OWNER_USERNAME, passwordHash, 'admin', shareToken, 0]);
+    if (!result.changes) {
+      return res.status(409).json({ error: 'This instance is already set up. Log in instead.' });
+    }
 
     // Both skipped by initDb, which found no account to hand them to.
     await db.adoptOrphanRows(result.lastID);
@@ -309,8 +307,11 @@ router.post('/register', authLimiter, async (req, res) => {
 
     const result = await db.run(`
       INSERT INTO users (username, password_hash, role, share_token, share_enabled)
-      VALUES (?, ?, ?, ?, ?)
+      SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users)
     `, [cleanUsername, passwordHash, 'member', shareToken, 0]);
+    if (!result.changes) {
+      return res.status(403).json({ error: 'Create the owner account before registering members.' });
+    }
 
     const token = await generateSession(result.lastID);
     const user = await db.get(`SELECT * FROM users WHERE id = ?`, [result.lastID]);
@@ -429,15 +430,29 @@ router.put('/settings', authenticateToken, async (req, res) => {
 
   try {
     if (password !== undefined) {
-      if (password.length < 8) {
+      if (typeof password !== 'string' || password.length < 8) {
         return res.status(400).json({ error: 'Password must be at least 8 characters' });
       }
-      const currentUser = await db.get(`SELECT password_hash FROM users WHERE id = ?`, [req.user.id]);
-      if (!current_password || !verifyPassword(current_password, currentUser.password_hash)) {
+      if (typeof current_password !== 'string' || !current_password) {
         return res.status(401).json({ error: 'Current password is incorrect' });
       }
-      const newHash = db.hashPassword(password);
-      await db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [newHash, req.user.id]);
+      const token = req.headers['authorization'].split(' ')[1];
+      const passwordError = await db.withTransaction(async () => {
+        // Middleware may have authenticated before another password change revoked this session.
+        const currentUser = await db.get(`
+          SELECT u.password_hash FROM users u
+          JOIN sessions s ON s.user_id = u.id
+          WHERE u.id = ? AND s.token = ? AND s.expires_at > DATETIME('now')
+        `, [req.user.id, token]);
+        if (!currentUser) return 'Invalid or expired session token.';
+        if (!verifyPassword(current_password, currentUser.password_hash)) {
+          return 'Current password is incorrect';
+        }
+        const newHash = db.hashPassword(password);
+        await db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [newHash, req.user.id]);
+        await db.run(`DELETE FROM sessions WHERE user_id = ? AND token <> ?`, [req.user.id, token]);
+      });
+      if (passwordError) return res.status(401).json({ error: passwordError });
     }
 
     if (share_enabled !== undefined) {

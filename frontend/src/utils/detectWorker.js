@@ -87,7 +87,7 @@ async function getSession() {
       return s;
     })().catch((err) => {
       console.error('[detectWorker] getSession error:', err);
-      sessionPromise = null;      // allow a later retry
+      // Keep the rejection until this worker is restarted; preview frames use contours.
       throw err;
     });
   }

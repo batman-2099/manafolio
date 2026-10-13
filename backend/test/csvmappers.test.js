@@ -23,4 +23,10 @@ for (const format of ['internal', 'arena', 'tcgplayer', 'dragonshield', 'manabox
   }
 }
 assert.strictEqual(parseThirdPartyCSV([{ Quantity: '', quantity: '4' }], 'internal')[0].quantity, 4);
+for (const format of ['internal', 'arena', 'tcgplayer', 'dragonshield', 'manabox', 'custom']) {
+  for (const [condition, expected] of [['moderately_played', 'Moderately Played'], ['heavily_played', 'Heavily Played']]) {
+    assert.strictEqual(parseThirdPartyCSV([{ Condition: condition }], format,
+      format === 'custom' ? { condition: 'Condition' } : undefined)[0].condition, expected);
+  }
+}
 console.log('csvmappers.test.js: conflicting and empty collector-number columns passed');

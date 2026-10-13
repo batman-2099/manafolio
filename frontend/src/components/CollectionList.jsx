@@ -99,7 +99,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   // Multi-select / bulk actions — shared long-press + /api/collection/bulk logic.
   const {
     selectMode, setSelectMode, selectedIds, setSelectedIds, toggleSelect, selectAt, clearSelection, exitSelectMode,
-    bulkMoveTarget, setBulkMoveTarget, pressHandlers, longPressFired, runBulk,
+    bulkMoveTarget, setBulkMoveTarget, bulkPending, pressHandlers, longPressFired, runBulk,
   } = useMultiSelect({ showToast, onChanged: onUpdate });
 
   useEffect(() => {
@@ -315,9 +315,10 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       if (stackByPrinting) key += `-${item.printing}`;
 
       if (!groups[key]) {
-        groups[key] = { ...item };
+        groups[key] = { ...item, stack_entries: [item] };
       } else {
         groups[key].quantity += item.quantity;
+        groups[key].stack_entries.push(item);
       }
     });
     const stacked = Object.values(groups);
@@ -373,7 +374,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
     <div>
       <div className="collection-inventory-picker form-group">
         <label htmlFor="collection-inventory">{t('collection.inventory')}</label>
-        <select id="collection-inventory" className="select-control" value={subTab} onChange={event => setSubTab(event.target.value)}>
+        <select id="collection-inventory" className="select-control" value={subTab} disabled={bulkPending} onChange={event => setSubTab(event.target.value)}>
           <option value="collection">{t('nav.collection')}</option>
           <option value="arena">{t('collection.arena')}</option>
           <option value="graveyard">{t('collection.graveyard')}</option>
@@ -384,7 +385,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       </div>
       <div className="sub-nav-tabs collection-inventory-nav" style={{ marginBottom: '0.75rem' }}>
         {[['collection', 'nav.collection'], ['arena', 'collection.arena'], ['graveyard', 'collection.graveyard'], ['unsorted', 'bulk.unassignedPile'], ['wishlist', 'collection.wishlist'], ['completion', 'completion.title']].map(([value, label]) => (
-          <button key={value} className={`sub-nav-tab ${subTab === value ? 'active' : ''}`} aria-pressed={subTab === value} onClick={() => setSubTab(value)}>
+          <button key={value} className={`sub-nav-tab ${subTab === value ? 'active' : ''}`} disabled={bulkPending} aria-pressed={subTab === value} onClick={() => setSubTab(value)}>
             {t(label)}
           </button>
         ))}
@@ -644,6 +645,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
             className={`btn ${selectMode ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
             aria-pressed={selectMode}
+            disabled={bulkPending}
             style={{ fontSize: '0.875rem', padding: '0.4rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
             title={t('collection.selectHint')}
           >
@@ -725,7 +727,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
       {/* Bulk action bar */}
       {selectMode && (
-        <div className="glass-panel bulk-action-bar" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', position: 'sticky', top: '0.5rem', zIndex: 30 }}>
+        <fieldset disabled={bulkPending} aria-busy={bulkPending} className="glass-panel bulk-action-bar" style={{ minWidth: 0, margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', position: 'sticky', top: '0.5rem', zIndex: 30 }}>
           <span style={{ fontWeight: 800, color: 'var(--text-strong)', fontSize: '0.85rem' }}>{t('bulk.selected', { count: selectedIds.size })}</span>
           <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={() => setSelectedIds(new Set(filteredCollection.map(i => i.entry_id)))}>{t('collection.selectAllMatches', { count: filteredCollection.length })}</button>
           <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={clearSelection}>{t('bulk.clear')}</button>
@@ -762,7 +764,8 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
           <PackPriceSplitter
             entryIds={Array.from(selectedIds)}
             showToast={showToast}
-            onApplied={() => { clearSelection(); onUpdate(); }}
+            runBulk={runBulk}
+            pending={bulkPending}
           />
               <select className="select-control" value={bulkMoveTarget} onChange={(e) => setBulkMoveTarget(e.target.value)} style={{ fontSize: '0.72rem', maxWidth: '170px', padding: '0.3rem 0.4rem' }}>
                 <option value="">{t('bulk.moveToContainer')}</option>
@@ -775,13 +778,13 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
               <div style={{ width: '1px', height: '22px', background: 'var(--border-glass)' }} />
               <AddToDeckSelect
                 onAdd={(id) => runBulk('add_to_deck', id)}
-                disabled={!selectedIds.size}
+                disabled={bulkPending || !selectedIds.size}
                 style={{ fontSize: '0.72rem', maxWidth: '160px', padding: '0.3rem 0.4rem' }}
               />
             </>
           )}
           <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', marginLeft: 'auto' }} onClick={exitSelectMode}>{t('bulk.done')}</button>
-        </div>
+        </fieldset>
       )}
 
 
@@ -811,6 +814,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                 style={{ cursor: 'pointer', touchAction: 'pan-y' }}
                 aria-label={getCardDisplayName(item.name, item.printed_name)}
                 aria-pressed={selectMode ? selected : undefined}
+                disabled={bulkPending}
                 aria-haspopup={selectMode ? undefined : 'dialog'}
                 onClick={(e) => activateCard(item, e)}
                 {...pressHandlers(item.entry_id)}
@@ -872,6 +876,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                           <input
                             type="checkbox"
                             checked={selected}
+                            disabled={bulkPending}
                             aria-label={getCardDisplayName(item.name, item.printed_name)}
                             onChange={() => toggleSelect(item.entry_id)}
                             style={{ width: '18px', height: '18px', flexShrink: 0, cursor: 'pointer' }}
@@ -882,6 +887,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                           className="collection-card-trigger"
                           aria-label={getCardDisplayName(item.name, item.printed_name)}
                           aria-pressed={selectMode ? selected : undefined}
+                          disabled={bulkPending}
                           aria-haspopup={selectMode ? undefined : 'dialog'}
                           onClick={(e) => activateCard(item, e)}
                           {...pressHandlers(item.entry_id)}
@@ -893,7 +899,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                           )}
                         </button>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <button type="button" className="collection-card-trigger" aria-pressed={selectMode ? selected : undefined} aria-haspopup={selectMode ? undefined : 'dialog'} onClick={(e) => activateCard(item, e)} {...pressHandlers(item.entry_id)} style={{ display: 'block', maxWidth: '100%', fontWeight: 700, color: 'var(--text-strong)', fontSize: '1rem', textAlign: 'left', cursor: 'pointer' }}>{getCardDisplayName(item.name, item.printed_name)}</button>
+                          <button type="button" className="collection-card-trigger" disabled={bulkPending} aria-pressed={selectMode ? selected : undefined} aria-haspopup={selectMode ? undefined : 'dialog'} onClick={(e) => activateCard(item, e)} {...pressHandlers(item.entry_id)} style={{ display: 'block', maxWidth: '100%', fontWeight: 700, color: 'var(--text-strong)', fontSize: '1rem', textAlign: 'left', cursor: 'pointer' }}>{getCardDisplayName(item.name, item.printed_name)}</button>
                           <div style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem' }}>
                             <span>{item.set_name} • #{item.number}</span>
                             <span style={{ fontSize: '0.875rem', fontWeight: 600, ...getRarityBadgeStyle(item.rarity) }}>

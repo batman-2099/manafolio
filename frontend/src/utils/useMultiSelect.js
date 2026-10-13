@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useLongPress } from './useLongPress';
 
 // Long-press-to-arm multi-select + bulk actions over collection entries. Shared
@@ -10,14 +10,27 @@ import { useLongPress } from './useLongPress';
 // string to block arming/bulk (e.g. a locked container) or a falsy value to
 // allow it; the message is shown as a toast.
 export function useMultiSelect({ showToast, onChanged, guard } = {}) {
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
-  const [bulkMoveTarget, setBulkMoveTarget] = useState('');
+  const [selectMode, updateSelectMode] = useState(false);
+  const [selectedIds, updateSelectedIds] = useState(() => new Set());
+  const [bulkMoveTarget, updateBulkMoveTarget] = useState('');
+  const [bulkPending, setBulkPending] = useState(false);
+  const pendingRef = useRef(false);
+  // Keep setter identities stable: callers also use them in reset effects.
+  const setSelectMode = useCallback(value => {
+    if (!pendingRef.current) updateSelectMode(value);
+  }, []);
+  const setSelectedIds = useCallback(value => {
+    if (!pendingRef.current) updateSelectedIds(value);
+  }, []);
+  const setBulkMoveTarget = useCallback(value => {
+    if (!pendingRef.current) updateBulkMoveTarget(value);
+  }, []);
 
   // Last plainly-clicked id: the far end of a shift-click range.
   const anchorId = useRef(null);
 
   const toggleSelect = (entryId) => {
+    if (pendingRef.current) return;
     anchorId.current = entryId;
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -31,6 +44,7 @@ export function useMultiSelect({ showToast, onChanged, guard } = {}) {
   // screen, whatever sort or filter is active. Shift only ever extends, so
   // several shift-clicks build a selection out of separate blocks.
   const selectAt = (entryId, orderedIds, withShift) => {
+    if (pendingRef.current) return;
     const anchor = anchorId.current;
     if (!withShift || anchor == null || anchor === entryId) {
       toggleSelect(entryId);
@@ -47,12 +61,22 @@ export function useMultiSelect({ showToast, onChanged, guard } = {}) {
     });
   };
 
-  const clearSelection = () => { anchorId.current = null; setSelectedIds(new Set()); };
-  const exitSelectMode = () => { setSelectMode(false); clearSelection(); setBulkMoveTarget(''); };
+  const clearSelection = () => {
+    if (pendingRef.current) return;
+    anchorId.current = null;
+    setSelectedIds(new Set());
+  };
+  const exitSelectMode = () => {
+    if (pendingRef.current) return;
+    setSelectMode(false);
+    clearSelection();
+    setBulkMoveTarget('');
+  };
 
   // Enter select mode and select `entryId`. Exposed so callers that own the
   // long-press elsewhere (CompartmentView) can arm the same state.
   const arm = (entryId) => {
+    if (pendingRef.current) return;
     const blocked = guard && guard();
     if (blocked) { showToast(blocked, 'error'); return; }
     setSelectMode(true);
@@ -65,11 +89,15 @@ export function useMultiSelect({ showToast, onChanged, guard } = {}) {
 
   // Runs one bulk action against every selected entry via the bulk endpoint.
   const runBulk = async (action, value, confirmMsg) => {
+    if (pendingRef.current) return false;
     const blocked = guard && guard();
     if (blocked) { showToast(blocked, 'error'); return; }
     const ids = Array.from(selectedIds);
     if (ids.length === 0) { showToast('No cards selected.', 'error'); return; }
     if (confirmMsg && !window.confirm(confirmMsg)) return;
+    pendingRef.current = true;
+    setBulkPending(true);
+    let changed = false;
     try {
       const res = await fetch('/api/collection/bulk', {
         method: 'POST',
@@ -79,19 +107,31 @@ export function useMultiSelect({ showToast, onChanged, guard } = {}) {
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         showToast(data.message || 'Done.', 'success');
-        clearSelection();
-        onChanged && onChanged({ ids, action, value });
+        anchorId.current = null;
+        updateSelectedIds(prev => {
+          const next = new Set(prev);
+          for (const id of ids) next.delete(id);
+          return next;
+        });
+        changed = true;
       } else {
         showToast(data.error || 'Bulk action failed.', 'error');
       }
     } catch (err) {
       console.error(err);
       showToast('Error performing bulk action.', 'error');
+    } finally {
+      pendingRef.current = false;
+      setBulkPending(false);
     }
+    // The owning action clears only its snapshot, then allows the caller to
+    // exit selection mode. Failed actions leave the selection available to retry.
+    if (changed) onChanged && onChanged({ ids, action, value });
+    return changed;
   };
 
   return {
     selectMode, setSelectMode, selectedIds, setSelectedIds, toggleSelect, selectAt, clearSelection, exitSelectMode, arm,
-    bulkMoveTarget, setBulkMoveTarget, pressHandlers, longPressFired, runBulk,
+    bulkMoveTarget, setBulkMoveTarget, bulkPending, pressHandlers, longPressFired, runBulk,
   };
 }

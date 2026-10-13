@@ -56,6 +56,44 @@ async function request(body, route = '/import') {
       assert.strictEqual(preview.body.errors.length, 6);
       assert.strictEqual(preview.body.quantity, 0);
     }
+    const { generateExportCSV } = require('../src/utils/csvExporters');
+    const csvItems = [
+      { card_id: 'mtg-csv-one', name: '  "Quoted", card\r\nsecond line  ', quantity: 2, condition: 'Moderately Played', set_code: 'tst', collector_number: '1' },
+      { card_id: 'mtg-csv-two', name: 'Other\n"card"', quantity: 3, condition: 'Heavily Played', set_code: 'tst', collector_number: '2' }
+    ];
+    for (const item of csvItems) {
+      await db.run('INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)', [item.card_id, item.name, 'mtg']);
+    }
+    let resolvedRows;
+    scryfall.bulkFetchByIdentifier = async rows => {
+      resolvedRows = rows;
+      return { cards: [], pairs: rows.map((row, index) => ({ row, card: { id: csvItems[index].card_id } })) };
+    };
+    for (const format of ['internal', 'manabox']) {
+      const data = generateExportCSV(csvItems, format);
+      const body = { format: 'internal', data };
+      const preview = await request(body, '/import/preview');
+      assert.strictEqual(preview.statusCode, 200);
+      assert.strictEqual(preview.body.cards, 2);
+      assert.strictEqual(preview.body.quantity, 5);
+      assert.deepStrictEqual(preview.body.errors, []);
+      const imported = await request(body);
+      assert.strictEqual(imported.statusCode, 200);
+      assert.strictEqual(imported.body.count, 2);
+      assert.deepStrictEqual(resolvedRows.map(row => [row.name, row.condition, row.quantity]),
+        csvItems.map(row => [row.name, row.condition, row.quantity]), 'exported quotes, embedded newlines, whitespace and conditions survive parsing');
+    }
+    const crlf = 'Name,Quantity,Condition\r\n\r\n"First, ""quoted""",2,moderately_played\r\nSecond,3,heavily_played\r\n';
+    assert.strictEqual((await request({ data: crlf }, '/import/preview')).body.cards, 2);
+    assert.strictEqual((await request({ data: crlf })).body.count, 2);
+    assert.deepStrictEqual(resolvedRows.map(row => row.name), ['First, "quoted"', 'Second']);
+    const saved = await db.all("SELECT quantity, condition FROM collection WHERE card_id IN ('mtg-csv-one', 'mtg-csv-two') ORDER BY id");
+    assert.deepStrictEqual(saved, Array.from({ length: 3 }, () => [
+      { quantity: 2, condition: 'Moderately Played' }, { quantity: 3, condition: 'Heavily Played' }
+    ]).flat());
+    for (const route of ['/import', '/import/preview']) {
+      assert.strictEqual((await request({ data: 'Name,Quantity\n"Unclosed,2' }, route)).statusCode, 400);
+    }
   } finally {
     scryfall.bulkFetchByIdentifier = bulkFetch;
     await new Promise(resolve => db.dbConnection.close(resolve));

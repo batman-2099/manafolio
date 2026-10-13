@@ -42,6 +42,7 @@ let base;
 let issuer;
 let requestNumber = 0;
 let providerExchanges = 0;
+let userInfoClaims;
 const authorizations = new Map();
 
 function testHandoffStore() {
@@ -149,7 +150,12 @@ async function startServers() {
     const url = new URL(req.url, issuer);
     if (url.pathname === '/.well-known/openid-configuration') {
       res.setHeader('Content-Type', 'application/json');
-      return res.end(JSON.stringify({ issuer, authorization_endpoint: `${issuer}/authorize`, token_endpoint: `${issuer}/token` }));
+      return res.end(JSON.stringify({ issuer, authorization_endpoint: `${issuer}/authorize`, token_endpoint: `${issuer}/token`, userinfo_endpoint: `${issuer}/userinfo` }));
+    }
+    if (url.pathname === '/userinfo') {
+      res.setHeader('Content-Type', 'application/json');
+      res.statusCode = userInfoClaims === undefined ? 503 : 200;
+      return res.end(JSON.stringify(userInfoClaims ?? {}));
     }
     if (url.pathname === '/token' && req.method === 'POST') {
       let body = '';
@@ -196,6 +202,18 @@ async function testRoutes() {
   assert.deepStrictEqual(badLogin.body, { error: 'invalid_request' });
   assert.strictEqual(badLogin.location, null);
   assert.strictEqual((await request(`/native/login?${new URLSearchParams(loginParams)}&state=duplicate`)).status, 400);
+  for (const profile of [{ sub: 'wrong-subject' }, {}]) {
+    userInfoClaims = profile;
+    assert.strictEqual(nativeResult(await callback(await begin()), 'error'), 'login_failed');
+    const browserFailure = new URL((await callback(await begin({ browser: true }))).location, base);
+    assert.match(browserFailure.searchParams.get('oidc_error'), /UserInfo subject does not match/);
+    assert.strictEqual(browserFailure.searchParams.get('oidc_token'), null);
+  }
+  userInfoClaims = { sub: 'owner-sub' };
+  assert.strictEqual(nativeResult(await callback(await begin({ sub: '' })), 'error'), 'login_failed');
+  assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM users')).count, 0, 'invalid identities never bootstrap or provision a user');
+  assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM sessions')).count, 0, 'invalid identities never create a session');
+  userInfoClaims = undefined;
   const attempt = await begin();
   const exchangesBefore = providerExchanges;
   for (const cookie of [undefined, 'manafolio_oidc=unrelated-browser', `${attempt.cookie}; ${attempt.cookie}`]) {

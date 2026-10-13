@@ -415,7 +415,7 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGUSR2']) {
 }
 
 // Start Express Server
-app.listen(PORT, '0.0.0.0', () => {
+const httpServer = app.listen(PORT, '0.0.0.0', () => {
   console.log(`=========================================`);
   console.log(`Manafolio Server running on port ${PORT}`);
   console.log(`Access local: http://localhost:${PORT}`);
@@ -423,4 +423,5 @@ app.listen(PORT, '0.0.0.0', () => {
   // Camera scanning needs a secure context, so a LAN/Docker install serves TLS
   // too when HTTPS_PORT is set. Certificates live beside the database.
   startHttps(app, path.join(path.dirname(db.dbPath), 'ssl'));
+  if (process.send) process.send({ type: 'listening', port: httpServer.address().port });
 });

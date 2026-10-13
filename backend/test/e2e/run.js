@@ -10,8 +10,6 @@ const files = fs.readdirSync(TEST_DIR)
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'manafolio-e2e-'));
 
-let totalPassed = 0;
-let totalFailed = 0;
 let passedSuites = 0;
 let failedSuites = 0;
 
@@ -24,7 +22,7 @@ async function runTestFile(file) {
     // Every suite drives the API as the 'admin' account. initDb only seeds that
     // account when a password is pinned — a real fresh install gets its owner
     // from the setup wizard instead, and a headless test has no browser.
-    const child = spawn('node', [path.join(TEST_DIR, file)], {
+    const child = spawn(process.execPath, [path.join(TEST_DIR, file)], {
       env: {
         ...process.env, DEFAULT_ADMIN_PASSWORD: 'test-admin-password',
         TMPDIR: tempDir, TMP: tempDir, TEMP: tempDir,
@@ -32,27 +30,17 @@ async function runTestFile(file) {
       },
     });
     
-    let filePassed = 0;
-    let fileFailed = 0;
-    
     child.stdout.on('data', (data) => {
       const output = data.toString();
       process.stdout.write(output);
-      
-      const passMatches = output.match(/PASS: F\d-TC\d+/g);
-      if (passMatches) {
-        filePassed += passMatches.length;
-      }
     });
 
     child.stderr.on('data', (data) => {
       const output = data.toString();
       process.stderr.write(output);
-      
-      const failMatches = output.match(/FAIL: F\d-TC\d+/g);
-      if (failMatches) {
-        fileFailed += failMatches.length;
-      }
+    });
+    child.on('error', error => {
+      console.error(`FAIL: ${file} could not start: ${error.message}`);
     });
     
     child.on('close', (code) => {
@@ -62,13 +50,7 @@ async function runTestFile(file) {
       } else {
         console.error(`FAIL: ${file} exited with code ${code}.`);
         failedSuites++;
-        if (fileFailed === 0) {
-          fileFailed = 1;
-        }
       }
-      
-      totalPassed += filePassed;
-      totalFailed += fileFailed;
       
       resolve();
     });
@@ -86,9 +68,6 @@ async function main() {
   console.log(`E2E TEST RUNNER RESULT SUMMARY:`);
   console.log(`  Passed suites: ${passedSuites} / ${files.length}`);
   console.log(`  Failed suites: ${failedSuites} / ${files.length}`);
-  console.log(`  Passed test cases: ${totalPassed}`);
-  console.log(`  Failed test cases: ${totalFailed}`);
-  console.log(`  Total test cases:  ${totalPassed + totalFailed}`);
   console.log(`=========================================`);
   
   process.exitCode = failedSuites > 0 ? 1 : 0;

@@ -129,6 +129,41 @@ const CERTIFICATE = {
     const again = await psaApi.lookupCert('82613901', 'tok');
     assert.strictEqual(again.cached, true);
     assert.strictEqual(calls, 1, 'a second lookup must not hit the network');
+
+    // Hold the first transport until the second lookup has also missed the cache.
+    await db.run(`DELETE FROM psa_cert WHERE cert_number = '82613901'`);
+    calls = 0;
+    let entered, release, missed;
+    const started = new Promise(resolve => { entered = resolve; });
+    const held = new Promise(resolve => { release = resolve; });
+    const secondMiss = new Promise(resolve => { missed = resolve; });
+    psaApi.client.get = async () => {
+      calls++;
+      entered();
+      await held;
+      return { data: CERTIFICATE };
+    };
+    const first = psaApi.lookupCert('82613901', 'tok');
+    await started;
+    const realDbGet = db.get;
+    db.get = async (sql, ...args) => {
+      const row = await realDbGet(sql, ...args);
+      if (sql.includes('SELECT payload FROM psa_cert') && !row) missed();
+      return row;
+    };
+    try {
+      const second = psaApi.lookupCert('8261 3901', 'tok');
+      await secondMiss;
+      release();
+      const [a, b] = await Promise.all([first, second]);
+      assert.strictEqual(calls, 1, 'concurrent normalized misses spend one provider request');
+      assert.strictEqual(a.cached, false);
+      assert.strictEqual(b.cached, true);
+      assert.deepStrictEqual({ ...a, cached: true }, b);
+    } finally {
+      release();
+      db.get = realDbGet;
+    }
   } finally {
     psaApi.client.get = realGet;
   }

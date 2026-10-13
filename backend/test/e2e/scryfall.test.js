@@ -2,73 +2,15 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const assert = require('assert');
-const { spawn } = require('child_process');
-
-const net = require('net');
+const { spawnServer, waitForServer, stopServer } = require('./server-helper');
 
 // Isolated temp DB and unique port
 const tmpDb = path.join(os.tmpdir(), `manafolio-scryfall-test-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
 
-let currentPort = 3030;
-function getNextPort() {
-  return (currentPort++).toString();
-}
-
-function isPortFree(port) {
-  return new Promise(resolve => {
-    const server = net.createServer();
-    server.once('error', () => resolve(false));
-    server.once('listening', () => {
-      server.close(() => resolve(true));
-    });
-    server.listen(Number(port));
-  });
-}
-
 const projectRoot = path.join(__dirname, '../../../');
 const db = require('../../src/db');
 
-async function waitForServer(port) {
-  const url = `http://localhost:${port}/api/health`;
-  for (let i = 0; i < 150; i++) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) return;
-    } catch (e) {
-      // retry
-    }
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  throw new Error(`Server on port ${port} did not start in time`);
-}
-
-async function stopServer(proc, port) {
-  if (proc && proc.exitCode === null && !proc.killed) {
-    await new Promise(resolve => {
-      let done = false;
-      const finish = () => {
-        if (!done) {
-          done = true;
-          setTimeout(resolve, 500);
-        }
-      };
-      proc.once('close', finish);
-      proc.once('exit', finish);
-      try {
-        proc.kill('SIGKILL');
-      } catch (e) {
-        finish();
-      }
-    });
-  }
-  if (port) {
-    for (let i = 0; i < 50; i++) {
-      if (await isPortFree(port)) break;
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-  }
-}
 
 async function waitForDatabase() {
   for (let i = 0; i < 150; i++) {
@@ -87,17 +29,16 @@ async function runTests() {
   // Start server preloading scryfall-mock.js
   const mockScript = path.join(__dirname, 'scryfall-mock.js');
   const serverScript = path.join(projectRoot, 'backend/src/server.js');
-  let port = getNextPort();
-  const server = spawn('node', ['-r', mockScript, serverScript], {
+  let port;
+  let server = spawnServer(['-r', mockScript, serverScript], {
     env: {
       ...process.env,
-      PORT: port,
       DB_PATH: tmpDb
     }
   });
 
   try {
-    await waitForServer(port);
+    port = await waitForServer(server);
     const adminId = await waitForDatabase();
 
     // Insert a valid session token for authentication
@@ -139,19 +80,17 @@ async function runTests() {
     // F3-TC3: Verify local cache read when Scryfall is offline (mocked error state)
     try {
       // Re-create server process with mock error
-      await stopServer(server, port);
-      
-      port = getNextPort();
-      const serverErr = spawn('node', ['-r', mockScript, serverScript], {
+      await stopServer(server);
+
+      server = spawnServer(['-r', mockScript, serverScript], {
         env: {
           ...process.env,
-          PORT: port,
           DB_PATH: tmpDb,
           MOCK_SCRYFALL_ERROR: 'true'
         }
       });
 
-      await waitForServer(port);
+      port = await waitForServer(server);
 
       // Search Lightning Bolt which is already cached in F3-TC2? No, Black Lotus was cached.
       const res = await fetch(`http://localhost:${port}/api/search?game=mtg&name=Lotus`, { headers: authHeaders });
@@ -161,7 +100,7 @@ async function runTests() {
       assert.strictEqual(data[0].name, 'Black Lotus');
       console.log('PASS: F3-TC3');
       
-      await stopServer(serverErr, port);
+      await stopServer(server);
     } catch (err) {
       console.error('FAIL: F3-TC3 -', err.message);
       throw err;
@@ -169,15 +108,13 @@ async function runTests() {
 
     // F3-TC4: Verify proxy rate limiting returns 429
     try {
-      port = getNextPort();
-      const serverRate = spawn('node', ['-r', mockScript, serverScript], {
+      server = spawnServer(['-r', mockScript, serverScript], {
         env: {
           ...process.env,
-          PORT: port,
           DB_PATH: tmpDb
         }
       });
-      await waitForServer(port);
+      port = await waitForServer(server);
 
       let rateLimited = false;
       for (let i = 0; i < 350; i++) {
@@ -191,7 +128,7 @@ async function runTests() {
       }
       assert.ok(rateLimited, 'Rapid search requests must be rate limited with 429 status code');
       console.log('PASS: F3-TC4');
-      await stopServer(serverRate, port);
+      await stopServer(server);
     } catch (err) {
       console.error('FAIL: F3-TC4 -', err.message);
       throw err;
@@ -199,15 +136,13 @@ async function runTests() {
 
     // F3-TC5: Verify mapped fields contract
     try {
-      port = getNextPort();
-      const serverField = spawn('node', ['-r', mockScript, serverScript], {
+      server = spawnServer(['-r', mockScript, serverScript], {
         env: {
           ...process.env,
-          PORT: port,
           DB_PATH: tmpDb
         }
       });
-      await waitForServer(port);
+      port = await waitForServer(server);
 
       const res = await fetch(`http://localhost:${port}/api/search?game=mtg&name=Lightning`, { headers: authHeaders });
       const data = await res.json();
@@ -222,7 +157,7 @@ async function runTests() {
       assert.strictEqual(card.price_normal, 0.50);
       assert.strictEqual(card.price_holofoil, 2.50);
       console.log('PASS: F3-TC5');
-      await stopServer(serverField, port);
+      await stopServer(server);
     } catch (err) {
       console.error('FAIL: F3-TC5 -', err.message);
       throw err;
@@ -230,22 +165,20 @@ async function runTests() {
 
     // F3-TC6: Verify empty search results return 200 with empty array
     try {
-      port = getNextPort();
-      const serverEmpty = spawn('node', ['-r', mockScript, serverScript], {
+      server = spawnServer(['-r', mockScript, serverScript], {
         env: {
           ...process.env,
-          PORT: port,
           DB_PATH: tmpDb
         }
       });
-      await waitForServer(port);
+      port = await waitForServer(server);
 
       const res = await fetch(`http://localhost:${port}/api/search?game=mtg&name=NonExistentCardName`, { headers: authHeaders });
       assert.strictEqual(res.status, 200);
       const data = await res.json();
       assert.deepStrictEqual(data, []);
       console.log('PASS: F3-TC6');
-      await stopServer(serverEmpty, port);
+      await stopServer(server);
     } catch (err) {
       console.error('FAIL: F3-TC6 -', err.message);
       throw err;
@@ -253,21 +186,19 @@ async function runTests() {
 
     // F3-TC7: Verify API timeout returns 504 Gateway Timeout or fallback cached data
     try {
-      port = getNextPort();
-      const serverTime = spawn('node', ['-r', mockScript, serverScript], {
+      server = spawnServer(['-r', mockScript, serverScript], {
         env: {
           ...process.env,
-          PORT: port,
           DB_PATH: tmpDb,
           MOCK_SCRYFALL_DELAY: 'true'
         }
       });
-      await waitForServer(port);
+      port = await waitForServer(server);
 
       const res = await fetch(`http://localhost:${port}/api/search?game=mtg&name=Lightning`, { headers: authHeaders });
       assert.ok(res.status === 504 || res.status === 200);
       console.log('PASS: F3-TC7');
-      await stopServer(serverTime, port);
+      await stopServer(server);
     } catch (err) {
       console.error('FAIL: F3-TC7 -', err.message);
       throw err;
@@ -275,15 +206,13 @@ async function runTests() {
 
     // F3-TC8: Verify cache expiration (3 days) triggers background refresh
     try {
-      port = getNextPort();
-      const serverExp = spawn('node', ['-r', mockScript, serverScript], {
+      server = spawnServer(['-r', mockScript, serverScript], {
         env: {
           ...process.env,
-          PORT: port,
           DB_PATH: tmpDb
         }
       });
-      await waitForServer(port);
+      port = await waitForServer(server);
 
       // Insert lightning bolt to cache first
       await db.run(
@@ -304,7 +233,7 @@ async function runTests() {
       }
       assert.ok(fresh, 'Background refresh should update last_updated to now');
       console.log('PASS: F3-TC8');
-      await stopServer(serverExp, port);
+      await stopServer(server);
     } catch (err) {
       console.error('FAIL: F3-TC8 -', err.message);
       throw err;
@@ -317,15 +246,13 @@ async function runTests() {
     // when the request uses the real syntax — `lang:ja` in q plus
     // include_multilingual — so this also guards the query construction.
     try {
-      port = getNextPort();
-      const serverLang = spawn('node', ['-r', mockScript, serverScript], {
+      server = spawnServer(['-r', mockScript, serverScript], {
         env: {
           ...process.env,
-          PORT: port,
           DB_PATH: tmpDb
         }
       });
-      await waitForServer(port);
+      port = await waitForServer(server);
 
       const res = await fetch(`http://localhost:${port}/api/search?game=mtg&name=Lotus&lang=ja&scope=internet`, { headers: authHeaders });
       const data = await res.json();
@@ -343,7 +270,7 @@ async function runTests() {
       assert.strictEqual(dataEn[0].language, 'English');
       assert.strictEqual(dataEn[0].name, 'Black Lotus');
       console.log('PASS: F3-TC9');
-      await stopServer(serverLang, port);
+      await stopServer(server);
     } catch (err) {
       console.error('FAIL: F3-TC9 -', err.message);
       throw err;
@@ -351,15 +278,13 @@ async function runTests() {
 
     // F3-TC10: Verify double-faced transform cards resolve using front face
     try {
-      port = getNextPort();
-      const serverDF = spawn('node', ['-r', mockScript, serverScript], {
+      server = spawnServer(['-r', mockScript, serverScript], {
         env: {
           ...process.env,
-          PORT: port,
           DB_PATH: tmpDb
         }
       });
-      await waitForServer(port);
+      port = await waitForServer(server);
 
       const res = await fetch(`http://localhost:${port}/api/search?game=mtg&name=Delver`, { headers: authHeaders });
       const data = await res.json();
@@ -368,7 +293,7 @@ async function runTests() {
       assert.strictEqual(card.name, 'Delver of Secrets');
       assert.strictEqual(card.image_url, 'https://images.scryfall.com/delver.png');
       console.log('PASS: F3-TC10');
-      await stopServer(serverDF, port);
+      await stopServer(server);
     } catch (err) {
       console.error('FAIL: F3-TC10 -', err.message);
       throw err;
@@ -378,11 +303,10 @@ async function runTests() {
     // the three things a set browse relies on to add many cards without
     // re-adding what is already in the binder.
     try {
-      port = getNextPort();
-      const serverBulk = spawn('node', ['-r', mockScript, serverScript], {
-        env: { ...process.env, PORT: port, DB_PATH: tmpDb }
+      server = spawnServer(['-r', mockScript, serverScript], {
+        env: { ...process.env, DB_PATH: tmpDb }
       });
-      await waitForServer(port);
+      port = await waitForServer(server);
 
       // Total match count is surfaced as a header, body stays a bare array.
       // Needs scope=internet: a cache hit has no upstream total to report.
@@ -418,7 +342,7 @@ async function runTests() {
       await emptyRes.text();
 
       console.log('PASS: F3-TC11');
-      await stopServer(serverBulk, port);
+      await stopServer(server);
     } catch (err) {
       console.error('FAIL: F3-TC11 -', err.message);
       throw err;
@@ -426,7 +350,7 @@ async function runTests() {
 
   } finally {
     // Teardown everything
-    try { await stopServer(server, port); } catch {}
+    await stopServer(server);
     try {
       await new Promise(resolve => {
         db.dbConnection.close(() => resolve());

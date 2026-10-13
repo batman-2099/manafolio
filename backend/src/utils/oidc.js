@@ -98,17 +98,17 @@ function getIssuerUrl() {
 //
 // Loopback is exempt because it never leaves the machine, and it is what the
 // test suite and a local IdP actually use.
-function assertIssuerTransport(issuer) {
+function assertIssuerTransport(issuer, name = 'OIDC_ISSUER_URL') {
   let url;
   try {
     url = new URL(issuer);
   } catch {
-    throw new Error(`OIDC_ISSUER_URL is not a valid URL: ${issuer}`);
+    throw new Error(`${name} is not a valid URL: ${issuer}`);
   }
   if (url.protocol === 'https:') return;
   if (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]', '::1'].includes(url.hostname)) return;
   throw new Error(
-    `OIDC_ISSUER_URL must be https (got ${url.protocol}//${url.hostname}). ` +
+    `${name} must be https (got ${url.protocol}//${url.hostname}). ` +
     'Identity is only as trustworthy as the connection it arrives over.'
   );
 }
@@ -136,6 +136,9 @@ const CLOCK_SKEW_SECONDS = 60;
 function validateIdTokenClaims(claims, { issuer, clientId, nonce, now = Date.now() } = {}) {
   if (!claims || typeof claims !== 'object' || !Object.keys(claims).length) {
     throw new Error('OIDC provider returned no ID token. The authorization code flow requires one.');
+  }
+  if (typeof claims.sub !== 'string' || !claims.sub.trim()) {
+    throw new Error('OIDC ID token is missing the required nonempty "sub" claim.');
   }
 
   const strip = (v) => String(v || '').replace(/\/+$/, '');
@@ -223,6 +226,7 @@ async function getDiscovery(forceRefresh = false) {
   const discoveryUrl = `${issuer}/.well-known/openid-configuration`;
   const res = await fetch(discoveryUrl, {
     headers: { Accept: 'application/json' },
+    redirect: 'error',
     signal: AbortSignal.timeout(10000)
   });
 
@@ -242,6 +246,9 @@ async function getDiscovery(forceRefresh = false) {
     throw new Error(
       `OIDC discovery at ${discoveryUrl} declares issuer "${doc.issuer}", which is not ${issuer}.`
     );
+  }
+  for (const endpoint of ['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint']) {
+    if (doc[endpoint] !== undefined) assertIssuerTransport(doc[endpoint], `OIDC ${endpoint}`);
   }
 
   discoveryCache = doc;
@@ -441,6 +448,7 @@ async function exchangeCode({ code, stateToken, req }) {
     method: 'POST',
     headers,
     body: params.toString(),
+    redirect: 'error',
     signal: AbortSignal.timeout(15000)
   });
 
@@ -460,7 +468,7 @@ async function exchangeCode({ code, stateToken, req }) {
   });
 
   // Fetch from userinfo endpoint if available to ensure all profile claims are present
-  let userInfoClaims = {};
+  let userInfoClaims;
   if (discovery.userinfo_endpoint && tokens.access_token) {
     try {
       const userinfoRes = await fetch(discovery.userinfo_endpoint, {
@@ -468,6 +476,7 @@ async function exchangeCode({ code, stateToken, req }) {
           Authorization: `Bearer ${tokens.access_token}`,
           Accept: 'application/json'
         },
+        redirect: 'error',
         signal: AbortSignal.timeout(10000)
       });
       if (userinfoRes.ok) {
@@ -478,7 +487,16 @@ async function exchangeCode({ code, stateToken, req }) {
     }
   }
 
+  // Transport/parse failures may fall back, but a successful response must bind
+  // its profile to the validated ID token before any claim is used.
+  if (userInfoClaims !== undefined && userInfoClaims?.sub !== idTokenClaims.sub) {
+    throw new Error('OIDC UserInfo subject does not match the ID token.');
+  }
   const mergedClaims = { ...idTokenClaims, ...userInfoClaims };
+  for (const claim of ['iss', 'sub', 'aud', 'exp', 'nonce', 'azp']) {
+    if (Object.hasOwn(idTokenClaims, claim)) mergedClaims[claim] = idTokenClaims[claim];
+    else delete mergedClaims[claim];
+  }
   return {
     tokens,
     claims: mergedClaims,

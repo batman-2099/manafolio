@@ -110,6 +110,9 @@ function testIdTokenValidation() {
   // empty object means something is wrong, not that there is nothing to check.
   assert.throws(() => check({}), /no ID token/);
   assert.throws(() => check(null), /no ID token/);
+  for (const sub of [undefined, null, '', '  ', 42, {}]) {
+    assert.throws(() => check({ ...ok(), sub }), /nonempty "sub"/);
+  }
 
   // iss: a discovery document naming someone else's token endpoint is the whole
   // reason this is checked rather than assumed.
@@ -154,9 +157,29 @@ async function testMockOidcFlow() {
   // real IdP does. Nothing verified this before -- the mock did not even send
   // one -- so the test passed against a client that never looked.
   let currentNonce = null;
+  let idSubject = 'auth-user-999';
+  let userInfo = null;
+  let userInfoMode = 'unavailable';
+  let redirectPath = null;
+  let redirectedRequests = 0;
+  let discoveryOverrides = {};
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
+    if (url.pathname === '/redirect-target') {
+      redirectedRequests++;
+      res.writeHead(200);
+      return res.end('{}');
+    }
+    if (url.pathname === redirectPath) {
+      res.writeHead(307, { Location: '/redirect-target' });
+      return res.end();
+    }
+    if (url.pathname === '/userinfo') {
+      if (userInfoMode === 'network') return req.socket.destroy();
+      res.writeHead(userInfoMode === 'unavailable' ? 503 : 200, { 'Content-Type': 'application/json' });
+      return res.end(userInfoMode === 'malformed' ? '{' : JSON.stringify(userInfo));
+    }
 
     if (url.pathname === '/.well-known/openid-configuration') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -164,7 +187,8 @@ async function testMockOidcFlow() {
         issuer: `http://${req.headers.host}`,
         authorization_endpoint: `http://${req.headers.host}/auth`,
         token_endpoint: `http://${req.headers.host}/token`,
-        userinfo_endpoint: `http://${req.headers.host}/userinfo`
+        userinfo_endpoint: `http://${req.headers.host}/userinfo`,
+        ...discoveryOverrides
       }));
       return;
     }
@@ -182,7 +206,7 @@ async function testMockOidcFlow() {
           aud: 'manafolio-test-client',
           exp: Math.floor(Date.now() / 1000) + 3600,
           nonce: currentNonce,
-          sub: 'auth-user-999',
+          sub: idSubject,
           preferred_username: 'DraftChampion',
           email: 'champion@example.org'
         };
@@ -271,6 +295,57 @@ async function testMockOidcFlow() {
     await assert.rejects(expired, /expired/i);
     assert.strictEqual(authCodeReceived, 'test-auth-code-xyz', 'reused and expired callbacks never exchange their code');
     console.log('PASS: Browser-bound, one-use OIDC exchange with PKCE and expiry');
+
+    const exchange = async () => {
+      const login = await begin();
+      currentNonce = new URL(login.authUrl).searchParams.get('nonce');
+      return oidc.exchangeCode({ code: 'profile-code', stateToken: login.stateToken, req: login.req });
+    };
+    userInfoMode = 'ok';
+    userInfo = {
+      sub: 'auth-user-999', preferred_username: 'ProfileName', name: 'Profile Name',
+      iss: 'untrusted', aud: 'another-client', exp: 0, nonce: 'wrong', azp: 'another-client',
+    };
+    const profile = await exchange();
+    assert.strictEqual(profile.extracted.username, 'profilename', 'matching UserInfo still supplies profile claims');
+    assert.strictEqual(profile.extracted.displayName, 'Profile Name');
+    assert.strictEqual(profile.claims.iss, mockIssuer);
+    assert.strictEqual(profile.claims.aud, 'manafolio-test-client');
+    assert(profile.claims.exp > Date.now() / 1000);
+    assert.strictEqual(profile.claims.nonce, currentNonce);
+    assert.strictEqual(Object.hasOwn(profile.claims, 'azp'), false);
+    for (const response of [{ sub: 'another-subject' }, {}, { sub: '' }, null]) {
+      userInfo = response;
+      await assert.rejects(exchange(), /UserInfo subject does not match/);
+    }
+    userInfo = { sub: 'auth-user-999' };
+    idSubject = '';
+    await assert.rejects(exchange(), /nonempty "sub"/, 'UserInfo cannot repair a missing ID token subject');
+    idSubject = 'auth-user-999';
+    for (const mode of ['unavailable', 'network', 'malformed']) {
+      userInfoMode = mode;
+      assert.strictEqual((await exchange()).extracted.username, 'draftchampion', `${mode} UserInfo falls back`);
+    }
+    userInfoMode = 'ok';
+
+    for (const endpoint of ['authorization_endpoint', 'token_endpoint', 'userinfo_endpoint']) {
+      for (const value of ['http://idp.example.test/endpoint', 'ftp://localhost/endpoint', 'not a url']) {
+        discoveryOverrides = { [endpoint]: value };
+        await assert.rejects(oidc.getDiscovery(true), /must be https|not a valid URL/);
+      }
+      discoveryOverrides = { [endpoint]: 'https://idp.example.test/endpoint' };
+      assert.strictEqual((await oidc.getDiscovery(true))[endpoint], discoveryOverrides[endpoint]);
+    }
+    discoveryOverrides = {};
+    await oidc.getDiscovery(true);
+    redirectPath = '/.well-known/openid-configuration';
+    await assert.rejects(oidc.getDiscovery(true), /fetch failed/);
+    redirectPath = '/token';
+    await assert.rejects(exchange(), /fetch failed/);
+    redirectPath = '/userinfo';
+    assert.strictEqual((await exchange()).extracted.username, 'draftchampion', 'redirecting UserInfo falls back without following it');
+    assert.strictEqual(redirectedRequests, 0, 'discovery, token and UserInfo redirects must never be followed');
+    console.log('PASS: Bound UserInfo profiles, validated claims, endpoint transport and redirect guards');
   } finally {
     if (typeof server.closeAllConnections === 'function') {
       server.closeAllConnections();

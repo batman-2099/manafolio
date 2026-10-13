@@ -220,7 +220,7 @@ Quantities must be whole numbers from 1 to 2,147,483,647. Missing quantities def
 
 **Import activity** reports lookups, provider rate-limit waits, preparation, and saving. Collection, deck, precon, and container imports resolve printings through the local Scryfall bulk catalog first, with API fallback for unresolved cards.
 
-**Important import warning:** lookup/preparation is not the same as saving. Leaving the page disconnects the activity log but does not roll back a server import already in progress. There are no automatic import retries. After a lost connection, inspect the destination before submitting the same file again; repeating a successful import can add unwanted copies.
+**Important import warning:** lookup/preparation is not the same as saving. While an Add Cards file import is committing, app navigation, mode changes, and sign-out are blocked so its activity log and completion summary remain available. The browser warns before unloading, but forcing it closed or losing the connection still disconnects the log without rolling back the server import. There are no automatic import retries. After a lost connection, inspect the destination before submitting the same file again; repeating a successful import can add unwanted copies.
 
 ### Add cards from a published preconstructed product
 
@@ -337,7 +337,7 @@ A trade flag is not another inventory: **For Trade Only** filters flagged entrie
    - **Every printing:** one copy per set and collector number. Different collector numbers are separate goals; any language or finish satisfies the printing.
    - **Foil printings:** one **Holofoil** copy per collector number that Scryfall explicitly offers in foil. Nonfoil-only and etched-only printings are excluded. Arena has no foil goal.
 4. The card grid defaults **Show** to **Missing**. Choose **All** or **Owned** when needed. Every printing appears as a separate tile with its collector number, artwork, price, and Wishlist button. Click an image to enlarge that printing. Pages contain up to 60 printing tiles. Goal progress and the Owned/Missing filter still follow the selected goal: **One of each card** groups alternate illustrations for ownership, while **Every printing** tracks each collector number separately.
-5. **Add to Wishlist** adds one copy of the displayed printing in its catalog language, as nonfoil for card/printing goals or foil for **Foil printings**. Wait for confirmation before adding another copy. This does not add owned cards or advance completion progress. If the connection fails, check Wishlist before retrying.
+5. **Add to Wishlist** adds one copy of the displayed printing in its catalog language. **FOIL** labels identify cards in the **Foil printings** goal and foil-only editions; those tiles use foil prices and add foil copies. Other tiles use nonfoil prices and add nonfoil copies. Wait for confirmation before adding another copy. This does not add owned cards or advance completion progress. If the connection fails, check Wishlist before retrying.
    Card tiles show the catalog's price estimate for that finish and its source currency. Missing quotes display **Price unavailable**; estimates are not live marketplace offers.
 
 Progress counts goals, not copies: owning ten copies does not fill ten checklist slots. **Owned** excludes copies marked Missing, Wishlist, and Graveyard. Reserved copies remain owned. These are records, not proof that the card is physically where it was last filed.
@@ -361,17 +361,17 @@ The server loads every provider page before showing progress and caches normaliz
 
 **Filters → Stack Duplicates** combines duplicate printings into a display card with a summed quantity. **Split by Condition** and **Split by Holo/Printing** determine whether those differences remain separate in the display.
 
-This does not move cards into one storage pocket or merge their real-world locations. For copy-specific editing, turn stacking off first. CSV exports preserve the underlying entry details regardless of display stacking. **Select** mode automatically shows individual entries so actions target real records, not an ambiguous display stack.
+This does not move cards into one storage pocket or merge their real-world locations. Opening a stack asks you to choose a stored entry before viewing or editing it. Each choice shows its finish, condition, language, quantity, and location. CSV exports preserve the underlying entry details regardless of display stacking. **Select** mode automatically shows individual entries so actions target real records, not an ambiguous display stack.
 
 ### Use the card inspector
 
-1. Open a card, checking that it is the copy/entry you mean to change.
+1. Open a card. If it represents a stack, choose the stored entry you mean to change.
 2. Read its printing, language, condition or grade, price information, quantity, and recorded location. Click the artwork for a larger view.
 3. Choose **Edit Card** to change quantity, copy details, purchase price, grading details, **Value for this copy**, **Storage Container**, or **Notes**.
 4. Choose **Save Changes**. **Cancel** discards every unsaved edit and restores the saved entry. While saving or duplicating, wait for completion before making another change or closing; a failure stays inside the inspector and keeps the draft for correction.
 5. Recheck the entry and location after a quantity, language, or placement change.
 
-**Quantity is not a display preference:** changing it changes recorded inventory. Leave it alone when you only intend to edit notes or condition, and use an unstacked entry when you need to distinguish copies.
+**Quantity applies only to the selected stored entry**, not the displayed stack or all matching copies in your collection. Quantity and copy-detail changes are saved together on that entry; other entries remain unchanged. For example, changing an entry from one copy to two leaves four matching copies elsewhere untouched. You cannot reduce an entry below the number of copies reserved by checked-out decks; check those decks in first.
 
 Useful inspector actions include:
 
@@ -384,7 +384,7 @@ Useful inspector actions include:
 
 **Prices are estimates.** Purchase price is your acquisition record, not the live market estimate. **Value for this copy** lets you supply a positive per-copy valuation instead of the provider's raw market price; leave it empty to use the card's price. Raw Near Mint prices should not be mistaken for a condition-adjusted or graded-slab appraisal. Switching a graded entry back to raw clears its grade and certification number.
 
-Quantities must be positive whole numbers. Certified slabs stay separate from raw stacks and other certifications; a certified entry represents one copy. Changing a raw stack's quantity does not remove a separately certified copy.
+Quantities must be positive whole numbers. Certified slabs stay separate from raw stacks and other certifications; a certified entry represents one copy. Editing an entry's quantity never removes another entry.
 
 **Related tokens** provides references and inventory-scoped ownership/location information. A same-named token is not necessarily the same rules/stat version; check its artwork and text.
 
@@ -1097,7 +1097,7 @@ Deck links use the root URL currently open in your browser, including protocol a
 2. Enter **Current Password**, **New Password** (at least eight characters), and **Confirm Password**.
 3. Select **Update Password** and wait for success.
 
-**Expected result:** the local password is changed. The form requires the current local password; it is not a password-recovery or identity-provider password-change flow. Do not paste passwords into issue reports or screenshots.
+**Expected result:** the local password is changed and all your other Manafolio sessions are signed out; the session making the change stays signed in. The form requires the current local password; it is not a password-recovery or identity-provider password-change flow. Read-only API keys are unchanged—revoke them separately if needed. Do not paste passwords into issue reports or screenshots.
 
 ### Create or revoke a read-only API key
 
@@ -1176,7 +1176,7 @@ If you do not see **Admin**, ask the person who operates your server. Do not cha
 2. Enter a **Username**, **Initial Password**, and **Role**.
 3. Choose **Create Account** and provide the credentials to the intended person through a private channel.
 4. Give ordinary users the Member role. Administrator access includes sensitive instance operations; grant it only to trusted people.
-5. In **Manage Planeswalkers**, use **Reset Password** when necessary. Verify the selected account before changing its role or deleting it.
+5. In **Manage Planeswalkers**, use **Reset Password** when necessary. This signs out every Manafolio session for the selected account, including your current session if you reset your own account here. The account must sign in again; other accounts and read-only API keys are unaffected. Verify the selected account before changing its role or deleting it.
 
 Account deletion is destructive. Back up required data first and read the confirmation. **Generate Test Cards** adds sample cards; do not use it on a real collection merely to test whether the server works.
 

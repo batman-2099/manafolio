@@ -48,7 +48,7 @@ Paths below are relative to the repository root.
 | `backend/src/scryfallBulk.js`, `scryfallBulkSchedule.js` | Persistent bulk catalog and daily UTC download scheduling |
 | `backend/src/mtgjsonApi.js` | Preconstructed deck discovery and downloads |
 | `backend/src/utils/cardApi.js`, `cardCache.js` | Provider dispatch, hydration, and normalized cache writes |
-| `backend/src/utils/collectionHelpers.js` | Shared placement, stack quantity, and checkout-allocation helpers |
+| `backend/src/utils/collectionHelpers.js` | Shared placement and checkout-allocation helpers |
 | `backend/src/utils/compartmentSort.js` | Storage eligibility, sorting, stacking, and slot recommendations |
 | `backend/src/utils/deckRules.js`, `aiDecks.js` | Deck validation and inventory-aware AI request/save rules |
 | `backend/src/codexDeckClient.js`, `ollamaDeckClient.js`, `hostedDeckClient.js` | Provider-specific AI transport and lifecycle |
@@ -83,6 +83,8 @@ The main persistent assets are the collection database and its sidecars, automat
 `locations.inventory_type` is `collection` or `graveyard`; `decks.inventory_type` is `collection`, `arena`, or `graveyard`. These fields are related but are not interchangeable enums. Trade status is an `is_trade` flag, not a fifth inventory destination.
 
 A provider card ID identifies an exact printing in `card_cache`. A `collection.id`, exposed as `entry_id`, identifies a user's stored entry. Storage highlights, edits, and pull lists use **entry identity**, not `card_id + position`, which can collide across compartments. Add paths normally create individual-copy rows; quantity-bearing rows and aggregated display stacks also exist, so consumers must sum `quantity`, not count rows.
+
+`PUT /api/collection/:id` treats `quantity` as the absolute quantity of that owned entry only. Quantity and metadata update together; no matching sibling rows are inserted, trimmed, or deleted. Reductions cannot consume checked-out copies, and reserved entries cannot change card identity or inventory. Legacy allocations are frozen before mutations can redistribute their sources. Frontend display stacks carry their original members in `stack_entries`; the shared inspector requires an explicit member choice before mounting entry controls.
 
 Missing/Found is a flag on an entry, not deletion or archival. Individual inventory transfers clear incompatible placement. Archiving retains quantities and metadata but removes cards from owned totals and Physical/Arena deck supply. Archived cards can supply Graveyard deck definitions. Restoring an individual card to Physical returns it to Unassigned Pile. A whole-container transfer instead preserves its layout and placements.
 
@@ -130,6 +132,7 @@ Public routes are mounted deliberately **before** the single `app.use('/api', au
 
 - Login verifies a PBKDF2 password hash and creates an expiring opaque session in SQLite; this is not JWT authentication.
 - Authentication resolves a Bearer token to `sessions` and `users`, then populates `req.user`.
+- Own-password changes revalidate the active bearer session and current password inside a transaction, then update the hash and delete other account sessions. Administrator password resets atomically update the account and delete all its sessions, including the administrator's current session on self-reset. Role-only updates and read-only API keys are unaffected.
 - A token matching `users.api_key` instead is GET-only. `requireAdmin` rejects API keys even for administrator accounts, and `/auth/me` removes provider credentials from API-key responses.
 - AI account/model/preferences and suggestion operations require a browser session. The read-only AI inventory endpoint remains accessible with an API key.
 - Local auth/bootstrap and optional OIDC live in `routes/auth.js`, `utils/oidc.js`, and `utils/nativeAuth.js`. Registration is closed unless `ALLOW_REGISTRATION=true`.
@@ -432,6 +435,16 @@ The Vite frontend uses `https://localhost:5173`; the API uses `http://localhost:
 | `npm run build:frontend` | Production frontend build |
 | `npm start` | Backend serving API and an existing `frontend/dist` build |
 
-Test runners give each invocation its own temporary directory and database defaults, then delete only that directory. Both Docker publication and server-binary builds depend on backend tests plus frontend lint, utility tests, and locale validation.
+Test runners give each invocation its own temporary directory and database defaults, then delete only that directory. HTTP E2E servers bind OS-assigned ports, announce their own listener over IPC, and are awaited during shutdown; another process's health response cannot satisfy startup. Both Docker publication and server-binary builds depend on backend tests plus frontend lint, utility tests, and locale validation.
 
 When changing a workflow, exercise the actual user path as well as relevant tests: inventory boundaries, ownership checks, rollback behavior, lost progress connections, deck draft saves, and physical placement are consumer-visible contracts. Scanner validation needs actual models/catalogs and camera conditions; AI verification needs the selected provider. Do not claim these optional integrations were exercised by an unrelated unit suite.
+
+The real-DOM mutation regression is intentionally separate from `npm test`. With Vite running, serve a temporary HTML page under `frontend/` containing the module script below (do not mount `App`), open it in a disposable browser profile, and inspect its console result. Vite supplies the React preamble. The regression mounts real components, uses synthetic data and intercepted requests, and cleans up its roots and globals. Delete the temporary page afterward.
+
+```html
+<script type="module">
+  const { runFrontendMutationRegressions } =
+    await import('/src/utils/frontendMutations.browser.test.jsx');
+  console.log(await runFrontendMutationRegressions());
+</script>
+```

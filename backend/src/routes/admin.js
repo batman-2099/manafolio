@@ -239,7 +239,15 @@ router.put('/users/:id', async (req, res) => {
     if (role !== undefined) updates.role = role;
     const fields = Object.keys(updates);
     if (fields.length) {
-      await db.run(`UPDATE users SET ${fields.map(key => `${key} = ?`).join(', ')} WHERE id = ?`, [...Object.values(updates), id]);
+      const updateUser = () => db.run(`UPDATE users SET ${fields.map(key => `${key} = ?`).join(', ')} WHERE id = ?`, [...Object.values(updates), id]);
+      if (password !== undefined) {
+        await db.withTransaction(async () => {
+          await updateUser();
+          await db.run('DELETE FROM sessions WHERE user_id = ?', [id]);
+        });
+      } else {
+        await updateUser();
+      }
     }
 
     res.json({ message: 'User updated successfully' });

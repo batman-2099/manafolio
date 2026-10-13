@@ -3,22 +3,12 @@ const os = require('os');
 const fs = require('fs');
 const http = require('http');
 const assert = require('assert');
-const { spawn } = require('child_process');
+const { spawnServer, waitForServer, stopServer } = require('./server-helper');
 
 const tmpDb = path.join(os.tmpdir(), `manafolio-oidc-test-${process.pid}.db`);
 const linkDb = path.join(os.tmpdir(), `manafolio-oidc-link-${process.pid}.db`);
 const projectRoot = path.join(__dirname, '../../../');
 
-async function waitForServer(url) {
-  for (let i = 0; i < 150; i++) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) return;
-    } catch { /* not ready */ }
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  throw new Error(`Server at ${url} did not start in time`);
-}
 
 async function runTests() {
   // 1. Start mock OIDC IdP
@@ -77,19 +67,18 @@ async function runTests() {
     res.end();
   });
 
-  await new Promise(resolve => idpServer.listen(0, '127.0.0.1', resolve));
+  await new Promise((resolve, reject) => {
+    idpServer.once('error', reject);
+    idpServer.listen(0, '127.0.0.1', resolve);
+  });
   const idpPort = idpServer.address().port;
   const idpIssuer = `http://127.0.0.1:${idpPort}`;
 
   // 2. Start Manafolio backend server with OIDC configuration
-  const manafolioPort = '3019';
-  const base = `http://localhost:${manafolioPort}`;
-
-  const server = spawn('node', [path.join(projectRoot, 'backend/src/server.js')], {
+  const server = spawnServer(['-r', path.join(__dirname, 'scryfall-mock.js'), path.join(projectRoot, 'backend/src/server.js')], {
     env: {
       ...process.env,
       DEFAULT_ADMIN_PASSWORD: '',
-      PORT: manafolioPort,
       DB_PATH: tmpDb,
       HTTPS_PORT: '',
       OIDC_ENABLED: 'true',
@@ -102,7 +91,8 @@ async function runTests() {
   });
 
   try {
-    await waitForServer(`${base}/api/health`);
+    const port = await waitForServer(server);
+    const base = `http://127.0.0.1:${port}`;
 
     // F7-TC1: Public config exposes OIDC status and provider name
     const configRes = await fetch(`${base}/api/auth/config`);
@@ -294,7 +284,7 @@ async function runTests() {
     console.log('PASS: F7-TC11');
 
   } finally {
-    server.kill('SIGKILL');
+    await stopServer(server);
     if (typeof idpServer.closeAllConnections === 'function') {
       idpServer.closeAllConnections();
     }
@@ -359,17 +349,18 @@ async function runUsernameLinkTests() {
     res.end();
   });
 
-  await new Promise(resolve => idpServer.listen(0, '127.0.0.1', resolve));
+  await new Promise((resolve, reject) => {
+    idpServer.once('error', reject);
+    idpServer.listen(0, '127.0.0.1', resolve);
+  });
   const idpIssuer = `http://127.0.0.1:${idpServer.address().port}`;
 
-  const port = '3020';
-  const base = `http://localhost:${port}`;
-  const server = spawn('node', [path.join(projectRoot, 'backend/src/server.js')], {
+  let base;
+  const server = spawnServer(['-r', path.join(__dirname, 'scryfall-mock.js'), path.join(projectRoot, 'backend/src/server.js')], {
     env: {
       ...process.env,
       // A pre-existing local account, exactly like an install upgrading into SSO.
       DEFAULT_ADMIN_PASSWORD: 'test-admin-password',
-      PORT: port,
       DB_PATH: linkDb,
       HTTPS_PORT: '',
       OIDC_ENABLED: 'true',
@@ -394,7 +385,8 @@ async function runUsernameLinkTests() {
   };
 
   try {
-    await waitForServer(`${base}/api/health`);
+    const port = await waitForServer(server);
+    base = `http://127.0.0.1:${port}`;
 
     // F7-TC9: with the flag on, the IdP identity attaches to the existing local
     // account rather than creating a second, empty one beside it.
@@ -435,7 +427,7 @@ async function runUsernameLinkTests() {
     console.log('PASS: F7-TC10');
 
   } finally {
-    server.kill('SIGKILL');
+    await stopServer(server);
     if (typeof idpServer.closeAllConnections === 'function') {
       idpServer.closeAllConnections();
     }

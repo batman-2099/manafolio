@@ -12,7 +12,7 @@ const { searchLimiter } = require('../middleware/auth');
 const { resolveCardPrice, parseCardRow, recordPrice } = require('../utils/priceHelpers');
 const { parseSetList } = require('../utils/setQuery');
 const { compartmentLabel, isBinderType, rebalanceCompartmentByScheme, stackKey } = require('../utils/compartmentSort');
-const { checkedOutAllocation, physicalCardEntries, sourceEntries, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, setStackQuantity, defaultCompartmentPlan } = require('../utils/collectionHelpers');
+const { checkedOutAllocation, checkedOutSources, physicalCardEntries, sourceEntries, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { splitPrice } = require('../utils/splitPrice');
 
@@ -1243,20 +1243,22 @@ router.put('/collection/:id', async (req, res) => {
     if (list_type !== undefined && !LIST_TYPES.includes(list_type)) return res.status(400).json({ error: 'Invalid list_type' });
     const nextListType = list_type ?? entry.list_type;
     const listChanged = nextListType !== entry.list_type;
-    const isMoving = location_id !== undefined || compartment_id !== undefined || listChanged;
+    const placementChanged = (location_id !== undefined && String(location_id ?? '') !== String(entry.location_id ?? ''))
+      || (compartment_id !== undefined && String(compartment_id ?? '') !== String(entry.compartment_id ?? ''));
+    const isMoving = placementChanged || listChanged;
     let finalCompartmentId = listChanged ? null : entry.compartment_id;
     let finalLocationId = listChanged ? null : entry.location_id;
     let finalPosition = listChanged ? 0 : entry.position;
     let resolvedRejected = false;
 
-    if (location_id !== undefined || compartment_id !== undefined) {
+    if (isMoving && (location_id !== undefined || compartment_id !== undefined)) {
       const resolved = await resolveCompartmentAndPosition({
         locationId: location_id === undefined ? (compartment_id ? null : finalLocationId) : location_id,
         compartmentId: compartment_id,
         listType: nextListType,
         userId: req.user.id,
         cardId: entry.card_id,
-        quantity: entry.quantity,
+        quantity: requestedQty ?? entry.quantity,
         printing: printing ?? entry.printing,
         language: language ?? entry.language,
         excludeEntryId: entry.id
@@ -1270,9 +1272,7 @@ router.put('/collection/:id', async (req, res) => {
     const updates = [];
     const params = [];
 
-    // Absolute, not additive: see the reconcile below. Deliberately NOT part of
-    // the UPDATE — setStackQuantity owns the quantity column so the two can
-    // never disagree about how many copies the row stands for.
+    if (requestedQty !== null) { updates.push('quantity = ?'); params.push(requestedQty); }
     if (condition !== undefined) { updates.push('condition = ?'); params.push(condition); }
     if (printing !== undefined) { updates.push('printing = ?'); params.push(printing); }
     if (language !== undefined) {
@@ -1341,9 +1341,31 @@ router.put('/collection/:id', async (req, res) => {
 
     await db.withTransaction(async () => {
     if (updates.length > 0) {
+      const current = await db.get('SELECT * FROM collection WHERE id = ? AND user_id = ?', [id, req.user.id]);
+      if (!current) throw new AddCardError(404, 'Collection entry not found');
+      const sources = await checkedOutSources(req.user.id);
+      const reserved = sources.filter(source => source.entry_id === current.id)
+        .reduce((sum, source) => sum + source.quantity, 0);
+      if (requestedQty !== null && requestedQty < reserved) {
+        throw new AddCardError(409, 'Check in the deck before reducing its checked-out copies.');
+      }
       params.push(id, req.user.id);
-      if (list_type === 'graveyard') await assertArchivable(req.user.id, [id]);
       await db.run(`UPDATE collection SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`, params);
+      const updated = await db.get('SELECT * FROM collection WHERE id = ? AND user_id = ?', [id, req.user.id]);
+      if (reserved && (updated.card_id !== current.card_id || updated.list_type !== current.list_type)) {
+        throw new AddCardError(409, 'Check in the deck before changing its checked-out card identity or inventory.');
+      }
+      if ((requestedQty !== null || grader !== undefined) && updated.cert_number && updated.quantity !== 1) {
+        throw new AddCardError(400, 'A certification number identifies one physical card');
+      }
+      // Freeze all legacy sources before quantity, identity or placement changes
+      // can make fallback reservations switch to different physical copies.
+      if (requestedQty !== null || isMoving || language !== undefined || missing !== undefined) {
+        for (const source of sources) {
+          await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+            [source.deck_id, source.card_id, source.entry_id, source.quantity]);
+        }
+      }
     }
 
     if (isMoving && finalCompartmentId && finalLocationId) {
@@ -1355,22 +1377,6 @@ router.put('/collection/:id', async (req, res) => {
       if (oldLoc) await rebalanceCompartmentByScheme(db, entry.compartment_id, oldLoc.sort_order, oldLoc.foil_sorting);
     }
 
-    // Quantity is absolute — it is how many copies the user says they own, and
-    // in the stacked collection view the number in the form is the total across
-    // the identical rows, not this row alone. So reconcile the whole stack to
-    // it, up or down. It used to only ever insert (quantity - 1) extra rows,
-    // which made lowering the number a no-op and made every save duplicate the
-    // entry instead of editing it.
-    if (requestedQty !== null) {
-      const changed = await setStackQuantity(db, req.user.id, id, requestedQty);
-      if (changed !== 0) {
-        const row = await db.get(`SELECT compartment_id, location_id FROM collection WHERE id = ? AND user_id = ?`, [id, req.user.id]);
-        if (row && row.compartment_id && row.location_id) {
-          const loc = await db.get(`SELECT sort_order, foil_sorting FROM locations WHERE id = ? AND user_id = ?`, [row.location_id, req.user.id]);
-          if (loc) await rebalanceCompartmentByScheme(db, row.compartment_id, loc.sort_order, loc.foil_sorting);
-        }
-      }
-    }
     });
 
     const finalPlacement = isMoving && finalCompartmentId ? await describePlacement(db, id, req.user.id) : null;

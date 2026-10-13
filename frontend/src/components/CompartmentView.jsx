@@ -28,16 +28,17 @@ function stackPocketCards(cards, highlightSet, pulledSet) {
     const key = `${card.card_id}|${card.printing || 'Normal'}|${card.language || 'English'}`;
     const held = stacks.get(key);
     if (!held) {
-      stacks.set(key, { ...card, quantity: card.quantity || 1 });
+      stacks.set(key, { ...card, quantity: card.quantity || 1, stack_entries: [card] });
       continue;
     }
     held.quantity += card.quantity || 1;
+    held.stack_entries.push(card);
     held.in_deck_qty = (held.in_deck_qty || 0) + (card.in_deck_qty || 0);
     // In pull mode represent an actionable physical copy, not an unrelated
     // first row. Keep the shared pocket's position and combined quantity.
     if (priority(card) > priority(held)) {
-      const { quantity, position, in_deck_qty } = held;
-      Object.assign(held, card, { quantity, position, in_deck_qty });
+      const { quantity, position, in_deck_qty, stack_entries } = held;
+      Object.assign(held, card, { quantity, position, in_deck_qty, stack_entries });
     }
     // Whichever copy is actually filed decides where the stack sits; an unplaced
     // one joining it must not drag the pocket back to "no position".

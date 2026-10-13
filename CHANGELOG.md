@@ -4,6 +4,10 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Password changes now revoke other account sessions while retaining the current session; administrator password resets revoke all target-account sessions. Password updates and revocation are atomic, with stale-session checks on self-service changes. Read-only API keys remain unchanged.
+
+- Made card-inspector quantity edits apply only to the selected stored entry, with an explicit entry chooser for combined Collection and Storage stacks. Quantity and metadata save atomically without altering matching copies elsewhere; checked-out copies retain reservation protection.
+
 - Fixed Quantity (High-Low) sorting in Collection and public collection views to use displayed stack totals after combining duplicate entries, including when splitting by condition or printing.
 - Added a fresh exact-printing count to the Add Card to Collection dialog, scoped to Physical or Arena, with loading and retry states and updates when the selected language changes.
 - Sorted the Unassigned Pile's File selected to dropdown alphabetically by container name.
@@ -36,6 +40,14 @@ Release history starts with Manafolio 2.0.
 - Showed finish-specific catalog price estimates on Set completion cards, preserving source currency and displaying Price unavailable when no quote exists.
 - Added symbols and name/code search to Set completion's single-set dropdown, always ordered newest to oldest by release date, with alphabetical ties and undated sets last.
 - Displayed every Set completion printing as a separate card tile with its own artwork, collector number, price, and Wishlist action; made Every printing the default goal and retained Show missing.
+- Added FOIL labels to Set completion foil-goal cards and foil-only editions, keeping their price estimates and Wishlist additions on the same finish.
+- Preserved deck reservations when container imports split quantity-bearing entries, and stopped inspector metadata saves from inadvertently re-filing cards.
+- Guarded shared bulk mutations against duplicate submissions and selection races; kept committed Add Cards imports mounted through app navigation and mode changes.
+- Bound OIDC UserInfo subjects to validated ID tokens, enforced HTTPS/loopback endpoint and redirect policy, prevented member registration before owner setup, and kept HTTP available when optional HTTPS cannot bind.
+- Validated export query types and complete-backup quantities/source IDs before destructive writes; corrected CSV escaped-quote and multiline round trips and ManaBox condition aliases.
+- Retried failed offline snapshot deletion even after disabling the feature, expanded offline lifecycle coverage, and removed redundant demo response wrappers.
+- Isolated E2E servers on child-owned ephemeral ports, removed unreliable output-chunk case counters, and pinned the server-binary packaging tool.
+- Cached failed detector initialization until worker restart, reused unchanged catalog metadata with external-publication detection, released build-owned inference sessions, removed a redundant dewarp buffer copy, and avoided duplicate concurrent PSA lookups.
 
 ## 2.3.3 — 2026-10-12
 

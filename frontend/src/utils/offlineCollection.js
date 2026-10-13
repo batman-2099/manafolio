@@ -58,12 +58,14 @@ function announce() {
 }
 
 export async function clearSnapshot() {
-  if (!localStorage.getItem(ENABLED)) return;
-  // Invalidate before awaiting IDB: a late download cannot undo logout/clear,
-  // including when another tab started it or browser storage deletion fails.
-  localStorage.setItem(GENERATION, crypto.randomUUID());
-  localStorage.removeItem(ENABLED);
-  announce();
+  if (localStorage.getItem(ENABLED)) {
+    // Invalidate before awaiting IDB: a late download cannot undo logout/clear,
+    // including when another tab started it or browser storage deletion fails.
+    localStorage.setItem(GENERATION, crypto.randomUUID());
+    localStorage.removeItem(ENABLED);
+    announce();
+  }
+  // Retry physical deletion even when a previous failed clear disabled reads.
   if (window.indexedDB) await transaction('readwrite', store => store.clear());
 }
 

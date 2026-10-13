@@ -73,6 +73,7 @@ const SESSION_OPTS = { intraOpNumThreads: 1, interOpNumThreads: 1, executionMode
 // Models load once; language catalogs load on first use.
 let models = null;
 const catalogs = {};   // catalog key -> { cat, ids, n, dim } (or an in-flight promise)
+const localFiles = new Map();
 
 // Preserve the bare English filename; other languages have their own catalogs.
 const suffix = (lang) => (!lang || lang === 'en' || lang === 'English' ? '' : `-${String(lang).toLowerCase()}`);
@@ -84,11 +85,26 @@ function catalogPath(game) {
 
 // Prefer local catalogs, whose IDs resolve directly in card_cache.
 function hasLocal(game, lang) {
+  const file = localMeta(game, lang);
+  const key = `${game}${suffix(lang)}`;
   try {
-    const file = localMeta(game, lang);
-    const meta = JSON.parse(fs.readFileSync(file, 'utf8'));
-    return fs.existsSync(binaryPath(file, meta));
-  } catch { return false; }
+    const stat = fs.statSync(file, { bigint: true });
+    const stamp = `${stat.ino}:${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}`;
+    let cached = localFiles.get(file);
+    if (!cached || cached.stamp !== stamp) {
+      delete catalogs[key];
+      const meta = JSON.parse(fs.readFileSync(file, 'utf8'));
+      cached = { stamp, binary: binaryPath(file, meta) };
+      localFiles.set(file, cached);
+    }
+    const available = fs.existsSync(cached.binary);
+    if (cached.available !== available) delete catalogs[key];
+    cached.available = available;
+    return available;
+  } catch {
+    if (localFiles.delete(file)) delete catalogs[key];
+    return false;
+  }
 }
 
 function isBuilt(game = 'mtg', lang) {
@@ -305,15 +321,11 @@ async function detectAndDewarp(session, imageBuffer) {
 //
 // Read current metadata for each scoped scan: card lookups and catalog builds
 // populate card_cache while the models stay loaded. Unknown sets remain excluded.
-async function rowSets(s, game) {
-  // ponytail: a fresh query avoids a second cache invalidation lifecycle.
+async function rowSets(game) {
+  // ponytail: a fresh query per scan avoids a second cache invalidation lifecycle.
   const db = require('./db');
   const rows = await db.all(`SELECT id, set_id FROM card_cache WHERE game = ?`, [game]);
-  const byId = new Map(rows.map(r => [r.id, (r.set_id || '').toLowerCase()]));
-  return s.ids.map((raw) => {
-    const id = String(raw).replace(/_back$/, '');
-    return byId.get(s.local ? id : `${game}-${id}`) ?? null;
-  });
+  return new Map(rows.map(r => [r.id, (r.set_id || '').toLowerCase()]));
 }
 
 // Brute-force cosine. Both sides are L2-normalised, so the dot product IS the
@@ -411,9 +423,13 @@ async function match(imageBuffer, game = 'mtg', topK = 8, opts = {}) {
   const want = new Set(wanted.flatMap(x => [x, x.replace(/^mtg-/, ''), `mtg-${x.replace(/^mtg-/, '')}`]));
   let scoped = null;
   const search = [];
+  const byId = wanted.length ? await rowSets(game) : null;
   for (const c of cats) {
     if (!wanted.length) { search.push({ c, allow: null }); continue; }
-    const setOf = await rowSets(c, game);
+    const setOf = c.ids.map((raw) => {
+      const id = String(raw).replace(/_back$/, '');
+      return byId.get(c.local ? id : `${game}-${id}`) ?? null;
+    });
     const rows = setOf.reduce((acc, v) => acc + (v && want.has(v) ? 1 : 0), 0);
     if (!rows) continue;
     search.push({ c, allow: (i) => setOf[i] && want.has(setOf[i]) });
@@ -599,6 +615,7 @@ async function scoreCards(imageBuffer, game = 'mtg', cards = [], opts = {}) {
 // The models are untouched — only the embedding table changes on a rebuild.
 function reload(game, lang) {
   if (game !== 'mtg') throw new Error('Unsupported game');
+  localFiles.delete(localMeta(game, lang));
   const key = `${game}${suffix(hasLocal(game, lang) ? lang : undefined)}`;
   delete catalogs[key];
   // A build can turn a game that had no catalog at all into one that does, and

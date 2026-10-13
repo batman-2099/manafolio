@@ -13,27 +13,42 @@ const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
 const validImportQuantity = quantity => Number.isSafeInteger(quantity) && quantity > 0 && quantity <= 2147483647;
 
 function parseCsvRows(data) {
-  const lines = typeof data === 'string' ? data.split(/\r?\n/).map(line => line.trim()).filter(Boolean) : [];
-  if (lines.length <= 1) throw new Error('CSV file is empty or missing headers');
-
-  const parseLine = (line) => {
-    const values = [];
-    let value = '';
-    let quoted = false;
-    for (const char of line) {
-      if (char === '"') quoted = !quoted;
-      else if (char === ',' && !quoted) {
-        values.push(value.trim());
-        value = '';
-      } else value += char;
-    }
-    values.push(value.trim());
-    return values.map(cell => cell.replace(/^"|"$/g, ''));
+  const records = [];
+  let values = [];
+  let value = '';
+  let quoted = false;
+  let wasQuoted = false;
+  const finishValue = () => {
+    values.push(wasQuoted ? value : value.trim());
+    value = '';
+    wasQuoted = false;
   };
-
-  const headers = parseLine(lines[0]);
-  const rows = lines.slice(1).map(parseLine)
-    .filter(values => values.length >= headers.length)
+  const finishRecord = () => {
+    finishValue();
+    if (values.some(cell => cell !== '')) records.push(values);
+    values = [];
+  };
+  for (let index = 0; index < (typeof data === 'string' ? data.length : 0); index++) {
+    const char = data[index];
+    if (char === '"') {
+      if (quoted && data[index + 1] === '"') {
+        value += '"';
+        index++;
+      } else {
+        quoted = !quoted;
+        wasQuoted = true;
+      }
+    } else if (char === ',' && !quoted) finishValue();
+    else if ((char === '\n' || char === '\r') && !quoted) {
+      finishRecord();
+      if (char === '\r' && data[index + 1] === '\n') index++;
+    } else value += char;
+  }
+  if (quoted) throw Object.assign(new Error('CSV contains an unterminated quoted field'), { status: 400 });
+  finishRecord();
+  if (records.length <= 1) throw new Error('CSV file is empty or missing headers');
+  const [headers, ...dataRows] = records;
+  const rows = dataRows.filter(values => values.length >= headers.length)
     .map(values => Object.fromEntries(headers.map((header, index) => [header, values[index]])));
   return { headers, rows };
 }
@@ -50,6 +65,20 @@ async function parseCompleteBackup(data) {
   const arrays = ['collection', 'card_cache', 'locations', 'compartments', 'compartment_assignments', 'decks', 'deck_cards'];
   if (!backup || backup.format !== 'manafolio-backup' || backup.version !== 1 || !arrays.every(key => Array.isArray(backup[key]))) {
     throw new Error('Invalid backup file');
+  }
+  for (const key of ['collection', 'locations', 'compartments', 'decks']) {
+    if (backup[key].some(row => !row || !Number.isSafeInteger(row.id) || row.id < 1)
+        || new Set(backup[key].map(row => row.id)).size !== backup[key].length) {
+      throw new Error(`Invalid backup ${key} IDs`);
+    }
+  }
+  if (backup.card_cache.some(row => !row || typeof row.id !== 'string')
+      || new Set(backup.card_cache.map(row => row.id)).size !== backup.card_cache.length) {
+    throw new Error('Invalid backup card IDs');
+  }
+  if (backup.collection.some(card => !validImportQuantity(card.quantity))
+      || backup.deck_cards.some(card => !card || (card.quantity !== 0 && !validImportQuantity(card.quantity)))) {
+    throw new Error('Invalid backup quantities');
   }
   const trades = backup.completed_trades ?? [];
   if (!Array.isArray(trades) || trades.some(trade => !trade
@@ -153,8 +182,8 @@ async function parseCompleteBackup(data) {
         !Number.isSafeInteger(card.source_entry_id) || card.source_entry_id === 0
         || (entries.has(card.source_entry_id) && entries.get(card.source_entry_id).card_id !== card.card_id)
         || (backup.decks.find(deck => deck.id === card.deck_id)?.inventory_type ?? 'collection') !== 'collection'))
-      || allocations.some(source => !Number.isSafeInteger(source.entry_id) || source.entry_id === 0
-        || !Number.isSafeInteger(source.quantity) || source.quantity < 1
+      || allocations.some(source => !source || !Number.isSafeInteger(source.entry_id) || source.entry_id === 0
+        || !validImportQuantity(source.quantity)
         || (backup.decks.find(deck => deck.id === source.deck_id)?.inventory_type ?? 'collection') !== 'collection'
         || !backup.deck_cards.some(card => card.deck_id === source.deck_id && card.card_id === source.card_id)
         || (entries.has(source.entry_id) && entries.get(source.entry_id).card_id !== source.card_id))) {
@@ -342,10 +371,12 @@ async function restoreCompleteBackup(backup, userId) {
 
 // Export endpoint
 router.get('/export', async (req, res) => {
-  const { format = 'csv', ecosystem = 'internal' } = req.query;
-  const targetFormat = (ecosystem || format || 'internal').toLowerCase();
-
   try {
+    const { format = 'csv', ecosystem = 'internal' } = req.query;
+    if (typeof format !== 'string' || typeof ecosystem !== 'string') {
+      return res.status(400).json({ error: 'Invalid export format or ecosystem' });
+    }
+    const targetFormat = (ecosystem || format || 'internal').toLowerCase();
     if (format.toLowerCase() === 'backup') {
       const backup = await db.withTransaction(async () => {
         const [collection, locations, compartments, compartmentAssignments, decks, deckCards, cardCache] = await Promise.all([

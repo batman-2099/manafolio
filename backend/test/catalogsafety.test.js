@@ -19,21 +19,34 @@ const { readCatalog, binaryPath } = require('../src/utils/localCatalog');
 const api = require('../src/scryfallApi');
 const get = api.client.get;
 const metaFile = catalog.metaPath('mtg', 'English');
-let behavior = 'normal', calls = 0;
-ort.InferenceSession.create = async () => ({ run: async () => {
-  calls++;
-  if (behavior === 'cancel' && calls === 1) catalog.stop();
-  if (behavior === 'fail') throw new Error('inference failed');
-  return { embedding: { data: new Float32Array([1, 0]) } };
-} });
+let behavior = 'normal', calls = 0, sessions = 0, releases = 0;
+ort.InferenceSession.create = async () => {
+  sessions++;
+  let released = false;
+  return {
+    run: async () => {
+      calls++;
+      if (behavior === 'cancel' && calls === 1) catalog.stop();
+      if (behavior === 'fail') throw new Error('inference failed');
+      return { embedding: { data: new Float32Array([1, 0]) } };
+    },
+    release: async () => {
+      assert.strictEqual(released, false, 'each owned session is released once');
+      released = true;
+      releases++;
+    },
+  };
+};
 const build = async (opts = {}) => {
-  calls = 0;
+  calls = 0; sessions = 0; releases = 0;
   catalog.start('mtg', 'English', { skipCache: true, ...opts });
   const deadline = Date.now() + 10000;
   while (catalog.state()) {
     assert(Date.now() < deadline, 'catalog job must finish');
     await new Promise(resolve => setTimeout(resolve, 5));
   }
+  assert.strictEqual(sessions, calls ? 1 : 0, 'only builds doing inference create a session');
+  assert.strictEqual(releases, sessions, 'success, cancellation and failure release their session');
   return catalog.lastResult();
 };
 const snapshot = () => {
@@ -103,7 +116,7 @@ const snapshot = () => {
   await db.run('DROP TRIGGER fail_cache');
 
   const preload = path.join(dir, 'inference.cjs');
-  fs.writeFileSync(preload, `const ort = require(${JSON.stringify(require.resolve('onnxruntime-node'))}); let n = 0; ort.InferenceSession.create = async () => ({ run: async () => ({ embedding: { data: new Float32Array(n++ % 2 ? [0, 1] : [1, 0]) } }) });`);
+  fs.writeFileSync(preload, `const ort = require(${JSON.stringify(require.resolve('onnxruntime-node'))}); let n = 0; ort.InferenceSession.create = async () => ({ run: async () => ({ embedding: { data: new Float32Array(n++ % 2 ? [0, 1] : [1, 0]) } }), release: async () => {} });`);
   const script = path.resolve(__dirname, '../scripts/build-cv-catalog.mjs');
   const cli = args => spawnSync(process.execPath, ['--require', preload, script, ...args], { env: process.env, encoding: 'utf8', timeout: 20000 });
   assert.notStrictEqual(cli(['--limit', '1']).status, 0, 'limited build needs explicit isolated output');
@@ -117,6 +130,34 @@ const snapshot = () => {
   const experiment = readCatalog(output);
   assert(Math.abs(experiment.bin.readFloatLE(4) - Math.SQRT1_2) < 1e-6, 'changed views re-embed rather than reuse old vectors');
   assert.deepStrictEqual(snapshot(), stable, 'experiments never replace production');
+
+  await cv.load();
+  const read = fs.readFileSync;
+  let metadataReads = 0;
+  fs.readFileSync = (file, ...args) => {
+    if (file === metaFile) metadataReads++;
+    return read(file, ...args);
+  };
+  try {
+    for (let i = 0; i < 3; i++) {
+      assert.strictEqual(cv.isBuilt(), true);
+      await cv.load();
+    }
+    assert.strictEqual(metadataReads, 0, 'warm availability and loads do not parse the manifest again');
+    const external = spawnSync(process.execPath, ['-e', `
+      const { publishCatalog } = require(${JSON.stringify(require.resolve('../src/utils/localCatalog'))});
+      publishCatalog(${JSON.stringify(metaFile)}, { dim: 2, ids: ['mtg-external'] }, [new Float32Array([0, 1])]);
+    `], { encoding: 'utf8' });
+    assert.strictEqual(external.status, 0, external.stderr);
+    const replaced = await cv.load();
+    assert.deepStrictEqual(replaced.ids, ['mtg-external'], 'out-of-process publication refreshes a warm catalog');
+    assert.deepStrictEqual(Array.from(replaced.cat), [0, 1]);
+    const readsAfterReplacement = metadataReads;
+    await cv.load();
+    assert.strictEqual(metadataReads, readsAfterReplacement, 'replacement is cached after its first load');
+  } finally {
+    fs.readFileSync = read;
+  }
   console.log('catalogsafety.test.js: publication faults, cancellation, failed cache/inference, legacy loading, reuse and isolated multi-view CLI passed');
 })().catch(e => { console.error(e); process.exitCode = 1; }).finally(async () => {
   ort.InferenceSession.create = create;

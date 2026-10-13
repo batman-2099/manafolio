@@ -5,6 +5,7 @@ import CardImage from './CardImage';
 import { priceText } from '../utils/formatPrice';
 import { getPrintingPrice } from '../utils/resolveCardPrice';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import { getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
 
 export default function SetCompletion() {
   const { t, locale } = useT();
@@ -69,7 +70,7 @@ export default function SetCompletion() {
     <button className="btn btn-secondary" disabled={currentPage === pages} onClick={() => setPage(currentPage + 1)}>{t('collection.nextPage')}</button>
   </nav>;
 
-  const addToWishlist = async printing => {
+  const addToWishlist = async (printing, finish) => {
     if (wishlistPending.current) return;
     wishlistPending.current = true;
     const key = `${printing.id}:${goal}`;
@@ -80,7 +81,7 @@ export default function SetCompletion() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_id: printing.id, quantity: 1, list_type: 'wishlist',
-          printing: goal === 'foil' ? 'Holofoil' : 'Normal',
+          printing: finish,
           language: printing.language || 'English',
         }),
       });
@@ -140,16 +141,18 @@ export default function SetCompletion() {
       {result.total > 0 && !rows.length && <p>{t('completion.noMatches')}</p>}
       <ul className="card-grid" style={{ listStyle: 'none', padding: 0 }}>
         {rows.slice((currentPage - 1) * 60, currentPage * 60).map(({ printing, owned }) => {
-          const price = getPrintingPrice(printing, goal === 'foil' ? 'Holofoil' : 'Normal');
+          const finish = goal === 'foil' || (printing.finishes?.includes('foil') && !printing.finishes.includes('nonfoil')) ? 'Holofoil' : 'Normal';
+          const price = getPrintingPrice(printing, finish);
           const actionKey = `${printing.id}:${goal}`;
           return <li key={printing.id} style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowWrap: 'anywhere' }}>
             <button type="button" aria-label={`${t('inspector.zoomHint')}: ${printing.name} · #${printing.number}`} aria-haspopup="dialog" onClick={() => setCard(printing)} style={{ width: '100%', padding: 0, border: 0, background: 'transparent', cursor: 'zoom-in', borderRadius: 'var(--radius-sm)' }}>
               <CardImage card={printing} loading="lazy" style={{ display: 'block', width: '100%', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
             </button>
             <strong>{printing.name} · #{printing.number}</strong>
+            {finish === 'Holofoil' && <span className="collection-card-tag collection-card-tag--foil" style={{ ...getPrintingBadgeStyle(finish), alignSelf: 'flex-start' }}>{getPrintingBadgeLabel(finish)}</span>}
             <span style={{ color: owned ? 'var(--text-positive)' : 'var(--text-secondary)' }}>{t(owned ? 'completion.owned' : 'completion.missing')}</span>
             <span style={{ color: 'var(--accent-yellow)', fontWeight: 600 }}>{price === null ? t('priceCheck.unavailable') : `${t('priceCheck.estimate')}: ${priceText(price, printing.price_currency)}`}</span>
-            <button type="button" className="btn btn-secondary" disabled={!!wishlistAction?.pending} aria-busy={wishlistAction?.key === actionKey && !!wishlistAction.pending} onClick={() => addToWishlist(printing)} style={{ minHeight: '44px', width: '100%', whiteSpace: 'normal' }}>
+            <button type="button" className="btn btn-secondary" disabled={!!wishlistAction?.pending} aria-busy={wishlistAction?.key === actionKey && !!wishlistAction.pending} onClick={() => addToWishlist(printing, finish)} style={{ minHeight: '44px', width: '100%', whiteSpace: 'normal' }}>
               {t(wishlistAction?.key === actionKey && wishlistAction.pending ? 'search.adding' : 'search.addToWishlist')}
             </button>
             {wishlistAction?.key === actionKey && !wishlistAction.pending && <p role={wishlistAction.error ? 'alert' : 'status'} style={{ margin: 0, fontSize: '0.875rem', color: wishlistAction.error ? 'var(--text-negative)' : 'var(--text-positive)' }}>

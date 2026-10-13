@@ -41,7 +41,7 @@ export default function AddToDeckSelect({
       aria-label={placeholder ?? t('deck.addToDeck')}
       value=""
       disabled={disabled || loading || error}
-      onChange={(e) => { if (e.target.value) onAdd(e.target.value); e.target.value = ''; }}
+      onChange={(e) => { if (!disabled && e.target.value) onAdd(e.target.value); e.target.value = ''; }}
       style={style}
     >
       <option value="">{loading ? t('common.loading') : (placeholder ?? t('deck.addToDeck'))}</option>

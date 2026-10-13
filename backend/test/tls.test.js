@@ -3,12 +3,20 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const http = require('http');
+const https = require('https');
 const { X509Certificate } = require('crypto');
 
-const { loadOrCreateCert } = require('../src/utils/tls');
+const { loadOrCreateCert, startHttps } = require('../src/utils/tls');
 
 (async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'manafolio-tls-'));
+  const savedEnv = Object.fromEntries(['HTTPS_PORT', 'SSL_CERT_PATH', 'SSL_KEY_PATH'].map(key => [key, process.env[key]]));
+  for (const key of Object.keys(savedEnv)) delete process.env[key];
+  let httpServer;
+  let httpsServer;
+  const originalError = console.error;
+  try {
 
   const first = await loadOrCreateCert(dir);
   assert.ok(first.selfSigned, 'generated cert is self-signed');
@@ -44,6 +52,46 @@ const { loadOrCreateCert } = require('../src/utils/tls');
   delete process.env.SSL_CERT_PATH;
   delete process.env.SSL_KEY_PATH;
 
-  fs.rmSync(dir, { recursive: true, force: true });
+  assert.strictEqual(await startHttps(() => {}, dir), null, 'HTTPS is optional when no port is set');
+  httpServer = http.createServer((req, res) => res.end('HTTP still works'));
+  await new Promise(resolve => httpServer.listen(0, '127.0.0.1', resolve));
+  const port = httpServer.address().port;
+  process.env.HTTPS_PORT = String(port);
+  const errors = [];
+  console.error = message => errors.push(message);
+  assert.strictEqual(await startHttps(() => {}, dir), null, 'occupied HTTPS port is a handled startup failure');
+  assert(errors.some(message => message.includes('HTTPS listener failed to start:') && message.includes('EADDRINUSE')));
+  assert.strictEqual(await (await fetch(`http://127.0.0.1:${port}`)).text(), 'HTTP still works', 'optional HTTPS failure must not kill HTTP');
+  httpServer.closeAllConnections();
+  await new Promise(resolve => httpServer.close(resolve));
+
+  httpsServer = await startHttps((req, res) => res.end('HTTPS works'), dir);
+  assert(httpsServer?.listening, 'successful startup resolves only after listening');
+  const body = await new Promise((resolve, reject) => {
+    https.get({ hostname: '127.0.0.1', port, rejectUnauthorized: false, agent: false }, res => {
+      let text = '';
+      res.on('data', chunk => { text += chunk; });
+      res.on('end', () => resolve(text));
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+  assert.strictEqual(body, 'HTTPS works');
   console.log('tls.test.js OK');
-})();
+  } finally {
+    console.error = originalError;
+    for (const server of [httpsServer, httpServer]) {
+      if (server?.listening) {
+        server.closeAllConnections();
+        await new Promise(resolve => server.close(resolve));
+      }
+    }
+    for (const [key, value] of Object.entries(savedEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});

@@ -10,6 +10,7 @@ process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 const db = require('../src/db');
 const scryfallApi = require('../src/scryfallApi');
 const importRouter = require('../src/routes/importExport');
+const { checkedOutSources, deckLocations, reserveDeckSources } = require('../src/utils/collectionHelpers');
 const importContainer = importRouter.stack.find(layer => layer.route?.path === '/import-container').route.stack[0].handle;
 const moveContainer = importRouter.stack.find(layer => layer.route?.path === '/import-container/move').route.stack[0].handle;
 
@@ -391,6 +392,99 @@ async function testContainerImport() {
       await db.run("UPDATE collection SET notes = 'Outer transaction survived' WHERE id = ?", [before]);
     });
     assert.strictEqual((await db.get('SELECT notes FROM collection WHERE id = ?', [before])).notes, 'Outer transaction survived');
+
+    for (const legacy of [false, true]) for (const movedQuantity of [2, 5]) {
+      const cardId = `mtg-reserved-${legacy}-${movedQuantity}`;
+      await db.run("INSERT INTO card_cache (id, name, game) VALUES (?, 'Reserved move', 'mtg')", [cardId]);
+      const addReservedSource = async quantity => (await db.run(`INSERT INTO collection
+        (user_id, card_id, game, quantity)
+        VALUES (1, ?, 'mtg', ?)`, [cardId, quantity])).lastID;
+      const reservedStack = await addReservedSource(5);
+      const otherSource = await addReservedSource(1);
+      const reservedDecks = [];
+      for (const quantity of [2, 4]) {
+        const id = (await db.run("INSERT INTO decks (name, user_id, checked_out) VALUES ('Reserved move', 1, 1)")).lastID;
+        reservedDecks.push(id);
+        await db.run(`INSERT INTO deck_cards (deck_id, card_id, quantity, source_entry_id) VALUES (?, ?, ?, ?)`,
+          [id, cardId, quantity, reservedStack]);
+      }
+      const initialAllocations = [
+        { deck_id: reservedDecks[0], card_id: cardId, entry_id: reservedStack, quantity: 2 },
+        { deck_id: reservedDecks[1], card_id: cardId, entry_id: reservedStack, quantity: 3 },
+        { deck_id: reservedDecks[1], card_id: cardId, entry_id: otherSource, quantity: 1 }
+      ];
+      if (!legacy) for (const allocation of initialAllocations) {
+        await db.run('INSERT INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)',
+          [allocation.deck_id, allocation.card_id, allocation.entry_id, allocation.quantity]);
+      }
+      const allocationOrder = (a, b) => a.deck_id - b.deck_id || a.entry_id - b.entry_id;
+      assert.deepStrictEqual((await checkedOutSources(1)).filter(row => row.card_id === cardId).sort(allocationOrder),
+        initialAllocations, 'legacy and persisted reservations start on the same physical copies');
+      const competingId = (await db.run("INSERT INTO decks (name, user_id) VALUES ('Competing move', 1)")).lastID;
+      await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, 1)', [competingId, cardId]);
+      const competingDeck = await db.get('SELECT * FROM decks WHERE id = ?', [competingId]);
+      const reservationState = async () => ({
+        ...await snapshot(),
+        decks: await db.all('SELECT * FROM decks ORDER BY id'),
+        deckCards: await db.all('SELECT * FROM deck_cards ORDER BY deck_id, card_id'),
+        allocations: await db.all('SELECT * FROM deck_card_allocations ORDER BY deck_id, card_id, entry_id')
+      });
+      const reservedBefore = await reservationState();
+      const reservedPayload = { ...payload, card_id: cardId, requested: movedQuantity };
+      // Fail after splitting, when allocation redistribution first reaches a moved copy.
+      await db.run(`CREATE TEMP TRIGGER fail_reserved_move BEFORE INSERT ON deck_card_allocations
+        WHEN NEW.card_id = '${cardId}' AND NEW.entry_id IN
+          (SELECT id FROM collection WHERE location_id = ${review.body.id})
+        BEGIN SELECT RAISE(ABORT, 'injected reservation failure'); END`);
+      console.error = () => {};
+      try {
+        assert.strictEqual((await move(reservedPayload)).statusCode, 500);
+      } finally {
+        console.error = originalConsoleError;
+        await db.run('DROP TRIGGER fail_reserved_move');
+      }
+      assert.deepStrictEqual(await reservationState(), reservedBefore,
+        'rollback restores splits, positions, persisted reservations and legacy materialization');
+      const movedReserved = await move(reservedPayload);
+      assert.strictEqual(movedReserved.statusCode, 200);
+      assert.strictEqual(movedReserved.body.moved, movedQuantity);
+      const reservedAfter = await reservationState();
+      assert.deepStrictEqual(reservedAfter.decks, reservedBefore.decks);
+      assert.deepStrictEqual(reservedAfter.deckCards, reservedBefore.deckCards);
+      assert.deepStrictEqual(reservedAfter.cards.filter(row => row.card_id !== cardId),
+        reservedBefore.cards.filter(row => row.card_id !== cardId), 'other cards, accounts and games are untouched');
+      const parts = reservedAfter.cards.filter(row => row.card_id === cardId);
+      assert.strictEqual(parts.reduce((sum, row) => sum + row.quantity, 0), 6);
+      assert.ok(parts.every(row => row.user_id === 1 && row.game === 'mtg' && row.list_type === 'collection'));
+      const movedParts = parts.filter(row => row.location_id === review.body.id);
+      assert.strictEqual(movedParts.length, movedQuantity);
+      assert.ok(movedParts.every(row => row.quantity === 1));
+      assert.strictEqual(parts.find(row => row.id === reservedStack).quantity, movedQuantity === 5 ? 1 : 3);
+      assert.deepStrictEqual(parts.find(row => row.id === otherSource),
+        reservedBefore.cards.find(row => row.id === otherSource), 'the other legacy source is retained');
+      const allocations = reservedAfter.allocations.filter(row => row.card_id === cardId);
+      assert.deepStrictEqual(allocations.filter(row => row.entry_id === otherSource), [initialAllocations[2]],
+        'freezing a legacy card preserves all sources, not just the split stack');
+      for (const part of parts) {
+        assert.strictEqual(allocations.filter(row => row.entry_id === part.id).reduce((sum, row) => sum + row.quantity, 0),
+          part.quantity, 'every reserved copy remains booked exactly once across split rows');
+      }
+      for (const [index, id] of reservedDecks.entries()) {
+        assert.strictEqual(allocations.filter(row => row.deck_id === id).reduce((sum, row) => sum + row.quantity, 0),
+          [2, 4][index], 'each deck retains its exact reservation total');
+        const plan = await deckLocations(await db.get('SELECT * FROM decks WHERE id = ?', [id]), 1);
+        assert.strictEqual(plan[0].missing, 0);
+        assert.deepStrictEqual(plan[0].locations.map(row => [row.entry_id, row.take, row.location_id]).sort((a, b) => a[0] - b[0]),
+          allocations.filter(row => row.deck_id === id).map(row =>
+            [row.entry_id, row.quantity, parts.find(part => part.id === row.entry_id).location_id]).sort((a, b) => a[0] - b[0]),
+          'return plans follow the actual moved and retained reservations');
+      }
+      assert.strictEqual((await deckLocations(competingDeck, 1))[0].found, 0);
+      await assert.rejects(db.withTransaction(() => reserveDeckSources(competingDeck, 1)), /Not enough cards/,
+        'another checkout cannot double-book any newly split copy');
+      assert.strictEqual((await move(reservedPayload)).statusCode, 200);
+      assert.deepStrictEqual(await reservationState(), reservedAfter, 'retries do not reassign reservations');
+    }
   } finally {
     scryfallApi.bulkFetchByIdentifier = originalBulkFetch;
     await new Promise((resolve, reject) => db.dbConnection.close(error => error ? reject(error) : resolve()));

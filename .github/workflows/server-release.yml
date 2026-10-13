@@ -88,10 +88,10 @@ jobs:
           FUSE=NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
           if [ "${{ runner.os }}" = "macOS" ]; then
             codesign --remove-signature "$EXE"
-            npx --yes postject "$EXE" NODE_SEA_BLOB sea-prep.blob --sentinel-fuse "$FUSE" --macho-segment-name NODE_SEA
+            npx --yes postject@1.0.0-alpha.6 "$EXE" NODE_SEA_BLOB sea-prep.blob --sentinel-fuse "$FUSE" --macho-segment-name NODE_SEA
             codesign --sign - "$EXE"
           else
-            npx --yes postject "$EXE" NODE_SEA_BLOB sea-prep.blob --sentinel-fuse "$FUSE"
+            npx --yes postject@1.0.0-alpha.6 "$EXE" NODE_SEA_BLOB sea-prep.blob --sentinel-fuse "$FUSE"
           fi
           chmod +x "$EXE" || true
           cp -r backend/src          "$ROOT/app/backend/src"

@@ -354,81 +354,20 @@ function normalizeRuleConfig(rule_config) {
   return JSON.stringify(rule_config);
 }
 
-// The rows the collection view stacks together with this one: same card, same
-// printing and grading details, same list. Ordered as trim candidates — unplaced copies
-// first, then newest — so a copy already filed into a binder is the last one
-// removed. The edited row itself is excluded: it is never the row deleted.
-async function stackSiblings(dbClient, userId, row, entryId) {
-  return dbClient.all(`
-    SELECT id, quantity FROM collection
-    WHERE user_id = ? AND card_id = ? AND condition = ? AND printing = ?
-      AND language = ? AND list_type = ? AND id != ?
-      AND COALESCE(grader, 'Raw') = ? AND grade IS ? AND cert_number IS ?
-    ORDER BY (location_id IS NULL) DESC, id DESC
-  `, [userId, row.card_id, row.condition, row.printing, row.language, row.list_type, entryId,
-    row.grader || 'Raw', row.grade, row.cert_number]);
-}
-
-// Make the number of copies this stack represents equal `target`, keeping the
-// edited row. The quantity field in the card popup is absolute — "how many of
-// these I own" — and the stacked collection view sums the identical rows into
-// that one number, so the edit has to reconcile the whole group both ways.
-// Growing inserts single-card rows (one physical card = one row, mirroring the
-// edited row's placement); shrinking removes the trim candidates first and only
-// then reduces the edited row's own quantity, which a legacy stacked row can
-// still have above 1. Returns the net change in copies.
-async function setStackQuantity(database, userId, entryId, target) {
-  const dbClient = database || db;
-  const row = await dbClient.get(`SELECT * FROM collection WHERE id = ? AND user_id = ?`, [entryId, userId]);
-  if (!row) return 0;
-  if (row.cert_number && target !== 1) {
-    throw Object.assign(new Error('A certification number identifies one physical card'), { status: 400 });
-  }
-  const siblings = await stackSiblings(dbClient, userId, row, entryId);
-
-  const start = (row.quantity || 1) + siblings.reduce((n, s) => n + (s.quantity || 1), 0);
-  let current = start;
-
-  for (let i = 0; current < target; i++, current++) {
-    await dbClient.run(`
-      INSERT INTO collection (
-        card_id, user_id, quantity, condition, printing, language, purchase_price,
-        location_id, compartment_id, position, is_trade, favorite, list_type, game,
-        grader, grade, notes, missing, market_value, market_value_source, market_value_at
-      ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      row.card_id, userId, row.condition, row.printing, row.language, row.purchase_price,
-      row.location_id, row.compartment_id, (row.position || 0) + (i + 1) * 0.001,
-      row.is_trade, row.favorite, row.list_type, row.game,
-      row.grader || 'Raw', row.grade, row.notes, row.missing,
-      row.market_value, row.market_value_source, row.market_value_at
-    ]);
-  }
-
-  for (const s of siblings) {
-    if (current <= target) break;
-    const have = s.quantity || 1;
-    const drop = Math.min(have, current - target);
-    current -= drop;
-    if (drop >= have) {
-      await dbClient.run(`DELETE FROM collection WHERE id = ? AND user_id = ?`, [s.id, userId]);
-    } else {
-      await dbClient.run(`UPDATE collection SET quantity = quantity - ? WHERE id = ? AND user_id = ?`, [drop, s.id, userId]);
-    }
-  }
-
-  if (current > target) {
-    await dbClient.run(`UPDATE collection SET quantity = ? WHERE id = ? AND user_id = ?`, [target, entryId, userId]);
-    current = target;
-  }
-
-  return current - start;
-}
-
 // The caller holds a transaction. Reuse whole single copies, split only the
 // selected quantity from legacy stacks, and leave remaining source copies intact.
 async function moveContainerCopies(userId, locationId, compartmentId, entries, quantity) {
   if (quantity <= 0 || entries.length === 0) return;
+  // Freeze legacy identities before filing changes their allocation order.
+  // Persist every source: a partial allocation disables fallback for that card.
+  const reservations = new Map();
+  for (const source of (await checkedOutSources(userId)).sort((a, b) =>
+    a.deck_id - b.deck_id || a.card_id.localeCompare(b.card_id))) {
+    await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+      [source.deck_id, source.card_id, source.entry_id, source.quantity]);
+    if (!reservations.has(source.entry_id)) reservations.set(source.entry_id, []);
+    reservations.get(source.entry_id).push(source);
+  }
   await rebalanceCompartmentPositions(db, compartmentId, userId);
   const occupied = await db.get(
     `SELECT COUNT(*) AS count FROM collection WHERE compartment_id = ? AND user_id = ?`,
@@ -441,6 +380,8 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
     const copies = Math.min(quantity, entry.available);
     quantity -= copies;
     const originalUsed = copies === entry.quantity;
+    const retainedQuantity = originalUsed ? 1 : entry.quantity - copies;
+    const segments = [{ id: entry.id, offset: 0, quantity: retainedQuantity }];
     if (originalUsed) {
       await db.run(`
         UPDATE collection SET quantity = 1, location_id = ?, compartment_id = ?, position = ?
@@ -450,7 +391,7 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
       await db.run(`UPDATE collection SET quantity = quantity - ? WHERE id = ? AND user_id = ?`, [copies, entry.id, userId]);
     }
     for (let copy = originalUsed ? 1 : 0; copy < copies; copy++) {
-      await db.run(`
+      const inserted = await db.run(`
         INSERT INTO collection (
           card_id, user_id, quantity, condition, printing, language, purchase_price,
           favorite, is_trade, list_type, game, added_at, notes, grader, grade,
@@ -463,6 +404,25 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
         entry.grade, entry.cert_number, entry.market_value, entry.market_value_source, entry.market_value_at, entry.missing,
         locationId, compartmentId, ++slot * 1000, entry.last_verified_at
       ]);
+      segments.push({ id: inserted.lastID, offset: entry.quantity - copies + copy, quantity: 1 });
+    }
+    // As in stocktake, intersect each deck's consecutive reserved copies with
+    // the split rows. Retained copies come first; moved copies keep the remainder.
+    if (entry.quantity > 1) {
+      let reservedOffset = 0;
+      for (const source of reservations.get(entry.id) || []) {
+        await db.run('DELETE FROM deck_card_allocations WHERE deck_id = ? AND card_id = ? AND entry_id = ?',
+          [source.deck_id, source.card_id, entry.id]);
+        for (const segment of segments) {
+          const reserved = Math.min(reservedOffset + source.quantity, segment.offset + segment.quantity)
+            - Math.max(reservedOffset, segment.offset);
+          if (reserved > 0) {
+            await db.run(`INSERT INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+              [source.deck_id, source.card_id, segment.id, reserved]);
+          }
+        }
+        reservedOffset += source.quantity;
+      }
     }
     if (entry.compartment_id) sources.add(entry.compartment_id);
   }
@@ -484,5 +444,4 @@ module.exports = {
   resolveCompartmentAndPosition,
   describePlacement,
   normalizeRuleConfig,
-  setStackQuantity,
 };

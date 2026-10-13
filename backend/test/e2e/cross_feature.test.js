@@ -2,29 +2,15 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const assert = require('assert');
-const { spawn } = require('child_process');
+const { spawnServer, waitForServer, stopServer } = require('./server-helper');
 
 // Isolated temp DB and unique port
 const tmpDb = path.join(os.tmpdir(), `manafolio-cross-test-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
-const port = '3011';
 
 const projectRoot = path.join(__dirname, '../../../');
 const db = require('../../src/db');
 
-async function waitForServer(port) {
-  const url = `http://localhost:${port}/api/health`;
-  for (let i = 0; i < 150; i++) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) return;
-    } catch (e) {
-      // retry
-    }
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  throw new Error(`Server on port ${port} did not start in time`);
-}
 
 async function waitForDatabase() {
   for (let i = 0; i < 150; i++) {
@@ -43,16 +29,15 @@ async function runTests() {
   // Start server preloading scryfall-mock.js
   const mockScript = path.join(__dirname, 'scryfall-mock.js');
   const serverScript = path.join(projectRoot, 'backend/src/server.js');
-  const server = spawn('node', ['-r', mockScript, serverScript], {
+  const server = spawnServer(['-r', mockScript, serverScript], {
     env: {
       ...process.env,
-      PORT: port,
       DB_PATH: tmpDb
     }
   });
 
   try {
-    await waitForServer(port);
+    const port = await waitForServer(server);
     const adminId = await waitForDatabase();
 
     // Insert a valid session token for authentication
@@ -204,7 +189,7 @@ async function runTests() {
     }
 
   } finally {
-    try { server.kill('SIGKILL'); } catch {}
+    await stopServer(server);
     try {
       await new Promise(resolve => {
         db.dbConnection.close(() => resolve());

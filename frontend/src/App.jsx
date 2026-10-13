@@ -522,7 +522,7 @@ function App() {
       case 'dashboard':
         return <Dashboard statsTrigger={statsTrigger} onNavigate={goTab} setSelectedLocationId={setSelectedLocationId} setFocusEntryId={setFocusEntryId} onUpdate={triggerRefresh} showToast={showToast} />;
       case 'add-cards':
-        return <AddCards onAddSuccess={triggerRefresh} showToast={showToast} setActiveTab={goTab} />;
+        return <AddCards onAddSuccess={triggerRefresh} showToast={showToast} setActiveTab={goTab} navigationGuardRef={navigationGuardRef} />;
       case 'collection':
         return (
           <CollectionList 

@@ -120,6 +120,19 @@ function searchableName(subject) {
     .trim();
 }
 
+async function cachedCert(cert_number) {
+  const cached = await db.get(`SELECT payload FROM psa_cert WHERE cert_number = ?`, [cert_number]);
+  if (cached) {
+    try {
+      return { ...normalizeCert(JSON.parse(cached.payload), cert_number), cached: true };
+    } catch {
+      // A corrupt payload must not make a certificate permanently unreadable.
+      await db.run(`DELETE FROM psa_cert WHERE cert_number = ?`, [cert_number]);
+    }
+  }
+  return null;
+}
+
 // Look up a cert. Cache first, then the network — and the cache hit is the whole
 // point, so a cert already seen resolves without a token.
 //
@@ -135,16 +148,8 @@ async function lookupCert(certInput, token = '') {
     throw e;
   }
 
-  const cached = await db.get(`SELECT payload FROM psa_cert WHERE cert_number = ?`, [cert_number]);
-  if (cached) {
-    try {
-      return { ...normalizeCert(JSON.parse(cached.payload), cert_number), cached: true };
-    } catch {
-      // A payload that will not parse is worse than no payload: it would make this
-      // cert permanently unreadable. Drop it and fall through to a refetch.
-      await db.run(`DELETE FROM psa_cert WHERE cert_number = ?`, [cert_number]);
-    }
-  }
+  const cached = await cachedCert(cert_number);
+  if (cached) return cached;
 
   if (!token) {
     const e = new Error('No PSA API token configured. Add one in Settings to look up certification numbers.');
@@ -152,51 +157,56 @@ async function lookupCert(certInput, token = '') {
     throw e;
   }
 
-  let data;
-  try {
-    const res = await serialized(() => client.get(`/cert/GetByCertNumber/${cert_number}`, {
-      // Lowercase 'bearer' is what PSA's own documentation shows.
-      headers: { Authorization: `bearer ${token}` },
-    }));
-    data = res.data;
-  } catch (err) {
-    const status = err.response?.status;
-    if (status === 401 || status === 403) {
-      const e = new Error('PSA rejected the API token. Check it in Settings.');
-      e.status = 401;
+  return serialized(async () => {
+    const cached = await cachedCert(cert_number);
+    if (cached) return cached;
+
+    let data;
+    try {
+      const res = await client.get(`/cert/GetByCertNumber/${cert_number}`, {
+        // Lowercase 'bearer' is what PSA's own documentation shows.
+        headers: { Authorization: `bearer ${token}` },
+      });
+      data = res.data;
+    } catch (err) {
+      const status = err.response?.status;
+      if (status === 401 || status === 403) {
+        const e = new Error('PSA rejected the API token. Check it in Settings.');
+        e.status = 401;
+        throw e;
+      }
+      if (status === 404) {
+        const e = new Error(`PSA has no record of certification number ${cert_number}.`);
+        e.status = 404;
+        throw e;
+      }
+      if (status === 429) {
+        const e = new Error('PSA rate limit reached. Try again later.');
+        e.status = 429;
+        throw e;
+      }
+      const e = new Error(`PSA lookup failed: ${err.message}`);
+      e.status = 502;
       throw e;
     }
-    if (status === 404) {
-      const e = new Error(`PSA has no record of certification number ${cert_number}.`);
+
+    const normalized = normalizeCert(data, cert_number);
+    // A response carrying no grade text is not a cert PSA knows — its API answers
+    // 200 with an empty body for some unknown numbers rather than 404. Storing that
+    // would cache a permanent "no such card" for a number the user may have simply
+    // mistyped, so refuse it instead.
+    if (!normalized.grade_label && !normalized.subject) {
+      const e = new Error(`PSA returned no details for certification number ${cert_number}.`);
       e.status = 404;
       throw e;
     }
-    if (status === 429) {
-      const e = new Error('PSA rate limit reached. Try again later.');
-      e.status = 429;
-      throw e;
-    }
-    const e = new Error(`PSA lookup failed: ${err.message}`);
-    e.status = 502;
-    throw e;
-  }
 
-  const normalized = normalizeCert(data, cert_number);
-  // A response carrying no grade text is not a cert PSA knows — its API answers
-  // 200 with an empty body for some unknown numbers rather than 404. Storing that
-  // would cache a permanent "no such card" for a number the user may have simply
-  // mistyped, so refuse it instead.
-  if (!normalized.grade_label && !normalized.subject) {
-    const e = new Error(`PSA returned no details for certification number ${cert_number}.`);
-    e.status = 404;
-    throw e;
-  }
-
-  await db.run(
-    `INSERT OR REPLACE INTO psa_cert (cert_number, payload) VALUES (?, ?)`,
-    [cert_number, JSON.stringify(data)]
-  );
-  return { ...normalized, cached: false };
+    await db.run(
+      `INSERT OR REPLACE INTO psa_cert (cert_number, payload) VALUES (?, ?)`,
+      [cert_number, JSON.stringify(data)]
+    );
+    return { ...normalized, cached: false };
+  });
 }
 
 module.exports = { lookupCert, normalizeCertNumber, parseGrade, searchableName, normalizeCert, client };

@@ -18,6 +18,12 @@ try {
       if (path.dirname(process.env.DB_PATH) !== temp) throw new Error('database escaped owned directory');
       fs.writeFileSync(process.env.DB_PATH, 'owned database');
       fs.writeFileSync(process.env.RECEIPT, temp);
+      process.stdout.write('PASS: F1-');
+      setTimeout(() => {
+        process.stdout.write('TC1\\nPASS: F12-TC345\\n');
+        process.stderr.write('FAIL: F1-');
+        setTimeout(() => process.stderr.write('TC2\\n'), 10);
+      }, 10);
       process.exitCode = Number(process.env.FAIL_FIXTURE);
     `);
     for (const failure of [0, 1]) {
@@ -27,6 +33,13 @@ try {
         env: { ...process.env, TMPDIR: root, TMP: root, TEMP: root, RECEIPT: receipt, FAIL_FIXTURE: String(failure) },
       });
       assert.strictEqual(result.status, failure, result.stdout + result.stderr);
+      if (runner === 'e2e/run.js') {
+        assert.match(result.stdout, new RegExp('Passed suites: ' + (failure ? 0 : 1) + ' / 1'));
+        assert.match(result.stdout, new RegExp('Failed suites: ' + failure + ' / 1'));
+        assert.doesNotMatch(result.stdout, /(?:Passed|Failed|Total) test cases:/, 'only exit-code suite totals are reported');
+        assert.match(result.stdout, /PASS: F1-TC1/, 'split stdout remains visible');
+        assert.match(result.stderr, /FAIL: F1-TC2/, 'split stderr remains visible');
+      }
       assert.strictEqual(fs.readFileSync(foreign, 'utf8'), 'another running suite owns this file');
       const owned = fs.readFileSync(receipt, 'utf8');
       assert.notStrictEqual(owned, root);

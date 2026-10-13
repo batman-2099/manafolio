@@ -18,6 +18,33 @@ test('import progress survives split UTF-8 and completes only on terminal data',
   assert.deepEqual(received, [progress]);
 });
 
+test('a committed import remains observed until its delayed completion summary arrives', async () => {
+  let stream;
+  let saved;
+  const savedProgress = new Promise(resolve => { saved = resolve; });
+  const pendingResponse = new Response(new ReadableStream({
+    start(controller) { stream = controller; },
+  }), { headers: { 'Content-Type': 'application/x-ndjson' } });
+  const send = event => stream.enqueue(new TextEncoder().encode(`${JSON.stringify(event)}\n`));
+  let completed = false;
+  const result = readProgressStream(pendingResponse, saved, messages).then(data => {
+    completed = true;
+    return data;
+  });
+  send({ type: 'progress', stage: 'saved', current: 1, total: 1 });
+  await savedProgress;
+  assert.equal(completed, false, 'saved progress is not the completion receipt');
+
+  const summary = {
+    added: { cards: 1, copies: 2, items: [{ name: 'Forest', quantity: 2 }] },
+    failed: { cards: 0, copies: 0, items: [] },
+  };
+  send({ type: 'complete', data: { success: true, summary } });
+  stream.close();
+  assert.deepEqual((await result).summary, summary);
+  assert.equal(completed, true);
+});
+
 test('incomplete or failed imports never report success', async () => {
   await assert.rejects(readProgressStream(response('{"type":"progress","stage":"saving"}\n'), () => {}, messages), /Incomplete/);
   await assert.rejects(readProgressStream(response('{"type":"error","error":"Import failed"}\n'), () => {}, messages), /Import failed/);

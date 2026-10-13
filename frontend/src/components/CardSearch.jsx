@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Search, Plus, X, ShieldAlert, Check, MousePointerClick, Zap, Undo2, Maximize2, Download } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { priceText } from '../utils/formatPrice';
@@ -80,7 +80,7 @@ function ImportLog({ entries }) {
 }
 
 
-function CardSearch({ onAddSuccess, showToast }) {
+function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   const { t } = useT();
   const [query, setQuery] = useState('');
   const [numberQuery, setNumberQuery] = useState('');
@@ -135,10 +135,31 @@ function CardSearch({ onAddSuccess, showToast }) {
   const [importSummary, setImportSummary] = useState(null);
   const [importLog, setImportLog] = useState([]);
   const importRequest = useRef(null);
+  const importCommitting = useRef(false);
   const importFileReader = useRef(null);
   const importLogId = useRef(0);
 
+  useLayoutEffect(() => {
+    const guard = () => {
+      if (!importCommitting.current) return true;
+      showToast(t('settings.importing'), 'status');
+      return false;
+    };
+    const beforeUnload = event => {
+      if (!importCommitting.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    if (navigationGuardRef) navigationGuardRef.current = guard;
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => {
+      if (navigationGuardRef?.current === guard) navigationGuardRef.current = null;
+      window.removeEventListener('beforeunload', beforeUnload);
+    };
+  }, [navigationGuardRef, showToast, t]);
+
   useEffect(() => () => {
+    // Aborting disconnects the observer; it cannot roll back a committed import.
     importRequest.current?.abort();
     importFileReader.current?.abort();
   }, []);
@@ -849,6 +870,7 @@ function CardSearch({ onAddSuccess, showToast }) {
     if (!preview || importingText || importRequest.current || (format === 'internal' && (preview.stale || preview.errors.length))) return;
     const controller = new AbortController();
     importRequest.current = controller;
+    importCommitting.current = true;
     setImportingText(true);
     setImportLog([]);
     appendImportLog({ stage: 'connecting' });
@@ -878,6 +900,7 @@ function CardSearch({ onAddSuccess, showToast }) {
         appendImportLog({ stage: 'failed', error: error.message || t('settings.importFailed', { error: '' }) });
       }
     } finally {
+      importCommitting.current = false;
       if (!controller.signal.aborted) setImportingText(false);
       if (importRequest.current === controller) importRequest.current = null;
     }

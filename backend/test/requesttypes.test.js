@@ -21,6 +21,7 @@ async function main() {
   app.use('/api/auth', require('../src/routes/auth'));
   app.use('/api/admin', require('../src/routes/admin'));
   app.use('/api', authenticateToken, require('../src/routes/notes'));
+  app.use('/api', authenticateToken, require('../src/routes/importExport'));
   server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const request = async (method, route, body) => {
     const response = await fetch(`http://127.0.0.1:${server.address().port}/api${route}`, {
@@ -52,6 +53,13 @@ async function main() {
   assert.deepStrictEqual(await db.all('SELECT * FROM notes'), [note], 'invalid note fields leave existing notes unchanged');
   assert.strictEqual((await request('PUT', `/notes/${note.id}`, { body: 'Updated text' })).status, 200);
   assert.strictEqual((await db.get('SELECT body FROM notes WHERE id = ?', [note.id])).body, 'Updated text');
+  for (const query of ['ecosystem[x]=internal', 'ecosystem=internal&ecosystem=arena',
+    'format[x]=csv', 'format=csv&format=json']) {
+    assert.strictEqual((await request('GET', `/export?${query}`)).status, 400, 'malformed export selectors return a controlled client error');
+  }
+  const exported = await request('GET', '/export?format=json');
+  assert.strictEqual(exported.status, 200, 'valid exports remain available after malformed selectors');
+  assert.deepStrictEqual(exported.body, []);
   console.log('requesttypes.test.js passed: malformed auth/admin/note fields rejected; valid login and note edits preserved');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {

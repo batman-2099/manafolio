@@ -1160,7 +1160,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
       const out = warpPerspective(rgba, w, h, getPerspectiveTransform(src, dst), RECTIFIED_SIZE, RECTIFIED_SIZE);
       const c = dewarpCanvas.current || (dewarpCanvas.current = document.createElement('canvas'));
       c.width = RECTIFIED_SIZE; c.height = RECTIFIED_SIZE;
-      c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(out), RECTIFIED_SIZE, RECTIFIED_SIZE), 0, 0);
+      c.getContext('2d').putImageData(new ImageData(out, RECTIFIED_SIZE, RECTIFIED_SIZE), 0, 0);
       return c.toDataURL('image/jpeg', 0.9);
     } catch {
       return null;   // any canvas/geometry failure: send the frame instead

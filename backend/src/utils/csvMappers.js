@@ -1,8 +1,8 @@
 const CONDITION_MAP = {
   'near mint': 'Near Mint', 'nm': 'Near Mint', 'near_mint': 'Near Mint',
   'lightly played': 'Lightly Played', 'lp': 'Lightly Played', 'lightly_played': 'Lightly Played',
-  'moderately played': 'Moderately Played', 'mp': 'Moderately Played',
-  'heavily played': 'Heavily Played', 'hp': 'Heavily Played',
+  'moderately played': 'Moderately Played', 'mp': 'Moderately Played', 'moderately_played': 'Moderately Played',
+  'heavily played': 'Heavily Played', 'hp': 'Heavily Played', 'heavily_played': 'Heavily Played',
   'damaged': 'Damaged', 'dmg': 'Damaged', 'poor': 'Damaged'
 };
 

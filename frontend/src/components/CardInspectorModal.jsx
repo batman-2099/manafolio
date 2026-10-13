@@ -15,6 +15,7 @@ import RelatedTokens from './RelatedTokens';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
 import { getSlotNumber } from '../utils/getSlotNumber';
+import Modal from './Modal';
 
 // MTG color identity pip colors (WUBRG), approximating the printed mana colors.
 const MTG_COLOR_BG = {
@@ -197,17 +198,17 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // Sent only when actually changed. The server reads quantity as the
-          // absolute number of copies owned and adds or removes rows to match,
-          // and some screens open this popup on a single row whose quantity is
-          // not the whole stack — so an untouched field must not be able to
-          // trim copies the user never asked to lose.
+          // Quantity and metadata always belong to this one stored entry.
           ...(qNum !== (card.quantity ?? 1) ? { quantity: qNum } : {}),
           condition,
           printing,
           language,
           purchase_price: parseFloat(purchasePrice) || 0,
-          location_id: locationId ? parseInt(locationId, 10) : null,
+          // Metadata saves must not re-file the copy. An inventory change still
+          // asks the server to resolve the chosen container for the new list.
+          ...(String(locationId || '') !== String(card.location_id || '') || listType !== (card.list_type || 'collection')
+            ? { location_id: locationId ? parseInt(locationId, 10) : null }
+            : {}),
           list_type: listType,
           is_trade: isTrade ? 1 : 0,
           favorite: favorite ? 1 : 0,
@@ -898,7 +899,37 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   );
 }
 
+function CardInspectorSelection(props) {
+  const { t } = useT();
+  const titleId = useId();
+  const descriptionId = useId();
+  const entries = props.card.stack_entries;
+  const [selectedEntry, setSelectedEntry] = useState(null);
+  const card = selectedEntry || (entries?.length === 1 ? entries[0] : !entries?.length ? props.card : null);
+  if (card) return <CardInspectorContent key={card.entry_id || card.id} {...props} card={card} />;
+
+  return (
+    <Modal onClose={props.onClose} aria-labelledby={titleId} aria-describedby={descriptionId}>
+      <div className="glass-panel" style={{ width: 'min(36rem, 100%)', maxHeight: '85dvh', overflowY: 'auto', padding: '1.5rem' }}>
+        <h2 id={titleId}>{t('inspector.chooseEntry')}</h2>
+        <p>{getCardDisplayName(props.card.name, props.card.printed_name)}</p>
+        <p id={descriptionId}>{t('inspector.chooseEntryHint')}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', margin: '1rem 0' }}>
+          {entries.map(entry => (
+            <button key={entry.entry_id || entry.id} type="button" className="btn btn-secondary" onClick={() => setSelectedEntry(entry)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', whiteSpace: 'normal', overflowWrap: 'anywhere', textAlign: 'start', padding: '0.75rem' }}>
+              <span>{entry.printing || 'Normal'} · {entry.condition || 'Near Mint'} · {entry.language || 'English'} · ×{entry.quantity ?? 1}</span>
+              <span>{[entry.storage_unit_name, entry.location_name || (entry.location_id ? t('inspector.currentStorage') : t('bulk.unassignedPile')), entry.compartment_name, entry.position != null && getSlotNumber(entry) != null ? t('stocktake.slot', { slot: getSlotNumber(entry) }) : null].filter(Boolean).join(' · ')}</span>
+              <span>{t('inspector.entryIdentifier', { id: entry.entry_id || entry.id })}</span>
+            </button>
+          ))}
+        </div>
+        <button type="button" className="btn btn-secondary" onClick={props.onClose}>{t('common.cancel')}</button>
+      </div>
+    </Modal>
+  );
+}
+
 export default function CardInspectorModal(props) {
-  // A keyed draft is initialized before controls render, never by a later effect.
-  return props.card ? <CardInspectorContent key={props.card.entry_id || props.card.id} {...props} /> : null;
+  // No entry controls or draft exist until an aggregate member is chosen.
+  return props.card ? <CardInspectorSelection key={props.card.entry_id || props.card.id} {...props} /> : null;
 }

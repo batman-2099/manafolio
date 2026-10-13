@@ -1183,9 +1183,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       if (stackContainerByCondition) key += `-${card.condition}`;
       if (stackContainerByPrinting) key += `-${card.printing}`;
       const foilQuantity = card.printing === 'Holofoil' ? card.quantity : 0;
-      if (!groups[key]) groups[key] = { ...card, foil_quantity: foilQuantity };
+      if (!groups[key]) groups[key] = { ...card, foil_quantity: foilQuantity, stack_entries: [card] };
       else {
         groups[key].quantity += card.quantity;
+        groups[key].stack_entries.push(card);
         groups[key].foil_quantity += foilQuantity;
         groups[key].in_deck_qty = (groups[key].in_deck_qty || 0) + (card.in_deck_qty || 0);
         if (!card.last_verified_at || !groups[key].last_verified_at) groups[key].last_verified_at = null;
@@ -1508,7 +1509,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     <div className="sub-nav-tabs" role="group" aria-label={t('loc.inventory')} style={{ margin: 0 }}>
       {[['collection', t('dash.physical')], ['graveyard', t('collection.graveyard')]].map(([value, label]) => (
         <button key={value} type="button" className={`sub-nav-tab ${inventoryType === value ? 'active' : ''}`}
-          aria-pressed={inventoryType === value} onClick={() => onInventoryTypeChange?.(value)}>
+          disabled={storage.bulkPending} aria-pressed={inventoryType === value} onClick={() => onInventoryTypeChange?.(value)}>
           {label}
         </button>
       ))}
@@ -2000,12 +2001,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         {unitsFeedback}
         <div className="view-toolbar storage-workspace-toolbar" style={{ justifyContent: 'space-between' }}>
           <div className="storage-workspace-identity" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', minWidth: 0 }}>
-            <button className="btn btn-secondary" onClick={() => { storage.exitSelectMode(); setActiveLocationId(null); setShowGallery(true); }} title={t('nav.storage')} aria-label={t('nav.storage')}><LayoutGrid size={16} /></button>
+            <button className="btn btn-secondary" disabled={storage.bulkPending} onClick={() => { storage.exitSelectMode(); setActiveLocationId(null); setShowGallery(true); }} title={t('nav.storage')} aria-label={t('nav.storage')}><LayoutGrid size={16} /></button>
             {inventorySelector}
             <select
               className="select-control"
               aria-label={t('loc.selectContainer')}
               value={activeLocationId || ''}
+              disabled={storage.bulkPending}
               onChange={(e) => setActiveLocationId(parseInt(e.target.value, 10))}
               style={{ fontSize: '1rem', fontWeight: 'bold', padding: '0.3rem', width: 'auto', minWidth: '150px', maxWidth: '100%' }}
             >
@@ -2138,7 +2140,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               <button
                 type="button"
                 className={`btn ${storage.selectMode ? 'btn-primary' : 'btn-secondary'}`}
-                disabled={!!selectedLoc.locked}
+                disabled={storage.bulkPending || !!selectedLoc.locked}
                 onClick={() => (storage.selectMode ? storage.exitSelectMode() : storage.setSelectMode(true))}
                 style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem' }}
                 title={t(selectedLoc.locked ? 'loc.lockedSelectHint' : 'loc.selectHint')}
@@ -2268,7 +2270,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         </div>
 
         {storage.selectMode && (
-          <div className="glass-panel" style={{ padding: '0.6rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', background: 'rgba(255,71,71,0.08)' }}>
+          <fieldset disabled={storage.bulkPending} aria-busy={storage.bulkPending} className="glass-panel" style={{ minWidth: 0, margin: 0, padding: '0.6rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', background: 'rgba(255,71,71,0.08)' }}>
             <span style={{ fontWeight: 800, color: 'var(--text-strong)', fontSize: '0.8rem' }}>{storage.selectedIds.size} selected</span>
             <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set(selectableContainerCards.map(c => c.entry_id)))}>Select all ({selectableContainerCards.length})</button>
             <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set())}>{t('bulk.clear')}</button>
@@ -2276,7 +2278,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             {!isArchive && (
             <AddToDeckSelect
               onAdd={(id) => storage.runBulk('add_to_deck', id)}
-              disabled={!storage.selectedIds.size}
+              disabled={storage.bulkPending || !storage.selectedIds.size}
               style={{ fontSize: '0.875rem', padding: '0.25rem 0.4rem', maxWidth: '160px' }}
             />
             )}
@@ -2336,7 +2338,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               {t('common.delete')}
             </button>
             <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.5rem', marginLeft: 'auto' }} onClick={storage.exitSelectMode}>{t('bulk.done')}</button>
-          </div>
+          </fieldset>
         )}
 
         {!selectedLoc ? (
@@ -2456,6 +2458,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     <button
                       key={card.entry_id}
                       type="button"
+                      disabled={storage.bulkPending}
                       onClick={() => storage.selectMode ? storage.toggleSelect(card.entry_id) : setInspectorCard(card)}
                       style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', padding: '0.25rem', border: selected ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', background: selected ? 'rgba(255,71,71,0.12)' : 'rgba(255,255,255,0.03)', cursor: 'pointer' }}
                     >

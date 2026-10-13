@@ -123,6 +123,40 @@ async function testFullBackup() {
     }
     const backupTables = ['card_cache', 'collection', 'locations', 'compartments', 'compartment_assignments', 'decks', 'deck_cards', 'deck_card_allocations'];
     const beforeInvalidSleeves = await Promise.all(backupTables.map(table => db.all(`SELECT * FROM ${table}`)));
+    for (const table of ['collection', 'deck_cards']) {
+      for (const quantity of [-1, 0.5, '2', null, true, 2147483648, ...(table === 'collection' ? [0] : [])]) {
+        const invalid = structuredClone(res.body);
+        invalid[table][0].quantity = quantity;
+        invalidRes.statusCode = 200;
+        await importBackup({ body: { format: 'backup', data: invalid }, user: { id: 1 } }, invalidRes);
+        assert.strictEqual(invalidRes.statusCode, 400, `${table} rejects quantity ${JSON.stringify(quantity)}`);
+        assert.match(invalidRes.body.message, /Invalid backup quantities/);
+        assert.deepStrictEqual(await Promise.all(backupTables.map(table => db.all(`SELECT * FROM ${table}`))),
+          beforeInvalidSleeves, 'invalid quantities cannot replace stored data');
+      }
+    }
+    for (const table of ['collection', 'locations', 'compartments', 'decks', 'card_cache']) {
+      const invalid = structuredClone(res.body);
+      invalid[table].push({ ...invalid[table][0] });
+      invalidRes.statusCode = 200;
+      await importBackup({ body: { format: 'backup', data: invalid }, user: { id: 1 } }, invalidRes);
+      assert.strictEqual(invalidRes.statusCode, 400, `${table} rejects duplicate source IDs`);
+      assert.match(invalidRes.body.message, /Invalid backup .*IDs/);
+      assert.deepStrictEqual(await Promise.all(backupTables.map(table => db.all(`SELECT * FROM ${table}`))),
+        beforeInvalidSleeves, 'ambiguous source identities cannot replace stored data');
+    }
+    for (const quantity of [0, -1, 0.5, '2', null, true, 2147483648]) {
+      const invalid = structuredClone(res.body);
+      invalid.deck_card_allocations = [{
+        deck_id: invalid.decks[0].id, card_id: 'backup-card', entry_id: invalid.collection[0].id, quantity
+      }];
+      invalidRes.statusCode = 200;
+      await importBackup({ body: { format: 'backup', data: invalid }, user: { id: 1 } }, invalidRes);
+      assert.strictEqual(invalidRes.statusCode, 400);
+      assert.match(invalidRes.body.message, /Invalid backup deck sources/);
+      assert.deepStrictEqual(await Promise.all(backupTables.map(table => db.all(`SELECT * FROM ${table}`))),
+        beforeInvalidSleeves, 'invalid reservation quantities cannot replace stored data');
+    }
     for (const sleeved of [-1, 4, 0.5, '1', null, true]) {
       const invalid = structuredClone(res.body);
       invalid.locations.find(row => row.id === location.lastID).sleeved = sleeved;
@@ -205,6 +239,15 @@ async function testFullBackup() {
       assert.deepStrictEqual(await db.all('SELECT card_id, quantity, checked_out FROM deck_cards WHERE deck_id = ?', [after.id]),
         [{ card_id: 'backup-card', quantity: 2, checked_out: 1 }], 'Brawl card references remap to the restored deck');
     }
+    const zeroBackup = structuredClone(res.body);
+    zeroBackup.decks[0].commander_card_id = null;
+    zeroBackup.deck_cards[0].quantity = 0;
+    zeroBackup.deck_cards[0].checked_out = 0;
+    zeroBackup.decks[0].checked_out = 0;
+    zeroBackup.deck_card_allocations = [];
+    await importBackup({ body: { format: 'backup', data: zeroBackup }, user: { id: 1 } }, restoreRes);
+    assert.strictEqual(restoreRes.statusCode, 200, 'zero-quantity saved deck rows remain valid backups');
+    assert.strictEqual((await db.get('SELECT quantity FROM deck_cards')).quantity, 0);
   } finally {
     try { db.dbConnection.close(); } catch { /* already closed */ }
     for (const suffix of ['', '-wal', '-shm']) {

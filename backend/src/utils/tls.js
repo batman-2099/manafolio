@@ -84,10 +84,16 @@ async function startHttps(app, dir) {
   if (!port) return null;
   try {
     const { key, cert, selfSigned } = await loadOrCreateCert(dir);
-    const server = https.createServer({ key, cert }, app).listen(port, '0.0.0.0', () => {
-      console.log(`HTTPS on port ${port}${selfSigned ? ' (self-signed — expect a one-time browser warning)' : ''}`);
-      console.log(`Card scanning from phones needs this https:// address, not http://`);
+    const server = https.createServer({ key, cert }, app);
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(port, '0.0.0.0', () => {
+        server.removeListener('error', reject);
+        resolve();
+      });
     });
+    console.log(`HTTPS on port ${port}${selfSigned ? ' (self-signed — expect a one-time browser warning)' : ''}`);
+    console.log(`Card scanning from phones needs this https:// address, not http://`);
     return server;
   } catch (err) {
     console.error(`HTTPS listener failed to start: ${err.message}`);
