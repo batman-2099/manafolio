@@ -18,6 +18,7 @@ Release history starts with Manafolio 2.0.
 - Increased New Storage Container text to 16px across all four steps, including sorting and filing controls, with a larger dialog title.
 - Alphabetized the storage More menu by displayed labels, including conditional Lock/Unlock and Archive/Restore actions.
 - Widened Container Settings to 640px on larger screens while preserving mobile width constraints and scrolling.
+- Added clickable, keyboard-accessible card image enlargement in Take Stock, preserving review decisions when the enlarged image closes.
 
 ## 2.3.3 — 2026-10-12
 

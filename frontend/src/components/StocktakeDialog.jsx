@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Modal from './Modal';
 import CardImage from './CardImage';
+import CardImageZoom from './CardImageZoom';
 import { useT } from '../utils/i18n';
 import { displayName } from '../utils/languages';
 import { getSlotNumber } from '../utils/getSlotNumber';
@@ -15,6 +16,7 @@ export default function StocktakeDialog({ location, onClose, onApplied }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [zoomCard, setZoomCard] = useState(null);
   const heading = useRef(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -38,6 +40,7 @@ export default function StocktakeDialog({ location, onClose, onApplied }) {
     onClose();
   };
   useBackGuard(true, close);
+  useBackGuard(!!zoomCard, () => setZoomCard(null));
   const validate = () => {
     const invalid = snapshot.entries.some(entry => decisions[entry.entry_id] === 'missing' && (
       !Number.isInteger(Number(missingQuantities[entry.entry_id]))
@@ -77,7 +80,10 @@ export default function StocktakeDialog({ location, onClose, onApplied }) {
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {snapshot.entries.map(entry => <li key={entry.entry_id} style={{ paddingBlock: '1rem', borderBottom: '1px solid var(--border-glass)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-              <CardImage card={entry} loading="lazy" style={{ width: '72px', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: '4px', flexShrink: 0 }} />
+              <button type="button" aria-label={`${t('inspector.zoomHint')}: ${displayName(entry) || entry.card_id}`} aria-haspopup="dialog"
+                onClick={() => setZoomCard(entry)} style={{ padding: 0, border: 0, background: 'transparent', cursor: 'zoom-in', flexShrink: 0, borderRadius: '4px' }}>
+                <CardImage card={entry} loading="lazy" style={{ display: 'block', width: '72px', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: '4px' }} />
+              </button>
               <strong style={{ minWidth: 0 }}>{displayName(entry) || entry.card_id}</strong>
             </div>
             <div>{entry.set_name || entry.set_id} · #{entry.number} · {entry.printing} · {entry.language} · {entry.condition}</div>
@@ -115,5 +121,6 @@ export default function StocktakeDialog({ location, onClose, onApplied }) {
         {snapshot && <button type="submit" className="btn btn-primary" disabled={busy || !selected.length}>{t(busy ? 'stocktake.applying' : review ? 'stocktake.apply' : 'stocktake.review')}</button>}
       </div>
     </form>
+    {zoomCard && <CardImageZoom card={zoomCard} onClose={() => setZoomCard(null)} />}
   </Modal>;
 }
