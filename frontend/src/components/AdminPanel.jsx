@@ -66,6 +66,12 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupsStatus, setBackupsStatus] = useState('loading');
   const backupsRequestRef = useRef(0);
+  const seedBusyRef = useRef(false);
+  const [seedBusy, setSeedBusy] = useState(false);
+  const userBusyRef = useRef(new Set());
+  const [pendingUsers, setPendingUsers] = useState(new Set());
+  const downloadBusyRef = useRef(false);
+  const [downloadingBackup, setDownloadingBackup] = useState('');
 
   // Scan catalog management (and its own polling) lives in CatalogPanel now.
   useEffect(() => {
@@ -97,9 +103,12 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
 
   const handleSeedDatabase = async () => {
+    if (seedBusyRef.current) return;
     if (!window.confirm(t('admin.confirmSeed'))) {
       return;
     }
+    seedBusyRef.current = true;
+    setSeedBusy(true);
     try {
       const res = await fetch('/api/admin/seed-cards', { method: 'POST' });
       if (res.ok) {
@@ -112,6 +121,9 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
     } catch (err) {
       console.error(err);
       showToast(t('admin.errSeedGeneric'), 'error');
+    } finally {
+      seedBusyRef.current = false;
+      setSeedBusy(false);
     }
   };
 
@@ -132,6 +144,9 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   };
 
   const handleDownloadBackup = async (file) => {
+    if (downloadBusyRef.current) return;
+    downloadBusyRef.current = true;
+    setDownloadingBackup(file);
     try {
       const res = await fetch(`/api/admin/backups/${encodeURIComponent(file)}/download`);
       if (!res.ok) { showToast(t('admin.errDownload'), 'error'); return; }
@@ -140,6 +155,9 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
     } catch (err) {
       console.error(err);
       showToast(t('admin.errDownloadGeneric'), 'error');
+    } finally {
+      downloadBusyRef.current = false;
+      setDownloadingBackup('');
     }
   };
 
@@ -262,6 +280,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   };
 
   const handleToggleRole = async (user) => {
+    if (userBusyRef.current.has(user.id)) return;
     const nextRole = user.role === 'admin' ? 'member' : 'admin';
     if (user.username === 'admin') {
       showToast(t('admin.errDemoteRoot'), 'error');
@@ -272,6 +291,8 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       return;
     }
 
+    userBusyRef.current.add(user.id);
+    setPendingUsers(new Set(userBusyRef.current));
     try {
       const response = await fetch(`/api/admin/users/${user.id}`, {
         method: 'PUT',
@@ -281,7 +302,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
       if (response.ok) {
         showToast(t('admin.roleUpdated', { role: nextRole, name: user.username }), 'success');
-        fetchUsers();
+        await fetchUsers();
       } else {
         const data = await response.json();
         showToast(data.error || t('admin.errRoleChange'), 'error');
@@ -289,12 +310,15 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
     } catch (err) {
       console.error(err);
       showToast(t('admin.errRoleChangeGeneric'), 'error');
+    } finally {
+      userBusyRef.current.delete(user.id);
+      setPendingUsers(new Set(userBusyRef.current));
     }
   };
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    if (!targetUser || pwdBusyRef.current) return;
+    if (!targetUser || pwdBusyRef.current || userBusyRef.current.has(targetUser.id)) return;
     if (updatePassword.length < 8) {
       setPwdError(t('login.errPasswordShort', { count: 8 }));
       pwdInputRef.current?.focus();
@@ -302,6 +326,8 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
     }
     setPwdError('');
     pwdBusyRef.current = true;
+    userBusyRef.current.add(targetUser.id);
+    setPendingUsers(new Set(userBusyRef.current));
 
     setPwdLoading(true);
     try {
@@ -324,11 +350,14 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       setPwdError(t('settings.errPasswordUpdateGeneric'));
     } finally {
       pwdBusyRef.current = false;
+      userBusyRef.current.delete(targetUser.id);
+      setPendingUsers(new Set(userBusyRef.current));
       setPwdLoading(false);
     }
   };
 
   const handleDeleteUser = async (user) => {
+    if (userBusyRef.current.has(user.id)) return;
     if (user.username === 'admin') {
       showToast(t('admin.errDeleteRoot'), 'error');
       return;
@@ -338,6 +367,8 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       return;
     }
 
+    userBusyRef.current.add(user.id);
+    setPendingUsers(new Set(userBusyRef.current));
     try {
       const response = await fetch(`/api/admin/users/${user.id}`, {
         method: 'DELETE'
@@ -345,7 +376,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
       if (response.ok) {
         showToast(t('admin.userDeleted', { name: user.username }), 'success');
-        fetchUsers();
+        await fetchUsers();
       } else {
         const data = await response.json();
         showToast(data.error || t('admin.errDeleteUser'), 'error');
@@ -353,6 +384,9 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
     } catch (err) {
       console.error(err);
       showToast(t('admin.errDeleteUserGeneric'), 'error');
+    } finally {
+      userBusyRef.current.delete(user.id);
+      setPendingUsers(new Set(userBusyRef.current));
     }
   };
 
@@ -392,10 +426,12 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
             type="button" 
             className="btn btn-secondary btn-sm" 
             onClick={handleSeedDatabase}
+            disabled={seedBusy}
             style={{ padding: '0.5rem 1rem', height: '34px', fontSize: '0.8rem', border: '1px solid var(--border-glass)' }}
           >
-            🧪 {t('admin.generateTestCards')}
+            {t('admin.generateTestCards')}
           </button>
+          {seedBusy && <span role="status">{t('admin.seeding')}</span>}
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', height: '34px' }}>
             <Users size={16} style={{ color: 'var(--accent-red)' }} />
@@ -584,9 +620,12 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                           className="btn btn-secondary btn-icon-only"
                           title={t('admin.downloadBackup')}
                           onClick={() => handleDownloadBackup(b.file)}
+                          disabled={!!downloadingBackup}
+                          aria-label={t('admin.downloadBackup')}
                         >
                           <Download size={14} />
                         </button>
+                        {downloadingBackup === b.file && <span role="status">{t('settings.downloading')}</span>}
                       </td>
                     </tr>
                   ))}
@@ -676,7 +715,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                             title={t('admin.toggleRole')}
                             aria-label={t('admin.toggleRole')}
                             onClick={() => handleToggleRole(user)}
-                            disabled={user.username === 'admin'}
+                            disabled={user.username === 'admin' || pendingUsers.has(user.id)}
                           >
                             {user.role === 'admin' ? <ToggleRight size={14} style={{ color: 'var(--accent-red)' }} /> : <ToggleLeft size={14} />}
                             <span className="admin-user-action-label">{t('admin.toggleRole')}</span>
@@ -685,7 +724,8 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                             className="btn btn-secondary btn-icon-only" 
                             title={t('admin.resetPassword')}
                             aria-label={t('admin.resetPassword')}
-                            onClick={() => setTargetUser(user)}
+                            onClick={() => { if (!userBusyRef.current.has(user.id)) setTargetUser(user); }}
+                            disabled={pendingUsers.has(user.id)}
                           >
                             <Key size={14} style={{ color: 'var(--accent-yellow)' }} />
                             <span className="admin-user-action-label">{t('admin.resetPassword')}</span>
@@ -695,12 +735,13 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                             title={t('admin.deleteAccount')}
                             aria-label={t('admin.deleteAccount')}
                             onClick={() => handleDeleteUser(user)}
-                            disabled={user.username === 'admin'}
+                            disabled={user.username === 'admin' || pendingUsers.has(user.id)}
                           >
                             <Trash2 size={14} />
                             <span className="admin-user-action-label">{t('admin.deleteAccount')}</span>
                           </button>
                         </div>
+                        {pendingUsers.has(user.id) && <span role="status">{t('admin.userUpdating')}</span>}
                       </td>
                     </tr>
                   ))}

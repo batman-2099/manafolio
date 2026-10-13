@@ -12,7 +12,7 @@ import { useT } from '../utils/i18n';
 export default function CardEntryFields({
   quantity, purchasePrice, condition, printing, language,
   onQuantity, onPurchasePrice, onCondition, onPrinting, onLanguage,
-  variant = 'grid', game,
+  variant = 'grid', game, quantityMax,
   grader = 'Raw', grade = '', certNumber = '',
   onGrader, onGrade, onCertNumber,
 }) {
@@ -28,7 +28,7 @@ export default function CardEntryFields({
   const grading = !!onGrader;
   const graded = grading && grader !== 'Raw';
 
-  const stepQty = (delta) => onQuantity(String(Math.max(1, (parseInt(quantity, 10) || 1) + delta)));
+  const stepQty = (delta) => onQuantity(String(Math.min(quantityMax ?? Infinity, Math.max(1, (parseInt(quantity, 10) || 1) + delta))));
   const Quantity = stacked ? (
     // Scanner quick-add: quantity is the most-changed field, so give it big
     // tap targets instead of a bare number input.
@@ -36,14 +36,14 @@ export default function CardEntryFields({
       <label htmlFor={`${fieldId}-quantity`}>{t('card.quantity')}</label>
       <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'stretch', width: '100%', boxSizing: 'border-box' }}>
         <button type="button" className="btn btn-secondary" onClick={() => stepQty(-1)} aria-label={t('card.quantityDown')} style={{ width: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 800, flexShrink: 0 }}>&minus;</button>
-        <input id={`${fieldId}-quantity`} type="number" className="input-control" min="1" value={quantity} onChange={(e) => onQuantity(e.target.value)} required style={{ flex: 1, minWidth: 0, textAlign: 'center', fontWeight: 700, height: '44px' }} />
+        <input id={`${fieldId}-quantity`} type="number" className="input-control" min="1" max={quantityMax} step="1" value={quantity} onChange={(e) => onQuantity(e.target.value)} required style={{ flex: 1, minWidth: 0, textAlign: 'center', fontWeight: 700, height: '44px' }} />
         <button type="button" className="btn btn-secondary" onClick={() => stepQty(1)} aria-label={t('card.quantityUp')} style={{ width: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 800, flexShrink: 0 }}>+</button>
       </div>
     </div>
   ) : (
     <div className="form-group" style={groupStyle}>
       <label htmlFor={`${fieldId}-quantity`}>{t('card.quantity')}</label>
-      <input id={`${fieldId}-quantity`} type="number" className="input-control" min="1" value={quantity} onChange={(e) => onQuantity(e.target.value)} required />
+      <input id={`${fieldId}-quantity`} type="number" className="input-control" min="1" max={quantityMax} step="1" value={quantity} onChange={(e) => onQuantity(e.target.value)} required />
     </div>
   );
   const Price = (

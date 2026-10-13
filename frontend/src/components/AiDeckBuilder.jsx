@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, LoaderCircle, Sparkles, Trash2, Check, X, Square } from 'lucide-react';
 import { useT } from '../utils/i18n';
 import { readProgressStream } from '../utils/importStream';
@@ -31,7 +31,7 @@ async function request(path, options, fallback) {
   return data;
 }
 
-export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onPreview, onOpenAiSettings }) {
+export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onPreview, onOpenAiSettings, onGuardStateChange }) {
   const { t, locale } = useT();
   const [account, setAccount] = useState(null);
   const [accountError, setAccountError] = useState('');
@@ -68,6 +68,12 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   const logId = useRef(0);
   const timeFormat = useMemo(() => new Intl.DateTimeFormat(locale, { timeStyle: 'medium' }), [locale]);
   const lifetime = useRef(null);
+  const configuration = JSON.stringify({ inventoryType, includeCheckedOut, containerIds, colors, sets, excludedSets, format, deckType, powerLevel, targetSize });
+  const initialConfiguration = useRef(configuration);
+  const dirty = !!draft || messages.length > 0 || !!prompt.trim() || configuration !== initialConfiguration.current;
+  useLayoutEffect(() => {
+    onGuardStateChange?.({ dirty, busy: !!busy });
+  }, [dirty, busy, onGuardStateChange]);
 
   useEffect(() => {
     const controller = new AbortController();

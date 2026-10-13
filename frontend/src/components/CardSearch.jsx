@@ -105,14 +105,16 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [total, setTotal] = useState(null);
 
+  const bulkPending = useRef(false);
   // Multi-select for bulk add — the same hook, gesture and visuals the
   // collection uses, so selecting works identically on both screens. Only the
   // action differs: bulk ADD here, bulk edit there (so runBulk goes unused).
   const {
     selectMode, setSelectMode, selectedIds, setSelectedIds, selectAt,
     clearSelection, exitSelectMode, pressHandlers, longPressFired,
-  } = useMultiSelect({ showToast });
+  } = useMultiSelect({ showToast, guard: () => bulkPending.current ? t('search.adding') : null });
   const [bulkAdding, setBulkAdding] = useState(false);
+  const [bulkErrors, setBulkErrors] = useState([]);
 
   // Set suggestions, sourced from the sets already cached in the DB.
   const [knownSets, setKnownSets] = useState([]);
@@ -141,12 +143,12 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
 
   useLayoutEffect(() => {
     const guard = () => {
-      if (!importCommitting.current) return true;
-      showToast(t('settings.importing'), 'status');
+      if (!importCommitting.current && !bulkPending.current) return true;
+      showToast(t(bulkPending.current ? 'search.adding' : 'settings.importing'), 'status');
       return false;
     };
     const beforeUnload = event => {
-      if (!importCommitting.current) return;
+      if (!importCommitting.current && !bulkPending.current) return;
       event.preventDefault();
       event.returnValue = '';
     };
@@ -276,7 +278,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
 
   // pageNum > 1 appends to the existing results instead of replacing them.
   const runSearch = async (pageNum, size = pageSize, criteria = null) => {
-    if (searchPending.current) return;
+    if (searchPending.current || bulkPending.current) return;
     searchPending.current = true;
     const append = pageNum > 1;
     const submitted = criteria || (append ? submittedSearch.current : { query, numberQuery, setCodeQuery, game, searchLang });
@@ -297,6 +299,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
       setFilterRarity('');
       setSortBy('relevance');
       clearSelection();
+      setBulkErrors([]);
       setTotal(null);
     }
     try {
@@ -419,40 +422,54 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   // Tap: swallowed if a long-press just armed selection; otherwise toggle (in
   // select mode) or open Quick Add. Mirrors CollectionList.activateCard.
   const handleCardClick = (card, event) => {
+    if (bulkPending.current) return;
     if (longPressFired.current) { longPressFired.current = false; return; }
     if (selectMode) selectAt(card.id, filteredAndSortedCards.map(c => c.id), event?.shiftKey);
     else openQuickAdd(card, event?.currentTarget);
   };
 
-  const handleBulkAdd = async () => {
+  const handleBulkAdd = async event => {
+    event.preventDefault();
+    if (bulkPending.current || !event.currentTarget.reportValidity()) return;
+    const submittedQuantity = Number(quantity);
+    if (!Number.isSafeInteger(submittedQuantity) || submittedQuantity < 1) return;
     const ids = filteredAndSortedCards.filter(c => selectedIds.has(c.id)).map(c => c.id);
     if (ids.length === 0) { showToast(t('search.errNoneSelected'), 'error'); return; }
+    const submittedInventory = addToArena ? 'arena' : 'collection';
+    bulkPending.current = true;
     setBulkAdding(true);
+    setBulkErrors([]);
     try {
       const response = await fetch('/api/collection/bulk-add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_ids: ids,
-          quantity: parseInt(quantity, 10) || 1,
+          quantity: submittedQuantity,
           condition,
           printing,
           language,
           purchase_price: parseFloat(purchasePrice) || 0,
-          list_type: addToArena ? 'arena' : 'collection',
+          list_type: submittedInventory,
           game
         })
       });
       const data = await response.json().catch(() => ({}));
+      const failures = (data.failed || []).filter(failure => ids.includes(failure.card_id));
+      setBulkErrors(failures);
       if (response.ok) {
-        showToast(data.message || t('search.addedCards', { count: ids.length }), 'success');
-        // Reflect the new owned counts without re-running the search.
-        const added = parseInt(quantity, 10) || 1;
-        setCards(prev => prev.map(c => (selectedIds.has(c.id)
-          ? { ...c, owned_qty: (c.owned_qty || 0) + added }
-          : c)));
-        exitSelectMode();
-        onAddSuccess();
+        const failedIds = new Set(failures.map(failure => failure.card_id));
+        const succeeded = new Set(ids.filter(id => !failedIds.has(id)));
+        showToast(data.message || t('search.addedCards', { count: succeeded.size }), failures.length ? 'error' : 'success');
+        // Search badges count Physical copies, never Arena copies.
+        if (submittedInventory === 'collection') {
+          setCards(prev => prev.map(c => (succeeded.has(c.id)
+            ? { ...c, owned_qty: (c.owned_qty || 0) + submittedQuantity }
+            : c)));
+        }
+        setSelectedIds(prev => new Set([...prev].filter(id => !succeeded.has(id))));
+        if (!failures.length) exitSelectMode();
+        if (succeeded.size) onAddSuccess();
       } else {
         showToast(data.error || t('search.errBulkAdd'), 'error');
       }
@@ -460,6 +477,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
       console.error(err);
       showToast(t('search.errAddCards'), 'error');
     } finally {
+      bulkPending.current = false;
       setBulkAdding(false);
     }
   };
@@ -919,6 +937,9 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   // Helper to determine location type layout guidance
   return (
     <div className="card-search">
+      <fieldset disabled={bulkAdding} aria-busy={bulkAdding} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
+        onClickCapture={event => { if (bulkPending.current) event.stopPropagation(); }}
+        onPointerDownCapture={event => { if (bulkPending.current) event.stopPropagation(); }}>
       {/* Search Header Panel */}
       <div className="glass-panel" style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -1263,10 +1284,10 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
 
       {/* Bulk add bar — sticky single row, matching the collection's bulk bar. */}
       {selectMode && (
-        <div className="glass-panel" style={{ marginBottom: '1rem', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', position: 'sticky', top: '0.5rem', zIndex: 30 }}>
+        <form onSubmit={handleBulkAdd} className="glass-panel" style={{ marginBottom: '1rem', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', position: 'sticky', top: '0.5rem', zIndex: 30 }}>
           <span style={{ fontWeight: 800, color: 'var(--text-strong)', fontSize: '0.85rem' }}>{t('bulk.selected', { count: selectedIds.size })}</span>
-          <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={() => setSelectedIds(new Set(filteredAndSortedCards.map(c => c.id)))}>{t('bulk.selectAll', { count: filteredAndSortedCards.length })}</button>
-          <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={clearSelection}>{t('bulk.clear')}</button>
+          <button type="button" className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={() => setSelectedIds(new Set(filteredAndSortedCards.map(c => c.id)))}>{t('bulk.selectAll', { count: filteredAndSortedCards.length })}</button>
+          <button type="button" className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={clearSelection}>{t('bulk.clear')}</button>
           <div style={{ width: '1px', height: '22px', background: 'var(--border-glass)' }} />
           <div className="form-group" style={{ margin: 0 }}>
             <label className="control-label" htmlFor="search-bulk-condition">{t('card.condition')}</label>
@@ -1286,6 +1307,8 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
             id="search-bulk-quantity"
             type="number"
             min="1"
+            step="1"
+            required
             className="input-control"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
@@ -1297,12 +1320,18 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
             className="btn btn-primary"
             style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
             disabled={bulkAdding || selectedIds.size === 0}
-            onClick={handleBulkAdd}
+            type="submit"
           >
             {bulkAdding ? t('search.adding') : t('search.addN', { count: selectedIds.size })}
           </button>
-          <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', marginLeft: 'auto' }} onClick={exitSelectMode}>{t('bulk.done')}</button>
-        </div>
+          <button type="button" className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', marginLeft: 'auto' }} onClick={exitSelectMode}>{t('bulk.done')}</button>
+          {bulkErrors.length > 0 && <div role="alert" style={{ flexBasis: '100%', color: 'var(--accent-red)' }}>
+            <p>{t('search.bulkRetry')}</p>
+            <ul>{bulkErrors.map(failure => <li key={failure.card_id}>
+              {displayName(cards.find(card => card.id === failure.card_id) || { name: failure.card_id })}: {failure.error || t('search.errAddCards')}
+            </li>)}</ul>
+          </div>}
+        </form>
       )}
 
       {/* Search Results Grid */}
@@ -1633,6 +1662,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
       {isFullScreen && selectedCard && (
         <CardImageZoom card={selectedCard} onClose={() => setIsFullScreen(false)} />
       )}
+      </fieldset>
     </div>
   );
 }

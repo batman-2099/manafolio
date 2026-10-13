@@ -1,9 +1,29 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useId } from 'react';
 import { X, Check, Minus, MapPin, Package, AlertTriangle } from 'lucide-react';
 import CompartmentView from './CompartmentView';
 import { sortCardsByOrder } from '../utils/cardSort';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
+import Modal from './Modal';
+
+function SelectAll({ ids, done, setChecked, label }) {
+  const { t } = useT();
+  const all = ids.length > 0 && ids.every(id => done.has(id));
+  const some = !all && ids.some(id => done.has(id));
+  return (
+    <button
+      type="button"
+      aria-pressed={some ? 'mixed' : all}
+      onClick={() => setChecked(ids, !all)}
+      style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem', flexShrink: 0 }}
+    >
+      <span aria-hidden="true" style={{ width: '16px', height: '16px', borderRadius: '4px', border: all || some ? 'none' : '2px solid var(--text-muted)', background: all ? 'var(--accent-green)' : some ? 'var(--accent-blue)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: all ? '#000' : '#fff' }}>
+        {all ? <Check size={11} strokeWidth={3} /> : some ? <Minus size={11} strokeWidth={3} /> : null}
+      </span>
+      {label ?? t('wizard.selectAll')}
+    </button>
+  );
+}
 
 // Slot number a stored position encodes (positions are slot * 1000).
 const slotOf = (position) => (position ? Math.floor(position / 1000) : null);
@@ -24,7 +44,8 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
   const kind = MODES.includes(mode) ? mode : 'checkout';
   const cancel = onCancel || onClose; // X / overlay / back = cancel (revert the toggle)
   const [done, setDone] = useState(new Set());
-  const [expanded, setExpanded] = useState({}); // container.key -> user forced open after auto-collapse
+  const [collapsedContainers, setCollapsedContainers] = useState({});
+  const titleId = useId();
   const [setsList, setSetsList] = useState([]);
   const [grids, setGrids] = useState({}); // page.key -> { compartment, cards, locationType, sortOrder }
 
@@ -141,22 +162,6 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
   });
   const toggleOne = (id) => setChecked([id], !done.has(id));
 
-  const SelectAll = ({ ids, label }) => {
-    const all = ids.length > 0 && ids.every(id => done.has(id));
-    const some = !all && ids.some(id => done.has(id));
-    return (
-      <button
-        type="button"
-        onClick={() => setChecked(ids, !all)}
-        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem', flexShrink: 0 }}
-      >
-        <span style={{ width: '16px', height: '16px', borderRadius: '4px', border: all || some ? 'none' : '2px solid var(--text-muted)', background: all ? 'var(--accent-green)' : some ? 'var(--accent-blue)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: all ? '#000' : '#fff' }}>
-          {all ? <Check size={11} strokeWidth={3} /> : some ? <Minus size={11} strokeWidth={3} /> : null}
-        </span>
-        {label ?? t('wizard.selectAll')}
-      </button>
-    );
-  };
 
   const renderRows = (pulls) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -167,6 +172,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
           <button
             key={pull.entry_id}
             type="button"
+            aria-pressed={isDone}
             onClick={() => toggleOne(pull.entry_id)}
             style={{
               textAlign: 'left', width: '100%', cursor: 'pointer',
@@ -231,11 +237,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
   };
 
   return (
-    <div
-      className="modal-overlay"
-      style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
-      onClick={cancel}
-    >
+    <Modal onClose={cancel} aria-labelledby={titleId}>
       <div
         className="glass-panel"
         style={{ maxWidth: '640px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
@@ -245,7 +247,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
         <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-glass)', flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
             <div>
-              <h2 style={{ fontSize: '1.35rem', color: 'var(--text-strong)', fontWeight: 800, margin: '0 0 0.25rem 0' }}>{t(`wizard.${kind}.title`)}</h2>
+              <h2 id={titleId} style={{ fontSize: '1.35rem', color: 'var(--text-strong)', fontWeight: 800, margin: '0 0 0.25rem 0' }}>{t(`wizard.${kind}.title`)}</h2>
               <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.85rem' }}>{t(`wizard.${kind}.subtitle`)}</p>
             </div>
             <button className="btn btn-secondary btn-icon-only" onClick={cancel} aria-label={t('common.cancel')}>
@@ -256,8 +258,8 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
           {totalPulls > 0 && (
             <div style={{ marginTop: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t(`wizard.${kind}.progress`, { done: doneCount, total: totalPulls })}</span>
-                <SelectAll ids={allEntryIds} label={t(allComplete ? 'wizard.clearAll' : 'wizard.selectAll')} />
+                <span role="status" aria-live="polite" aria-atomic="true" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t(`wizard.${kind}.progress`, { done: doneCount, total: totalPulls })}</span>
+                <SelectAll ids={allEntryIds} done={done} setChecked={setChecked} label={t('wizard.selectAll')} />
               </div>
               <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
                 <div style={{ width: `${pct}%`, height: '100%', background: allComplete ? 'var(--accent-green)' : 'var(--accent-blue)', transition: 'width 0.3s ease' }} />
@@ -286,30 +288,32 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
           {containers.map(container => {
             const singlePage = container.pages.length === 1;
             const complete = container.entryIds.length > 0 && container.entryIds.every(id => done.has(id));
-            const collapsed = complete && !expanded[container.key];
-            const toggleExpand = () => setExpanded(prev => ({ ...prev, [container.key]: !prev[container.key] }));
+            const collapsed = !!collapsedContainers[container.key];
+            const panelId = `${titleId}-${container.key}`;
+            const toggleExpand = () => setCollapsedContainers(prev => ({ ...prev, [container.key]: !prev[container.key] }));
             return (
               <div key={container.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                 {/* Container header (with container-level select-all) */}
-                <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: complete ? 'pointer' : 'default' }}
-                  onClick={complete ? toggleExpand : undefined}
-                >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <button type="button" aria-expanded={!collapsed} aria-controls={panelId} onClick={toggleExpand}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1, minWidth: 0, textAlign: 'left', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}>
                   <div style={{ width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0, background: complete ? 'var(--accent-green)' : container.unassigned ? 'rgba(148,163,184,0.15)' : 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: complete ? '#000' : container.unassigned ? 'var(--text-muted)' : 'var(--accent-blue)' }}>
                     {complete ? <Check size={16} strokeWidth={3} /> : container.unassigned ? <Package size={16} /> : <MapPin size={16} />}
                   </div>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ color: 'var(--text-strong)', fontWeight: 700, fontSize: '0.95rem' }}>{container.location_name}</div>
-                    {collapsed ? (
+                    {collapsed && complete ? (
                       <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{t(`wizard.${kind}.collapsed`, { count: container.entryIds.length })}</div>
                     ) : singlePage && container.pages[0].compartment_display && (
                       <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{container.pages[0].compartment_display}</div>
                     )}
                   </div>
-                  {!collapsed && <SelectAll ids={container.entryIds} />}
+                  </button>
+                  {!collapsed && <SelectAll ids={container.entryIds} done={done} setChecked={setChecked} />}
                 </div>
 
-                {collapsed ? null : singlePage ? (
+                <div id={panelId} hidden={collapsed}>
+                {singlePage ? (
                   <>
                     {!container.unassigned && renderGrid(container.pages[0])}
                     {renderRows(container.pages[0].pulls)}
@@ -320,13 +324,14 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
                     <div key={page.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingLeft: '0.5rem', borderLeft: '2px solid var(--border-glass)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>{page.compartment_display || t('wizard.page')}</span>
-                        <SelectAll ids={page.pulls.map(p => p.entry_id)} />
+                        <SelectAll ids={page.pulls.map(p => p.entry_id)} done={done} setChecked={setChecked} />
                       </div>
                       {renderGrid(page)}
                       {renderRows(page.pulls)}
                     </div>
                   ))
                 )}
+                </div>
               </div>
             );
           })}
@@ -337,7 +342,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
           <button className="btn btn-primary" onClick={onClose} disabled={totalPulls > 0 && !allComplete}>{t('bulk.done')}</button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 

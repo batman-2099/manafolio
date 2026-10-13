@@ -139,6 +139,8 @@ Pressing **Enter** in the quick-add form submits to the selected Physical or Are
 
 Changing the language in an add form can resolve a different printing, rather than merely relabeling the same card. Recheck the artwork and identification after changing it. Finish and condition are choices you make; the application does not inspect a card to determine them.
 
+For **Bulk Add**, enter a positive whole-number quantity. While the request is pending, selection and entry controls stay locked. If some cards fail, successful cards are added once and failures remain selected with their errors; retry adds only those retained cards. Arena additions do not change Physical-owned counts.
+
 **If you cannot find a card:** check the language, set code, collector number, and result filters. Use a broader name search if a tightly scoped search fails. A **Card API Unavailable** message concerns the upstream card service; retry later rather than adding a similar-looking printing as a substitute.
 
 ### Rapid add: work through one set by collector number
@@ -261,6 +263,7 @@ The scanner displays upper-left title OCR separately from artwork candidates, in
 5. Check the identified card's name, set, number, artwork, and language. In **Identified Cards Found**, select the correct card to queue it immediately without a second details screen. This queues one Near Mint, non-foil copy with the resolved language and market price as purchase price. Use the manual search field or **Rescan / Try Again** when the suggestions are wrong. A failed save keeps the candidate list open for retry.
    On phones, matches appear in two columns. Scroll the results dialog itself to browse cards and reach the bottom actions; **See more** expands the remaining matches in the same scroll area.
 6. If the scanner opens **Review scanned card** for a single confirmed match, set quantity, purchase price, condition, printing, and language, then choose **Queue for review**. Candidate selections skip this form.
+   Quantities must be whole numbers from 1 to 250 per scan draft. A failed language lookup restores the previous language and printing; correct or retry the choice before queuing. A save error keeps the form and explains the rejection.
 7. Remove the queued card before presenting the next one. Each card in **Scan review** has a **Foil** toggle and **Discard** button. Foil switches the whole draft's quantity between foil and non-foil without changing its card identity or other details; the highlighted button means foil. Discard a wrong match and scan it again. Discarding a draft does not touch your collection.
    To discard the whole reviewed batch, choose **Clear** and confirm. This removes only the drafts shown when you clicked Clear, not owned collection cards or newly queued scans.
 8. Tap **Scanning** to switch to **Paused** whenever you need to stop identification. Leaving the scanning view releases its camera stream.
@@ -492,6 +495,8 @@ Choose **Automatic image** to let the gallery use a recent eligible card. If a m
 
 **Expected result:** an empty named container with the chosen layout. It does not add cards to Collection.
 
+Layout counts must be positive whole numbers. **Next** or Enter validates the layout without replacing invalid values. While creation is saving, wait before using Back, closing, or leaving; a failure keeps the draft available for correction.
+
 Storage opens as a gallery. Search container names/types or sort by name/quantity, then open a container. Select **More → Container Settings** on its toolbar. **Choose container image** selects a card-art cover; **Automatic image** returns to an automatic cover. The container's **More** menu also contains creation and import actions; page navigation, views, selection, and Arrange remain directly available.
 
 In the container's card view, a **FOIL** badge identifies foil copies. If **Stack Duplicates** is enabled and **Split by Holo/Printing** is off, mixed-finish stacks show the foil count—for example, **FOIL 1/3** means one of the three copies is foil. Normal-only cards and stacks have no foil badge.
@@ -660,7 +665,7 @@ Open **Trade workbench** in navigation (**More** on a phone). This exchanges you
 
 Selected artwork cards appear in **Cards being traded**, separate from available cards and search results. Its **Giving** and **Receiving** panels contain only the chosen entries. Adjust quantities there, choose finish and condition for received cards, or use **Remove** before reviewing. Empty panels explicitly say no cards are selected; browsing alone never adds a card to the trade.
 
-**Back** edits an unconfirmed review; **Cancel** clears an unconfirmed draft without inventory changes. Drafts are held only in the current page, with a leave warning. Each side supports up to 100 entries and each line up to 250 copies.
+**Back** edits an unconfirmed review; **Cancel** asks before clearing an unconfirmed draft and does not change inventory. Declining keeps the draft. Drafts are held only in the current page, with a leave warning. Each side supports up to 100 entries and each line up to 250 copies.
 
 Available Giving entries are paged in groups of 60; changing pages does not clear your selections. A filter with no matches offers **Clear filter**. Refreshing marks changed or unavailable selected entries with a warning: remove and explicitly reselect them before reviewing, so you can check the latest quantity and location.
 
@@ -720,7 +725,7 @@ The selection is anchored to an existing collection copy and follows its current
 
 ### Add cards, change quantities, and save
 
-1. Open the deck and scroll below the overview to **Add Cards to Deck**, or use **Jump to add cards** near the header. **Jump to cards** moves directly to the deck list. These controls keep the overview, Description, and Notes available.
+1. Open the deck and find **Add Cards to Deck**, or use **Jump to add cards** near the header. **Jump to cards** moves directly to the deck list. On phones and tablets, card editing appears before the overview, Description, Notes, and appearance; those sections remain available below it.
 2. Search by card name using the search button, or select **Browse Collection** to browse the deck's matching Physical, Arena, or Graveyard inventory. Graveyard decks use archived cards only.
    After browsing, open **Filters** for the same set, type, color, rarity, condition, finish, language, and deck-status filters as Unsorted. Choices come from the browsed inventory; colors use actual card colors, not Commander color identity. Combined filters must match the same owned entry. **Clear filters** clears the search and filters and reloads the inventory. Filtering narrows the displayed printings; owned totals, copy limits, and source-location selection remain unchanged.
 3. Inspect the set and collector number before adding a printing. Select its add control.
@@ -827,6 +832,8 @@ This deck-creation chooser creates a definition only. It does not buy or add own
 
 **Expected result:** deck text is copied for use elsewhere. The buylist contains quantities needed beyond what you own, not every copy temporarily unavailable because another deck reserves it. The TCGplayer action opens an external site; it does not place an order. Export is not a complete account backup.
 
+If automatic copying is unavailable or denied, the decklist is selected and a message asks you to copy it manually. No successful-copy message is shown until the clipboard accepts the text.
+
 ### Plan acquisitions for several decks
 
 1. Save each deck, return to **Your decks**, and open **Shopping List**.
@@ -853,6 +860,8 @@ Estimates use cached nonfoil prices for all Needed copies, including copies alre
 **Expected result:** the deck is **Checked out**, and its quantities are reserved against other Physical decks. The reservation is made before the guide opens. Checkout does not erase or change the recorded storage slots; those slots remain the return addresses.
 
 In a binder with stacking enabled, the highlighted shared pocket acts on a requested physical entry, not an unrelated first copy in that pocket. Use the individual checklist rows when gathering multiple requested entries from the same pocket.
+
+Completing a group keeps its rows open so you can correct a checkmark. Use the container heading to collapse or reopen it. Tab reaches card and group controls; Enter or Space activates them. In storage layouts, these keys also select/open binder pockets and pick/place cards in Arrange; arrow keys move between coverflow cards.
 
 If you use the guide's **Cancel**/X, click outside it, or use its back action, Manafolio attempts to undo the checkout. Do not treat closing it as completion. After a network or undo error, inspect the deck's current status before trying again.
 
@@ -1008,7 +1017,7 @@ The reviewed strategy is saved to the new deck's **Notes**. You can edit it befo
 
 **Expected result:** a saved, unchecked-out deck after successful validation—not a collection mutation or automatic checkout. Until Add Deck, the conversation/draft is not a saved deck. Saving rechecks ownership, quantities, copy limits, and cached rules; a failed save does not partially replace account data.
 
-Changing inventory, format, target size, deck type, target power level, checked-out inclusion, or filters clears the conversation and draft. The selected deck type and power level accompany every request, including follow-up questions and improvements, but do not change a saved deck's inventory or category. Leaving the builder clears the session conversation and cancels an active request. **Clear conversation, keep draft** is the explicit way to reset the conversation without discarding the current draft. Each request permits up to 4,000 characters; the session limit is 40 messages. The request log records progress, not private model reasoning.
+Changing inventory, format, target size, deck type, target power level, checked-out inclusion, or filters clears the conversation and draft. The selected deck type and power level accompany every request, including follow-up questions and improvements, but do not change a saved deck's inventory or category. Navigation warns before discarding unsaved AI setup, prompts, conversation, or drafts, and is blocked while generation or saving is pending. A failed save retains the draft for retry. Forcing the browser closed can still interrupt observing a server request; check saved decks before retrying. **Clear conversation, keep draft** is the explicit way to reset the conversation without discarding the current draft. Each request permits up to 4,000 characters; the session limit is 40 messages. The request log records progress, not private model reasoning.
 
 If no eligible cards match, adjust filters or ask questions without generating a deck. Oversized inventories and incomplete or invalid responses are rejected rather than silently trimmed or partially saved. Narrow the pool for oversized requests; Ollama may need a larger configured model context. Review every suggestion: cached rules may be missing or stale, and the AI is not a guarantee of tournament legality. Partner commanders and sideboards are not supported.
 
@@ -1075,6 +1084,8 @@ Only enable this on a trusted device. Browser-profile access can expose saved da
 **Privacy warning:** these are bearer links, not invited-user permissions. All three list links use the same share token; a trade or Wishlist link is a view selector, not a restriction preventing its holder from opening the standard Physical share. Do not use it as a way to expose only a hand-picked subset of an otherwise private account.
 
 Public data includes the account username, card names/printings, quantities, condition, finish, language, and displayed values, including per-copy valuations. Purchase prices and private notes are not exposed. Enabling locations reveals container information; container links expose the corresponding Physical layout and cards. Anyone who can open a link can retain what they see, so later disabling sharing cannot retract screenshots or saved copies. **Regenerate Link** invalidates existing standard/trade/Wishlist/container links using that token. Shared links include your active theme when copied; theme parameters change appearance, not permissions.
+
+Combined public stacks show **Mixed** for differing copy details; open a card for the read-only **Copy breakdown**. Locations remain hidden unless enabled. If container links fail to load in Settings, use their **Retry** action; the failure does not change sharing settings.
 
 ### Share one deck
 
@@ -1178,7 +1189,7 @@ If you do not see **Admin**, ask the person who operates your server. Do not cha
 4. Give ordinary users the Member role. Administrator access includes sensitive instance operations; grant it only to trusted people.
 5. In **Manage Planeswalkers**, use **Reset Password** when necessary. This signs out every Manafolio session for the selected account, including your current session if you reset your own account here. The account must sign in again; other accounts and read-only API keys are unaffected. Verify the selected account before changing its role or deleting it.
 
-Account deletion is destructive. Back up required data first and read the confirmation. **Generate Test Cards** adds sample cards; do not use it on a real collection merely to test whether the server works.
+Account deletion is destructive. Back up required data first and read the confirmation. **Replace collection data with test cards…** is also destructive: it deletes the current user's existing entries across Physical, Arena, Wishlist, and Graveyard for the seed sets before inserting randomized entries. These sets are normally Limited Edition Alpha (`lea`) and Modern Horizons 3 (`mh3`); if remote data is unavailable, cached cards can be used and entries for those cached sets deleted instead. Download a backup first. Do not use this action on a real collection merely to test whether the server works.
 
 Deletion also stops the account's local ChatGPT/Codex work and removes its credential directory. It does not contact OpenAI, revoke provider authorization, or erase backups. If credential cleanup fails, the account remains and an error is shown; correct the filesystem problem and retry deletion.
 

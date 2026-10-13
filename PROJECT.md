@@ -448,3 +448,14 @@ The real-DOM mutation regression is intentionally separate from `npm test`. With
   console.log(await runFrontendMutationRegressions());
 </script>
 ```
+
+The same isolated page can run the UI audit regressions. Their fetch, media, clipboard, and history fixtures do not use the server or a real collection. They are separate from `npm test`; scanner fixtures are not a substitute for physical-camera checks.
+
+```js
+for (const group of ['AdminSettings', 'Search', 'Container', 'PublicTrade', 'Storage', 'Deck', 'Scanner']) {
+  const module = await import(`/src/utils/ui${group}.browser.test.jsx`);
+  console.log(group, await module[`runUi${group}Regressions`]());
+}
+```
+
+The storage runner additionally accepts `{ pressKey, dragCard }`: `pressKey(key)` sends a trusted browser key to the focused element, and `dragCard(fromSelector, toSelector)` performs a real pointer drag between the supplied elements, allowing a paint after activation and before release. Without these callbacks, the runner verifies native click activation and reports `trustedKeyboard: false` and `pointerDrag: false`; test actual keyboard, pointer filing, and focus restoration separately.

@@ -37,6 +37,11 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
   const [shareLocations, setShareLocations] = useState(user?.share_locations === 1);
   const [shareLoading, setShareLoading] = useState(false);
   const [containers, setContainers] = useState([]);
+  const [containersStatus, setContainersStatus] = useState('loading');
+  const [containersRetry, setContainersRetry] = useState(0);
+  const exportBusyRef = useRef(false);
+  const [exporting, setExporting] = useState('');
+  const versionTextRef = useRef(null);
 
   const [accessKey, setAccessKey] = useState(user?.api_key || '');
   const [showAccessKey, setShowAccessKey] = useState(false);
@@ -267,12 +272,21 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
   // Containers to offer share links for. Only fetched once both share toggles are
   // on, because that is the only state the links work in.
   useEffect(() => {
-    if (!shareEnabled || !shareLocations) { setContainers([]); return; }
+    if (!shareEnabled || !shareLocations) return;
+    let cancelled = false;
+    setContainersStatus('loading');
     fetch('/api/locations')
-      .then(res => (res.ok ? res.json() : []))
-      .then(list => setContainers(Array.isArray(list) ? list : []))
-      .catch(() => setContainers([]));
-  }, [shareEnabled, shareLocations]);
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(list => {
+        if (!Array.isArray(list)) throw new Error('Invalid container list');
+        if (!cancelled) { setContainers(list); setContainersStatus('loaded'); }
+      })
+      .catch(() => { if (!cancelled) setContainersStatus('error'); });
+    return () => { cancelled = true; };
+  }, [shareEnabled, shareLocations, containersRetry]);
 
   useEffect(() => {
     if (user) {
@@ -318,6 +332,9 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
   };
 
   const handleExport = async (format) => {
+    if (exportBusyRef.current) return;
+    exportBusyRef.current = true;
+    setExporting(format);
     try {
       const response = await fetch(`/api/export?format=${format}`);
       if (!response.ok) {
@@ -329,6 +346,9 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
     } catch (err) {
       console.error(err);
       showToast(t('settings.errExportGeneric'), 'error');
+    } finally {
+      exportBusyRef.current = false;
+      setExporting('');
     }
   };
 
@@ -451,14 +471,26 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
 
   // messageType is separate from type because the per-container rows key their
   // "copied" tick by container id, while sharing one toast message.
-  const copyToClipboard = (url, type, messageType = type) => {
-    navigator.clipboard.writeText(url).then(() => {
+  const copyToClipboard = async (text, type, messageType = type) => {
+    setCopiedType('');
+    try {
+      await navigator.clipboard.writeText(text);
       setCopiedType(type);
-      showToast(t(`settings.copied.${messageType}`), 'success');
+      showToast(t(type === 'version' ? 'settings.versionCopied' : `settings.copied.${messageType}`), 'success');
       setTimeout(() => setCopiedType(''), 2000);
-    }).catch(() => {
-      showToast(t('settings.errCopy'), 'error');
-    });
+    } catch {
+      const input = [...revealRef.current.querySelectorAll('input[readonly]')].find(field => field.value === text);
+      if (input) {
+        input.focus();
+        input.select();
+      } else if (type === 'version' && versionTextRef.current) {
+        const range = document.createRange();
+        range.selectNodeContents(versionTextRef.current);
+        window.getSelection()?.removeAllRanges();
+        window.getSelection()?.addRange(range);
+      }
+      showToast(t('settings.copyManually'), 'error');
+    }
   };
 
   return (
@@ -606,15 +638,22 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
               {/* A container link opens that binder or box as itself — pockets
                   and pages, or box rows — rather than as a flat card list, which
                   is why it needs the locations toggle above to be on. */}
-              {shareLocations && containers.length > 0 && (
+              {shareLocations && (
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>{t('settings.linkContainer')}</label>
+                  {containersStatus === 'loading' && <p role="status">{t('common.loading')}</p>}
+                  {containersStatus === 'error' && <div role="alert">
+                    <p>{t('settings.containerLinksError')}</p>
+                    <button type="button" className="btn btn-secondary" onClick={() => setContainersRetry(value => value + 1)}>{t('common.retry')}</button>
+                  </div>}
+                  {containersStatus === 'loaded' && containers.length === 0 && <p role="status">{t('settings.containerLinksEmpty')}</p>}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {containers.map(loc => (
                       <div key={loc.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ flex: 1, fontSize: '0.8rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {loc.name}
-                        </span>
+                        <input readOnly className="input-control" aria-label={loc.name}
+                          value={`${origin}/share/${user?.share_token}?container=${loc.id}${themeQuery}`}
+                          onClick={event => event.target.select()} style={{ flex: 1, minWidth: 0 }} />
+                        <span style={{ maxWidth: '35%', fontSize: '0.8rem', overflowWrap: 'anywhere' }}>{loc.name}</span>
                         <button
                           className="btn btn-secondary"
                           onClick={() => copyToClipboard(`${origin}/share/${user?.share_token}?container=${loc.id}${themeQuery}`, `container-${loc.id}`, 'container')}
@@ -753,14 +792,14 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                     className="input-control"
                     value={accessKey}
                     onClick={(e) => e.target.select()}
-                    style={{ fontFamily: 'monospace', paddingRight: '2.4rem', width: '100%' }}
+                    style={{ fontFamily: 'monospace', paddingRight: '3.5rem', minHeight: '44px', width: '100%' }}
                   />
                   <button
                     type="button"
                     onClick={() => setShowAccessKey((v) => !v)}
                     aria-label={t(showAccessKey ? 'settings.hideApiKey' : 'settings.showApiKey')}
                     title={t(showAccessKey ? 'settings.hideApiKey' : 'settings.showApiKey')}
-                    style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
+                    style={{ position: 'absolute', right: '0.25rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', padding: 0 }}
                   >
                     {showAccessKey ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -864,6 +903,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
             <button
               type="button"
               onClick={() => handleExport('backup')}
+              disabled={!!exporting}
               className="btn btn-primary"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
             >
@@ -873,6 +913,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
             <button
               type="button"
               onClick={() => handleExport('csv')}
+              disabled={!!exporting}
               className="btn btn-secondary"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
             >
@@ -882,12 +923,14 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
             <button
               type="button"
               onClick={() => handleExport('json')}
+              disabled={!!exporting}
               className="btn btn-secondary"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
             >
               <Download size={14} />
               <span>{t('settings.exportJson')}</span>
             </button>
+            {exporting && <span role="status">{t('settings.downloading')}</span>}
 
             <button
               type="button"
@@ -1053,16 +1096,14 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span>{shownVersion ? `Manafolio v${shownVersion}` : t('settings.versionUnknown')}</span>
+                <span ref={versionTextRef}>{shownVersion ? `Manafolio v${shownVersion}` : t('settings.versionUnknown')}</span>
                 <button
                   type="button"
                   className="btn btn-secondary"
                   title={t('settings.copyVersionHint')}
                   onClick={() => {
                     const text = `Manafolio app v${shownVersion || 'unknown'} | server v${versionInfo?.version || (backendReachable ? 'unknown' : 'unreachable')} | ${navigator.platform || 'unknown'} | ${navigator.userAgent}`;
-                    navigator.clipboard?.writeText(text)
-                      .then(() => showToast(t('settings.versionCopied'), 'success'))
-                      .catch(() => showToast(t('settings.errCopyShort'), 'error'));
+                    copyToClipboard(text, 'version');
                   }}
                   style={{ padding: '0.15rem 0.45rem', fontSize: '0.7rem' }}
                 >

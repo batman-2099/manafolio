@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, BookOpen, Box, Package, Award, LayoutGrid, Layers, Archive, HelpCircle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { SortBuilder, FilterBuilder } from './SortFilterBuilder';
 import { isBinderType, containerTypeKey } from '../utils/cardOptions';
@@ -45,8 +45,21 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
   const [sortDraft, setSortDraft] = useState([]);
   const [filterDraft, setFilterDraft] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-
-  useBackGuard(true, onClose);
+  const busy = useRef(false);
+  const headingRef = useRef(null);
+  const previousStep = useRef(step);
+  const [submitError, setSubmitError] = useState(false);
+  const close = () => {
+    if (busy.current) return false;
+    onClose();
+  };
+  useBackGuard(true, close);
+  useEffect(() => {
+    if (previousStep.current !== step) {
+      headingRef.current?.focus();
+      previousStep.current = step;
+    }
+  }, [step]);
 
   const pickType = (next) => {
     setType(next);
@@ -57,43 +70,55 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
   const kind = compartmentKind(type);
   const typeLabel = (meta) => t(`container.type.${containerTypeKey(meta.type)}`);
 
-  const canNext = step === 0 ? !!type : step === 1 ? name.trim().length > 0 : true;
+  const validLayout = name.trim().length > 0 && [count, capacity].every(value => Number.isSafeInteger(Number(value)) && Number(value) > 0);
+  const next = () => {
+    if (!busy.current && (step !== 1 || validLayout)) setStep(step + 1);
+  };
 
   const submit = async () => {
-    if (submitting) return;
+    if (busy.current || !validLayout) return;
+    busy.current = true;
     setSubmitting(true);
+    setSubmitError(false);
     const payload = {
       name: name.trim(),
       type,
       game,
       sleeved,
       storage_unit_id: storageUnitId,
-      compartmentPlan: { count: Math.max(1, parseInt(count, 10) || 1), capacity: Math.max(1, parseInt(capacity, 10) || 1) },
+      compartmentPlan: { count: Number(count), capacity: Number(capacity) },
       sort_order: sortDraft.length > 0 ? JSON.stringify(sortDraft) : 'custom',
       rule_type: filterDraft.length > 0 ? 'compound' : 'any',
       rule_config: filterDraft.length > 0 ? JSON.stringify({ rules: filterDraft }) : null,
     };
-    await onCreate(payload);
-    setSubmitting(false);
+    try {
+      await onCreate(payload);
+    } catch {
+      setSubmitError(true);
+    } finally {
+      busy.current = false;
+      setSubmitting(false);
+    }
   };
 
   return (
-    <Modal onClose={onClose} aria-labelledby="create-container-title">
+    <Modal onClose={close} aria-labelledby="create-container-title">
       <div className="glass-panel create-container-dialog" style={{ width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }} onClick={(e) => e.stopPropagation()}>
         {/* Header + step indicator */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 id="create-container-title" style={{ margin: 0 }}>{t('container.newTitle')}</h3>
-          <button className="btn btn-secondary btn-icon-only" aria-label={t('common.close')} onClick={onClose} style={{ width: '44px', height: '44px', padding: 0 }}><X size={15} /></button>
+          <h3 id="create-container-title" ref={headingRef} tabIndex={-1} style={{ margin: 0 }}>{t('container.newTitle')} · {t(`container.step.${STEPS[step]}`)}</h3>
+          <button className="btn btn-secondary btn-icon-only" disabled={submitting} aria-label={t('common.close')} onClick={close} style={{ width: '44px', height: '44px', padding: 0 }}><X size={15} /></button>
         </div>
         {step === 0 && children}
         <div style={{ display: 'flex', gap: '0.4rem' }}>
           {STEPS.map((s, i) => (
-            <div key={s} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <div key={s} aria-current={i === step ? 'step' : undefined} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               <div style={{ height: '4px', borderRadius: '2px', background: i <= step ? 'var(--accent-red)' : 'var(--border-glass)' }} />
               <span style={{ fontSize: '0.6rem', color: i === step ? '#fff' : 'var(--text-muted)', fontWeight: i === step ? 800 : 600 }}>{i + 1}. {t(`container.step.${s}`)}</span>
             </div>
           ))}
         </div>
+        <p aria-live="polite" aria-atomic="true" style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)' }}>{t(`container.step.${STEPS[step]}`)} · {t('setup.stepCount', { step: step + 1, total: STEPS.length })}</p>
 
         {/* Step 1: Type */}
         {step === 0 && (
@@ -123,10 +148,10 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
 
         {/* Step 2: Layout */}
         {step === 1 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+          <form id="container-layout-form" onSubmit={event => { event.preventDefault(); if (event.currentTarget.reportValidity()) next(); }} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label htmlFor="create-container-name" style={{ fontSize: '0.72rem' }}>{t('container.name')}</label>
-              <input id="create-container-name" className="input-control" placeholder={t('container.namePlaceholder', { type: typeLabel(TYPE_META.find(m => m.type === type) || TYPE_META[0]) })} value={name} onChange={(e) => setName(e.target.value)} />
+              <input id="create-container-name" required pattern=".*\S.*" disabled={submitting} className="input-control" placeholder={t('container.namePlaceholder', { type: typeLabel(TYPE_META.find(m => m.type === type) || TYPE_META[0]) })} value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             {storageUnitsLoading && <p role="status">{t('common.loading')}</p>}
             {storageUnitsError && <div role="alert"><p>{t('storageUnit.loadError')}</p><button type="button" className="btn btn-secondary" onClick={onRetryStorageUnits}>{t('loc.retry')}</button></div>}
@@ -143,21 +168,21 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
             <div style={{ display: 'flex', gap: '0.9rem', flexWrap: 'wrap' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label htmlFor="create-container-count" style={{ fontSize: '0.72rem' }}>{t(`container.${kind}.label`)}</label>
-                <input id="create-container-count" type="number" min="1" className="input-control" value={count} onChange={(e) => setCount(e.target.value)} style={{ width: '110px' }} />
+                <input id="create-container-count" type="number" required min="1" max={Number.MAX_SAFE_INTEGER} step="1" disabled={submitting} className="input-control" value={count} onChange={(e) => setCount(e.target.value)} style={{ width: '110px' }} />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label htmlFor="create-container-capacity" style={{ fontSize: '0.72rem' }}>{t(`container.${kind}.perLabel`)}</label>
-                <input id="create-container-capacity" type="number" min="1" className="input-control" value={capacity} onChange={(e) => setCapacity(e.target.value)} style={{ width: '110px' }} />
+                <input id="create-container-capacity" type="number" required min="1" max={Number.MAX_SAFE_INTEGER} step="1" disabled={submitting} className="input-control" value={capacity} onChange={(e) => setCapacity(e.target.value)} style={{ width: '110px' }} />
               </div>
             </div>
             <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: 0 }}>
               {t(`container.${kind}.summary`, {
-                count: parseInt(count, 10) || 0,
-                capacity: parseInt(capacity, 10) || 0,
-                total: (parseInt(count, 10) || 0) * (parseInt(capacity, 10) || 0),
+                count: Number(count) || 0,
+                capacity: Number(capacity) || 0,
+                total: (Number(count) || 0) * (Number(capacity) || 0),
               })}
             </p>
-          </div>
+          </form>
         )}
 
         {/* Step 3: Sort */}
@@ -176,17 +201,21 @@ export default function CreateContainerModal({ onClose, onCreate, setsList = [],
             <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: 0 }}>
               {t('container.filingHint')}
             </p>
-            <FilterBuilder value={filterDraft} onChange={setFilterDraft} setsList={setsList} fieldOptions={filterFieldOptions} />
+            <fieldset disabled={submitting} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+              <FilterBuilder value={filterDraft} onChange={value => { if (!busy.current) setFilterDraft(value); }} setsList={setsList} fieldOptions={filterFieldOptions} />
+            </fieldset>
           </form>
         )}
+        {submitError && <p role="alert">{t('loc.errCreate')}</p>}
+        {submitting && <p role="status">{t('container.creating')}</p>}
 
         {/* Footer nav */}
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.25rem' }}>
-          <button className="btn btn-secondary" onClick={() => (step === 0 ? onClose() : setStep(step - 1))} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+          <button className="btn btn-secondary" disabled={submitting} onClick={() => { if (!busy.current) { if (step === 0) close(); else setStep(step - 1); } }} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
             {step === 0 ? t('common.cancel') : (<><ArrowLeft size={14} /> {t('common.back')}</>)}
           </button>
           {step < STEPS.length - 1 ? (
-            <button className="btn btn-primary" disabled={!canNext} onClick={() => setStep(step + 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+            <button type={step === 1 ? 'submit' : 'button'} form={step === 1 ? 'container-layout-form' : undefined} className="btn btn-primary" disabled={submitting} onClick={step === 1 ? undefined : next} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
               {t('common.next')} <ArrowRight size={14} />
             </button>
           ) : (

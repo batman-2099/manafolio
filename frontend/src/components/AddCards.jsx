@@ -33,9 +33,10 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, navigationGuardRef, i
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', gap: '1rem', position: 'relative' }}>
-        <div className="sub-nav-tabs" style={{ width: '100%', maxWidth: '520px', margin: 0 }}>
+        <div className="sub-nav-tabs" role="group" aria-label={t('addCards.mode')} style={{ width: '100%', maxWidth: '520px', margin: 0 }}>
           <button
             className={`sub-nav-tab ${mode === 'search' ? 'active' : ''}`}
+            aria-pressed={mode === 'search'}
             onClick={() => changeMode('search')}
           >
             <Search size={18} />
@@ -43,6 +44,7 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, navigationGuardRef, i
           </button>
           <button
             className={`sub-nav-tab ${mode === 'deck' ? 'active' : ''}`}
+            aria-pressed={mode === 'deck'}
             onClick={() => changeMode('deck')}
           >
             <BookOpen size={18} />
@@ -50,6 +52,7 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, navigationGuardRef, i
           </button>
           <button
             className={`sub-nav-tab ${mode === 'scan' ? 'active' : ''}`}
+            aria-pressed={mode === 'scan'}
             onClick={() => changeMode('scan')}
           >
             <Camera size={18} />
@@ -57,6 +60,7 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, navigationGuardRef, i
           </button>
           <button
             className={`sub-nav-tab ${mode === 'slab' ? 'active' : ''}`}
+            aria-pressed={mode === 'slab'}
             onClick={() => changeMode('slab')}
           >
             <Award size={18} />

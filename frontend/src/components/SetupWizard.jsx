@@ -8,6 +8,7 @@ import { gameLabel } from '../utils/games';
 import { containerTypeKey } from '../utils/cardOptions';
 import { LOCALES, localeName, useT } from '../utils/i18n';
 import Modal from './Modal';
+import { useBackGuard } from '../utils/useBackGuard';
 
 // First-run setup.
 //
@@ -65,6 +66,18 @@ export default function SetupWizard({ user, onClose }) {
   const [actionError, setActionError] = useState('');
   const [finishError, setFinishError] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const busy = useRef(false);
+  const mounted = useRef(true);
+  const [storagePending, setStoragePending] = useState(false);
+  const close = () => {
+    if (busy.current) return false;
+    onClose();
+  };
+  useBackGuard(true, close);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     if (previousStep.current !== step) {
@@ -188,18 +201,23 @@ export default function SetupWizard({ user, onClose }) {
 
   const addLocation = async () => {
     const name = newName.trim();
-    if (!name) return;
+    if (!name || busy.current) return;
+    busy.current = true;
+    setStoragePending(true);
     setActionError('');
     try {
       await post('/api/locations', { name, type: newType });
       setNewName('');
       await loadLocations();
     } catch (e) { setActionError(e.message); }
+    finally { busy.current = false; setStoragePending(false); }
   };
 
   const renameLocation = async (id) => {
     const name = editName.trim();
-    if (!name) return;
+    if (!name || busy.current) return;
+    busy.current = true;
+    setStoragePending(true);
     setActionError('');
     try {
       const r = await fetch(`/api/locations/${id}`, {
@@ -210,34 +228,41 @@ export default function SetupWizard({ user, onClose }) {
       setEditingId(null);
       await loadLocations();
     } catch (e) { setActionError(e.message); }
+    finally { busy.current = false; setStoragePending(false); }
   };
 
   const deleteLocation = async (loc) => {
+    if (busy.current) return;
     // Deleting a location unfiles its cards rather than deleting them, but that is
     // not obvious from a trash icon, so say it before doing it.
     const warn = loc.total_cards > 0
       ? t('setup.storage.confirmDeleteCards', { name: loc.name, count: loc.total_cards })
       : t('setup.storage.confirmDelete', { name: loc.name });
     if (!window.confirm(warn)) return;
+    busy.current = true;
+    setStoragePending(true);
     setActionError('');
     try {
       const r = await fetch(`/api/locations/${loc.id}`, { method: 'DELETE' });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || t('setup.storage.errDelete'));
       await loadLocations();
     } catch (e) { setActionError(e.message); }
+    finally { busy.current = false; setStoragePending(false); }
   };
 
   const finish = async () => {
-    if (finishing) return;
+    if (busy.current) return;
+    busy.current = true;
     setFinishing(true);
     setFinishError(false);
     try {
       const response = await markComplete();
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      onClose();
+      if (mounted.current) onClose();
     } catch {
       setFinishError(true);
     } finally {
+      busy.current = false;
       setFinishing(false);
     }
   };
@@ -427,7 +452,7 @@ export default function SetupWizard({ user, onClose }) {
 
 
   const storage = (
-    <>
+    <fieldset disabled={storagePending} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <Heading
         icon={<MapPin size={18} />}
         title={t('setup.storage.title')}
@@ -449,15 +474,15 @@ export default function SetupWizard({ user, onClose }) {
                 <input
                   type="text" value={editName} autoFocus
                   aria-label={t('setup.storage.rename', { name: l.name })}
-                  onChange={(e) => setEditName(e.target.value)}
+                  onChange={(e) => { if (!busy.current) setEditName(e.target.value); }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') renameLocation(l.id);
-                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setEditingId(null); }
+                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!busy.current) setEditingId(null); }
                   }}
                   style={{ ...input, flex: 1 }}
                 />
                 <button className="btn btn-primary btn-sm" onClick={() => renameLocation(l.id)}>{t('common.save')}</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => setEditingId(null)}>{t('common.cancel')}</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { if (!busy.current) setEditingId(null); }}>{t('common.cancel')}</button>
               </>
             ) : (
               <>
@@ -474,7 +499,7 @@ export default function SetupWizard({ user, onClose }) {
                 </div>
                 <div style={{ display: 'flex', gap: '0.3rem', flexShrink: 0 }}>
                   <button className="btn btn-secondary btn-sm" aria-label={t('setup.storage.rename', { name: l.name })}
-                    onClick={() => { setEditingId(l.id); setEditName(l.name); }}>
+                    onClick={() => { if (!busy.current) { setEditingId(l.id); setEditName(l.name); } }}>
                     <Pencil size={13} />
                   </button>
                   <button className="btn btn-secondary btn-sm" aria-label={t('setup.storage.delete', { name: l.name })}
@@ -494,14 +519,14 @@ export default function SetupWizard({ user, onClose }) {
             <label htmlFor="setup-location-name" style={{ ...label, display: 'block', marginBottom: '0.3rem' }}>{t('container.name')}</label>
             <input
               id="setup-location-name"
-              type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
+              type="text" value={newName} onChange={(e) => { if (!busy.current) setNewName(e.target.value); }}
               onKeyDown={(e) => { if (e.key === 'Enter') addLocation(); }}
               placeholder={t('setup.storage.namePlaceholder')} style={{ ...input, width: '100%' }}
             />
           </div>
           <div style={{ flex: '1 1 130px', minWidth: 0 }}>
             <label htmlFor="setup-location-type" style={{ ...label, display: 'block', marginBottom: '0.3rem' }}>{t('container.step.type')}</label>
-            <select id="setup-location-type" className="select-control" style={{ ...input, width: '100%' }} value={newType} onChange={(e) => setNewType(e.target.value)}>
+            <select id="setup-location-type" className="select-control" style={{ ...input, width: '100%' }} value={newType} onChange={(e) => { if (!busy.current) setNewType(e.target.value); }}>
             {NEW_LOCATION_TYPES.map(type => (
               <option key={type} value={type}>{typeName(type)}</option>
             ))}
@@ -513,7 +538,7 @@ export default function SetupWizard({ user, onClose }) {
           {t('setup.storage.addHint')}
         </p>
       </div>
-    </>
+    </fieldset>
   );
 
   const tour = (
@@ -546,7 +571,7 @@ export default function SetupWizard({ user, onClose }) {
   const last = step === STEPS.length - 1;
 
   return (
-    <Modal onClose={() => { if (!finishing) onClose(); }} aria-labelledby="setup-step-title" style={{
+    <Modal onClose={close} aria-labelledby="setup-step-title" style={{
       position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: '1rem', background: 'rgba(0,0,0,0.72)',
       backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
@@ -559,7 +584,7 @@ export default function SetupWizard({ user, onClose }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
           <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
             {STEPS.map((s, i) => (
-              <div key={s} title={t(`setup.step.${s}`)} style={{
+              <div key={s} aria-current={i === step ? 'step' : undefined} title={t(`setup.step.${s}`)} style={{
                 width: i === step ? 20 : 8, height: 8, borderRadius: 4,
                 background: i === step ? 'var(--accent-red)' : i < step ? 'var(--accent-green)' : 'var(--surface-3)',
                 transition: 'width 0.15s',
@@ -569,16 +594,16 @@ export default function SetupWizard({ user, onClose }) {
               {t(`setup.step.${STEPS[step]}`)} · {t('setup.stepCount', { step: step + 1, total: STEPS.length })}
             </span>
           </div>
-          <button type="button" onClick={onClose} disabled={finishing} aria-label={t('common.close')}
+          <button type="button" onClick={close} disabled={finishing || storagePending} aria-label={t('common.close')}
             className="btn btn-icon-only" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
             <X size={18} />
           </button>
         </div>
 
-        <div ref={contentRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', paddingRight: '0.25rem' }}>
+        <fieldset disabled={finishing} ref={contentRef} style={{ border: 0, margin: 0, padding: 0, flex: 1, minHeight: 0, minWidth: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', paddingRight: '0.25rem' }}>
           {content}
           {actionError && <p role="alert" style={{ ...body, color: 'var(--accent-red)' }}>{actionError}</p>}
-        </div>
+        </fieldset>
 
         {finishError && (
           <div>
@@ -586,17 +611,17 @@ export default function SetupWizard({ user, onClose }) {
             <button className="btn btn-secondary btn-sm" disabled={finishing} onClick={finish}>{t('common.retry')}</button>
           </div>
         )}
-        {finishing && <p role="status" style={body}>{t('common.loading')}</p>}
+        {(finishing || storagePending) && <p role="status" style={body}>{t('common.loading')}</p>}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderTop: '1px solid var(--border-glass)', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
-          <button className="btn btn-secondary btn-sm" disabled={finishing} onClick={finish}>{t('setup.skip')}</button>
+          <button className="btn btn-secondary btn-sm" disabled={finishing || storagePending} onClick={finish}>{t('setup.skip')}</button>
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             {step > 0 && (
-              <button className="btn btn-secondary btn-sm" disabled={finishing} onClick={() => setStep(s => s - 1)}
+              <button className="btn btn-secondary btn-sm" disabled={finishing || storagePending} onClick={() => { if (!busy.current) setStep(s => s - 1); }}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <ArrowLeft size={13} /> {t('common.back')}
               </button>
             )}
-            <button className="btn btn-primary btn-sm" disabled={finishing} onClick={() => last ? finish() : setStep(s => s + 1)}
+            <button className="btn btn-primary btn-sm" disabled={finishing || storagePending} onClick={() => { if (!busy.current) { if (last) finish(); else setStep(s => s + 1); } }}
               style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
               {last ? t('setup.done') : t('common.next')} <ArrowRight size={13} />
             </button>

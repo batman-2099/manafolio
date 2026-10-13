@@ -111,6 +111,13 @@ function ManaCounts({ deck }) {
 function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const { t } = useT();
   const cardsHeadingRef = useRef(null);
+  const [compactEditor, setCompactEditor] = useState(() => window.matchMedia('(max-width: 768px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)');
+    const update = () => setCompactEditor(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
   const addCardsInputRef = useRef(null);
   const [decks, setDecks] = useState([]);
   const [activeDeck, setActiveDeck] = useState(null);
@@ -153,7 +160,12 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [createDeckError, setCreateDeckError] = useState(null);
   const [showAiBuilder, setShowAiBuilder] = useState(false);
   const [aiSourceDeck, setAiSourceDeck] = useState(null);
-  const closeAiBuilder = () => { setShowAiBuilder(false); setAiSourceDeck(null); };
+  const [aiGuardState, setAiGuardState] = useState({ dirty: false, busy: false });
+  const closeAiBuilder = () => { setShowAiBuilder(false); setAiSourceDeck(null); setAiGuardState({ dirty: false, busy: false }); };
+  const requestCloseAiBuilder = () => {
+    if (!confirmLeaveEditor()) return false;
+    closeAiBuilder();
+  };
   const [newDeckName, setNewDeckName] = useState('');
   const [newDeckDesc, setNewDeckDesc] = useState('');
   const [newDeckInventoryType, setNewDeckInventoryType] = useState('collection');
@@ -235,6 +247,13 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [importComparison, setImportComparison] = useState(null);
   const [comparingImport, setComparingImport] = useState(false);
   const [importSummary, setImportSummary] = useState(null);
+  const exportTextRef = useRef(null);
+  const [exportCopyStatus, setExportCopyStatus] = useState('');
+  const closeImportModal = () => {
+    if (comparingImport) return false;
+    setShowImportModal(false);
+    setImportComparison(null);
+  };
 
   // Checkout States
   const [checkingOut, setCheckingOut] = useState(false);
@@ -376,11 +395,11 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   ].filter(Boolean).join(' · ');
 
   const confirmLeaveEditor = () => {
-    if (activeDeck && (editorBusy || savingRecord)) {
+    if ((showAiBuilder && aiGuardState.busy) || (activeDeck && (editorBusy || savingRecord))) {
       showToast(t('deck.waitForOperation'), 'status');
       return false;
     }
-    return !hasUnsavedChanges || window.confirm(t('deck.confirmDiscard'));
+    return !(hasUnsavedChanges || (showAiBuilder && aiGuardState.dirty)) || window.confirm(t('deck.confirmDiscard'));
   };
 
   const leaveDeck = () => {
@@ -406,14 +425,14 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   });
 
   useEffect(() => {
-    if (!hasUnsavedChanges && !savingDeck) return;
+    if (!hasUnsavedChanges && !savingDeck && !(showAiBuilder && (aiGuardState.dirty || aiGuardState.busy))) return;
     const warnBeforeUnload = (event) => {
       event.preventDefault();
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', warnBeforeUnload);
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
-  }, [hasUnsavedChanges, savingDeck]);
+  }, [hasUnsavedChanges, savingDeck, showAiBuilder, aiGuardState]);
 
   const closeCreateModal = () => {
     setCreateDeckError(null);
@@ -436,11 +455,11 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   useBackGuard(showCreateModal, () => creatingDeck ? false : closeCreateModal());
   useBackGuard(showSimulator, () => setShowSimulator(false));
   useBackGuard(!!deckDraft, () => refreshingInventory ? false : setDeckDraft(null));
-  useBackGuard(showImportModal, () => setShowImportModal(false));
+  useBackGuard(showImportModal, () => closeImportModal());
   useBackGuard(showExportModal, () => setShowExportModal(false));
   useBackGuard(showShareModal, () => shareBusy ? false : setShowShareModal(false));
   useBackGuard(!!importSummary, () => setImportSummary(null));
-  useBackGuard(showAiBuilder, closeAiBuilder);
+  useBackGuard(showAiBuilder, requestCloseAiBuilder);
   useBackGuard(!!previewCard, () => setPreviewCard(null));
 
   useEffect(() => {
@@ -950,22 +969,26 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     return buildDeckExport(activeDeck.cards, exportFormat);
   };
 
-  const handleCopyExportText = () => {
-    const text = handleExportDeckText();
-    navigator.clipboard.writeText(text)
-      .then(() => showToast(t('deck.copied'), 'success'))
-      .catch(() => showToast(t('deck.errCopy'), 'error'));
+  const copyExportText = async (text, successKey) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setExportCopyStatus(t(successKey));
+      showToast(t(successKey), 'success');
+    } catch {
+      exportTextRef.current?.focus();
+      exportTextRef.current?.select();
+      setExportCopyStatus(t('deck.copyManually'));
+    }
   };
 
-  // Copy the buylist and open TCGplayer Mass Entry — user pastes (their mass
-  // entry page has no documented prefill URL param, so clipboard + open is the
-  // reliable path).
+  const handleCopyExportText = () => copyExportText(handleExportDeckText(), 'deck.copied');
+
   const handleOpenMassEntry = () => {
     const text = buildDeckExport(activeDeck?.cards, 'buylist');
     if (!text) { showToast(t('deck.nothingToBuy'), 'status'); return; }
-    navigator.clipboard.writeText(text).catch(() => {});
-    window.open('https://www.tcgplayer.com/massentry?productline=Magic', '_blank', 'noopener');
-    showToast(t('deck.buylistCopied'), 'success');
+    // Open synchronously while the click still carries browser user activation.
+    window.open('https://www.tcgplayer.com/massentry?productline=Magic', '_blank', 'noopener,noreferrer');
+    copyExportText(text, 'deck.buylistCopied');
   };
 
   const loadOwnedImportCards = async () => {
@@ -1200,6 +1223,216 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     return new Date(b.created_at) - new Date(a.created_at);
   });
 
+  const deckSummary = activeDeck && (
+          <div className={`deck-summary-layout${commanderCard || activeDeck.game === 'mtg' ? ' deck-summary-layout--commander' : ''}`}>
+            <div className="deck-summary-content">
+            <div className="deck-overview">
+              <div className="deck-overview-column">
+                <section className="deck-overview-section" aria-labelledby="deck-types-heading">
+                  <h3 id="deck-types-heading"><Layers size={18} aria-hidden="true" style={{ color: 'var(--accent-blue)' }} />{t('deck.supertypeBreakdown')}</h3>
+                  {supertypeData.length ? (
+                    <ul className="deck-distribution">
+                      {supertypeData.map(entry => (
+                        <li key={entry.name} style={{ '--distribution-color': DECK_DISTRIBUTION_COLORS[entry.name] || 'var(--accent-blue)' }}>
+                          <span>{t(CARD_GROUP_LABELS[entry.name])}</span>
+                          <strong>{entry.value}</strong>
+                          <span className="deck-distribution-track" aria-hidden="true">
+                            <span style={{ width: `${entry.value / totalDeckCardsCount * 100}%` }} />
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p>{t('shared.noCards')}</p>}
+                </section>
+                {activeDeck.inventory_type === 'collection' && (
+                  <section className="deck-overview-section" aria-labelledby="deck-containers-heading">
+                    <h3 id="deck-containers-heading">
+                      <MapPin size={18} aria-hidden="true" style={{ color: 'var(--accent-yellow)' }} />{t('deck.containersNeeded')}
+                    </h3>
+                    {hasUnsavedChanges ? (
+                      <p style={{ color: 'var(--text-secondary)' }}>{t('deck.saveFirst')}</p>
+                    ) : deckLocationsError ? (
+                      <div role="alert">
+                        <p>{t('aiDeck.errContainers')}</p>
+                        <button className="btn btn-secondary" disabled={editorBusy} onClick={() => loadDeckDetails(activeDeck.id)}>{t('loc.retry')}</button>
+                      </div>
+                    ) : (
+                      <>
+                        {neededContainers.length > 0 ? (
+                          <ul className="deck-overview-rows">
+                            {neededContainers.map(container => (
+                              <li key={container.id ?? 'unassigned'}>
+                                <span>{container.id === null ? t('bulk.unassignedPile') : container.name}</span>
+                                <strong>{t('admin.userCards', { count: container.quantity })}</strong>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p style={{ color: 'var(--text-secondary)' }}>{t(activeDeck.cards.length ? 'deck.sourcesEmpty' : 'shared.noCards')}</p>
+                        )}
+                        {unavailableCopies > 0 && <p style={{ marginTop: '0.75rem', color: 'var(--accent-yellow)', fontSize: '0.85rem' }}>{t('deck.unavailableCopies', { count: unavailableCopies })}</p>}
+                      </>
+                    )}
+                  </section>
+                )}
+                </div>
+
+              <div className="deck-overview-column">
+                <section className="deck-overview-section" aria-labelledby="deck-colors-heading">
+                  <h3 id="deck-colors-heading"><BarChart2 size={18} aria-hidden="true" style={{ color: 'var(--accent-red)' }} />{t('deck.colorLandDist')}</h3>
+                  {colorData.length ? (
+                    <ul className="deck-distribution">
+                      {colorData.map(entry => (
+                        <li key={entry.name} style={{ '--distribution-color': DECK_DISTRIBUTION_COLORS[entry.name] || 'var(--accent-yellow)' }}>
+                          <span>{entry.name}</span>
+                          <strong>{entry.value}</strong>
+                          <span className="deck-distribution-track" aria-hidden="true">
+                            <span style={{ width: `${entry.value / totalDeckCardsCount * 100}%` }} />
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p>{t('shared.noCards')}</p>}
+                </section>
+                <section className="deck-overview-section" aria-labelledby="deck-health-heading">
+                  <h3 id="deck-health-heading"><PackageCheck size={18} aria-hidden="true" style={{ color: 'var(--accent-green)' }} />{t('deck.healthTitle')}</h3>
+                  <dl className="deck-overview-rows">
+                    <div>
+                      <dt>{t('deck.targetDeckSize')}</dt>
+                      <dd className="deck-overview-capacity" style={{ color: totalDeckCardsCount === targetDeckCardsCount ? 'var(--accent-green)' : 'var(--accent-yellow)' }}>
+                        {totalDeckCardsCount === targetDeckCardsCount
+                          ? <CheckCircle size={16} aria-hidden="true" />
+                          : <AlertTriangle size={16} aria-hidden="true" />}
+                        {totalDeckCardsCount}/{targetDeckCardsCount}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{t('deck.uniqueCards')}</dt>
+                      <dd>{t('deck.titlesCount', { count: activeDeck.cards.length })}</dd>
+                    </div>
+                    {deckGame === 'mtg' && (
+                      <div>
+                        <dt>{t('deck.basicLands')}</dt>
+                        <dd>{t('deck.basicLandsCount', { count: activeDeck.cards.filter(c => isBasicLand(c, deckGame)).reduce((s, c) => s + c.quantity, 0) })}</dd>
+                      </div>
+                    )}
+                  </dl>
+                {activeDeck.game === 'mtg' && (
+                  <div className="deck-overview-record">
+                    {['win', 'loss'].map(result => {
+                      const count = activeDeck[result === 'win' ? 'wins' : 'losses'] ?? 0;
+                      return (
+                        <div key={result} role="group" aria-label={t(result === 'win' ? 'deck.wins' : 'deck.losses')} aria-busy={savingRecord}>
+                          <span aria-live="polite" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {t(result === 'win' ? 'deck.wins' : 'deck.losses')}: <strong>{count}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-icon-only"
+                            aria-label={t(result === 'win' ? 'deck.removeWin' : 'deck.removeLoss')}
+                            disabled={savingRecord || savingDeck || count === 0}
+                            onClick={() => handleRecordChange(result, -1)}
+                          >
+                            <Minus size={14} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-icon-only"
+                            aria-label={t(result === 'win' ? 'deck.addWin' : 'deck.addLoss')}
+                            disabled={savingRecord || savingDeck || count === 2147483647}
+                            onClick={() => handleRecordChange(result, 1)}
+                          >
+                            <Plus size={14} aria-hidden="true" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                  <div className="deck-sleeved-field" aria-busy={savingSleeved}>
+                    <label htmlFor="deck-sleeved">{t('deck.sleeved')}</label>
+                    <select
+                      id="deck-sleeved"
+                      className="input-control"
+                      value={activeDeck.sleeved ?? 0}
+                      disabled={editorBusy}
+                      aria-describedby={sleevedError ? 'deck-sleeved-error' : undefined}
+                      onChange={event => handleSleevedChange(Number(event.target.value))}
+                    >
+                      <option value={0}>{t('deck.sleevedNone')}</option>
+                      <option value={1}>{t('deck.sleevedOne')}</option>
+                      <option value={2}>{t('deck.sleevedDouble')}</option>
+                      <option value={3}>{t('deck.sleevedTriple')}</option>
+                    </select>
+                    {savingSleeved && <p role="status">{t('deck.saving')}</p>}
+                    {sleevedError && <p id="deck-sleeved-error" className="deck-source-error" role="alert">{t('deck.errSleeved')}</p>}
+                  </div>
+                </section>
+              </div>
+            </div>
+          <section className="glass-panel" aria-labelledby="deck-description-heading">
+            <h3 id="deck-description-heading" style={{ marginBottom: '0.75rem' }}>{t('deck.description')}</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              {activeDeck.description || '—'}
+            </p>
+          </section>
+          <section className="glass-panel" aria-labelledby="deck-notes-heading">
+            <h3 id="deck-notes-heading" style={{ marginBottom: '0.75rem' }}>
+              <label htmlFor="deck-notes">{t('nav.notes')}</label>
+            </h3>
+            <textarea
+              id="deck-notes"
+              className="input-control"
+              rows={6}
+              style={{ display: 'block', width: '100%', fontSize: '16px', resize: 'vertical' }}
+              value={activeDeck.notes || ''}
+              disabled={editorBusy || !!deckDraft}
+              onChange={(event) => setActiveDeck(deck => ({ ...deck, notes: event.target.value }))}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
+              <button className="btn btn-secondary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
+            </div>
+          </section>
+            </div>
+              <div className="deck-card-previews">
+                {commanderCard && (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewCard(commanderCard)}
+                    aria-label={`${t('deck.commander')}: ${displayName(commanderCard)}`}
+                    title={`${t('deck.commander')}: ${displayName(commanderCard)}`}
+                    style={{ padding: 0, width: '100%', maxWidth: '350px', justifySelf: 'center', border: '1px solid var(--accent-yellow)', borderRadius: '8px', background: 'transparent', cursor: 'pointer' }}
+                  >
+                    <CardImage card={commanderCard} style={{ display: 'block', width: '100%', aspectRatio: '0.718', objectFit: 'contain', borderRadius: '7px' }} />
+                  </button>
+                )}
+                {/commander|edh|brawl/i.test(activeDeck.format || '') && (
+                  <div className="deck-commander-field">
+                    <label htmlFor="deck-commander">{t('deck.commander')}</label>
+                    <select id="deck-commander" className="input-control" value={activeDeck.commander_card_id || ''} disabled={editorBusy} onChange={e => handleCommanderChange(e.target.value)}>
+                      <option value="">{t('deck.noCommander')}</option>
+                      {commanderChoices.map(card => (
+                        <option key={card.id} value={card.id}>
+                          {displayName(card)}{card.set_name ? ` · ${card.set_name}` : ''}{card.number ? ` #${card.number}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {activeDeck.game === 'mtg' && <DeckCardBack
+                  key={activeDeck.id}
+                  deck={activeDeck}
+                  disabled={editorBusy}
+                  onBusy={setSavingCardBack}
+                  onSaved={(deckId, back) => {
+                    setActiveDeck(deck => deck?.id === deckId ? { ...deck, ...back } : deck);
+                    setDecks(current => current.map(deck => deck.id === deckId ? { ...deck, ...back } : deck));
+                  }}
+                />}
+              </div>
+          </div>
+  );
+
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {showAcquisitionPlanner && <AcquisitionPlanner decks={decks} onClose={() => setShowAcquisitionPlanner(false)} />}
@@ -1208,7 +1441,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
         <AiDeckBuilder
           sourceDeck={aiSourceDeck}
           onPreview={setPreviewCard}
-          onClose={closeAiBuilder}
+          onClose={requestCloseAiBuilder}
+          onGuardStateChange={setAiGuardState}
           onOpenAiSettings={onOpenAiSettings}
           onSaved={async id => {
             closeAiBuilder();
@@ -1931,7 +2165,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               </button>
               <button
                 className="btn btn-secondary"
-                onClick={() => setShowExportModal(true)}
+                onClick={() => { setExportCopyStatus(''); setShowExportModal(true); }}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                 title={t('deck.exportHint')}
               >
@@ -1988,213 +2222,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             </div>
           )}
 
-          <div className={`deck-summary-layout${commanderCard || activeDeck.game === 'mtg' ? ' deck-summary-layout--commander' : ''}`}>
-            <div className="deck-summary-content">
-            <div className="deck-overview">
-              <div className="deck-overview-column">
-                <section className="deck-overview-section" aria-labelledby="deck-types-heading">
-                  <h3 id="deck-types-heading"><Layers size={18} aria-hidden="true" style={{ color: 'var(--accent-blue)' }} />{t('deck.supertypeBreakdown')}</h3>
-                  {supertypeData.length ? (
-                    <ul className="deck-distribution">
-                      {supertypeData.map(entry => (
-                        <li key={entry.name} style={{ '--distribution-color': DECK_DISTRIBUTION_COLORS[entry.name] || 'var(--accent-blue)' }}>
-                          <span>{t(CARD_GROUP_LABELS[entry.name])}</span>
-                          <strong>{entry.value}</strong>
-                          <span className="deck-distribution-track" aria-hidden="true">
-                            <span style={{ width: `${entry.value / totalDeckCardsCount * 100}%` }} />
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : <p>{t('shared.noCards')}</p>}
-                </section>
-                {activeDeck.inventory_type === 'collection' && (
-                  <section className="deck-overview-section" aria-labelledby="deck-containers-heading">
-                    <h3 id="deck-containers-heading">
-                      <MapPin size={18} aria-hidden="true" style={{ color: 'var(--accent-yellow)' }} />{t('deck.containersNeeded')}
-                    </h3>
-                    {hasUnsavedChanges ? (
-                      <p style={{ color: 'var(--text-secondary)' }}>{t('deck.saveFirst')}</p>
-                    ) : deckLocationsError ? (
-                      <div role="alert">
-                        <p>{t('aiDeck.errContainers')}</p>
-                        <button className="btn btn-secondary" disabled={editorBusy} onClick={() => loadDeckDetails(activeDeck.id)}>{t('loc.retry')}</button>
-                      </div>
-                    ) : (
-                      <>
-                        {neededContainers.length > 0 ? (
-                          <ul className="deck-overview-rows">
-                            {neededContainers.map(container => (
-                              <li key={container.id ?? 'unassigned'}>
-                                <span>{container.id === null ? t('bulk.unassignedPile') : container.name}</span>
-                                <strong>{t('admin.userCards', { count: container.quantity })}</strong>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p style={{ color: 'var(--text-secondary)' }}>{t(activeDeck.cards.length ? 'deck.sourcesEmpty' : 'shared.noCards')}</p>
-                        )}
-                        {unavailableCopies > 0 && <p style={{ marginTop: '0.75rem', color: 'var(--accent-yellow)', fontSize: '0.85rem' }}>{t('deck.unavailableCopies', { count: unavailableCopies })}</p>}
-                      </>
-                    )}
-                  </section>
-                )}
-                </div>
-
-              <div className="deck-overview-column">
-                <section className="deck-overview-section" aria-labelledby="deck-colors-heading">
-                  <h3 id="deck-colors-heading"><BarChart2 size={18} aria-hidden="true" style={{ color: 'var(--accent-red)' }} />{t('deck.colorLandDist')}</h3>
-                  {colorData.length ? (
-                    <ul className="deck-distribution">
-                      {colorData.map(entry => (
-                        <li key={entry.name} style={{ '--distribution-color': DECK_DISTRIBUTION_COLORS[entry.name] || 'var(--accent-yellow)' }}>
-                          <span>{entry.name}</span>
-                          <strong>{entry.value}</strong>
-                          <span className="deck-distribution-track" aria-hidden="true">
-                            <span style={{ width: `${entry.value / totalDeckCardsCount * 100}%` }} />
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : <p>{t('shared.noCards')}</p>}
-                </section>
-                <section className="deck-overview-section" aria-labelledby="deck-health-heading">
-                  <h3 id="deck-health-heading"><PackageCheck size={18} aria-hidden="true" style={{ color: 'var(--accent-green)' }} />{t('deck.healthTitle')}</h3>
-                  <dl className="deck-overview-rows">
-                    <div>
-                      <dt>{t('deck.targetDeckSize')}</dt>
-                      <dd className="deck-overview-capacity" style={{ color: totalDeckCardsCount === targetDeckCardsCount ? 'var(--accent-green)' : 'var(--accent-yellow)' }}>
-                        {totalDeckCardsCount === targetDeckCardsCount
-                          ? <CheckCircle size={16} aria-hidden="true" />
-                          : <AlertTriangle size={16} aria-hidden="true" />}
-                        {totalDeckCardsCount}/{targetDeckCardsCount}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>{t('deck.uniqueCards')}</dt>
-                      <dd>{t('deck.titlesCount', { count: activeDeck.cards.length })}</dd>
-                    </div>
-                    {deckGame === 'mtg' && (
-                      <div>
-                        <dt>{t('deck.basicLands')}</dt>
-                        <dd>{t('deck.basicLandsCount', { count: activeDeck.cards.filter(c => isBasicLand(c, deckGame)).reduce((s, c) => s + c.quantity, 0) })}</dd>
-                      </div>
-                    )}
-                  </dl>
-                {activeDeck.game === 'mtg' && (
-                  <div className="deck-overview-record">
-                    {['win', 'loss'].map(result => {
-                      const count = activeDeck[result === 'win' ? 'wins' : 'losses'] ?? 0;
-                      return (
-                        <div key={result} role="group" aria-label={t(result === 'win' ? 'deck.wins' : 'deck.losses')} aria-busy={savingRecord}>
-                          <span aria-live="polite" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                            {t(result === 'win' ? 'deck.wins' : 'deck.losses')}: <strong>{count}</strong>
-                          </span>
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-icon-only"
-                            aria-label={t(result === 'win' ? 'deck.removeWin' : 'deck.removeLoss')}
-                            disabled={savingRecord || savingDeck || count === 0}
-                            onClick={() => handleRecordChange(result, -1)}
-                          >
-                            <Minus size={14} aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-icon-only"
-                            aria-label={t(result === 'win' ? 'deck.addWin' : 'deck.addLoss')}
-                            disabled={savingRecord || savingDeck || count === 2147483647}
-                            onClick={() => handleRecordChange(result, 1)}
-                          >
-                            <Plus size={14} aria-hidden="true" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                  <div className="deck-sleeved-field" aria-busy={savingSleeved}>
-                    <label htmlFor="deck-sleeved">{t('deck.sleeved')}</label>
-                    <select
-                      id="deck-sleeved"
-                      className="input-control"
-                      value={activeDeck.sleeved ?? 0}
-                      disabled={editorBusy}
-                      aria-describedby={sleevedError ? 'deck-sleeved-error' : undefined}
-                      onChange={event => handleSleevedChange(Number(event.target.value))}
-                    >
-                      <option value={0}>{t('deck.sleevedNone')}</option>
-                      <option value={1}>{t('deck.sleevedOne')}</option>
-                      <option value={2}>{t('deck.sleevedDouble')}</option>
-                      <option value={3}>{t('deck.sleevedTriple')}</option>
-                    </select>
-                    {savingSleeved && <p role="status">{t('deck.saving')}</p>}
-                    {sleevedError && <p id="deck-sleeved-error" className="deck-source-error" role="alert">{t('deck.errSleeved')}</p>}
-                  </div>
-                </section>
-              </div>
-            </div>
-          <section className="glass-panel" aria-labelledby="deck-description-heading">
-            <h3 id="deck-description-heading" style={{ marginBottom: '0.75rem' }}>{t('deck.description')}</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-              {activeDeck.description || '—'}
-            </p>
-          </section>
-          <section className="glass-panel" aria-labelledby="deck-notes-heading">
-            <h3 id="deck-notes-heading" style={{ marginBottom: '0.75rem' }}>
-              <label htmlFor="deck-notes">{t('nav.notes')}</label>
-            </h3>
-            <textarea
-              id="deck-notes"
-              className="input-control"
-              rows={6}
-              style={{ display: 'block', width: '100%', fontSize: '16px', resize: 'vertical' }}
-              value={activeDeck.notes || ''}
-              disabled={editorBusy || !!deckDraft}
-              onChange={(event) => setActiveDeck(deck => ({ ...deck, notes: event.target.value }))}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
-              <button className="btn btn-secondary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
-            </div>
-          </section>
-            </div>
-              <div className="deck-card-previews">
-                {commanderCard && (
-                  <button
-                    type="button"
-                    onClick={() => setPreviewCard(commanderCard)}
-                    aria-label={`${t('deck.commander')}: ${displayName(commanderCard)}`}
-                    title={`${t('deck.commander')}: ${displayName(commanderCard)}`}
-                    style={{ padding: 0, width: '100%', maxWidth: '350px', justifySelf: 'center', border: '1px solid var(--accent-yellow)', borderRadius: '8px', background: 'transparent', cursor: 'pointer' }}
-                  >
-                    <CardImage card={commanderCard} style={{ display: 'block', width: '100%', aspectRatio: '0.718', objectFit: 'contain', borderRadius: '7px' }} />
-                  </button>
-                )}
-                {/commander|edh|brawl/i.test(activeDeck.format || '') && (
-                  <div className="deck-commander-field">
-                    <label htmlFor="deck-commander">{t('deck.commander')}</label>
-                    <select id="deck-commander" className="input-control" value={activeDeck.commander_card_id || ''} disabled={editorBusy} onChange={e => handleCommanderChange(e.target.value)}>
-                      <option value="">{t('deck.noCommander')}</option>
-                      {commanderChoices.map(card => (
-                        <option key={card.id} value={card.id}>
-                          {displayName(card)}{card.set_name ? ` · ${card.set_name}` : ''}{card.number ? ` #${card.number}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                {activeDeck.game === 'mtg' && <DeckCardBack
-                  key={activeDeck.id}
-                  deck={activeDeck}
-                  disabled={editorBusy}
-                  onBusy={setSavingCardBack}
-                  onSaved={(deckId, back) => {
-                    setActiveDeck(deck => deck?.id === deckId ? { ...deck, ...back } : deck);
-                    setDecks(current => current.map(deck => deck.id === deckId ? { ...deck, ...back } : deck));
-                  }}
-                />}
-              </div>
-          </div>
+          {!compactEditor && deckSummary}
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1.5rem', alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
               
@@ -2502,6 +2530,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
             </div>
           </div>
+          {compactEditor && deckSummary}
         </div>
       )}
 
@@ -2903,18 +2932,20 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
       {/* C. Export Modal */}
       {showExportModal && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-          <div className="glass-panel" style={{ maxWidth: '500px', width: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', padding: '1.75rem', position: 'relative' }}>
-            <button className="btn btn-secondary btn-icon-only" onClick={() => setShowExportModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', borderRadius: '50%' }}>
+        <Modal onClose={() => setShowExportModal(false)} aria-labelledby="deck-export-title">
+          <div className="glass-panel deck-text-panel" style={{ maxWidth: '500px' }}>
+            <button aria-label={t('common.close')} className="btn btn-secondary btn-icon-only" onClick={() => setShowExportModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', borderRadius: '50%' }}>
               <X size={16} />
             </button>
-            <h3 style={{ fontSize: '1.2rem', color: 'var(--text-strong)', marginBottom: '0.5rem' }}>{t('deck.exportTitle')}</h3>
+            <h3 id="deck-export-title" style={{ fontSize: '1.2rem', color: 'var(--text-strong)', marginBottom: '0.5rem' }}>{t('deck.exportTitle')}</h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>{t('deck.exportHintBody')}</p>
+            <label htmlFor="deck-export-format">{t('deck.exportFormatLabel')}</label>
             <select
+              id="deck-export-format"
               className="input-control"
               style={{ width: '100%', marginBottom: '1rem', fontSize: '0.85rem' }}
               value={exportFormat}
-              onChange={e => setExportFormat(e.target.value)}
+              onChange={e => { setExportFormat(e.target.value); setExportCopyStatus(''); }}
             >
               <option value="mtga">{t('deck.formatMtga')}</option>
               <option value="plain">{t('deck.formatPlain')}</option>
@@ -2925,12 +2956,16 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 {t('deck.buylistHint')}
               </p>
             )}
+            <label htmlFor="deck-export-text">{t('deck.decklistLabel')}</label>
             <textarea
+              id="deck-export-text"
+              ref={exportTextRef}
               readOnly
               className="input-control"
               style={{ width: '100%', height: '220px', fontFamily: 'monospace', fontSize: '0.8rem', resize: 'vertical' }}
               value={handleExportDeckText()}
             />
+            <p role="status">{exportCopyStatus}</p>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowExportModal(false)}>{t('common.close')}</button>
               <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleCopyExportText}>{t('deck.copyClipboard')}</button>
@@ -2939,20 +2974,23 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               )}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* D. Import Modal with Collection Comparison */}
       {showImportModal && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-          <div className="glass-panel" style={{ maxWidth: '600px', width: '100%', padding: '1.75rem', position: 'relative', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
-            <button className="btn btn-secondary btn-icon-only" onClick={() => { setShowImportModal(false); setImportComparison(null); }} style={{ position: 'absolute', top: '1rem', right: '1rem', borderRadius: '50%' }}>
+        <Modal onClose={closeImportModal} aria-labelledby="deck-import-title" aria-busy={comparingImport}>
+          <div className="glass-panel deck-text-panel">
+            <button aria-label={t('common.close')} disabled={comparingImport} className="btn btn-secondary btn-icon-only" onClick={closeImportModal} style={{ position: 'absolute', top: '1rem', right: '1rem', borderRadius: '50%' }}>
               <X size={16} />
             </button>
-            <h3 style={{ fontSize: '1.2rem', color: 'var(--text-strong)', marginBottom: '0.5rem' }}>{t('deck.importTitle')}</h3>
+            <h3 id="deck-import-title" style={{ fontSize: '1.2rem', color: 'var(--text-strong)', marginBottom: '0.5rem' }}>{t('deck.importTitle')}</h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>{t('deck.pasteDecklistHint')}</p>
             
+            <label htmlFor="deck-import-text">{t('deck.decklistLabel')}</label>
             <textarea
+              id="deck-import-text"
+              disabled={comparingImport}
               className="input-control"
               style={{ width: '100%', minHeight: '120px', maxHeight: '180px', fontFamily: 'monospace', fontSize: '0.8rem', resize: 'vertical' }}
               placeholder={'4 Llanowar Elves\n2 Lightning Bolt\n20 Forest'}
@@ -2999,7 +3037,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             )}
 
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setShowImportModal(false); setImportComparison(null); }}>{t('common.cancel')}</button>
+              <button className="btn btn-secondary" disabled={comparingImport} style={{ flex: 1 }} onClick={closeImportModal}>{t('common.cancel')}</button>
               {!importComparison ? (
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleCompareImport} disabled={!importText.trim() || editorBusy}>{t('deck.compare')}</button>
               ) : (
@@ -3007,13 +3045,13 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               )}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {importSummary && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-          <div className="glass-panel" style={{ maxWidth: '600px', width: '100%', padding: '1.75rem' }}>
-            <h3 style={{ fontSize: '1.2rem', color: 'var(--text-strong)', marginBottom: '0.5rem' }}>{t('deck.importSummary')}</h3>
+        <Modal onClose={() => setImportSummary(null)} aria-labelledby="deck-import-summary-title">
+          <div className="glass-panel deck-text-panel">
+            <h3 id="deck-import-summary-title" style={{ fontSize: '1.2rem', color: 'var(--text-strong)', marginBottom: '0.5rem' }}>{t('deck.importSummary')}</h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>{t('deck.imported', { count: importSummary.addedCount })}</p>
             <p style={{ fontSize: '0.8rem', color: 'var(--accent-yellow)' }}>{t('deck.saveDraftHint')}</p>
             {importSummary.skipped.length > 0 && (
@@ -3023,7 +3061,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   {importSummary.skipped.map((item, index) => (
                     <div key={`${item.name}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', padding: '0.5rem 0.65rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}>
                       <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{item.name}</span>
-                      <span style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{t('deck.reqQuantity', { count: item.quantity })} · {t(item.reason)}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{t('deck.reqQuantity', { count: item.quantity })} · {t(item.reason)}</span>
                     </div>
                   ))}
                 </div>
@@ -3031,7 +3069,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             )}
             <button className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} onClick={() => setImportSummary(null)}>{t('common.close')}</button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* E. High-Res Card Art Preview Popover */}

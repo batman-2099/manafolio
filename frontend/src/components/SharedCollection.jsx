@@ -130,9 +130,13 @@ function SharedCollection({ shareToken }) {
       if (stackByPrinting) key += `-${item.printing}`;
 
       if (!groups[key]) {
-        groups[key] = { ...item };
+        groups[key] = { ...item, members: [item] };
       } else {
         groups[key].quantity = (groups[key].quantity || 1) + (item.quantity || 1);
+        groups[key].members.push(item);
+        for (const field of ['condition', 'printing', 'language', 'location']) {
+          if (groups[key][field] !== item[field]) groups[key][field] = null;
+        }
       }
     });
     const stacked = Object.values(groups);
@@ -347,6 +351,7 @@ function SharedCollection({ shareToken }) {
                       {getPrintingBadgeLabel(card.printing)}
                     </span>
                   )}
+                  {card.members?.length > 1 && card.printing === null && <span className="tcg-card-quantity-tag" style={{ top: '6px', bottom: 'auto' }}>{t('shared.mixed')}</span>}
                   {card.quantity > 1 && (
                     <span className="tcg-card-quantity-tag">x{card.quantity}</span>
                   )}
@@ -357,9 +362,9 @@ function SharedCollection({ shareToken }) {
                     <span style={{ fontSize: '0.7rem' }}>{card.set_name} • #{card.number}</span>
                     <span className="tcg-card-price">{priceText(card.price_trend, card.price_currency)}</span>
                   </span>
-                  {shareLocations && card.location && (
+                  {shareLocations && (card.location || (card.members?.length > 1 && card.location === null)) && (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                      <MapPin size={11} /> {card.location}
+                      <MapPin size={11} /> {card.location ?? t('shared.mixed')}
                     </span>
                   )}
                 </span>
@@ -459,16 +464,25 @@ function SharedCollection({ shareToken }) {
                   {activeCard.subtypes.length > 0 && (<><span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{t('shared.specSubtypes')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.subtypes.join(', ')}</span></>)}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>{t('inspector.specCondition')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.condition}</span>
-                  <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.printing}</span>
-                  <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{t('inspector.specLanguage')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.language}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{t('inspector.specCondition')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.condition ?? t('shared.mixed')}</span>
+                  <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.printing ?? t('shared.mixed')}</span>
+                  <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{t('inspector.specLanguage')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.language ?? t('shared.mixed')}</span>
                 </div>
-                {shareLocations && activeCard.location && (
+                {shareLocations && (activeCard.location || (activeCard.members?.length > 1 && activeCard.location === null)) && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', marginTop: '0.25rem' }}>
                     <MapPin size={13} style={{ color: 'var(--accent-red)' }} />
-                    <span style={{ color: 'var(--text-muted)' }}>{t('inspector.locationLabel')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.location}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{t('inspector.locationLabel')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.location ?? t('shared.mixed')}</span>
                   </div>
                 )}
+                {activeCard.members?.length > 1 && <section aria-labelledby="shared-copies-title">
+                  <h4 id="shared-copies-title">{t('shared.copyBreakdown')}</h4>
+                  <ul>
+                    {activeCard.members.map((member, index) => <li key={index}>
+                      {t('shared.quantity')}: {member.quantity || 1} · {t('card.printing')}: {member.printing} · {t('card.condition')}: {member.condition} · {t('card.language')}: {member.language}
+                      {shareLocations && member.location && <> · {t('inspector.locationLabel')} {member.location}</>}
+                    </li>)}
+                  </ul>
+                </section>}
               </div>
             </div>
           </div>

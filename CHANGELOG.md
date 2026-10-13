@@ -4,6 +4,15 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Corrected bulk-add partial-success handling: failed cards remain selected with errors for retry, and only successful Physical additions update Physical counts. Invalid bulk quantities and container layout counts are rejected instead of silently replaced.
+- Kept scanner language and printing identity together after failed lookups, preserved scan drafts on save errors, and exposed the scan-only 1–250 quantity limit. Camera retry now starts one request; advanced sliders have associated labels.
+- Reused native dialogs for deck import/export/results, checkout, and scanner confirmations, with keyboard focus, Escape cancellation, and viewport-bounded deck text panels.
+- Made storage pockets and coverflow cards keyboard-operable. Checkout selections expose checked/mixed states and live progress; completed groups remain open and can be collapsed, reopened, and corrected.
+- Protected AI drafts and pending saves from navigation; kept mobile deck card editing ahead of analytics, notes, and appearance without removing those sections.
+- Added pending guards and feedback to container creation, setup storage edits, administrator mutations, and backup downloads. Clarified the destructive test-card replacement warning, including cached-set fallback and all affected inventories, in every supported language.
+- Made clipboard failures offer manual copying, sharing-link failures offer Retry, public mixed stacks show their copy breakdown, and trade cancellation confirm before discarding a draft.
+- Exposed Add Cards mode selection and container wizard progress to assistive technology, preserved trade selection focus, and enlarged the API-key reveal control.
+
 - Password changes now revoke other account sessions while retaining the current session; administrator password resets revoke all target-account sessions. Password updates and revocation are atomic, with stale-session checks on self-service changes. Read-only API keys remain unchanged.
 
 - Made card-inspector quantity edits apply only to the selected stored entry, with an explicit entry chooser for combined Collection and Storage stacks. Quantity and metadata save atomically without altering matching copies elsewhere; checked-out copies retain reservation protection.

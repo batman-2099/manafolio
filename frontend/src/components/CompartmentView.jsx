@@ -139,16 +139,19 @@ export function getSortCategories(card, sortOrder, setsList = []) {
 // A binder pocket that accepts a dragged card. Two components, not one with a
 // conditional hook: CompartmentView also renders inside CheckoutWizardModal,
 // which has no DndContext above it, so the hook must not mount there at all.
-function ActiveDroppable({ dropId, dropData, style, children, ...divProps }) {
+function ActiveDroppable({ dropId, dropData, style, children, disabled, ...divProps }) {
   const { setNodeRef, isOver } = useDroppable({ id: dropId, data: dropData });
+  // Native disabled buttons swallow mouse-up, preventing drops into empty pockets.
   return (
-    <div
+    <button type="button"
       ref={setNodeRef}
-      style={isOver ? { ...style, outline: '3px solid var(--accent-green)', outlineOffset: '2px' } : style}
+      style={{ padding: 0, color: 'inherit', ...style, ...(isOver ? { outline: '3px solid var(--accent-green)', outlineOffset: '2px' } : {}) }}
       {...divProps}
+      aria-disabled={disabled || undefined}
+      tabIndex={disabled ? -1 : 0}
     >
       {children}
-    </div>
+    </button>
   );
 }
 
@@ -164,9 +167,10 @@ function ActiveDragDropPocket({ dropId, dropData, dragId, dragCard, style, child
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: dropId, data: dropData });
   const { setNodeRef: setDragRef, attributes, listeners, isDragging } = useDraggable({ id: dragId, data: { card: dragCard } });
   return (
-    <div
+    <button type="button"
       ref={(node) => { setDropRef(node); setDragRef(node); }}
       style={{
+        padding: 0, color: 'inherit',
         ...style,
         cursor: 'grab',
         ...(isDragging ? { opacity: 0.4 } : {}),
@@ -177,12 +181,12 @@ function ActiveDragDropPocket({ dropId, dropData, dragId, dragCard, style, child
       {...divProps}
     >
       {children}
-    </div>
+    </button>
   );
 }
 
 function DroppablePocket({ enabled, dropId, dropData, dragId, dragCard, children, ...divProps }) {
-  if (!enabled) return <div {...divProps}>{children}</div>;
+  if (!enabled) return <button type="button" {...divProps} style={{ padding: 0, color: 'inherit', ...divProps.style }}>{children}</button>;
   if (dragId) {
     return (
       <ActiveDragDropPocket dropId={dropId} dropData={dropData} dragId={dragId} dragCard={dragCard} {...divProps}>
@@ -447,10 +451,8 @@ export default function CompartmentView({
     isDraggingRef.current = true;
     draggedRef.current = false;
     dragStartXRef.current = e.clientX;
-    // Focus the coverflow so its arrow-key handler works. Nothing else focuses
-    // this tabIndex=0 div on desktop, so keys were dead until now. preventScroll
-    // stops the page from jumping to it.
-    e.currentTarget.focus({ preventScroll: true });
+    // Preserve native button focus; focus the browse region only on its background.
+    if (!e.target.closest('button')) e.currentTarget.focus({ preventScroll: true });
   };
 
   const handleCoverflowMouseUp = (e, totalCards) => {
@@ -462,13 +464,13 @@ export default function CompartmentView({
   };
 
   const handleCoverflowKeyDown = (e, totalCards) => {
-    if (['ArrowRight', 'ArrowDown'].includes(e.key)) {
-      e.preventDefault();
-      setCoverflowActiveIndex(prev => Math.min(totalCards - 1, prev + 1));
-    } else if (['ArrowLeft', 'ArrowUp'].includes(e.key)) {
-      e.preventDefault();
-      setCoverflowActiveIndex(prev => Math.max(0, prev - 1));
-    }
+    const direction = ['ArrowRight', 'ArrowDown'].includes(e.key) ? 1 : ['ArrowLeft', 'ArrowUp'].includes(e.key) ? -1 : 0;
+    if (!direction) return;
+    e.preventDefault();
+    const next = Math.max(0, Math.min(totalCards - 1, coverflowActiveIndex + direction));
+    setCoverflowActiveIndex(next);
+    // Arrow navigation keeps the active card as the only card in the tab order.
+    e.currentTarget.querySelectorAll('.box-coverflow-card')[next]?.focus({ preventScroll: true });
   };
 
   // --- Binder Grid State ---
@@ -655,6 +657,9 @@ export default function CompartmentView({
                   key={card.entry_id || `slot-${i}`}
                   id={card.entry_id ? `card-${card.entry_id}` : undefined}
                   className={`binder-pocket ${categoryStart ? 'set-start' : ''} ${card.entry_id === focusEntryId ? 'focus-flash' : ''}`}
+                  aria-label={t('compartment.cardSlot', { name: displayName(card), slot: pos })}
+                  aria-pressed={pullMode ? pulledSet.has(card.entry_id) : selectMode ? isSelected(card.entry_id) : placementMode ? pickedEntryId === card.entry_id : undefined}
+                  disabled={isGrey(card.entry_id) && !placementMode && !selectMode}
                   style={{
                     ...getCardRarityBorder(card.rarity),
                     ...(isTarget ? {
@@ -683,7 +688,7 @@ export default function CompartmentView({
                     else setCurrentActiveId(card.entry_id);
                   }}
                 >
-                  <CardImage card={card} alt={displayName(card)} title={displayName(card)} loading="lazy" decoding="async" />
+                  <CardImage card={card} alt={displayName(card)} title={displayName(card)} loading="lazy" decoding="async" draggable={dropEnabled ? false : undefined} />
                   {getFoilOverlayClass(card.printing) && <div className={getFoilOverlayClass(card.printing)} style={{ borderRadius: '4px' }} />}
                   <PrintingBadge printing={card.printing} />
                   {allowStacking && card.quantity > 1 && (
@@ -720,6 +725,8 @@ export default function CompartmentView({
                   dropData={{ compartmentId: compartment.id, slot: pos, occupantEntryId: null }}
                   key={`empty-${i}`}
                   className="binder-pocket empty"
+                  aria-label={t('compartment.placeSlot', { slot: pos })}
+                  disabled={!placementMode || !pickedEntryId}
                   onClick={placementMode && pickedEntryId ? () => onPlaceSlot(compartment.id, pos, null) : undefined}
                   style={{
                     ...(isTarget ? { borderColor: 'var(--accent-green)', background: 'rgba(34,197,94,0.1)' } : {}),
@@ -918,10 +925,11 @@ export default function CompartmentView({
 
                 if (card.__empty) {
                   return (
-                    <div
+                    <button type="button" tabIndex={offset === 0 ? 0 : -1}
+                      aria-label={t('compartment.placeSlot', { slot: card.__slotNumber })}
                       key={card.entry_id}
                       className={`box-coverflow-card ${offset === 0 ? 'active' : ''}`}
-                      style={{ transform, zIndex, opacity: opacity * 0.6, filter, ...highlightStyle, ...(placementMode && pickedEntryId ? { border: '2px solid var(--accent-red)' } : {}) }}
+                      style={{ padding: 0, border: 0, background: 'transparent', transform, zIndex, opacity: opacity * 0.6, filter, ...highlightStyle, ...(placementMode && pickedEntryId ? { border: '2px solid var(--accent-red)' } : {}) }}
                       onClick={() => {
                         if (placementMode && pickedEntryId) { onPlaceSlot(compartment.id, card.__slotNumber, null); return; }
                         setCoverflowActiveIndex(i);
@@ -933,13 +941,13 @@ export default function CompartmentView({
                           <div style={{ color: 'var(--accent-green)', fontWeight: 'bold', fontSize: '1rem', marginTop: '0.5rem' }}>{t('compartment.pull')}</div>
                         )}
                       </div>
-                    </div>
+                    </button>
                   );
                 }
 
                 if (card.__divider) {
                   return (
-                    <div
+                    <button type="button" tabIndex={offset === 0 ? 0 : -1}
                       key={card.entry_id}
                       className={`box-coverflow-card ${offset === 0 ? 'active' : ''}`}
                       style={{ transform, zIndex, opacity, filter: 'none', background: card.color || 'var(--accent-red)', border: `1px solid ${card.color || 'var(--accent-red)'}`, display: 'flex', flexDirection: 'column', overflow: 'visible' }}
@@ -951,30 +959,34 @@ export default function CompartmentView({
                       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-strong)' }}>
                         <div style={{ fontSize: '1.2rem', fontWeight: 'bold', textAlign: 'center', padding: '0 1rem' }}>{card.label}</div>
                       </div>
-                    </div>
+                    </button>
                   );
                 }
 
                 if (card.__ghost) {
                   return (
-                    <div
+                    <button type="button" tabIndex={offset === 0 ? 0 : -1}
+                      aria-label={t('compartment.recommendedSpot')}
                       key="ghost"
                       id="recommended-spot"
                       className={`box-coverflow-card recommended-ghost ${offset === 0 ? 'active' : ''}`}
-                      style={{ transform, zIndex, opacity: opacity * 0.85, filter }}
+                      style={{ padding: 0, border: 0, background: 'transparent', transform, zIndex, opacity: opacity * 0.85, filter }}
                       onClick={() => setCoverflowActiveIndex(i)}
                     >
                       {absOffset <= IMG_WINDOW && <CardImage card={card} decoding="async" />}
                       <div className="rec-ghost-label">Slot {pos}</div>
-                    </div>
+                    </button>
                   );
                 }
 
                 return (
-                  <div
+                  <button type="button" tabIndex={offset === 0 ? 0 : -1}
+                    aria-label={t('compartment.cardSlot', { name: displayName(card), slot: pos })}
+                    aria-pressed={pullMode ? pulledSet.has(card.entry_id) : selectMode ? isSelected(card.entry_id) : placementMode ? pickedEntryId === card.entry_id : undefined}
+                    aria-disabled={pullMode && isGrey(card.entry_id) && offset === 0 && !placementMode && !selectMode ? true : undefined}
                     key={card.entry_id}
                     className={`box-coverflow-card ${offset === 0 ? 'active' : ''}`}
-                    style={{ transform, zIndex, opacity, filter, ...highlightStyle, ...getCardRarityBorder(card.rarity), ...(isSelected(card.entry_id) ? selectedOutline : {}), ...(placementMode && pickedEntryId === card.entry_id ? selectedOutline : {}), ...(isGrey(card.entry_id) ? { opacity: opacity * 0.3, filter: 'grayscale(1) brightness(0.5)' } : {}) }}
+                    style={{ padding: 0, border: 0, background: 'transparent', transform, zIndex, opacity, filter, ...highlightStyle, ...getCardRarityBorder(card.rarity), ...(isSelected(card.entry_id) ? selectedOutline : {}), ...(placementMode && pickedEntryId === card.entry_id ? selectedOutline : {}), ...(isGrey(card.entry_id) ? { opacity: opacity * 0.3, filter: 'grayscale(1) brightness(0.5)' } : {}) }}
                     {...pressHandlers(card.entry_id)}
                     onClick={() => {
                       if (draggedRef.current) { draggedRef.current = false; return; }
@@ -1012,7 +1024,7 @@ export default function CompartmentView({
                     {isTarget && (
                       <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'var(--accent-green)', color: '#000', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.5rem', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>✓</div>
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>

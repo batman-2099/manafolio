@@ -1,0 +1,167 @@
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import CreateContainerModal from '../components/CreateContainerModal';
+import SetupWizard from '../components/SetupWizard';
+import en from '../locales/en.json';
+
+// Run on an isolated Vite page; every request is mocked, never a real database.
+// await (await import('/src/utils/uiContainer.browser.test.jsx')).runUiContainerRegressions()
+export async function runUiContainerRegressions() {
+  const assert = (condition, message) => { if (!condition) throw new Error(message); };
+  const originalFetch = window.fetch;
+  const originalAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  const originalState = history.state;
+  const originalUrl = location.href;
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const cases = [];
+  const requests = [];
+  let settle;
+  let closes = 0;
+  let locations = [1, 2].map(id => ({ id, name: `Binder ${id}`, type: 'Binder', compartment_count: 1, total_cards: 0, total_capacity: 9 }));
+  const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
+  window.fetch = async (url, options = {}) => {
+    if (options.method && options.method !== 'GET') {
+      requests.push({ url, method: options.method, body: JSON.parse(options.body || '{}') });
+      return new Promise(resolve => { settle = (status = 200) => {
+        if (status < 400 && options.method === 'PUT' && String(url).startsWith('/api/locations/')) {
+          locations = locations.map(row => row.id === Number(String(url).split('/').at(-1)) ? { ...row, ...JSON.parse(options.body) } : row);
+        }
+        resolve(response({ error: 'Fixture failure' }, status));
+      }; });
+    }
+    if (url === '/api/admin/models') return response({ models: [], catalogs: [] });
+    if (url === '/api/admin/catalogs') return response({ catalogs: [] });
+    if (url === '/api/locations') return response(locations);
+    throw new Error(`Unexpected fixture request: ${url}`);
+  };
+  const button = key => [...host.querySelectorAll('button')].find(node => node.textContent.trim() === en[key]);
+  const click = async key => { const node = button(key); assert(node, `Missing ${key}`); await act(async () => node.click()); };
+  const change = async (selector, value) => {
+    const node = host.querySelector(selector);
+    assert(node && !node.matches(':disabled'), `Editable field expected: ${selector}`);
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(node, value);
+      node.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
+  const clear = async () => {
+    await act(async () => root.render(null));
+    // Let useBackGuard's programmatic pop finish before mounting another overlay.
+    await new Promise(resolve => setTimeout(resolve, 40));
+  };
+  const cancelDialog = () => host.querySelector('dialog').dispatchEvent(new Event('cancel', { cancelable: true }));
+  const back = async () => {
+    await act(async () => {
+      await new Promise(resolve => {
+        window.addEventListener('popstate', resolve, { once: true });
+        history.back();
+      });
+    });
+  };
+  try {
+    await act(async () => root.render(<CreateContainerModal onClose={() => { closes++; }} onCreate={async payload => {
+      const result = await fetch('/api/locations', { method: 'POST', body: JSON.stringify(payload) });
+      if (!result.ok) throw new Error('Fixture failure');
+    }} />));
+    await click('common.next');
+    assert(document.activeElement.id === 'create-container-title', 'layout heading receives focus');
+    assert(host.querySelector('[aria-current="step"]')?.textContent.includes(en['container.step.layout']), 'layout is announced as current');
+    await change('#create-container-name', 'Draft binder');
+    for (const selector of ['#create-container-count', '#create-container-capacity']) {
+      for (const value of ['', '0', '-1', '1.5']) {
+        await change(selector, value);
+        await click('common.next');
+        assert(host.querySelector('#container-layout-form'), `${selector}=${value} must stay on layout`);
+        // requestSubmit exercises the native submission path used by Enter;
+        // synthetic keyboard events alone cannot invoke browser default actions.
+        await act(async () => host.querySelector('#container-layout-form').requestSubmit());
+        assert(host.querySelector('#container-layout-form') && requests.length === 0, 'native submit must reject invalid counts without coercion');
+      }
+      await change(selector, '3');
+    }
+    await change('#create-container-name', '   ');
+    await act(async () => host.querySelector('#container-layout-form').requestSubmit());
+    assert(host.querySelector('#container-layout-form'), 'whitespace-only name is invalid');
+    await change('#create-container-name', 'Draft binder');
+    await act(async () => host.querySelector('#container-layout-form').requestSubmit());
+    assert(!host.querySelector('#container-layout-form') && document.activeElement.id === 'create-container-title', 'valid native submit advances and focuses heading');
+    await click('common.next');
+    const filing = host.querySelector('#container-filing-form');
+    await act(async () => {
+      filing.requestSubmit();
+      filing.requestSubmit();
+      cancelDialog();
+      button('common.back').click();
+      host.querySelector('button[aria-label="Close"]').click();
+    });
+    assert(requests.length === 1 && closes === 0, 'same-tick submission locks duplicate, Escape, close and Back');
+    assert([...filing.querySelectorAll('input, select, button')].every(node => node.matches(':disabled')), 'filing inputs are frozen');
+    await back();
+    await back();
+    assert(closes === 0 && host.querySelector('#container-filing-form'), 'repeated browser Back stays blocked while creating');
+    await act(async () => settle(500));
+    assert(host.querySelector('[role="alert"]') && !button('common.back').disabled, 'create failure is announced and releases navigation');
+    await click('common.back');
+    await click('common.back');
+    assert(host.querySelector('#create-container-name').value === 'Draft binder' && host.querySelector('#create-container-count').value === '3', 'failed create retains draft');
+    await click('common.next');
+    await click('common.next');
+    await click('container.create');
+    assert(requests.length === 2 && requests[1].body.compartmentPlan.count === 3, 'retry sends exact positive integer without coercion');
+    await act(async () => settle());
+    cases.push('layout native validation/Enter submit, step focus and current announcement', 'create same-tick/pending close/Escape/Back lock, failure draft and retry');
+    await clear();
+
+    requests.length = 0;
+    await act(async () => root.render(<SetupWizard onClose={() => { closes++; }} />));
+    await click('common.next');
+    await click('common.next');
+    assert(document.activeElement.id === 'setup-step-title', 'setup storage heading receives focus');
+    await change('#setup-location-name', 'New binder');
+    await act(async () => { button('setup.storage.add').click(); button('setup.storage.add').click(); });
+    assert(requests.length === 1 && host.querySelector('#setup-location-name').matches(':disabled'), 'setup add owns draft and rejects same-tick duplicate');
+    assert(button('common.next').disabled && host.querySelector('[role="status"]'), 'pending setup exposes status and disables navigation');
+    await act(async () => settle(500));
+    assert(host.querySelector('#setup-location-name').value === 'New binder' && host.querySelector('[role="alert"]'), 'setup add failure retains draft');
+    await click('setup.storage.add');
+    await act(async () => settle());
+    assert(host.querySelector('#setup-location-name').value === '', 'successful add clears its submitted draft');
+    await act(async () => host.querySelector('button[aria-label="Rename Binder 1"]').click());
+    await change('input[aria-label="Rename Binder 1"]', 'Renamed binder');
+    await act(async () => {
+      button('common.save').click();
+      host.querySelector('button[aria-label="Rename Binder 2"]').click();
+      button('common.save').click();
+      button('common.cancel').click();
+    });
+    assert(requests.length === 3 && requests.at(-1).url === '/api/locations/1', 'rename is single-flight and cannot switch ownership');
+    assert(host.querySelector('input[aria-label="Rename Binder 1"]').matches(':disabled'), 'pending rename keeps correct editor frozen');
+    await act(async () => settle(500));
+    assert(host.querySelector('input[aria-label="Rename Binder 1"]').value === 'Renamed binder', 'rename failure retains correct draft');
+    await click('common.save');
+    await act(async () => settle());
+    assert(host.querySelector('button[aria-label="Rename Renamed binder"]'), 'rename retry updates the intended row');
+    cases.push('setup add/rename duplicate lock, disabled controls, correct editor and failure recovery');
+
+    const closesBeforeFinish = closes;
+    await act(async () => { button('setup.skip').click(); button('setup.skip').click(); cancelDialog(); });
+    await back();
+    assert(closes === closesBeforeFinish && requests.filter(r => r.url === '/api/settings').length === 1, 'setup completion is single-flight and blocks dismissal');
+    await clear();
+    await act(async () => root.render(<SetupWizard onClose={() => { closes++; }} />));
+    await act(async () => settle());
+    assert(closes === closesBeforeFinish && host.querySelector('dialog[open]'), 'old completion cannot close a new wizard instance');
+    cases.push('setup pending completion close/history lock and stale-instance isolation');
+    return { passed: cases.length, cases };
+  } finally {
+    await act(async () => root.unmount());
+    await new Promise(resolve => setTimeout(resolve, 40));
+    host.remove();
+    history.replaceState(originalState, '', originalUrl);
+    window.fetch = originalFetch;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = originalAct;
+  }
+}

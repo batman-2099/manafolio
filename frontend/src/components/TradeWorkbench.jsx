@@ -35,6 +35,15 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
   const tradeId = useRef(null);
   if (tradeId.current === null) tradeId.current = newTradeId();
   const heading = useRef(null);
+  const givingHeading = useRef(null);
+  const givingResults = useRef(null);
+  const focusAfterGiving = useRef(null);
+  useEffect(() => {
+    if (focusAfterGiving.current === null) return;
+    const buttons = givingResults.current?.querySelectorAll('button:not(:disabled)');
+    (buttons?.[focusAfterGiving.current] || buttons?.[0] || givingHeading.current)?.focus();
+    focusAfterGiving.current = null;
+  }, [giving]);
   const requestController = useRef(null);
   const load = useCallback(async (signal) => {
     setLoading(true);
@@ -47,13 +56,13 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
     load(controller.signal);
     return () => { controller.abort(); requestController.current?.abort(); };
   }, [load]);
+  const canLeave = useCallback(() => !(giving.length || receiving.length) || (!busy && !uncertain && window.confirm(t('trade.leave'))), [giving.length, receiving.length, busy, uncertain, t]);
   useEffect(() => {
-    const guard = () => !(giving.length || receiving.length) || (!busy && !uncertain && window.confirm(t('trade.leave')));
-    navigationGuardRef.current = guard;
+    navigationGuardRef.current = canLeave;
     const beforeUnload = event => { if (giving.length || receiving.length) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload);
     return () => { navigationGuardRef.current = null; window.removeEventListener('beforeunload', beforeUnload); };
-  }, [giving.length, receiving.length, busy, uncertain, navigationGuardRef, t]);
+  }, [giving.length, receiving.length, navigationGuardRef, canLeave]);
   const run = async fn => {
     setBusy(true); setError('');
     requestController.current = new AbortController();
@@ -139,12 +148,12 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
     </> : <>
       <fieldset disabled={busy} className="trade-editor">
         <div className="trade-columns">
-          <section><h3>{t('trade.giving')}</h3><p>{t('trade.eligible')}</p>
+          <section><h3 ref={givingHeading} tabIndex={-1}>{t('trade.giving')}</h3><p>{t('trade.eligible')}</p>
             <label>{t('trade.filter')}<input className="input-control" value={filter} onChange={event => { setFilter(event.target.value); setPage(1); }} /></label>
             <button className="btn btn-secondary" disabled={loading} onClick={() => { setError(''); load(); }}>{t('trade.refresh')}</button>
             {giving.length >= MAX_ROWS && <p id="trade-giving-limit" role="status">{t('trade.rowLimit', { max: MAX_ROWS })}</p>}
             {loading ? <p role="status">{t('common.loading')}</p> : <>
-              <ul className="scan-review-list trade-results">{pageEntries.map(card => <li className="scan-review-card" key={card.entry_id}><CardImage card={card} loading="lazy" /><strong>{identity(card)}</strong><p>{card.quantity} × {card.printing} · {card.condition} · {card.location_name || t('trade.unassigned')} · #{card.entry_id}</p><button className="btn btn-secondary" disabled={giving.length >= MAX_ROWS} aria-describedby={giving.length >= MAX_ROWS ? 'trade-giving-limit' : undefined} onClick={() => { if (giving.length >= MAX_ROWS) return; setSuccess(null); setGiving([...giving, { ...card, available: card.quantity, quantity: 1 }]); }}>{t('trade.add')}</button></li>)}</ul>
+              <ul ref={givingResults} className="scan-review-list trade-results">{pageEntries.map((card, index) => <li className="scan-review-card" key={card.entry_id}><CardImage card={card} loading="lazy" /><strong>{identity(card)}</strong><p>{card.quantity} × {card.printing} · {card.condition} · {card.location_name || t('trade.unassigned')} · #{card.entry_id}</p><button className="btn btn-secondary" disabled={giving.length >= MAX_ROWS} aria-describedby={giving.length >= MAX_ROWS ? 'trade-giving-limit' : undefined} onClick={event => { if (giving.length >= MAX_ROWS) return; if (event.detail === 0) focusAfterGiving.current = index; setSuccess(null); setGiving([...giving, { ...card, available: card.quantity, quantity: 1 }]); }}>{t('trade.add')}</button></li>)}</ul>
               {pageCount > 1 && <nav className="trade-pagination" aria-label={t('trade.pagination')}>
                 <button className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>{t('collection.previousPage')}</button>
                 <span role="status">{t('collection.pageCount', { page: currentPage, count: pageCount })}<br />{t('collection.pageRange', { start: (currentPage - 1) * PAGE_SIZE + 1, end: Math.min(currentPage * PAGE_SIZE, matching.length), count: matching.length })}</span>
@@ -166,6 +175,7 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
         <section className="trade-selection" aria-labelledby="trade-selection-title">
           <h3 id="trade-selection-title">{t('trade.selectedTitle')}</h3>
           <p>{t('trade.selectedHint')}</p>
+          <p role="status">{t('trade.selectionCount', { giving: giving.length, receiving: receiving.length })}</p>
           <div className="trade-columns">
             <section aria-labelledby="trade-selected-giving">
               <h4 id="trade-selected-giving">{t('trade.giving')}</h4>
@@ -182,7 +192,7 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
         event.preventDefault();
         if (busy || loading || staleIds.size || !giving.length || !receiving.length || giving.length > MAX_ROWS || receiving.length > MAX_ROWS) return;
         run(async signal => { setReview(await api('trades/review', draft(), signal)); heading.current?.focus(); });
-      }}><button type="button" className="btn btn-secondary" disabled={busy} onClick={reset}>{t('common.cancel')}</button><button type="submit" className="btn btn-primary" disabled={busy || loading || staleIds.size > 0 || !giving.length || !receiving.length}>{busy ? t('common.loading') : t('trade.review')}</button></form>
+      }}><button type="button" className="btn btn-secondary" disabled={busy} onClick={() => { if (canLeave()) reset(); }}>{t('common.cancel')}</button><button type="submit" className="btn btn-primary" disabled={busy || loading || staleIds.size > 0 || !giving.length || !receiving.length}>{busy ? t('common.loading') : t('trade.review')}</button></form>
     </>}
   </section>;
 }
