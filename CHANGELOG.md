@@ -27,6 +27,7 @@ Release history starts with Manafolio 2.0.
 - Allowed reserved copies to be verified or marked missing in Take Stock without checking in their deck, preserving reservations and return locations.
 - Added an In Deck label to reserved-copy tiles in Take Stock without disabling Verified or Missing.
 - Display Last verified as a locale-formatted date without the time in Take Stock and container views; stored timestamps remain unchanged.
+- Outlined missing Take Stock card tiles in red, clearing the outline when verified and retaining it when reopening saved missing copies.
 
 ## 2.3.3 — 2026-10-12
 
