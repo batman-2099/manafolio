@@ -14,7 +14,7 @@ Release history starts with Manafolio 2.0.
 - Moved Unassigned Pile beside the Storage Units navigation and moved Import ManaBox container into the first step of New Storage Container.
 - Container card views now sort sets A–Z, then card names A–Z within each set when Set is selected. Saved filing rules and Collection sorting remain unchanged.
 - Fixed Re-sort Container ignoring the selected card-view order. Confirmed re-sorts now save and apply that order atomically, including alphabetical sets and card names; Storage order retains saved rules, and settings-triggered re-sorts apply the settings rules.
-- Moved the Re-sort: Move Guide above container cards on desktop and mobile, retaining its progress and Next, Skip, and Done actions.
+- Removed the Re-sort: Move Guide walkthrough. Confirmed re-sorts still save card positions immediately; normal Sort & Move guided filing is unchanged.
 - Increased New Storage Container text to 16px across all four steps, including sorting and filing controls, with a larger dialog title.
 - Alphabetized the storage More menu by displayed labels, including conditional Lock/Unlock and Archive/Restore actions.
 - Widened Container Settings to 640px on larger screens while preserving mobile width constraints and scrolling.

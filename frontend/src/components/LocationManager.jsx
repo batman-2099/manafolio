@@ -413,16 +413,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [filingMode, setFilingMode] = useState(false);
   const [filingQueue, setFilingQueue] = useState([]);
   const [filingIndex, setFilingIndex] = useState(0);
-  // Re-sort review reuses the filing UI, but the cards are already placed in the
-  // DB by /resort — so "Placed" just advances instead of issuing a move.
-  const [filingReadOnly, setFilingReadOnly] = useState(false);
   // Collapse the mobile filing bar to a slim strip so it stops covering the binder.
   const [filingBarCollapsed, setFilingBarCollapsed] = useState(false);
 
-  // Back gesture exits filing mode. Declared HERE, after filingMode/filingReadOnly:
-  // useBackGuard reads filingMode during render, so placing it above the useState
-  // above would hit the temporal dead zone (crashes the whole view on mount).
-  useBackGuard(filingMode, () => { setFilingMode(false); setFilingReadOnly(false); refreshAll(); });
+  useBackGuard(filingMode, () => { setFilingMode(false); refreshAll(); });
 
   // Manual tap-to-place ("Arrange"), custom-order containers only. Pick a card
   // (unsorted or in-container), then tap a slot to place/swap it.
@@ -445,9 +439,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   useEffect(() => {
     if (filingMode && filingQueue[filingIndex]?.recommended) {
       const rec = filingQueue[filingIndex].recommended;
-      // Filing is scoped to the open container, so rec.location_id normally
-      // matches it. Guard anyway (re-sort review reuses this path) — switch,
-      // then compartments reload and this effect reruns to snap to the slot.
+      // Switch containers before snapping to the recommended slot.
       if (rec.location_id && rec.location_id !== activeLocationId) {
         setActiveLocationId(rec.location_id);
         return;
@@ -515,7 +507,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     setActiveCompartmentId(null);
     setActivePageIndex(0);
     setBinderActiveEntryId(null);
-    if (!filingReadOnly) setFilingQueue([]);
+    setFilingQueue([]);
     storage.exitSelectMode();
     setMoveMode(false);
     setPickedEntryId(null);
@@ -1300,9 +1292,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     if (filingIndex < filingQueue.length - 1) {
       setFilingIndex(filingIndex + 1);
     } else {
-      showToast(t(filingReadOnly ? 'loc.resortComplete' : 'loc.filingComplete'), 'success');
+      showToast(t('loc.filingComplete'), 'success');
       setFilingMode(false);
-      setFilingReadOnly(false);
       onUpdate();
     }
   };
@@ -1336,8 +1327,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   };
 
   const handleFilingPlaced = async (entryId, locationId, compartmentId, position) => {
-    // Re-sort review: the DB already reflects this placement, just advance.
-    if (filingReadOnly) { advanceFiling(); return; }
     try {
       const res = await fetch(`/api/collection/${entryId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -1365,11 +1354,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         const data = await res.json();
         await refreshAll();
         if (!Array.isArray(data) || data.length === 0) { showToast(t('loc.nothingToResort'), 'status'); return; }
-        setFilingQueue(data);
-        setFilingIndex(0);
-        setFilingReadOnly(true);
-        setFilingMode(true);
-        setActiveLocationId(selectedLoc.id);
+        onUpdate();
         showToast(t('loc.resorted'), 'success');
       } else {
         showToast(t('loc.errResort'), 'error');
@@ -1575,16 +1560,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const filingGuide = filingMode && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', height: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong style={{ fontSize: 'max(0.85rem, var(--unsorted-text-min, 0rem))' }}>{t(filingReadOnly ? 'loc.refileGuide' : 'loc.filingMode')}</strong>
-              <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => { setFilingMode(false); setFilingReadOnly(false); refreshAll(); }} style={{ padding: '0.2rem 0.5rem', width: 'auto', fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))' }}>
-                {t(filingReadOnly ? 'bulk.done' : 'common.cancel')}
+              <strong style={{ fontSize: 'max(0.85rem, var(--unsorted-text-min, 0rem))' }}>{t('loc.filingMode')}</strong>
+              <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => { setFilingMode(false); refreshAll(); }} style={{ padding: '0.2rem 0.5rem', width: 'auto', fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))' }}>
+                {t('common.cancel')}
               </button>
             </div>
-            {filingReadOnly && (
-              <div style={{ textAlign: 'center', fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)' }}>
-                {t('loc.resortGuideHint')}
-              </div>
-            )}
             
             <div style={{ textAlign: 'center', fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-muted)' }}>
               {t('loc.filingCardProgress', { current: filingIndex + 1, total: filingQueue.length })}
@@ -1652,7 +1632,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     }}
                     style={{ flex: 2, padding: '0.6rem', fontSize: 'max(0.9rem, var(--unsorted-text-min, 0rem))', fontWeight: 'bold' }}
                   >
-                    {filingReadOnly ? t('loc.next') : t('loc.placed')}
+                    {t('loc.placed')}
                   </button>
                 </div>
               </div>
@@ -2361,7 +2341,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           <p style={{ color: 'var(--text-secondary)' }}>{t('loc.selectPrompt')}</p>
         ) : (
           <>
-            {filingMode && filingReadOnly && <section className="view-section">{filingGuide}</section>}
             {!!selectedLoc.locked && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'rgba(255,193,7,0.12)', border: '1px solid var(--accent-yellow)', padding: '0.55rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
                 <Lock size={16} color="var(--accent-yellow)" style={{ flexShrink: 0 }} />
@@ -2728,9 +2707,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       </div>
 
       {/* Unsorted queue */}
-      <div className="view-section location-unsorted-col" style={{ minWidth: 0, display: filingReadOnly || (isStacked && filingMode) ? 'none' : 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div className="view-section location-unsorted-col" style={{ minWidth: 0, display: isStacked && filingMode ? 'none' : 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         {filingMode ? (
-          !filingReadOnly && filingGuide
+          filingGuide
         ) : (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3072,12 +3051,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           shows what to file, where, and which physical card it goes behind, and
           carries Locate / Placed / Skip. Replaces the full desktop guide so the
           container and the guide share one screen. */}
-      {isStacked && filingMode && !filingReadOnly && filingQueue[filingIndex] && (
+      {isStacked && filingMode && filingQueue[filingIndex] && (
         <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))', zIndex: 90, padding: '0 0.6rem' }}>
           <div className="glass-panel" style={{ padding: '0.7rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'var(--bg-secondary)', boxShadow: '0 -6px 20px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                {t(filingReadOnly ? 'loc.refile' : 'loc.filing')} {filingIndex + 1} / {filingQueue.length}
+                {t('loc.filing')} {filingIndex + 1} / {filingQueue.length}
               </span>
               {filingBarCollapsed && (
                 <span style={{ flex: 1, minWidth: 0, fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -3088,7 +3067,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => setFilingBarCollapsed(c => !c)} title={t(filingBarCollapsed ? 'loc.expand' : 'loc.collapse')} style={{ width: '26px', height: '26px', padding: 0 }}>
                   {filingBarCollapsed ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                 </button>
-                <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => { setFilingMode(false); setFilingReadOnly(false); refreshAll(); }} title={t('loc.exitFiling')} style={{ width: '26px', height: '26px', padding: 0 }}>
+                <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => { setFilingMode(false); refreshAll(); }} title={t('loc.exitFiling')} style={{ width: '26px', height: '26px', padding: 0 }}>
                   <X size={13} />
                 </button>
               </div>
@@ -3144,7 +3123,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     onClick={() => handleFilingPlaced(filingQueue[filingIndex].entry.entry_id, currentRecSpot.location_id, currentRecSpot.compartment_id, currentRecSpot.position)}
                     style={{ flex: 2, padding: '0.55rem', fontSize: '0.85rem', fontWeight: 700 }}
                   >
-                    {filingReadOnly ? 'Next' : 'Placed'}
+                    {t('loc.placed')}
                   </button>
                 </div>
               </>

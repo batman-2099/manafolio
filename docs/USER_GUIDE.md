@@ -561,7 +561,7 @@ To add selected quantities to an existing deck without moving the cards, select 
 3. Tap a card, then the destination. In a binder, tap an empty pocket to place it or an occupied pocket to swap. Row layouts prompt you to drop before another card or into an empty slot.
 4. Repeat, moving the physical cards to match, then choose **Done Arranging**.
 
-Automatic sorting can renumber positions and shift later cards, especially in a binder. Use Custom order for a fixed pocket layout. If you choose to re-sort after changing structured sorting, the **Re-sort: Move Guide** reflects positions already saved in the app: move each physical card to the displayed spot and choose **Next →**. Exiting that guide is not an undo of the re-sort.
+Automatic sorting can renumber positions and shift later cards, especially in a binder. Use Custom order for a fixed pocket layout. Confirming a re-sort immediately saves the new card positions and refreshes the container, without a card-by-card walkthrough. Rearrange the physical cards to match the saved positions. Normal **Sort & Move (into open container)** guided filing from Unsorted is unchanged.
 
 To apply the container card view's selected order physically, choose the order (for example, **Set** for sets A–Z, then card names A–Z) and use **More → Re-sort Container**. Confirming saves that order as the container's sorting rule and applies it to future filing too. Select **Storage order** before re-sorting to retain the existing saved rules. Changing sorting rules in Container Settings and accepting its re-sort prompt applies those settings instead of the view selection.
 
@@ -630,7 +630,7 @@ Choose **More → Create Deck** in a Graveyard container to create an archived d
 | --- | --- |
 | A card will not move | Confirm the inventory, container/row locks, and moving rules. Capacity alone does not block moving. |
 | Automatic moving leaves cards behind | They may not match the open container's rules or any unlocked page/row. Review the remaining Unsorted cards rather than assuming they were lost. |
-| The physical binder no longer matches the app | Sorting or moving may have shifted positions. Follow the move guide, or switch to Custom and arrange a fixed layout deliberately. |
+| The physical binder no longer matches the app | Sorting or moving may have shifted positions. Rearrange the physical cards to match their saved positions, or switch to Custom and arrange a fixed layout deliberately. |
 | A row/page cannot be removed | It must be the last removable empty compartment. The container also must be unlocked. |
 | A move/archive/restore is blocked | Check locks and inventory boundaries. Individual card archiving also requires returning reserved copies; whole-container transfers retain their reservations. |
 | ManaBox container import moved fewer copies than requested | It only moves existing eligible physical copies. Expand the full summary for unresolved printings, other locations, and remaining quantities. |
