@@ -103,7 +103,7 @@ Choose inventory filters, format, play style, and target power level. Live AI re
 | [Architecture and development](PROJECT.md) | Components, data model, security boundaries, and verification commands |
 | [Privacy](PRIVACY.md) | Stored data, external services, credentials, and operator responsibilities |
 
-The user guide is also available under **How-to** in the app (**More → How-to** on a phone), with full-guide search and chapter navigation. Guide text is currently English.
+The user guide is also available under **How-to** in the app (**More → How-to** on a phone), with full-guide search and chapter navigation. Guide text is currently English. Returning after an update? Start with [recent workflow changes](docs/USER_GUIDE.md#catch-up-with-recent-changes).
 
 ## Help and contributing
 

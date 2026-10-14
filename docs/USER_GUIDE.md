@@ -36,6 +36,21 @@ The guide text is currently English. Tables scroll horizontally on narrow screen
 
 Keyboard users can use **Skip to content** to bypass navigation. Changing the main view moves focus to its content; closing a dialog returns focus to its opener. Forms keep errors beside the affected task and retain entries after failed requests. If account setup, storage choices, or other data cannot load, use **Retry** rather than treating the failure as an empty collection or missing configuration.
 
+### Catch up with recent changes
+
+For changes introduced in **2.3.3–2.3.4**, start with these procedures:
+
+- [Add cards to a default container](#add-a-card-by-searching) and [correct Rapid add receipts with Foil or Undo](#rapid-add-work-through-one-set-by-collector-number).
+- [Browse missing set printings and add them to Wishlist](#track-set-completion).
+- [Choose a stored entry before editing a duplicate stack](#display-stacks-are-not-physical-pockets).
+- [Verify individual copies with Take Stock](#check-a-container-with-take-stock) and [apply a container's selected sort order](#arrange-fixed-positions-manually).
+- [Find Unassigned Pile](#move-cards-from-unassigned-pile) and [import an existing ManaBox container list](#import-a-manabox-container-layout-from-a-text-list).
+- [Include or exclude sets in AI Deck Builder](#ask-questions-and-create-a-suggested-deck).
+- [Use the mobile deck editor](#add-cards-change-quantities-and-save) and [correct checkout checklist selections](#check-out-a-physical-deck-for-play).
+- [Understand which sessions a password change signs out](#change-your-local-password).
+
+The chapters below describe the current workflows. For the complete release-by-release list, see the [changelog](../CHANGELOG.md).
+
 ### Your first session
 
 1. Open the address supplied by your server administrator. On a phone, use the server's HTTPS address—not `localhost`, which means the phone itself.
@@ -83,7 +98,7 @@ On narrow screens, use **More** for navigation items that are not shown in the b
 
 ## Read the Dashboard
 
-1. Choose the relevant inventory scope before comparing totals.
+1. Choose the relevant inventory scope before comparing totals. Dashboard starts on **Physical**; **All Cards** is the last inventory tab, not the initial view.
 2. Read owned quantities and valuation separately from purchase cost. An estimated market value is not a guaranteed sale price.
 3. Use the history-range controls for valuation trends.
 4. Expand **View chart data** where provided to read exact values without relying on chart colors.
@@ -148,7 +163,7 @@ For **Bulk Add**, enter a positive whole-number quantity. While the request is p
 Rapid add is useful when you have a pile from one known set and do not want to reopen the add form for every card.
 
 1. In **Search & Add**, enter one set code in the set field and choose the search language.
-2. Choose the destination in **Add cards to**.
+2. Choose the destination in **Add cards to**. For Physical cards, choose **Default container** on the main page before entering numbers, or leave **Unassigned Pile** selected. Rapid add uses that default without opening a placement dialog; check the confirmation for any fallback to Unassigned Pile.
 3. Choose **Rapid add**. The button changes to **Rapid add on**.
 4. Check the condition, printing/finish, and **Copies added per Enter**. These settings apply to subsequent rapid additions.
 5. Type a collector number in **Card number, then Enter** and press Enter.
@@ -366,6 +381,8 @@ The server loads every provider page before showing progress and caches normaliz
 
 This does not move cards into one storage pocket or merge their real-world locations. Opening a stack asks you to choose a stored entry before viewing or editing it. Each choice shows its finish, condition, language, quantity, and location. CSV exports preserve the underlying entry details regardless of display stacking. **Select** mode automatically shows individual entries so actions target real records, not an ambiguous display stack.
 
+**Quantity (High-Low)** sorts by the total shown on each display stack, including when split by condition or finish. Turning stacking off sorts individual entry quantities instead; changing the display never changes owned copies.
+
 ### Use the card inspector
 
 1. Open a card. If it represents a stack, choose the stored entry you mean to change.
@@ -427,9 +444,9 @@ If pages or rows fail to load, use **Retry**. A load error is not an empty conta
 ### Check a container with Take Stock
 
 1. Open a Physical or Graveyard container in **Storage**, then choose **More → Take Stock**.
-2. The unstacked grid shows one tile per **physical copy**, even when copies share an entry or container slot. Each tile shows the card name and Last verified date. Card images can be enlarged without leaving the stocktake.
-3. Click the green **Verified** button when that copy is present, or the red **Missing** button when it is absent. **Each click saves immediately.** Only the selected copy changes; other copies keep their status and verification date. There is no missing-quantity field, review step, or Apply button.
-4. Reserved copies can also be marked **Verified** or **Missing** without checking in their deck. Stocktake preserves their reservations and return locations; it does not release copies or change deck contents.
+2. The unstacked grid shows one tile per **physical copy**, even when copies share an entry or container slot. Each tile shows the card name and **Last verified** date, formatted in your interface language without a time. Click the artwork, or focus it and press Enter/Space, to enlarge it without leaving the stocktake; close the image to continue.
+3. Click the green **Verified** button when that copy is present, or the red **Missing** button when it is absent. **Each click saves immediately.** Missing tiles have a red outline that remains when you reopen the stocktake and clears after successful verification. Only the selected copy changes; other copies keep their status and verification date. There is no missing-quantity field, review step, or Apply button.
+4. Reserved copies show **In Deck** and can also be marked **Verified** or **Missing** without checking in their deck. Stocktake preserves their reservations and return locations; it does not release copies or change deck contents.
 5. Wait for **Saving…** to finish before marking another copy. A successful save persists the copy's status and the container's stocktake date together. Where necessary, a quantity-bearing entry splits around the selected copy while preserving total copies, metadata, physical slots, reservations, and deck state. Certified entries containing multiple copies cannot be split and are rejected explicitly.
 6. Close the dialog when finished. Saved changes remain saved; there is no discard prompt or final confirmation. Closing, Escape, and browser Back are blocked while a save is pending. Copies you do not mark remain unchanged and never become missing automatically.
 
@@ -497,7 +514,7 @@ Choose **Automatic image** to let the gallery use a recent eligible card. If a m
 
 Layout counts must be positive whole numbers. **Next** or Enter validates the layout without replacing invalid values. While creation is saving, wait before using Back, closing, or leaving; a failure keeps the draft available for correction.
 
-Storage opens as a gallery. Search container names/types or sort by name/quantity, then open a container. Select **More → Container Settings** on its toolbar. **Choose container image** selects a card-art cover; **Automatic image** returns to an automatic cover. The container's **More** menu also contains creation and import actions; page navigation, views, selection, and Arrange remain directly available.
+Storage opens as a gallery. Search container names/types or sort by name/quantity, then open a container. Select **More → Container Settings** on its toolbar. **Choose container image** selects a card-art cover; **Automatic image** returns to an automatic cover. The container's **More** actions are alphabetized by their displayed labels, including the current Lock/Unlock and Move to Graveyard/Restore action. Page navigation, views, selection, and Arrange remain directly available. For a ManaBox container import, choose **Create Container**, then **Import ManaBox container** in the first (**Type**) step; it is no longer a separate More-menu action.
 
 In the container's card view, a **FOIL** badge identifies foil copies. If **Stack Duplicates** is enabled and **Split by Holo/Printing** is off, mixed-finish stacks show the foil count—for example, **FOIL 1/3** means one of the three copies is foil. Normal-only cards and stacks have no foil badge.
 
@@ -526,6 +543,8 @@ For example, a binder can sort by set then collector number while accepting only
 **Warning:** saving moving rules that existing cards no longer match can move those cards to Unsorted. Check the resulting location changes and move the physical cards as needed.
 
 ### Move cards from Unassigned Pile
+
+To browse unfiled cards without opening a container, choose **Unassigned Pile** beside the Storage units navigation in the Storage gallery. On a phone, it sits alongside the storage-unit selector. This is separate from **No storage unit**, which lists containers that have not been grouped into a unit.
 
 1. Open the destination container in the correct Storage inventory.
 2. Find the **Unsorted** queue and review the cards waiting to be moved. Its search, filters, and ordering help you inspect the pile. The color filter uses actual card colors, matching Deck Builder: white, blue, black, red, green, multicolor, and colorless—not Commander color identity. Only categories present in the pile are offered; multicolor cards have their own category and basic lands are colorless.
@@ -595,7 +614,7 @@ Deleting a container is not the same as deleting its cards: **Delete Container**
 
 This workflow is for **moving cards already in physical Collection**. It does not add missing copies.
 
-1. In physical **Storage**, choose **Create Container**, then **Import ManaBox container**, and select a ManaBox `.txt` export.
+1. In physical **Storage**, choose **Create Container**. In the first (**Type**) step of **New Storage Container**, choose **Import ManaBox container** and select a ManaBox `.txt` export. The import option is unavailable in Graveyard.
 2. The app creates a box named after the file and tries to move matching, already-owned copies from Unsorted into its first row.
 3. Read **Container import review**. Expand **Show full summary** to compare **Requested**, **Moved**, **Not moved**, and **Other locations / inventory**.
 4. For remaining quantities, review the available locations and choose **Move** where offered. This can bring eligible copies from other unlocked containers or Unsorted.
@@ -687,7 +706,7 @@ In Table view, **Color Identity** shows card-copy counts for white, blue, black,
 
 **Missing cards** appears in red in both Grid and Table view when required copies are unavailable, even if the deck has reached its target size. Physical decks exclude archived copies and other decks' reservations; Arena decks use Arena ownership only; Graveyard decks use archived copies only. A checked-out Physical deck keeps its Return action and reservations, but archived or missing reserved copies still show **Missing cards**. Use the matching status filter to find affected decks; the target-reached filter excludes them.
 
-An open deck keeps its tools, Description, analytics, commander, private Notes, sleeves, card back, and wins/losses visible above **Add Cards to Deck**, **Deck Cards**, and **Tokens**. These top sections are not collapsible. Properties, imports, exports, and other deck actions are directly available beneath the header. Some charts appear only when the deck contains relevant cards.
+An open deck keeps its properties, imports, exports, and other tools directly available beneath the header. On desktop, Description, analytics, commander, private Notes, sleeves, card back, and wins/losses appear above **Add Cards to Deck**, **Deck Cards**, and **Tokens**. On narrow screens, card editing comes first and the overview follows below; its sections remain visible rather than hidden in collapsible panels. Some charts appear only when the deck contains relevant cards.
 
 Below Description, the summary panel groups **Supertype Breakdown**, **Color & Land Distribution**, **Containers needed**, and **Deck Health & Rules**. Labeled, color-coded bars show exact counts relative to the deck's total card count; multicolor cards can contribute to more than one color. The panel stacks on phones. For Physical decks, **Containers needed** lists source containers, Unassigned Pile, and unavailable-copy counts from the saved pull-list plan (reserved locations when checked out). Save draft changes to refresh it; Arena decks have no physical-container list.
 
@@ -964,7 +983,7 @@ The official [Codex app-server](https://developers.openai.com/codex/app-server/)
 
 1. Open **Deck Builder → AI Deck Builder**.
 2. In **Deck setup**, choose **Owned inventory** (Physical or Arena), **Format**, and **Target Size**. Choose one required **Play style** and set **Target power level** before requesting a suggestion; see the option guides below. Wishlist and Graveyard cannot supply AI decks.
-3. In **Card pool & filters**, optionally select colors/sets and, for Physical inventory, **Containers**. All setup options and guidance remain visible without expanding sections. Empty filters include all eligible cards. Set options show their Magic set symbols alongside readable names. Missing Physical copies are excluded; Arena is separate.
+3. In **Card pool & filters**, optionally select colors/sets and, for Physical inventory, **Containers**. All setup options and guidance remain visible without expanding sections. Empty filters include all eligible cards. Open **Set** and type in its search field to narrow the choices; searching preserves included and excluded sets even when they are hidden. Closing and reopening the dropdown clears only the search. Set options show their Magic set symbols alongside readable names. Missing Physical copies are excluded; Arena is separate.
    - Click a set once to **include** it (check mark), again to **exclude** it (X), and a third time to **clear** that set. Keyboard users can focus the set and press Space or Enter for the same cycle. **Clear** resets all included and excluded sets.
    - With no included sets, all sets are eligible except excluded ones. With included sets, additional cards must come from those sets; exclusions take precedence. Changing filters clears the draft and conversation. **Improve with AI** still retains eligible original-deck copies up to their source quantities, even outside the chosen set filters.
 4. Leave **Include checked-out cards** off unless intentionally planning with reserved copies. The toggle turns green when enabled. Turning it on does not release or share reservations; return those cards from their other decks before checking out this deck.
@@ -1017,7 +1036,7 @@ The reviewed strategy is saved to the new deck's **Notes**. You can edit it befo
 
 **Expected result:** a saved, unchecked-out deck after successful validation—not a collection mutation or automatic checkout. Until Add Deck, the conversation/draft is not a saved deck. Saving rechecks ownership, quantities, copy limits, and cached rules; a failed save does not partially replace account data.
 
-Changing inventory, format, target size, deck type, target power level, checked-out inclusion, or filters clears the conversation and draft. The selected deck type and power level accompany every request, including follow-up questions and improvements, but do not change a saved deck's inventory or category. Navigation warns before discarding unsaved AI setup, prompts, conversation, or drafts, and is blocked while generation or saving is pending. A failed save retains the draft for retry. Forcing the browser closed can still interrupt observing a server request; check saved decks before retrying. **Clear conversation, keep draft** is the explicit way to reset the conversation without discarding the current draft. Each request permits up to 4,000 characters; the session limit is 40 messages. The request log records progress, not private model reasoning.
+Changing inventory, format, target size, play style, target power level, checked-out inclusion, or selected filters clears the conversation and draft; typing in the Set dropdown's search field only narrows its choices. The selected play style and power level accompany every request, including follow-up questions and improvements, but do not change a saved deck's inventory or category. Navigation warns before discarding unsaved AI setup, prompts, conversation, or drafts, and is blocked while generation or saving is pending. A failed save retains the draft for retry. Forcing the browser closed can still interrupt observing a server request; check saved decks before retrying. **Clear conversation, keep draft** is the explicit way to reset the conversation without discarding the current draft. Each request permits up to 4,000 characters; the session limit is 40 messages. The request log records progress, not private model reasoning.
 
 If no eligible cards match, adjust filters or ask questions without generating a deck. Oversized inventories and incomplete or invalid responses are rejected rather than silently trimmed or partially saved. Narrow the pool for oversized requests; Ollama may need a larger configured model context. Review every suggestion: cached rules may be missing or stale, and the AI is not a guarantee of tournament legality. Partner commanders and sideboards are not supported.
 
@@ -1025,7 +1044,7 @@ If no eligible cards match, adjust filters or ask questions without generating a
 
 1. Open the saved deck and save all local edits.
 2. Select **Improve with AI**.
-3. Choose one **Deck type** and a **Target power level**, then ask for advice or describe changes. Inventory, format, and target size stay fixed for this workflow. AI improvement is available for Physical and Arena decks, not Graveyard decks.
+3. Choose a **Play style** (or keep **Any**) and a **Target power level**, then ask for advice or describe changes. Inventory, format, and target size stay fixed for this workflow. AI improvement is available for Physical and Arena decks, not Graveyard decks.
 4. Review/edit the returned draft and choose:
    - **Save Deck** to replace the original's name, description, cards, and commander while retaining its identity, results, and settings. The reviewed strategy is appended to existing Notes without overwriting them; an identical strategy already at the end is not repeated.
    - **Save as New Deck** to keep the original and create a separate unchecked-out deck with the reviewed strategy in its Notes.
@@ -1164,7 +1183,7 @@ For full server recovery, ask the operator to maintain protected persistent-data
 
 ## Keep private Notes
 
-Each deck has its own **Notes** section below the stats in the top overview of **Deck Builder**. Notes are separate from the deck description and card-entry notes.
+Each deck has its own **Notes** section beneath Description in the **Deck Builder** overview. On narrow screens, scroll past the card editor to reach it. Notes are separate from the deck description and card-entry notes.
 
 1. Open a deck and enter reminders, matchup plans, or upgrade ideas in **Notes**.
 2. Select **Save** beneath the field or in the deck toolbar. Both save the whole deck draft, including any card or property changes.
