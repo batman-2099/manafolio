@@ -375,7 +375,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       <div className="collection-inventory-picker form-group">
         <label htmlFor="collection-inventory">{t('collection.inventory')}</label>
         <select id="collection-inventory" className="select-control" value={subTab} disabled={bulkPending} onChange={event => setSubTab(event.target.value)}>
-          <option value="collection">{t('nav.collection')}</option>
+          <option value="collection">{t('dash.physical')}</option>
           <option value="arena">{t('collection.arena')}</option>
           <option value="graveyard">{t('collection.graveyard')}</option>
           <option value="unsorted">{t('bulk.unassignedPile')}</option>
@@ -384,7 +384,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
         </select>
       </div>
       <div className="sub-nav-tabs collection-inventory-nav" style={{ marginBottom: '0.75rem' }}>
-        {[['collection', 'nav.collection'], ['arena', 'collection.arena'], ['graveyard', 'collection.graveyard'], ['unsorted', 'bulk.unassignedPile'], ['wishlist', 'collection.wishlist'], ['completion', 'completion.title']].map(([value, label]) => (
+        {[['collection', 'dash.physical'], ['arena', 'collection.arena'], ['graveyard', 'collection.graveyard'], ['unsorted', 'bulk.unassignedPile'], ['wishlist', 'collection.wishlist'], ['completion', 'completion.title']].map(([value, label]) => (
           <button key={value} className={`sub-nav-tab ${subTab === value ? 'active' : ''}`} disabled={bulkPending} aria-pressed={subTab === value} onClick={() => setSubTab(value)}>
             {t(label)}
           </button>
