@@ -5,9 +5,10 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 
-# Copy frontend packages and lockfiles
+# Copy frontend packages and lockfiles. Persist the download cache outside the
+# image layer so dependency reinstalls do not redownload unchanged packages.
 COPY frontend/package*.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Copy frontend source files
 COPY frontend/ ./
@@ -60,45 +61,44 @@ ENV CV_MODEL_DIR=/app/database/models
 # startup, as its own user.
 RUN mkdir -p /app/database
 
-# Copy backend configuration
-COPY backend/package*.json ./backend/
+# Copy backend configuration. Cache the package-manager download directory so a
+# dependency rebuild reuses already downloaded tarballs across ordinary updates.
+COPY --chown=node:node backend/package*.json ./backend/
 WORKDIR /app/backend
 # Install production backend dependencies (prebuilt native binaries).
 # ONNXRUNTIME_NODE_INSTALL_CUDA=skip: onnxruntime-node's postinstall otherwise
 # fetches the CUDA/DirectML native packages from api.nuget.org, which fails on any
 # build host without access to it. Inference here is CPU-only (two small models),
 # and the CPU binaries ship inside the npm package itself.
-RUN ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --omit=dev
+RUN --mount=type=cache,target=/root/.npm \
+    ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --omit=dev
 # Recompile ONLY sqlite3 from source: its node-pre-gyp prebuilt is linked
 # against a newer glibc (GLIBC_2.38) than this Debian base provides, so the
 # prebuilt aborts at startup with ERR_DLOPEN_FAILED. Building here links against
 # the image's own glibc. Scoped to sqlite3 so sharp keeps its prebuilt (sharp
 # can't build from source without libvips-dev).
-RUN npm rebuild sqlite3 --build-from-source
+RUN --mount=type=cache,target=/root/.npm npm rebuild sqlite3 --build-from-source
 
-# Copy backend source files
-COPY backend/src/ ./src/
+# Copy only application files as node. This avoids a final recursive chown of
+# /app, which previously created a duplicate ~735 MB layer on every app change.
+COPY --chown=node:node backend/src/ ./src/
 
 # Operator maintenance tools; runtime catalog building lives in src/.
-COPY backend/scripts/ ./scripts/
+COPY --chown=node:node backend/scripts/ ./scripts/
 
 # Shared JSON tables required at runtime by backend/src/utils/compartmentSort.js
 # via ../../../shared/*.json (resolves to /app/shared)
-COPY shared/ /app/shared/
+COPY --chown=node:node shared/ /app/shared/
 
 # Copy compiled frontend assets from Stage 1 to the location server.js expects
 # (../../frontend/dist relative to backend/src, i.e. /app/frontend/dist)
-COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
-
-# Ownership of the app + database dirs set here so a fresh named volume mounted
-# at /app/database inherits node-writable permissions on first init.
-RUN chown -R node:node /app
+COPY --chown=node:node --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
 # The container starts as root and the entrypoint drops to the unprivileged
 # `node` user AFTER chowning the mounted volume (a legacy root-owned volume
 # would otherwise be unwritable). sed strips any CRLF so the shebang works when
 # the file is checked out on Windows.
-COPY entrypoint.sh /entrypoint.sh
+COPY --chown=node:node entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 

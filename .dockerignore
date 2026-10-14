@@ -13,6 +13,19 @@ out
 .git
 .github
 .gitignore
+.gitattributes
+.gitmodules
+
+# Local build/cache artifacts and test output that are never used by the image.
+.cache
+**/.cache
+coverage
+**/coverage
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Local databases and env — must not leak into the image
 **/*.db
