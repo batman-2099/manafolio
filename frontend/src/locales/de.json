@@ -1081,6 +1081,8 @@
   "inspector.copyValueHint": "Wird überall anstelle des Marktpreises verwendet: Gesamtwert, Set-Summen, Preissortierung. Leer lassen für Standard-Marktpreis.",
   "inspector.deleteCard": "Karte löschen",
   "inspector.editCard": "Karte bearbeiten",
+  "inspector.previousCard": "Vorherige Karte",
+  "inspector.nextCard": "Nächste Karte",
   "inspector.entryUpdated": "Karteneintrag aktualisiert.",
   "inspector.errAddDeck": "Hinzufügen zum Deck fehlgeschlagen.",
   "inspector.errAddDeckGeneric": "Fehler beim Hinzufügen zum Deck.",

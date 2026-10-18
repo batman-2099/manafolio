@@ -941,6 +941,8 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       {/* Card Detail Inspector Modal (Private Authorized View) */}
       <CardInspectorModal
         card={inspectorCard}
+        cards={displayCards}
+        onNavigate={card => { setInspectorCard(card); setInspectorStartEdit(false); }}
         startInEdit={inspectorStartEdit}
         onClose={() => { setInspectorCard(null); setInspectorStartEdit(false); }}
         onUpdate={onUpdate}

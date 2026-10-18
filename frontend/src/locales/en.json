@@ -1756,6 +1756,8 @@
   "inspector.viewInStorage": "Click to view in storage",
   "inspector.locationLabel": "Location:",
   "inspector.editCard": "Edit Card",
+  "inspector.previousCard": "Previous card",
+  "inspector.nextCard": "Next card",
   "inspector.addToDeck": "+ Add to Deck…",
   "inspector.obtained": "Obtained",
   "inspector.favorite": "Mark as Favorite",

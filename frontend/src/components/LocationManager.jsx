@@ -1197,6 +1197,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   }, [containerListCards, stackContainerCards, stackContainerByCondition, stackContainerByPrinting]);
 
   const displayContainerListCards = storage.selectMode ? containerListCards : processedContainerListCards;
+  const inspectorCards = useMemo(() => !inspectorCard?.location_id ? unsortedCards
+    : containerViewMode === 'list' ? displayContainerListCards
+    : compartments.flatMap(compartment => cardsByCompartment.get(compartment.id) || []),
+  [inspectorCard?.location_id, unsortedCards, containerViewMode, displayContainerListCards, compartments, cardsByCompartment]);
   const selectableContainerCards = containerViewMode === 'list' ? containerListCards : cardsInActiveLocation;
 
   const containerListSections = useMemo(() => {
@@ -3149,6 +3153,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
       <CardInspectorModal
         card={inspectorCard}
+        cards={inspectorCards}
+        onNavigate={setInspectorCard}
         onClose={() => setInspectorCard(null)}
         onUpdate={() => { refreshAll(); onUpdate?.(); }}
         showToast={showToast}

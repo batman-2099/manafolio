@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useId } from 'react';
-import { X, MapPin, Trash2, Star, Maximize2, ExternalLink, Search, Copy } from 'lucide-react';
+import { useState, useEffect, useLayoutEffect, useRef, useId } from 'react';
+import { X, MapPin, Trash2, Star, Maximize2, ExternalLink, Search, Copy, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getCardDisplayName } from '../utils/langHelper';
 import { translatedName, setCode, isEnglish } from '../utils/languages';
 import { formatPrice, priceText } from '../utils/formatPrice';
@@ -29,7 +29,7 @@ const MTG_COLOR_FG = {
 // Self-contained: owns its edit form (PUT) and delete (DELETE) so every screen
 // gets the same rich view + edit without duplicating the form. onUpdate() lets
 // the parent refetch after a change. onViewStorage is optional (hidden if absent).
-function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, onViewStorage, startInEdit = false }) {
+function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, onViewStorage, startInEdit = false, previousCard, nextCard, onNavigate, returnFocusRef, closeHandlerRef }) {
   const { t } = useT();
   const [mode, setMode] = useState(startInEdit ? 'edit' : 'view');
   const [locations, setLocations] = useState([]);
@@ -84,14 +84,14 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   useEffect(() => {
     if (!isOpen) return;
     const dialog = dialogRef.current;
-    const trigger = document.activeElement;
+    const trigger = returnFocusRef.current;
     dialog.showModal();
     closeRef.current?.focus();
     return () => {
       dialog.close();
       if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
     };
-  }, [isOpen]);
+  }, [isOpen, returnFocusRef]);
 
   useBackGuard(isFullScreen, () => setIsFullScreen(false));
 
@@ -163,6 +163,12 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
     onClose && onClose();
   };
 
+  const navigate = target => {
+    if (!target || mode === 'edit' || writingRef.current || printingPending.current || creatingCommanderDeckRef.current) return;
+    if (hasToggledRef.current) onUpdate?.();
+    onNavigate(target);
+  };
+
   const resetDraft = () => {
     if (writingRef.current) return;
     printingRequest.current++;
@@ -185,7 +191,10 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
     setStatus('');
     setMode('view');
   };
-  useBackGuard(!!card, handleClose);
+  useLayoutEffect(() => {
+    closeHandlerRef.current = handleClose;
+    return () => { closeHandlerRef.current = null; };
+  });
 
   if (!card || !activeCard) return null;
 
@@ -470,6 +479,16 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
               <span>{t('inspector.fullScreen')}</span>
             </span>
           </button>
+          {onNavigate && (
+            <div style={{ display: 'flex', gap: '0.5rem', width: '100%', maxWidth: '300px', marginTop: '0.75rem' }}>
+              <button type="button" className="btn btn-secondary" disabled={!previousCard || mode === 'edit' || writing || localizing || creatingCommanderDeck} onClick={() => navigate(previousCard)} style={{ flex: 1, minHeight: '44px' }}>
+                <ChevronLeft size={16} aria-hidden="true" /> {t('inspector.previousCard')}
+              </button>
+              <button type="button" className="btn btn-secondary" disabled={!nextCard || mode === 'edit' || writing || localizing || creatingCommanderDeck} onClick={() => navigate(nextCard)} style={{ flex: 1, minHeight: '44px' }}>
+                {t('inspector.nextCard')} <ChevronRight size={16} aria-hidden="true" />
+              </button>
+            </div>
+          )}
           <CardArtEditor
             card={activeCard}
             hasProviderArt={!!activeCard.image_url}
@@ -909,7 +928,7 @@ function CardInspectorSelection(props) {
   if (card) return <CardInspectorContent key={card.entry_id || card.id} {...props} card={card} />;
 
   return (
-    <Modal onClose={props.onClose} aria-labelledby={titleId} aria-describedby={descriptionId}>
+    <Modal onClose={props.onClose} returnFocus={props.returnFocusRef.current} aria-labelledby={titleId} aria-describedby={descriptionId}>
       <div className="glass-panel" style={{ width: 'min(36rem, 100%)', maxHeight: '85dvh', overflowY: 'auto', padding: '1.5rem' }}>
         <h2 id={titleId}>{t('inspector.chooseEntry')}</h2>
         <p>{getCardDisplayName(props.card.name, props.card.printed_name)}</p>
@@ -929,7 +948,22 @@ function CardInspectorSelection(props) {
   );
 }
 
-export default function CardInspectorModal(props) {
+export default function CardInspectorModal({ cards = [], onNavigate, ...props }) {
+  const returnFocusRef = useRef(null);
+  const closeHandlerRef = useRef(null);
+  const isOpen = !!props.card;
+  useLayoutEffect(() => {
+    returnFocusRef.current = isOpen ? document.activeElement : null;
+  }, [isOpen]);
+  // Card changes reset drafts, but must not pop/push the dialog's history entry.
+  useBackGuard(isOpen, () => closeHandlerRef.current ? closeHandlerRef.current() : props.onClose?.());
+  const index = props.card ? cards.findIndex(card => (card.entry_id || card.id) === (props.card.entry_id || props.card.id)) : -1;
   // No entry controls or draft exist until an aggregate member is chosen.
-  return props.card ? <CardInspectorSelection key={props.card.entry_id || props.card.id} {...props} /> : null;
+  return props.card ? <CardInspectorSelection key={props.card.entry_id || props.card.id} {...props}
+    returnFocusRef={returnFocusRef}
+    closeHandlerRef={closeHandlerRef}
+    onNavigate={onNavigate}
+    previousCard={index > 0 ? cards[index - 1] : null}
+    nextCard={index >= 0 ? cards[index + 1] : null}
+  /> : null;
 }

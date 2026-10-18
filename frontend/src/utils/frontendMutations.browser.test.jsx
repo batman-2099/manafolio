@@ -167,7 +167,9 @@ export async function runFrontendMutationRegressions() {
           else buttons[2].click();
         });
         assert(closed === 1 && requests.length === before, 'cancel and Escape must close the picker without mutation');
+        const popped = new Promise(resolve => window.addEventListener('popstate', resolve, { once: true }));
         await act(async () => { root.render(null); });
+        await popped;
         assert(document.activeElement === trigger, 'picker dismissal must restore trigger focus');
       }
       const chooseSecond = async () => {

@@ -391,6 +391,8 @@ This does not move cards into one storage pocket or merge their real-world locat
 4. Choose **Save Changes**. **Cancel** discards every unsaved edit and restores the saved entry. While saving or duplicating, wait for completion before making another change or closing; a failure stays inside the inspector and keeps the draft for correction.
 5. Recheck the entry and location after a quantity, language, or placement change.
 
+Use **Previous card** and **Next card** beneath the artwork to browse without closing the inspector. Collection follows the current filtered/sorted list across pages; Storage follows its displayed list or compartment order, and Dashboard stays within the list you opened. Navigation stops at each end. Save or cancel edits first; navigation is disabled while editing or a write is pending. Stacked cards still require choosing a stored entry before editing.
+
 **Quantity applies only to the selected stored entry**, not the displayed stack or all matching copies in your collection. Quantity and copy-detail changes are saved together on that entry; other entries remain unchanged. For example, changing an entry from one copy to two leaves four matching copies elsewhere untouched. You cannot reduce an entry below the number of copies reserved by checked-out decks; check those decks in first.
 
 Useful inspector actions include:

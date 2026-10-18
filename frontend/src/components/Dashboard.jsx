@@ -59,6 +59,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
 
   // Clickable Card Inspector State
   const [inspectorCard, setInspectorCard] = useState(null);
+  const [inspectorList, setInspectorList] = useState('recent');
 
   useEffect(() => {
     if (priceCheckOpen) backButtonRef.current?.focus();
@@ -342,7 +343,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                 {recentAdditions.map((card, idx) => (
                   <button
                     type="button" key={idx}
-                    onClick={() => setInspectorCard(card)}
+                    onClick={() => { setInspectorList('recent'); setInspectorCard(card); }}
                     className="dashboard-card-clickable dashboard-card-row"
                   >
                     <CardImage card={card} thumbnail loading="lazy" width={48} height={67} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px' }} />
@@ -377,7 +378,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
               {topValuable.map((card, idx) => (
                 <button
                   type="button" key={idx}
-                  onClick={() => setInspectorCard(card)}
+                  onClick={() => { setInspectorList('valuable'); setInspectorCard(card); }}
                   className="dashboard-card-clickable dashboard-card-row"
                 >
                   <CardImage card={card} thumbnail loading="lazy" width={48} height={67} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px' }} />
@@ -539,6 +540,8 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
       {/* Card Inspector Modal Overlay */}
       <CardInspectorModal
         card={inspectorCard}
+        cards={inspectorList === 'recent' ? recentAdditions : topValuable}
+        onNavigate={setInspectorCard}
         onClose={() => setInspectorCard(null)}
         onUpdate={onUpdate}
         showToast={showToast}
