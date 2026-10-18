@@ -790,7 +790,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                   <Trash2 size={16} />
                 </button>
               </div>
-              <RelatedTokens compact cardIds={[activeCard.card_id || activeCard.id]} inventoryType={activeCard.list_type === 'arena' ? 'arena' : 'collection'} />
+              <RelatedTokens compact cardIds={[activeCard.card_id || activeCard.id]} inventoryType={activeCard.list_type === 'arena' ? 'arena' : activeCard.list_type === 'graveyard' ? 'graveyard' : 'collection'} onChanged={onUpdate} />
 
               {/* Price Panel */}
               <div style={{ borderTop: '1px solid var(--border-glass)', borderBottom: '1px solid var(--border-glass)', padding: '0.75rem 0', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>

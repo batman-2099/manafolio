@@ -907,11 +907,12 @@ Arena and Graveyard decks cannot be checked out, even if a checkout control is v
 1. Open the deck and scroll below **Deck Cards** to **Tokens**.
 2. Read each token's ownership status and **Created by:** card names.
 3. For owned Physical tokens, use the shown container/page/slot or Unassigned Pile location to find them. Arena token status is separate and does not display Physical locations.
-4. If lookup fails, use **Retry**.
+4. Open a token's artwork to **Add to Deck** or **Add one copy to container…**. Each selection adds one copy. Deck additions require owned copies and follow the destination deck's normal rules; adding to a container creates a new inventory copy, rather than moving an existing one. Arena does not offer physical containers.
+5. Save pending deck edits before adding from its token viewer. If lookup or an addition fails, retry; the viewer keeps the error visible.
 
-**Expected result:** related-token references and inventory information. This panel does not add tokens to your collection or deck, and it does not promise how many token copies a game will require. An empty result means no related tokens were returned, not a general ruling on every possible card interaction.
+**Expected result:** related-token references and inventory information, with explicit actions to save copies. The panel does not promise how many token copies a game will require. An empty result means no related tokens were returned, not a general ruling on every possible card interaction.
 
-The card inspector's **Related tokens** and AI drafts offer the same references. Ownership matches names case-insensitively, including double-faced tokens' front names. Decks prefer the commander's set or corresponding token set, then any set in their inventory. Same-named tokens can have different rules or stats: check artwork and text. Wishlist does not count, and Graveyard token ownership stays separate from Physical and Arena. Scryfall supplies the relations; tokens do not affect deck size, reserve copies, or enter deck exports.
+The card inspector's **Related tokens** and AI drafts offer the same viewer. Ownership matches names case-insensitively, including double-faced tokens' front names. Decks prefer the commander's set or corresponding token set, then any set in their inventory. Same-named tokens can have different rules or stats: check artwork and text. Wishlist does not count, and Graveyard token ownership stays separate from Physical and Arena. Scryfall supplies the relations; references alone do not affect deck size, reserve copies, or enter deck exports. Tokens explicitly added to a deck become ordinary deck entries.
 
 ### Create a container from a deck
 

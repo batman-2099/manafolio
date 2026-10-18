@@ -2500,7 +2500,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     })
                   )}
                 </div>
-                <RelatedTokens cardIds={activeDeck.cards.map(card => card.id)} title={t('tokens.title')} inventoryType={activeDeck.inventory_type} commanderCardId={activeDeck.commander_card_id} />
+                <RelatedTokens cardIds={activeDeck.cards.map(card => card.id)} title={t('tokens.title')} inventoryType={activeDeck.inventory_type} commanderCardId={activeDeck.commander_card_id} disabled={hasUnsavedChanges || editorBusy || !!deckDraft} onChanged={deckId => { if (deckId === activeDeck.id) loadDeckDetails(deckId); fetchDecks(); }} />
               </div>
 
               {/* Mana Curve */}

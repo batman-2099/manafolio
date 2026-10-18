@@ -321,6 +321,7 @@
   "relatedTokens.ownedArena": "Owned in Arena",
   "relatedTokens.notOwnedArena": "Not owned in Arena",
   "relatedTokens.createdBy": "Created by:",
+  "relatedTokens.addToContainer": "Add one copy to container…",
   "aiDeck.title": "AI Deck Builder",
   "aiDeck.setupTitle": "Deck setup",
   "aiDeck.deckType": "Deck type",

@@ -1,12 +1,13 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import CardImage from './CardImage';
-import CardImageZoom from './CardImageZoom';
+import Modal from './Modal';
+import AddToDeckSelect from './AddToDeckSelect';
 import { getSlotNumber } from '../utils/getSlotNumber';
 import { useT } from '../utils/i18n';
 
 const MTG_CARD_ID = /^mtg-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default function RelatedTokens({ cardIds = [], title, inventoryType = 'collection', commanderCardId, compact = false }) {
+export default function RelatedTokens({ cardIds = [], title, inventoryType = 'collection', commanderCardId, compact = false, onChanged, disabled = false }) {
   const { t } = useT();
   const headingId = useId();
   const idsKey = [...new Set((Array.isArray(cardIds) ? cardIds : [])
@@ -68,14 +69,10 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
         <ul className={compact ? 'related-token-list' : 'card-grid'} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {result.tokens.map(token => (
             <li key={token.id} className={compact ? 'related-token-item' : undefined} style={compact ? { minWidth: 0, overflowWrap: 'anywhere' } : { display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 0, background: 'var(--surface-1)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '0.5rem', overflowWrap: 'anywhere' }}>
-              {compact ? (
-                <button type="button" className="related-token-art ci-image-wrap" aria-label={`${t('deck.previewArt')}: ${token.name}`} aria-haspopup="dialog" onClick={() => setPreviewToken({ ...token, id: token.matched_card_id || token.id })}>
-                  <CardImage card={{ ...token, id: token.matched_card_id || token.id }} game="mtg" loading="lazy" style={{ width: '100%', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
-                  <span>{t('deck.previewArt')}</span>
-                </button>
-              ) : (
+              <button type="button" className={compact ? 'related-token-art ci-image-wrap' : 'ci-image-wrap'} aria-label={`${t('deck.previewArt')}: ${token.name}`} aria-haspopup="dialog" onClick={() => setPreviewToken({ ...token, id: token.matched_card_id || token.id })}>
                 <CardImage card={{ ...token, id: token.matched_card_id || token.id }} game="mtg" loading="lazy" style={{ width: '100%', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
-              )}
+                <span>{t('deck.previewArt')}</span>
+              </button>
               <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{token.name}</span>
@@ -110,7 +107,84 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
           ))}
         </ul>
       ))}
-      {previewToken && <CardImageZoom card={previewToken} onClose={() => setPreviewToken(null)} />}
+      {previewToken && <TokenViewer token={previewToken} inventoryType={inventoryType} disabled={disabled} onClose={() => setPreviewToken(null)} onChanged={deckId => { setAttempt(value => value + 1); onChanged?.(deckId); }} />}
     </section>
+  );
+}
+
+function TokenViewer({ token, inventoryType, disabled, onClose, onChanged }) {
+  const { t } = useT();
+  const [locations, setLocations] = useState([]);
+  const [locationsError, setLocationsError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (inventoryType === 'arena') return;
+    const controller = new AbortController();
+    setLocationsError(false);
+    fetch(`/api/locations?inventory_type=${inventoryType}`, { signal: controller.signal })
+      .then(response => { if (!response.ok) throw new Error(); return response.json(); })
+      .then(items => { if (!controller.signal.aborted) setLocations(items); })
+      .catch(() => { if (!controller.signal.aborted) setLocationsError(true); });
+    return () => controller.abort();
+  }, [inventoryType, attempt]);
+
+  async function add(kind, destination) {
+    if (pending.current || disabled) return;
+    pending.current = true;
+    setBusy(true);
+    setMessage('');
+    setError('');
+    try {
+      let quantity = 1;
+      if (kind === 'deck') {
+        const response = await fetch(`/api/decks/${destination}`);
+        const deck = await response.json();
+        if (!response.ok) throw new Error(deck.error || t('inspector.errAddDeck'));
+        quantity += deck.cards.find(card => card.id === token.id)?.quantity || 0;
+      }
+      const response = await fetch(kind === 'deck' ? `/api/decks/${destination}/cards` : '/api/collection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(kind === 'deck'
+          ? { card_id: token.id, quantity }
+          : { card_id: token.id, quantity: 1, list_type: inventoryType, location_id: Number(destination), condition: 'Near Mint', printing: 'Normal', language: token.language || 'English' }),
+      });
+      const saved = await response.json();
+      if (!response.ok) throw new Error(saved.error || t('search.errAddCard'));
+      setMessage(kind === 'deck' ? t('inspector.addedToDeck') : saved.placement
+        ? t('search.addedToContainer', { name: token.name, location: saved.placement.label })
+        : t('search.addedUnassigned', { name: token.name }));
+      onChanged(kind === 'deck' ? Number(destination) : null);
+    } catch (failure) {
+      setError(failure.message || t('search.errAddCard'));
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal onClose={() => { if (!pending.current) onClose(); }} aria-label={token.name}>
+      <div className="glass-panel" style={{ width: 'min(440px, 100%)', maxHeight: '90dvh', overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <button type="button" className="btn btn-secondary" disabled={busy} onClick={onClose}>{t('common.close')}</button>
+        <CardImage card={token} style={{ width: '100%', maxHeight: '55dvh', objectFit: 'contain' }} />
+        <AddToDeckSelect disabled={busy || disabled} onAdd={id => add('deck', id)} style={{ width: '100%' }} />
+        {inventoryType !== 'arena' && (
+          <select className="select-control" aria-label={t('relatedTokens.addToContainer')} value="" disabled={disabled || busy || !locations.length} onChange={event => { if (event.target.value) add('container', event.target.value); }}>
+            <option value="">{t('relatedTokens.addToContainer')}</option>
+            {locations.map(location => <option key={location.id} value={location.id} disabled={!!location.locked}>{location.name}</option>)}
+          </select>
+        )}
+        {locationsError && <div role="alert">{t('inspector.errLocations')} <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setAttempt(value => value + 1)}>{t('common.retry')}</button></div>}
+        {disabled && <p role="status">{t('deck.saveFirst')}</p>}
+        {error && <p role="alert">{error}</p>}
+        {message && <p role="status">{message}</p>}
+      </div>
+    </Modal>
   );
 }

@@ -205,6 +205,7 @@
   "relatedTokens.ownedArena": "In Arena vorhanden",
   "relatedTokens.notOwnedArena": "Nicht in Arena vorhanden",
   "relatedTokens.createdBy": "Erzeugt von:",
+  "relatedTokens.addToContainer": "Ein Exemplar zum Behälter hinzufügen…",
   "aiDeck.title": "KI-Deckbuilder",
   "aiDeck.setupTitle": "Deck-Einstellungen",
   "aiDeck.poolTitle": "Kartenauswahl & Filter",
