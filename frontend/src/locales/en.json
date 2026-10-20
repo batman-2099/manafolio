@@ -1,6 +1,10 @@
 {
   "token.reverse": "Reverse token (optional)",
   "token.pairHint": "Choose the token printed on the other side of this physical card. Both faces share one quantity and storage location; no pairing is inferred.",
+  "token.promptTitle": "What is on the reverse side?",
+  "token.promptHint": "Choose a token from the same set, or continue without a reverse if it is unknown or blank. Cancel stops this addition.",
+  "token.continueWithout": "Continue without reverse",
+  "token.useReverse": "Use selected reverse",
   "token.reversePrinting": "Reverse printing",
   "token.none": "No separate reverse token",
   "token.searchError": "Token search failed. Try searching again.",

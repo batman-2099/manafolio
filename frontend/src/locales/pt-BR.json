@@ -1,6 +1,10 @@
 {
   "token.reverse": "Ficha no verso (opcional)",
   "token.pairHint": "Escolha a ficha impressa no verso desta carta física. Ambas as faces compartilham quantidade e localização; nenhuma combinação é automática.",
+  "token.promptTitle": "O que há no verso?",
+  "token.promptHint": "Escolha uma ficha da mesma coleção ou continue sem verso se ele for desconhecido ou em branco. Cancelar interrompe esta adição.",
+  "token.continueWithout": "Continuar sem verso",
+  "token.useReverse": "Usar o verso selecionado",
   "token.reversePrinting": "Edição do verso",
   "token.none": "Sem ficha separada no verso",
   "token.searchError": "A busca de fichas falhou. Tente novamente.",

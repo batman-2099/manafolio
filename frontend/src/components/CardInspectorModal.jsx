@@ -17,6 +17,7 @@ import { useT } from '../utils/i18n';
 import { getSlotNumber } from '../utils/getSlotNumber';
 import Modal from './Modal';
 import { pairedCardName, reverseFace } from '../utils/tokenFaces';
+import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
 
 // MTG color identity pip colors (WUBRG), approximating the printed mana colors.
 const MTG_COLOR_BG = {
@@ -32,6 +33,7 @@ const MTG_COLOR_FG = {
 // the parent refetch after a change. onViewStorage is optional (hidden if absent).
 function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, onViewStorage, startInEdit = false, previousCard, nextCard, onNavigate, returnFocusRef, closeHandlerRef }) {
   const { t } = useT();
+  const { requestReverse, reversePrompt } = useReverseTokenPrompt();
   const [mode, setMode] = useState(startInEdit ? 'edit' : 'view');
   const [locations, setLocations] = useState([]);
   const [locationsLoading, setLocationsLoading] = useState(true);
@@ -263,11 +265,14 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   const handleDuplicate = async () => {
     if (!beginWrite()) return;
     try {
+      const choice = await requestReverse(activeCard, { inventoryType: activeCard.list_type });
+      if (!choice) return;
       const response = await fetch('/api/collection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_id: activeCard.card_id || activeCard.id,
+          reverse_card_id: choice.reverseCard?.id || null,
           quantity: 1,
           condition: activeCard.condition,
           printing: activeCard.printing,
@@ -937,6 +942,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
           )}
         </div>
       </fieldset>
+      {reversePrompt}
 
       {isFullScreen && (
         <CardImageZoom card={activeCard} onClose={() => setIsFullScreen(false)} />

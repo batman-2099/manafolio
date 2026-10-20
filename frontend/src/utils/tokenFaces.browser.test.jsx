@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import CardEntryFields from '../components/CardEntryFields';
 import CardImageZoom from '../components/CardImageZoom';
 import en from '../locales/en.json';
+import { useReverseTokenPrompt } from './useReverseTokenPrompt';
 
 // Run on an isolated styled Vite page; every network request stays in this fixture.
 // await (await import('/src/utils/tokenFaces.browser.test.jsx')).runTokenFaceRegressions()
@@ -14,15 +15,16 @@ export async function runTokenFaceRegressions() {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
-  const front = { id: 'mtg-front', name: 'Goblin', game: 'mtg', subtypes: ['Token'], image_url: '/mtg-card-back.webp' };
-  const back = { id: 'mtg-back', name: 'Soldier', game: 'mtg', subtypes: ['Token'], set_name: 'Fixture tokens', number: '2', language: 'English', image_url: '/logo.svg' };
+  const front = { id: 'mtg-front', name: 'Goblin', game: 'mtg', set_id: 'tst', subtypes: ['Token'], image_url: '/mtg-card-back.webp' };
+  const back = { id: 'mtg-back', name: 'Soldier', game: 'mtg', set_id: 'tst', subtypes: ['Token'], set_name: 'Fixture tokens', number: '2', language: 'English', image_url: '/logo.svg' };
   let selected = null;
   let fail = true;
   let searches = 0;
   window.fetch = async url => {
     if (String(url).startsWith('/api/search?')) {
       searches++;
-      return { ok: !fail, json: async () => [front, { ...back, id: 'non-token', subtypes: ['Creature'] }, back] };
+      assert(new URL(String(url), location.origin).searchParams.get('set') === 'tst', 'reverse search stays in the front set');
+      return { ok: !fail, json: async () => [front, { ...back, id: 'non-token', subtypes: ['Creature'] }, { ...back, id: 'other-set', set_id: 'else' }, back] };
     }
     if (String(url).startsWith('/api/card-art')) return { ok: true, json: async () => [] };
     throw new Error(`Unexpected request: ${url}`);
@@ -64,7 +66,38 @@ export async function runTokenFaceRegressions() {
     assert(flip.getAttribute('aria-pressed') === 'true' && host.querySelector('img').alt === 'Soldier', 'existing zoom flips to explicit reverse art');
     await act(async () => flip.click());
     assert(host.querySelector('img').alt === 'Goblin', 'flipping restores front artwork');
-    return { passed: ['no inferred pairing', 'labels', 'search error and retry', 'token-only filtering', 'explicit selection and clear', 'Arena exclusion', 'paired artwork flip'] };
+    let requestReverse;
+    const Prompt = () => {
+      const prompt = useReverseTokenPrompt();
+      requestReverse = prompt.requestReverse;
+      return prompt.reversePrompt;
+    };
+    const action = label => [...host.querySelectorAll('button')].find(button => button.textContent === label);
+    const closePrompt = async effect => {
+      const popped = new Promise(resolve => window.addEventListener('popstate', resolve, { once: true }));
+      await act(effect);
+      await popped;
+    };
+    await act(async () => root.render(<Prompt />));
+    assert((await requestReverse(front, { inventoryType: 'arena' })).reverseCard === null && !host.querySelector('dialog'), 'Arena bypasses the physical prompt');
+    assert((await requestReverse(front, { reverseCard: back })).reverseCard === back && !host.querySelector('dialog'), 'already chosen reverse does not ask twice');
+    let decision;
+    await act(async () => { decision = requestReverse(front); });
+    assert(host.querySelector('dialog[open]') && action(en['token.useReverse']).disabled, 'an unpaired token waits for an explicit decision');
+    await closePrompt(async () => action(en['common.cancel']).click());
+    assert(await decision === null, 'cancel aborts rather than adding an unpaired copy');
+    await act(async () => { decision = requestReverse(front); });
+    await closePrompt(async () => action(en['token.continueWithout']).click());
+    assert((await decision).reverseCard === null, 'explicit skip proceeds without inventing a reverse');
+    await act(async () => { decision = requestReverse(front); });
+    await search();
+    await select(back.id);
+    await closePrompt(async () => action(en['token.useReverse']).click());
+    assert((await decision).reverseCard.id === back.id, 'confirmation returns the selected same-set printing');
+    await act(async () => { decision = requestReverse(front); });
+    await closePrompt(async () => root.render(null));
+    assert(await decision === null, 'unmount cancels the pending addition');
+    return { passed: ['no inferred pairing', 'labels', 'search error and retry', 'token-only filtering', 'explicit selection and clear', 'Arena exclusion', 'paired artwork flip', 'prompt cancel/skip/select/unmount', 'already-paired bypass'] };
   } finally {
     await act(async () => root.unmount());
     host.remove();

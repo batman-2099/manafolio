@@ -6,6 +6,7 @@ import { resolveCardPrice, getPrintingPrice } from '../utils/resolveCardPrice';
 import { CONDITIONS, getPrintings } from '../utils/cardOptions';
 import CardEntryFields from './CardEntryFields';
 import { pairedCardName, reverseFace } from '../utils/tokenFaces';
+import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
 import Modal from './Modal';
 import { useBackGuard } from '../utils/useBackGuard';
 import { langName, langCode, getLanguagesForGame } from '../utils/languages';
@@ -87,6 +88,7 @@ function LangFallbackNote({ card, style, priceCheck = false }) {
 
 function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
   const { t } = useT();
+  const { requestReverse, reversePrompt } = useReverseTokenPrompt();
   const priceCheck = mode === 'price-check';
 
   const [stream, setStream] = useState(null);
@@ -105,6 +107,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
   const draftBusyRef = useRef(false);
   const [draftAction, setDraftAction] = useState(null);
   const draftActionRef = useRef(null);
+  const reviewedDrafts = useRef(new Set());
 
   const loadDrafts = useCallback(async (signal) => {
     if (priceCheck) return;
@@ -1032,15 +1035,25 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     draftBusyRef.current = true;
     setDraftBusy(true);
     setDraftError('');
-    // Preserve the duplicate guard while the staging request is in flight.
-    lastAddedIdRef.current = card.id;
+    let selectedReverse = null;
     try {
+      const choice = await requestReverse(card);
+      if (!choice) {
+        resolvedDupIdRef.current = card.id;
+        autoArmed.current = false;
+        capturedQuad.current = lastRawQuad.current;
+        return;
+      }
+      selectedReverse = choice.reverseCard;
+      // Preserve the duplicate guard while the staging request is in flight.
+      lastAddedIdRef.current = card.id;
       const autoPrinting = overrides?.printing || 'Normal';
       const response = await fetch('/api/scan-drafts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_id: card.id,
+          reverse_card_id: selectedReverse?.id || null,
           quantity: qty,
           condition: overrides?.condition || 'Near Mint',
           printing: autoPrinting,
@@ -1051,6 +1064,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
       });
       if (!response.ok) throw new Error('Could not queue card');
       const draft = await response.json();
+      reviewedDrafts.current.add(draft.draft_id);
       setScanDrafts(prev => [draft, ...prev]);
       showToast(t('scan.queued', { name: getCardDisplayName(card.name, card.printed_name) }), 'success');
       draftBusyRef.current = false;
@@ -1062,6 +1076,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
       // Keep manual candidates available for retry; automatic captures retain their editable fallback.
       if (!scanMatches.length) {
         openQuickAdd(card);
+        setReverseCard(selectedReverse);
         setQuantity(qty);
         if (overrides?.condition) setCondition(overrides.condition);
         if (overrides?.printing) setPrinting(overrides.printing);
@@ -1691,6 +1706,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
         method: 'DELETE',
       });
       if (!response.ok) throw new Error('Draft action failed');
+      reviewedDrafts.current.delete(draft.draft_id);
       setScanDrafts(prev => prev.filter(item => item.draft_id !== draft.draft_id));
     } catch {
       showToast(t('scan.errDraftAction'), 'error');
@@ -1710,6 +1726,24 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     setDraftAction(action);
     setDraftError('');
     try {
+      if (action === 'commit') {
+        for (const draft of scanDrafts) {
+          if (draft.reverse_card_id || reviewedDrafts.current.has(draft.draft_id)) continue;
+          const choice = await requestReverse(draft);
+          if (!choice) return;
+          if (choice.reverseCard) {
+            const response = await fetch(`/api/scan-drafts/${draft.draft_id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reverse_card_id: choice.reverseCard.id }),
+            });
+            if (!response.ok) throw new Error('Could not update scan draft reverse');
+            const updated = await response.json();
+            setScanDrafts(prev => prev.map(item => item.draft_id === updated.draft_id ? updated : item));
+          }
+          reviewedDrafts.current.add(draft.draft_id);
+        }
+      }
       const response = await fetch(action === 'clear' ? '/api/scan-drafts' : '/api/scan-drafts/commit', {
         method: action === 'clear' ? 'DELETE' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1718,6 +1752,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
       if (!response.ok) throw new Error('Could not update review batch');
       const result = await response.json();
       const submittedIds = new Set(draftIds);
+      draftIds.forEach(id => reviewedDrafts.current.delete(id));
       setScanDrafts(prev => prev.filter(draft => !submittedIds.has(draft.draft_id)));
       showToast(t(action === 'clear' ? 'scan.reviewCleared' : 'scan.batchAdded', { count: result.added }), 'success');
       if (action === 'commit') onAddSuccess();
@@ -1743,12 +1778,15 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     setDraftBusy(true);
     setDraftError('');
     try {
+      const choice = editingDraftId ? { reverseCard } : await requestReverse(selectedCard, { reverseCard });
+      if (!choice) return;
+      setReverseCard(choice.reverseCard);
       const response = await fetch(editingDraftId ? `/api/scan-drafts/${editingDraftId}` : '/api/scan-drafts', {
         method: editingDraftId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_id: selectedCard.id,
-          reverse_card_id: reverseCard?.id || null,
+          reverse_card_id: choice.reverseCard?.id || null,
           quantity: Number(quantity),
           condition,
           printing,
@@ -1762,6 +1800,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
         throw Object.assign(new Error('Could not save scan draft'), { detail: error?.error });
       }
       const draft = await response.json();
+      reviewedDrafts.current.add(draft.draft_id);
       setScanDrafts(prev => editingDraftId ? prev.map(item => item.draft_id === editingDraftId ? draft : item) : [draft, ...prev]);
       showToast(editingDraftId ? t('inspector.entryUpdated') : t('scan.queued', { name: getCardDisplayName(selectedCard.name, selectedCard.printed_name) }), 'success');
       draftBusyRef.current = false;
@@ -2950,6 +2989,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
           </div>
         )}
       </div></Modal>}
+      {reversePrompt}
     </div>
   );
 }

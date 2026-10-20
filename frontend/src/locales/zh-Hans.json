@@ -1,6 +1,10 @@
 {
   "token.reverse": "背面衍生物（可选）",
   "token.pairHint": "选择这张实体牌背面印制的衍生物。两面共用数量和存放位置，不会自动推断配对。",
+  "token.promptTitle": "背面是什么？",
+  "token.promptHint": "请选择同一系列的衍生物。如果背面未知或为空白，可以不指定背面继续。取消将停止此次添加。",
+  "token.continueWithout": "不指定背面继续",
+  "token.useReverse": "使用所选背面",
   "token.reversePrinting": "背面版本",
   "token.none": "无单独的背面衍生物",
   "token.searchError": "衍生物搜索失败，请重试。",

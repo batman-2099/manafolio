@@ -8,13 +8,22 @@ import { useEffect, useRef } from 'react';
 // rather than navigating away. Closing via a button/backdrop instead consumes
 // the pushed entry with history.back() so history never accumulates.
 
-const stack = []; // { close } entries, topmost last
+const stack = []; // { close, pushed } entries, topmost last
 let ignorePops = 0; // pops we triggered ourselves (programmatic close)
 let listening = false;
 
 function onPopState() {
   if (ignorePops > 0) {
     ignorePops--;
+    if (ignorePops > 0) window.history.back();
+    else {
+      // A replacement modal must not push into history while an older one is popping.
+      for (const entry of stack) {
+        if (entry.pushed) continue;
+        window.history.pushState({ backGuard: true }, '');
+        entry.pushed = true;
+      }
+    }
     return;
   }
   const entry = stack.pop();
@@ -33,16 +42,15 @@ export function pushBackGuard(onClose) {
     window.addEventListener('popstate', onPopState);
     listening = true;
   }
-  const entry = { close: onClose };
+  const entry = { close: onClose, pushed: ignorePops === 0 };
   stack.push(entry);
-  window.history.pushState({ backGuard: true }, '');
+  if (entry.pushed) window.history.pushState({ backGuard: true }, '');
 
   return () => {
     const i = stack.indexOf(entry);
     if (i === -1) return; // already popped by a back gesture
     stack.splice(i, 1);
-    ignorePops++;
-    window.history.back();
+    if (entry.pushed && ++ignorePops === 1) window.history.back();
   };
 }
 

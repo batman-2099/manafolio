@@ -1079,12 +1079,19 @@ router.post('/collection', async (req, res) => {
 // set browse can be added in one action instead of one drawer per card.
 const BULK_ADD_MAX = 250;
 router.post('/collection/bulk-add', async (req, res) => {
-  const { card_ids = [], ...shared } = req.body;
+  const { card_ids = [], reverse_card_ids, ...shared } = req.body;
   if (!Array.isArray(card_ids) || card_ids.length === 0) {
     return res.status(400).json({ error: 'card_ids is required' });
   }
   if (card_ids.length > BULK_ADD_MAX) {
     return res.status(400).json({ error: `Cannot add more than ${BULK_ADD_MAX} cards at once.` });
+  }
+  if (reverse_card_ids !== undefined && (
+    !reverse_card_ids || typeof reverse_card_ids !== 'object' || Array.isArray(reverse_card_ids)
+    || Object.entries(reverse_card_ids).some(([id, reverse]) => !card_ids.includes(id)
+      || (reverse !== null && (typeof reverse !== 'string' || !reverse.trim())))
+  )) {
+    return res.status(400).json({ error: 'reverse_card_ids must map selected card IDs to reverse card IDs or null.' });
   }
   // Every field in `shared` is applied to every card, which a cert number cannot
   // survive: it identifies one slab. Rejected rather than dropped, because silently
@@ -1101,7 +1108,9 @@ router.post('/collection/bulk-add', async (req, res) => {
   const failed = [];
   for (const card_id of card_ids) {
     try {
-      const result = await addCardToCollection(req.user, { ...shared, card_id });
+      const reverse_card_id = reverse_card_ids && Object.hasOwn(reverse_card_ids, card_id)
+        ? reverse_card_ids[card_id] : shared.reverse_card_id;
+      const result = await addCardToCollection(req.user, { ...shared, card_id, reverse_card_id });
       added.push({ card_id, id: result.id });
     } catch (error) {
       if (!(error instanceof AddCardError)) console.error(error);

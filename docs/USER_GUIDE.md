@@ -415,17 +415,19 @@ Quantities must be positive whole numbers. Certified slabs stay separate from ra
 Record **one physical item**, not one owned copy for each face.
 
 1. Add the visible token, or open an owned token and choose **Edit Card**.
-2. In **Reverse token (optional)**, search for the other face. Use its set and collector number to narrow the results, then choose the exact **Reverse printing**. Check the artwork; Manafolio never guesses the reverse.
+2. In **Reverse token (optional)**, search for the other face. **Set** is fixed to the visible face's set; use the name or collector number to narrow the results, then choose the exact **Reverse printing**. Both faces must belong to the same set. Check the artwork; Manafolio never guesses the reverse.
 3. Save the entry. Its quantity counts physical cards: three Goblin / Soldier tokens are three cards, not six. Both faces share the same storage location, missing status, and reservation.
 4. Search by either face. Open the inspector or enlarged artwork and choose **Flip card** to view the other side. Choose **Face to add to deck** when adding an owned pair to a deck.
 
+Adding an unpaired token through Quick Add, Rapid Add, bulk selection, scanning, a related token's container action, or duplication opens **What is on the reverse side?** before saving. Trade also asks when selecting a token to receive. Choose **Use selected reverse**, **Continue without reverse** for an unknown/blank back, or **Cancel** to stop the addition. Arena and already-paired additions skip the prompt. Bulk selection asks about each token before adding any selected cards.
+
 Different reverse pairings remain separate stacks. Choose **No separate reverse token** to clear an incorrect pairing; this does not delete the physical item. Return checked-out copies before changing their identity. Pairing is not available in Arena; Physical, Wishlist, and Graveyard entries retain it when transferred between those lists.
 
-In **Scan review**, confirm the reverse manually before adding the batch. Recognizing one face never establishes the other. A token can remain unpaired when its reverse is unknown.
+Scanning asks before queuing a new unpaired token. **Scan review** also asks before committing older unpaired drafts that have not been reviewed in the current session. Cancelling never adds owned inventory; reviewed reverse choices may remain on drafts for the next attempt. Recognizing one face never establishes the other. Existing drafts can still be edited to correct or clear a reverse.
 
 One copy can supply either face, never both simultaneously. Checkout, Shopping List planning, and AI draft validation share that physical capacity. Deck definitions may still describe missing copies; they do not create ownership. Related-token ownership includes paired reverse faces, but remains name-based—check the token's rules and stats.
 
-Complete account backups and Manafolio's own JSON/CSV exports preserve explicit pairing. The internal CSV column is **Reverse Card ID**; formats without that field cannot describe the pairing.
+Complete account backups and Manafolio's own JSON/CSV exports preserve explicit pairing. The internal CSV column is **Reverse Card ID**; formats without that field cannot describe the pairing. File imports use their supplied pairing data without opening per-token prompts.
 
 
 ### Change several entries together

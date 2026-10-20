@@ -1,6 +1,10 @@
 {
   "token.reverse": "Jeton au verso (facultatif)",
   "token.pairHint": "Choisissez le jeton imprimé au verso de cette carte physique. Les deux faces partagent la quantité et l’emplacement ; aucune association n’est automatique.",
+  "token.promptTitle": "Qu’y a-t-il au verso ?",
+  "token.promptHint": "Choisissez un jeton de la même extension ou continuez sans verso s’il est inconnu ou vierge. Annuler interrompt cet ajout.",
+  "token.continueWithout": "Continuer sans verso",
+  "token.useReverse": "Utiliser le verso choisi",
   "token.reversePrinting": "Édition du verso",
   "token.none": "Aucun jeton distinct au verso",
   "token.searchError": "La recherche de jetons a échoué. Réessayez.",

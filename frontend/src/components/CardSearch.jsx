@@ -16,6 +16,7 @@ import { useT } from '../utils/i18n';
 import { readProgressStream } from '../utils/importStream';
 import { downloadBlob } from '../utils/downloadBlob';
 import { useBackGuard } from '../utils/useBackGuard';
+import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
 
 const CSV_FIELDS = [
   ['name', 'csvMapping.name', ['name', 'card name', 'card']],
@@ -83,6 +84,7 @@ function ImportLog({ entries }) {
 
 function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   const { t } = useT();
+  const { requestReverse, reversePrompt } = useReverseTokenPrompt();
   const [query, setQuery] = useState('');
   const [numberQuery, setNumberQuery] = useState('');
   const [setCodeQuery, setSetCodeQuery] = useState('');
@@ -435,18 +437,26 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
     if (bulkPending.current || !event.currentTarget.reportValidity()) return;
     const submittedQuantity = Number(quantity);
     if (!Number.isSafeInteger(submittedQuantity) || submittedQuantity < 1) return;
-    const ids = filteredAndSortedCards.filter(c => selectedIds.has(c.id)).map(c => c.id);
+    const selectedCards = filteredAndSortedCards.filter(c => selectedIds.has(c.id));
+    const ids = selectedCards.map(c => c.id);
     if (ids.length === 0) { showToast(t('search.errNoneSelected'), 'error'); return; }
     const submittedInventory = addToArena ? 'arena' : 'collection';
     bulkPending.current = true;
     setBulkAdding(true);
-    setBulkErrors([]);
+    const reverseCardIds = {};
     try {
+      for (const card of selectedCards) {
+        const choice = await requestReverse(card, { inventoryType: submittedInventory });
+        if (!choice) return;
+        reverseCardIds[card.id] = choice.reverseCard?.id || null;
+      }
+      setBulkErrors([]);
       const response = await fetch('/api/collection/bulk-add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_ids: ids,
+          reverse_card_ids: reverseCardIds,
           quantity: submittedQuantity,
           condition,
           printing,
@@ -488,11 +498,14 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   // Enter press becomes exactly one row, so undo removes exactly what it added
   // (an unstacked qty-3 add would leave two orphan copies behind).
   const addCardNow = async (card) => {
+    const choice = await requestReverse(card, { inventoryType: addToArena ? 'arena' : 'collection' });
+    if (!choice) return null;
     const response = await fetch('/api/collection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         card_id: card.id,
+        reverse_card_id: choice.reverseCard?.id || null,
         quantity: parseInt(quantity, 10) || 1,
         condition,
         printing,
@@ -563,6 +576,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
       }
 
       const result = await addCardNow(hit);
+      if (!result) return;
       if (!addToArena && defaultAddLocation) {
         showToast(result.placement
           ? t('search.addedToContainer', { name: displayName(hit), location: result.placement.label })
@@ -726,12 +740,15 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
     const listType = addToArena && action === 'collection' ? 'arena' : action;
 
     try {
+      const choice = await requestReverse(selectedCard, { inventoryType: listType, reverseCard });
+      if (!choice) return;
+      setReverseCard(choice.reverseCard);
       const response = await fetch('/api/collection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_id: selectedCard.id,
-          reverse_card_id: listType === 'arena' ? null : reverseCard?.id || null,
+          reverse_card_id: choice.reverseCard?.id || null,
           quantity: parseInt(quantity, 10),
           condition,
           printing,
@@ -1668,6 +1685,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
         <CardImageZoom card={selectedCard} onClose={() => setIsFullScreen(false)} />
       )}
       </fieldset>
+      {reversePrompt}
     </div>
   );
 }

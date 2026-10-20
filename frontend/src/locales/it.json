@@ -1,6 +1,10 @@
 {
   "token.reverse": "Pedina sul retro (facoltativa)",
   "token.pairHint": "Scegli la pedina stampata sul retro di questa carta fisica. Entrambe le facce condividono quantità e posizione; l’abbinamento non è automatico.",
+  "token.promptTitle": "Cosa c’è sul retro?",
+  "token.promptHint": "Scegli una pedina della stessa espansione o continua senza retro se è sconosciuto o vuoto. Annulla interrompe questa aggiunta.",
+  "token.continueWithout": "Continua senza retro",
+  "token.useReverse": "Usa il retro selezionato",
   "token.reversePrinting": "Edizione del retro",
   "token.none": "Nessuna pedina separata sul retro",
   "token.searchError": "Ricerca delle pedine non riuscita. Riprova.",

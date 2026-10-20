@@ -1,6 +1,10 @@
 {
   "token.reverse": "Ficha del reverso (opcional)",
   "token.pairHint": "Elige la ficha impresa al otro lado de esta carta física. Ambas caras comparten cantidad y ubicación; no se emparejan automáticamente.",
+  "token.promptTitle": "¿Qué hay en el reverso?",
+  "token.promptHint": "Elige una ficha de la misma colección o continúa sin reverso si lo desconoces o está en blanco. Cancelar detiene esta adición.",
+  "token.continueWithout": "Continuar sin reverso",
+  "token.useReverse": "Usar el reverso elegido",
   "token.reversePrinting": "Edición del reverso",
   "token.none": "Sin ficha separada en el reverso",
   "token.searchError": "Error al buscar fichas. Vuelve a buscar.",

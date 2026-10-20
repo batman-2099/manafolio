@@ -16,7 +16,7 @@ async function main() {
   try {
     await db.initDb();
     for (const [id, name] of [['mtg-front', 'Soldier'], ['mtg-back', 'Spirit'], ['mtg-third', 'Treasure']]) {
-      await db.run(`INSERT INTO card_cache (id, name, game, supertype, language) VALUES (?, ?, 'mtg', 'Token', 'en')`, [id, name]);
+      await db.run(`INSERT INTO card_cache (id, name, game, supertype, language, set_id) VALUES (?, ?, 'mtg', 'Token', 'en', 'tst')`, [id, name]);
     }
     const pair = (await db.run(`INSERT INTO collection (card_id, reverse_card_id, quantity, user_id) VALUES ('mtg-front', 'mtg-back', 1, 1)`)).lastID;
     const makeDeck = async (name, inventory = 'collection') => (await db.run('INSERT INTO decks (name, user_id, inventory_type) VALUES (?, 1, ?)', [name, inventory])).lastID;

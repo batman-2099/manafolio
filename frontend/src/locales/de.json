@@ -1,6 +1,10 @@
 {
   "token.reverse": "Rückseitiger Spielstein (optional)",
   "token.pairHint": "Wähle den Spielstein auf der Rückseite dieser physischen Karte. Beide Seiten teilen sich Menge und Lagerort; die Paarung wird nicht automatisch bestimmt.",
+  "token.promptTitle": "Was ist auf der Rückseite?",
+  "token.promptHint": "Wähle einen Spielstein aus demselben Set oder fahre ohne Rückseite fort, wenn sie unbekannt oder leer ist. Abbrechen stoppt das Hinzufügen.",
+  "token.continueWithout": "Ohne Rückseite fortfahren",
+  "token.useReverse": "Gewählte Rückseite verwenden",
   "token.reversePrinting": "Druckversion der Rückseite",
   "token.none": "Kein separater rückseitiger Spielstein",
   "token.searchError": "Spielsteinsuche fehlgeschlagen. Suche erneut.",

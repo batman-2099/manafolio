@@ -4,6 +4,9 @@ import Modal from './Modal';
 import AddToDeckSelect from './AddToDeckSelect';
 import { getSlotNumber } from '../utils/getSlotNumber';
 import { useT } from '../utils/i18n';
+import { langCode } from '../utils/languages';
+import { isMtgToken } from '../utils/tokenFaces';
+import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
 
 const MTG_CARD_ID = /^mtg-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -116,6 +119,7 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
 
 function TokenViewer({ token, inventoryType, disabled, onClose, onChanged }) {
   const { t } = useT();
+  const { requestReverse, reversePrompt } = useReverseTokenPrompt();
   const [locations, setLocations] = useState([]);
   const [locationsError, setLocationsError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -145,6 +149,17 @@ function TokenViewer({ token, inventoryType, disabled, onClose, onChanged }) {
     try {
       let quantity = 1;
       const source = token.owned_entries?.find(entry => String(entry.entry_id) === String(sourceEntryId));
+      let card = token;
+      let reverseCard = null;
+      if (kind === 'container') {
+        const metadata = await fetch(`/api/cards/${encodeURIComponent(token.id)}/printing?lang=${langCode(token.language || 'English')}&game=mtg`);
+        const printing = await metadata.json();
+        if (!metadata.ok || !printing?.id || !isMtgToken(printing) || !printing.set_id) throw new Error(printing?.error || t('search.errAddCard'));
+        const choice = await requestReverse(printing, { inventoryType });
+        if (!choice) return;
+        card = printing;
+        reverseCard = choice.reverseCard;
+      }
       const cardId = kind === 'deck' && source ? source.card_id : token.id;
       if (kind === 'deck') {
         const response = await fetch(`/api/decks/${destination}`);
@@ -157,7 +172,7 @@ function TokenViewer({ token, inventoryType, disabled, onClose, onChanged }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(kind === 'deck'
           ? { card_id: cardId, quantity, ...(inventoryType === 'collection' && sourceEntryId ? { source_entry_id: Number(sourceEntryId) } : {}) }
-          : { card_id: token.id, quantity: 1, list_type: inventoryType, location_id: Number(destination), condition: 'Near Mint', printing: 'Normal', language: token.language || 'English' }),
+          : { card_id: card.id, reverse_card_id: reverseCard?.id || null, quantity: 1, list_type: inventoryType, location_id: Number(destination), condition: 'Near Mint', printing: 'Normal', language: card.language || 'English' }),
       });
       const saved = await response.json();
       if (!response.ok) throw new Error(saved.error || t('search.errAddCard'));
@@ -174,6 +189,7 @@ function TokenViewer({ token, inventoryType, disabled, onClose, onChanged }) {
   }
 
   return (
+    <>
     <Modal onClose={() => { if (!pending.current) onClose(); }} aria-label={token.name}>
       <div className="glass-panel" style={{ width: 'min(440px, 100%)', maxHeight: '90dvh', overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={onClose}>{t('common.close')}</button>
@@ -197,5 +213,7 @@ function TokenViewer({ token, inventoryType, disabled, onClose, onChanged }) {
         {message && <p role="status">{message}</p>}
       </div>
     </Modal>
+      {reversePrompt}
+    </>
   );
 }

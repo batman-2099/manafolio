@@ -6,6 +6,9 @@ function assertTokenPair(front, reverse, listType) {
   if (listType === 'arena' || !isToken(front) || !isToken(reverse) || front.id === reverse.id) {
     throw Object.assign(new Error('Reverse faces require two distinct Magic tokens outside Arena'), { status: 400 });
   }
+  if (!front.set_id || !reverse.set_id || front.set_id.toLowerCase() !== reverse.set_id.toLowerCase()) {
+    throw Object.assign(new Error('Both token faces must belong to the same set'), { status: 400 });
+  }
 }
 
 async function validateReverseCard(front, reverseId, listType = 'collection') {

@@ -3,6 +3,7 @@ import { useT } from '../utils/i18n';
 import { CONDITIONS, getPrintings, getLanguageNamesForGame } from '../utils/cardOptions';
 import CardImage from './CardImage';
 import './TradeWorkbench.css';
+import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
 
 async function api(path, body, signal) {
   const response = await fetch(`/api/${path}`, { signal, ...(body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
@@ -18,6 +19,7 @@ const MAX_ROWS = 100;
 
 export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
   const { t } = useT();
+  const { requestReverse, reversePrompt } = useReverseTokenPrompt();
   const [entries, setEntries] = useState([]);
   const [giving, setGiving] = useState([]);
   const [receiving, setReceiving] = useState([]);
@@ -82,7 +84,7 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
   };
   const draft = () => ({ trade_id: tradeId.current,
     giving: giving.map(({ entry_id, quantity, snapshot }) => ({ entry_id, quantity: Number(quantity), snapshot })),
-    receiving: receiving.map(({ id, quantity, printing, language: lang, condition }) => ({ card_id: id, quantity: Number(quantity), printing, language: lang, condition })) });
+    receiving: receiving.map(({ id, quantity, printing, language: lang, condition, reverse_card_id }) => ({ card_id: id, quantity: Number(quantity), printing, language: lang, condition, ...(reverse_card_id ? { reverse_card_id } : {}) })) });
   const selectedIds = new Set(giving.map(card => card.entry_id));
   const available = new Map(entries.map(card => [card.entry_id, card]));
   const staleIds = new Set(giving.filter(card => available.get(card.entry_id)?.snapshot !== card.snapshot).map(card => card.entry_id));
@@ -169,7 +171,16 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
               <button className="btn btn-secondary" type="submit">{t('trade.search')}</button>
             </form>
             {receiving.length >= MAX_ROWS && <p id="trade-receiving-limit" role="status">{t('trade.rowLimit', { max: MAX_ROWS })}</p>}
-            {results && <><p>{t('trade.refine')}</p><ul className="scan-review-list trade-results">{results.map(card => <li className="scan-review-card" key={card.id}><CardImage card={card} loading="lazy" /><strong>{identity(card)}</strong><button className="btn btn-secondary" disabled={receiving.length >= MAX_ROWS} aria-describedby={receiving.length >= MAX_ROWS ? 'trade-receiving-limit' : undefined} onClick={() => { if (receiving.length >= MAX_ROWS) return; setSuccess(null); setReceiving([...receiving, { ...card, quantity: 1, printing: 'Normal', condition: 'Near Mint' }]); }}>{t('trade.add')}</button></li>)}</ul>{!results.length && <p>{t('trade.emptySearch')}</p>}</>}
+            {results && <><p>{t('trade.refine')}</p><ul className="scan-review-list trade-results">{results.map(card => <li className="scan-review-card" key={card.id}><CardImage card={card} loading="lazy" /><strong>{identity(card)}</strong><button className="btn btn-secondary" disabled={receiving.length >= MAX_ROWS} aria-describedby={receiving.length >= MAX_ROWS ? 'trade-receiving-limit' : undefined} onClick={() => {
+              if (busy || receiving.length >= MAX_ROWS) return;
+              run(async () => {
+                const choice = await requestReverse(card);
+                if (!choice) return;
+                setSuccess(null);
+                setReceiving(current => [...current, { ...card, quantity: 1, printing: 'Normal', condition: 'Near Mint',
+                  reverse_card_id: choice.reverseCard?.id || null }]);
+              });
+            }}>{t('trade.add')}</button></li>)}</ul>{!results.length && <p>{t('trade.emptySearch')}</p>}</>}
           </section>
         </div>
         <section className="trade-selection" aria-labelledby="trade-selection-title">
@@ -194,5 +205,6 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
         run(async signal => { setReview(await api('trades/review', draft(), signal)); heading.current?.focus(); });
       }}><button type="button" className="btn btn-secondary" disabled={busy} onClick={() => { if (canLeave()) reset(); }}>{t('common.cancel')}</button><button type="submit" className="btn btn-primary" disabled={busy || loading || staleIds.size > 0 || !giving.length || !receiving.length}>{busy ? t('common.loading') : t('trade.review')}</button></form>
     </>}
+    {reversePrompt}
   </section>;
 }
