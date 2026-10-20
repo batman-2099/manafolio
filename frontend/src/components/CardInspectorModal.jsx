@@ -584,6 +584,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
               </p>
             )}
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', fontWeight: 500 }}>
+              {setSymbols[setCode(activeCard)] && <img key={setCode(activeCard)} src={setSymbols[setCode(activeCard)]} alt="" width="20" height="20" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', verticalAlign: 'middle', marginRight: '0.35rem' }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
               {activeCard.set_name}
               {/* Set code alongside the native set name: it reads the same in every
                   language, so it is the part you can search or quote. The collector
@@ -720,13 +721,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                 {activeCard.cert_number && (
                   <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specCert')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.cert_number}</span></div>
                 )}
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.printing}</span>
-                  {(activeCard.set_name || setCode(activeCard)) && <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.35rem', color: 'var(--text-secondary)' }}>
-                    {setSymbols[setCode(activeCard)] && <img key={setCode(activeCard)} src={setSymbols[setCode(activeCard)]} alt="" width="20" height="20" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
-                    <span>{activeCard.set_name || setCode(activeCard)}</span>
-                  </div>}
-                </div>
+                <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.printing}</span></div>
                 <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specLanguage')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.language}</span></div>
               </div>
 

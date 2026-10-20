@@ -34,14 +34,15 @@ export async function runInspectorNavigationRegressions() {
   const click = async node => { assert(node, 'expected button exists'); await act(async () => node.click()); };
   const previous = () => button(en['inspector.previousCard']);
   const next = () => button(en['inspector.nextCard']);
-  const printing = () => [...host.querySelectorAll('span')].find(node => node.textContent === en['inspector.specPrinting']).parentElement;
+  const setDetails = () => [...host.querySelectorAll('p')].find(node => node.textContent.includes('Sample Set'));
   try {
     await act(async () => root.render(<Preview />));
     assert(previous().disabled && !next().disabled, 'first card has only next available');
-    assert(printing().textContent.includes('Sample Set 1') && printing().querySelector('img')?.getAttribute('src') === '/logo.svg', 'printing details show the current set name and symbol');
+    assert(setDetails().textContent.includes('Sample Set 1') && setDetails().querySelector('img')?.getAttribute('src') === '/logo.svg', 'set metadata shows the current symbol beside the name');
+    assert(host.textContent.split('Sample Set 1').length === 2, 'the set name is not duplicated under Printing');
     await click(next());
     assert(host.querySelector('.section-heading').textContent.includes('Sample 2'), 'same-printing entries navigate by entry identity');
-    assert(printing().textContent.includes('Sample Set 2') && !printing().querySelector('img'), 'navigation keeps the set name without leaking the previous set symbol');
+    assert(setDetails().textContent.includes('Sample Set 2') && !setDetails().querySelector('img'), 'navigation keeps the set name without leaking the previous set symbol');
     await click(button(en['inspector.editCard']));
     const notes = host.querySelector('textarea');
     await act(async () => {

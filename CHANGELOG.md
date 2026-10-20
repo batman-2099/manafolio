@@ -11,7 +11,7 @@ Release history starts with Manafolio 2.0.
 - Kept successive reverse prompts and scanner dialog handoffs on the current page by serializing shared browser-history cleanup.
 - Recognize cards from sets named with “Token” or “Tokens” as tokens regardless of type metadata, including reverse pairing, add prompts, and related-token suppression.
 - Automatically select the sole valid reverse printing returned by a token card-number search; name-only searches and ambiguous results still require a choice.
-- Show the set name and available set symbol directly beneath Printing in the card inspector.
+- Show the set symbol beside the existing set name beneath the card title in the inspector, without duplicating the set beneath Printing.
 
 ## 2.3.4 — 2026-10-13
 
