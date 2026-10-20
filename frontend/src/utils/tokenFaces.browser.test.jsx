@@ -20,11 +20,12 @@ export async function runTokenFaceRegressions() {
   let selected = null;
   let fail = true;
   let searches = 0;
+  let candidates = null;
   window.fetch = async url => {
     if (String(url).startsWith('/api/search?')) {
       searches++;
       assert(new URL(String(url), location.origin).searchParams.get('set') === 'tst', 'reverse search stays in the front set');
-      return { ok: !fail, json: async () => [front, { ...back, id: 'non-token', set_name: 'Ordinary Set', subtypes: ['Creature'] }, { ...back, id: 'other-set', set_id: 'else' }, back] };
+      return { ok: !fail, json: async () => candidates || [front, { ...back, id: 'non-token', set_name: 'Ordinary Set', subtypes: ['Creature'] }, { ...back, id: 'other-set', set_id: 'else' }, back] };
     }
     if (String(url).startsWith('/api/card-art')) return { ok: true, json: async () => [] };
     throw new Error(`Unexpected request: ${url}`);
@@ -57,6 +58,21 @@ export async function runTokenFaceRegressions() {
     assert(selected.id === back.id && host.querySelector('img')?.alt === 'Soldier', 'explicit selected printing is previewed');
     await select('');
     assert(selected === null, 'reverse can be cleared explicitly');
+    const numberInput = [...host.querySelectorAll('label')].find(label => label.textContent === en['search.cardNumber']).querySelector('input');
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(numberInput, '2');
+      numberInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => numberInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    assert(selected?.id === back.id && choice().value === back.id, 'number search selects its sole valid reverse and updates the dropdown');
+    await select('');
+    candidates = [back, { ...back, id: 'another-printing', language: 'German' }];
+    await search();
+    assert(selected === null && choice().value === '', 'ambiguous numbered results require an explicit printing choice');
+    candidates = [];
+    await search();
+    assert(selected === null && host.textContent.includes(en['token.noResults']), 'an unmatched number does not invent a reverse');
+    candidates = null;
     await act(async () => root.render(<Fields inventoryType="arena" />));
     assert(!input(), 'Arena does not offer physical pairing');
     const pair = { ...front, reverse_card_id: back.id, reverse_name: back.name, reverse_image_url: back.image_url };

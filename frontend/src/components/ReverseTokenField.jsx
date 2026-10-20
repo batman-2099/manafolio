@@ -28,8 +28,10 @@ export default function ReverseTokenField({ card, value, onChange, disabled = fa
       if (!response.ok) throw new Error();
       const data = await response.json();
       if (!controller.signal.aborted) {
-        setResults(data.filter(candidate => isMtgToken(candidate) && candidate.id !== (card.card_id || card.id)
-          && candidate.set_id?.toLowerCase() === setCode));
+        const matches = data.filter(candidate => isMtgToken(candidate) && candidate.id !== (card.card_id || card.id)
+          && candidate.set_id?.toLowerCase() === setCode);
+        setResults(matches);
+        if (number.trim() && matches.length === 1) onChange(matches[0]);
         setStatus('ready');
       }
     } catch {

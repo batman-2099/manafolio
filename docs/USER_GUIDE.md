@@ -417,7 +417,7 @@ Record **one physical item**, not one owned copy for each face.
 Cards in sets whose names contain **Token** or **Tokens** (case-insensitive) are treated as tokens even when their card type does not say Token. They receive the same reverse-side prompt and same-set pairing options.
 
 1. Add the visible token, or open an owned token and choose **Edit Card**.
-2. In **Reverse token (optional)**, search for the other face. **Set** is fixed to the visible face's set; use the name or collector number to narrow the results, then choose the exact **Reverse printing**. Both faces must belong to the same set. Check the artwork; Manafolio never guesses the reverse.
+2. In **Reverse token (optional)**, search for the other face. **Set** is fixed to the visible face's set. A card-number search with exactly one valid result selects that **Reverse printing** automatically; name-only searches or multiple results require you to choose a printing. Both faces must belong to the same set. Check the artwork before saving.
 3. Save the entry. Its quantity counts physical cards: three Goblin / Soldier tokens are three cards, not six. Both faces share the same storage location, missing status, and reservation.
 4. Search by either face. Open the inspector or enlarged artwork and choose **Flip card** to view the other side. Choose **Face to add to deck** when adding an owned pair to a deck.
 
