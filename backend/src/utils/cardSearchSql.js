@@ -51,7 +51,7 @@ function collectionQuery(game, { userId, name, number, setList = [], limit, offs
   let sql = `
     SELECT cc.*, SUM(c.quantity) AS owned_qty
     FROM collection c
-    JOIN card_cache cc ON c.card_id = cc.id
+    JOIN card_cache cc ON (c.card_id = cc.id OR c.reverse_card_id = cc.id)
     WHERE c.user_id = ? AND c.list_type = ? AND cc.game = ?
   `;
   const params = [userId, listType, game];

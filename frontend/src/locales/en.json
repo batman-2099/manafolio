@@ -1,4 +1,13 @@
 {
+  "token.reverse": "Reverse token (optional)",
+  "token.pairHint": "Choose the token printed on the other side of this physical card. Both faces share one quantity and storage location; no pairing is inferred.",
+  "token.reversePrinting": "Reverse printing",
+  "token.none": "No separate reverse token",
+  "token.searchError": "Token search failed. Try searching again.",
+  "token.noResults": "No tokens found. Try a different name.",
+  "token.flip": "Flip card",
+  "token.deckFace": "Face to add to deck",
+  "token.source": "Physical source",
   "offline.settingsTitle": "Offline collection lookup",
   "offline.title": "Offline collection",
   "offline.privacy": "Enable only on a device you trust. This saves your account name, card inventory, quantities, and storage locations in this browser for read-only lookup. Anyone with access to this browser profile may access the saved data. No artwork, prices, private notes, or credentials are included in the snapshot. Refresh is manual; browser storage can be evicted. This is not a backup.",

@@ -1,4 +1,13 @@
 {
+  "token.reverse": "背面衍生物（選填）",
+  "token.pairHint": "選擇這張實體牌背面印製的衍生物。兩面共用數量和存放位置，不會自動推斷配對。",
+  "token.reversePrinting": "背面版本",
+  "token.none": "無單獨的背面衍生物",
+  "token.searchError": "衍生物搜尋失敗，請重試。",
+  "token.noResults": "找不到衍生物，請嘗試其他名稱。",
+  "token.flip": "翻轉卡牌",
+  "token.deckFace": "加入套牌的牌面",
+  "token.source": "實體來源",
   "stocktake.title": "庫存盤點",
   "stocktake.slot": "位置 {slot}",
   "stocktake.verified": "已核實",

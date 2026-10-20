@@ -68,11 +68,13 @@ router.get('/:share_token/containers/:id', async (req, res) => {
     const rows = await db.all(`
       SELECT c.id AS entry_id, c.card_id, c.compartment_id, c.position, c.quantity, c.condition,
              c.printing, c.language, c.favorite, c.is_trade, c.market_value,
+             c.reverse_card_id, rc.name AS reverse_name, rc.printed_name AS reverse_printed_name, rc.image_url AS reverse_image_url,
              cc.name, cc.printed_name, cc.supertype, cc.subtypes, cc.types, cc.rarity,
              cc.set_id, cc.set_name, cc.number, cc.image_url, cc.game, cc.cmc, cc.color_identity,
              cc.price_trend, cc.price_normal, cc.price_holofoil, cc.price_currency
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
+      LEFT JOIN card_cache rc ON rc.id = c.reverse_card_id
       WHERE c.location_id = ? AND c.user_id = ? AND c.list_type = 'collection' AND cc.game = 'mtg'
       ORDER BY c.position ASC, c.id ASC
     `, [location.id, owner.id]);
@@ -119,6 +121,10 @@ router.get('/:share_token', async (req, res) => {
       SELECT
         c.id as entry_id,
         c.card_id,
+        c.reverse_card_id,
+        rc.name AS reverse_name,
+        rc.printed_name AS reverse_printed_name,
+        rc.image_url AS reverse_image_url,
         c.quantity,
         c.condition,
         c.printing,
@@ -150,6 +156,7 @@ router.get('/:share_token', async (req, res) => {
         l.name AS location_name
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
+      LEFT JOIN card_cache rc ON rc.id = c.reverse_card_id
       LEFT JOIN locations l ON c.location_id = l.id
       ${filterSql}
       ORDER BY c.added_at DESC

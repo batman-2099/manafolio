@@ -696,7 +696,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const unsortedCards = useMemo(() => {
     const search = unsortedFilters.search.toLowerCase();
     const cards = unsortedCollection.filter(card =>
-      (!search || [card.name, card.printed_name, card.set_name, card.number].some(value => String(value || '').toLowerCase().includes(search)))
+      (!search || [card.name, card.printed_name, card.reverse_name, card.reverse_printed_name, card.set_name, card.number].some(value => String(value || '').toLowerCase().includes(search)))
       && (!unsortedFilters.set || card.set_name === unsortedFilters.set)
       && (!unsortedFilters.type || [...(card.types || []), ...(card.subtypes || [])].includes(unsortedFilters.type))
       && (!unsortedFilters.color || typeCategory(card.types) === unsortedFilters.color)
@@ -1156,7 +1156,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     const compartmentIndex = new Map(compartments.map((compartment, index) => [compartment.id, index]));
     const cards = cardsInActiveLocation
       .filter(card =>
-        (!search || [card.name, card.printed_name, card.set_name, card.number].some(value => String(value || '').toLowerCase().includes(search)))
+        (!search || [card.name, card.printed_name, card.reverse_name, card.reverse_printed_name, card.set_name, card.number].some(value => String(value || '').toLowerCase().includes(search)))
         && (!containerFilters.set || card.set_name === containerFilters.set)
         && (!containerFilters.type || [...(card.types || []), ...(card.subtypes || [])].includes(containerFilters.type))
         && (!containerFilters.color || (card.color_identity || []).includes(containerFilters.color))
@@ -1179,7 +1179,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     if (!stackContainerCards) return containerListCards;
     const groups = {};
     containerListCards.forEach(card => {
-      let key = card.card_id;
+      let key = JSON.stringify([card.card_id, card.reverse_card_id || null]);
       if (stackContainerByCondition) key += `-${card.condition}`;
       if (stackContainerByPrinting) key += `-${card.printing}`;
       const foilQuantity = card.printing === 'Holofoil' ? card.quantity : 0;

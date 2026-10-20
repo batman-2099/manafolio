@@ -15,6 +15,7 @@ const { compartmentLabel, isBinderType, rebalanceCompartmentByScheme, stackKey }
 const { checkedOutAllocation, checkedOutSources, physicalCardEntries, sourceEntries, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { splitPrice } = require('../utils/splitPrice');
+const { validateReverseCard } = require('../utils/tokenPairing');
 
 const router = express.Router();
 const LIST_TYPES = ['collection', 'wishlist', 'arena', 'graveyard'];
@@ -34,9 +35,10 @@ async function attachOwnedQty(cards, userId, listType = 'collection') {
   const ids = cards.map(c => c.id).filter(Boolean);
   if (ids.length === 0) return;
   const rows = await db.all(
-    `SELECT card_id, SUM(quantity) AS qty FROM collection
-     WHERE user_id = ? AND list_type = ? AND card_id IN (${ids.map(() => '?').join(',')})
-     GROUP BY card_id`,
+    `SELECT cc.id AS card_id, SUM(c.quantity) AS qty FROM card_cache cc
+     JOIN collection c ON cc.id = c.card_id OR cc.id = c.reverse_card_id
+     WHERE c.user_id = ? AND c.list_type = ? AND cc.id IN (${ids.map(() => '?').join(',')})
+     GROUP BY cc.id`,
     [userId, listType ?? 'collection', ...ids]
   );
   const owned = new Map(rows.map(r => [r.card_id, r.qty]));
@@ -397,8 +399,8 @@ router.get('/collection', async (req, res) => {
     let filterSql = `WHERE c.user_id = ? AND c.list_type = ? AND cc.game = 'mtg'`;
     let filterParams = [req.user.id, listType];
     if (cardId !== undefined) {
-      filterSql += ` AND c.card_id = ?`;
-      filterParams.push(cardId);
+      filterSql += ` AND (c.card_id = ? OR c.reverse_card_id = ?)`;
+      filterParams.push(cardId, cardId);
     }
 
     if (isTrade !== undefined) {
@@ -414,6 +416,9 @@ router.get('/collection', async (req, res) => {
       SELECT
         c.id as entry_id,
         c.card_id,
+        c.reverse_card_id, rc.name AS reverse_name, rc.printed_name AS reverse_printed_name,
+        rc.image_url AS reverse_image_url, rc.set_id AS reverse_set_id,
+        rc.set_name AS reverse_set_name, rc.number AS reverse_number,
         c.quantity,
         c.condition,
         c.printing,
@@ -467,6 +472,7 @@ router.get('/collection', async (req, res) => {
         checked_out_decks.deck_names
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
+      LEFT JOIN card_cache rc ON rc.id = c.reverse_card_id
       LEFT JOIN locations l ON c.location_id = l.id
       LEFT JOIN storage_units su ON su.id = l.storage_unit_id AND su.user_id = c.user_id
       LEFT JOIN compartments cp ON c.compartment_id = cp.id
@@ -534,6 +540,7 @@ router.get('/collection/offline-snapshot', async (req, res) => {
       if (!user) return null;
       const rows = await db.all(`
         SELECT c.id AS entry_id, c.card_id, cc.name, cc.printed_name,
+          c.reverse_card_id, rc.name AS reverse_name, rc.printed_name AS reverse_printed_name,
           cc.set_id, cc.set_name, cc.number, c.quantity, c.list_type,
           c.printing, c.language, c.condition, cc.color_identity,
           COALESCE(c.missing, 0) AS missing,
@@ -542,6 +549,7 @@ router.get('/collection/offline-snapshot', async (req, res) => {
           CASE WHEN l.id IS NOT NULL THEN c.position ELSE NULL END AS position
         FROM collection c
         JOIN card_cache cc ON cc.id = c.card_id AND cc.game = c.game
+        LEFT JOIN card_cache rc ON rc.id = c.reverse_card_id
         LEFT JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
           AND c.list_type = 'collection' AND l.inventory_type = 'collection'
         LEFT JOIN storage_units su ON su.id = l.storage_unit_id AND su.user_id = c.user_id
@@ -675,6 +683,7 @@ async function addCardToCollection(user, body, preparedCard = null, inTransactio
       cardId = localized.id;
     }
     const effectiveGame = 'mtg';
+    const reverseCardId = await validateReverseCard(card, body.reverse_card_id, list_type);
     const insert = async () => {
 
     if (location_id) {
@@ -696,6 +705,7 @@ async function addCardToCollection(user, body, preparedCard = null, inTransactio
       quantity: count,
       userId: req.user.id,
       cardId,
+      reverseCardId,
       printing,
       language
     });
@@ -713,12 +723,12 @@ async function addCardToCollection(user, body, preparedCard = null, inTransactio
         INSERT INTO collection (
           card_id, user_id, quantity, condition, printing, language, purchase_price,
           location_id, compartment_id, position, is_trade, list_type, game,
-          grader, grade, cert_number
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          grader, grade, cert_number, reverse_card_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         cardId, req.user.id, count, condition, printing, language, purchase_price || 0,
         targetLocationId, resolved.compartment_id, resolved.position, is_trade ? 1 : 0, list_type, effectiveGame,
-        grader, gradeValue, certValue
+        grader, gradeValue, certValue, reverseCardId
       ]);
       lastInsertedId = result.lastID;
     } else {
@@ -727,12 +737,12 @@ async function addCardToCollection(user, body, preparedCard = null, inTransactio
           INSERT INTO collection (
             card_id, user_id, quantity, condition, printing, language, purchase_price,
             location_id, compartment_id, position, is_trade, list_type, game,
-            grader, grade, cert_number
-          ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            grader, grade, cert_number, reverse_card_id
+          ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
           cardId, req.user.id, condition, printing, language, purchase_price || 0,
           targetLocationId, resolved.compartment_id, resolved.position + (i * 0.001), is_trade ? 1 : 0, list_type, effectiveGame,
-          grader, gradeValue, certValue
+          grader, gradeValue, certValue, reverseCardId
         ]);
         lastInsertedId = result.lastID;
       }
@@ -762,8 +772,12 @@ async function addCardToCollection(user, body, preparedCard = null, inTransactio
 
 const SCAN_DRAFT_SELECT = `
   SELECT cc.*, d.id AS draft_id, d.card_id, d.quantity, d.condition, d.printing,
-    d.language, d.purchase_price, d.location_id
+    d.language, d.purchase_price, d.location_id, d.reverse_card_id,
+    rc.name AS reverse_name, rc.printed_name AS reverse_printed_name,
+    rc.image_url AS reverse_image_url, rc.set_id AS reverse_set_id,
+    rc.set_name AS reverse_set_name, rc.number AS reverse_number
   FROM scan_drafts d JOIN card_cache cc ON cc.id = d.card_id
+  LEFT JOIN card_cache rc ON rc.id = d.reverse_card_id
   WHERE d.user_id = ?`;
 
 async function getScanDraft(userId, id) {
@@ -812,6 +826,7 @@ async function normalizeScanDraft(body, previous = {}) {
   if (!card || card.game !== 'mtg') throw new AddCardError(400, 'Invalid Magic card');
   card = await cardApi.printingInLanguage(card, draft.language) || card;
   draft.card_id = card.id;
+  draft.reverse_card_id = await validateReverseCard(card, draft.reverse_card_id);
   return draft;
 }
 
@@ -842,10 +857,10 @@ router.post('/scan-drafts', async (req, res) => {
     const result = await db.withTransaction(async () => {
       await assertScanDraftLocation(draft, req.user.id);
       const inserted = await db.run(`INSERT INTO scan_drafts
-        (user_id, card_id, quantity, condition, printing, language, purchase_price, location_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+        (user_id, card_id, quantity, condition, printing, language, purchase_price, location_id, reverse_card_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
         req.user.id, draft.card_id, draft.quantity, draft.condition, draft.printing,
-        draft.language, draft.purchase_price, draft.location_id
+        draft.language, draft.purchase_price, draft.location_id, draft.reverse_card_id
       ]);
       return getScanDraft(req.user.id, inserted.lastID);
     });
@@ -862,10 +877,10 @@ router.patch('/scan-drafts/:id', async (req, res) => {
     const result = await db.withTransaction(async () => {
       await assertScanDraftLocation(draft, req.user.id);
       const updated = await db.run(`UPDATE scan_drafts SET
-        card_id = ?, quantity = ?, condition = ?, printing = ?, language = ?, purchase_price = ?, location_id = ?
+        card_id = ?, quantity = ?, condition = ?, printing = ?, language = ?, purchase_price = ?, location_id = ?, reverse_card_id = ?
         WHERE id = ? AND user_id = ?`, [
         draft.card_id, draft.quantity, draft.condition, draft.printing,
-        draft.language, draft.purchase_price, draft.location_id, req.params.id, req.user.id
+        draft.language, draft.purchase_price, draft.location_id, draft.reverse_card_id, req.params.id, req.user.id
       ]);
       if (!updated.changes) throw new AddCardError(404, 'Scan draft not found');
       return getScanDraft(req.user.id, req.params.id);
@@ -953,14 +968,16 @@ router.post('/cards/related-tokens', async (req, res) => {
       const commanderSet = commander?.set_id?.toLowerCase();
       const names = [...new Set(tokens.flatMap(token => [token.name, token.name.split(' // ')[0]]))];
       const rows = await db.all(`
-        SELECT DISTINCT c.card_id, cc.name, cc.image_url, cc.set_id, l.name AS location_name, l.type AS location_type,
+        SELECT c.id AS entry_id, c.card_id AS front_card_id, c.reverse_card_id, c.quantity,
+               cc.id AS card_id, cc.name, cc.image_url, cc.set_id, l.name AS location_name, l.type AS location_type,
                l.id AS location_id, cp.idx, cp.label, c.position
         FROM collection c
-        JOIN card_cache cc ON cc.id = c.card_id AND cc.game = 'mtg'
+        JOIN card_cache cc ON (cc.id = c.card_id OR cc.id = c.reverse_card_id) AND cc.game = 'mtg'
         LEFT JOIN compartments cp ON cp.id = c.compartment_id
         LEFT JOIN locations l ON l.id = COALESCE(cp.location_id, c.location_id)
           AND l.user_id = c.user_id AND l.inventory_type = 'collection'
         WHERE c.user_id = ? AND c.list_type = ? AND c.quantity > 0
+          AND COALESCE(c.missing, 0) = 0
           AND cc.name COLLATE NOCASE IN (${names.map(() => '?').join(',')})
         ORDER BY l.name, cp.idx, c.position, c.card_id
       `, [req.user.id, inventoryType, ...names]);
@@ -974,8 +991,19 @@ router.post('/cards/related-tokens', async (req, res) => {
         const selected = pool.find(row => row.card_id === token.id) || pool[0];
         token.matched_card_id = selected.card_id;
         token.image_url = selected.image_url;
+        token.source_entry_id = selected.entry_id;
+        const ownedEntries = [...new Map(matches.map(row => [row.entry_id, row])).values()];
+        token.owned_qty = ownedEntries.reduce((sum, row) => sum + row.quantity, 0);
+        token.owned_entries = ownedEntries.map(row => ({
+          entry_id: row.entry_id, card_id: row.card_id, front_card_id: row.front_card_id,
+          reverse_card_id: row.reverse_card_id, quantity: row.quantity,
+          location_id: inventoryType === 'collection' ? row.location_id : null,
+          location_name: inventoryType === 'collection' ? row.location_name : null,
+          compartment_display: inventoryType === 'collection' && row.location_id && row.idx != null ? compartmentLabel(row, row.location_type) : null,
+          position: inventoryType === 'collection' && row.location_id ? row.position : null,
+        }));
         token.owned = true;
-        for (const row of pool) {
+        for (const row of new Map(pool.map(row => [row.entry_id, row])).values()) {
           if (inventoryType === 'collection') {
             token.locations.push({
               location_name: row.location_name,
@@ -1242,6 +1270,8 @@ router.put('/collection/:id', async (req, res) => {
     }
     if (list_type !== undefined && !LIST_TYPES.includes(list_type)) return res.status(400).json({ error: 'Invalid list_type' });
     const nextListType = list_type ?? entry.list_type;
+    const reverseCardId = req.body.reverse_card_id === undefined ? entry.reverse_card_id : req.body.reverse_card_id;
+    await validateReverseCard(await db.get('SELECT * FROM card_cache WHERE id = ?', [entry.card_id]), reverseCardId, nextListType);
     const listChanged = nextListType !== entry.list_type;
     const placementChanged = (location_id !== undefined && String(location_id ?? '') !== String(entry.location_id ?? ''))
       || (compartment_id !== undefined && String(compartment_id ?? '') !== String(entry.compartment_id ?? ''));
@@ -1258,6 +1288,7 @@ router.put('/collection/:id', async (req, res) => {
         listType: nextListType,
         userId: req.user.id,
         cardId: entry.card_id,
+        reverseCardId,
         quantity: requestedQty ?? entry.quantity,
         printing: printing ?? entry.printing,
         language: language ?? entry.language,
@@ -1272,6 +1303,7 @@ router.put('/collection/:id', async (req, res) => {
     const updates = [];
     const params = [];
 
+    if (req.body.reverse_card_id !== undefined) { updates.push('reverse_card_id = ?'); params.push(reverseCardId); }
     if (requestedQty !== null) { updates.push('quantity = ?'); params.push(requestedQty); }
     if (condition !== undefined) { updates.push('condition = ?'); params.push(condition); }
     if (printing !== undefined) { updates.push('printing = ?'); params.push(printing); }
@@ -1283,6 +1315,7 @@ router.put('/collection/:id', async (req, res) => {
         if (card) {
           const localized = await cardApi.printingInLanguage(card, language);
           if (localized && localized.id && localized.id !== entry.card_id) {
+            await validateReverseCard(localized, reverseCardId, nextListType);
             updates.push('card_id = ?');
             params.push(localized.id);
           }
@@ -1352,7 +1385,7 @@ router.put('/collection/:id', async (req, res) => {
       params.push(id, req.user.id);
       await db.run(`UPDATE collection SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`, params);
       const updated = await db.get('SELECT * FROM collection WHERE id = ? AND user_id = ?', [id, req.user.id]);
-      if (reserved && (updated.card_id !== current.card_id || updated.list_type !== current.list_type)) {
+      if (reserved && (updated.card_id !== current.card_id || updated.reverse_card_id !== current.reverse_card_id || updated.list_type !== current.list_type)) {
         throw new AddCardError(409, 'Check in the deck before changing its checked-out card identity or inventory.');
       }
       if ((requestedQty !== null || grader !== undefined) && updated.cert_number && updated.quantity !== 1) {
@@ -1360,7 +1393,7 @@ router.put('/collection/:id', async (req, res) => {
       }
       // Freeze all legacy sources before quantity, identity or placement changes
       // can make fallback reservations switch to different physical copies.
-      if (requestedQty !== null || isMoving || language !== undefined || missing !== undefined) {
+      if (requestedQty !== null || isMoving || language !== undefined || missing !== undefined || req.body.reverse_card_id !== undefined) {
         for (const source of sources) {
           await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
             [source.deck_id, source.card_id, source.entry_id, source.quantity]);
@@ -1368,7 +1401,7 @@ router.put('/collection/:id', async (req, res) => {
       }
     }
 
-    if (isMoving && finalCompartmentId && finalLocationId) {
+    if ((isMoving || req.body.reverse_card_id !== undefined) && finalCompartmentId && finalLocationId) {
       const loc = await db.get(`SELECT sort_order, foil_sorting FROM locations WHERE id = ? AND user_id = ?`, [finalLocationId, req.user.id]);
       if (loc) await rebalanceCompartmentByScheme(db, finalCompartmentId, loc.sort_order, loc.foil_sorting);
     }
@@ -1546,6 +1579,9 @@ router.post('/collection/bulk', async (req, res) => {
       if (!LIST_TYPES.includes(value)) return res.status(400).json({ error: 'Invalid list_type' });
       const result = await db.withTransaction(async () => {
         if (value === 'graveyard') await assertArchivable(req.user.id, ids);
+        if (value === 'arena' && await db.get(`SELECT id FROM collection WHERE id IN (${placeholders}) AND user_id = ? AND reverse_card_id IS NOT NULL`, [...ids, req.user.id])) {
+          throw new AddCardError(400, 'Double-sided physical tokens cannot move to Arena');
+        }
         return db.run(`UPDATE collection SET
           location_id = CASE WHEN COALESCE(list_type, 'collection') = ? THEN location_id ELSE NULL END,
           compartment_id = CASE WHEN COALESCE(list_type, 'collection') = ? THEN compartment_id ELSE NULL END,
@@ -1615,7 +1651,7 @@ router.post('/collection/bulk', async (req, res) => {
       }
       const resolved = await resolveCompartmentAndPosition({
         locationId, userId: req.user.id, cardId: entry.card_id, printing: entry.printing, language: entry.language,
-        listType: entry.list_type, quantity: entry.quantity, excludeEntryId: entry.id
+        listType: entry.list_type, quantity: entry.quantity, excludeEntryId: entry.id, reverseCardId: entry.reverse_card_id
       });
       const finalLoc = resolved.compartment_id ? (resolved.location_id ?? locationId) : null;
       await db.run(`UPDATE collection SET location_id = ?, compartment_id = ?, position = ? WHERE id = ? AND user_id = ?`, [finalLoc, resolved.compartment_id, resolved.position, id, req.user.id]);

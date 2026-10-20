@@ -18,6 +18,7 @@ Built with React, Express, and SQLite, it runs as one Docker service or from sou
 
 - **Separate inventories:** Physical and Arena collections, Wishlist acquisition plans, and Graveyard archives. Wishlist and Graveyard do not inflate owned totals.
 - **Collection management:** Search exact printings, track condition, finish, language, purchase prices, and graded slabs; check set completion and estimated value.
+- **[Double-sided tokens](docs/USER_GUIDE.md#track-a-double-sided-token):** Explicitly pair two token faces, search either side, and flip the artwork while tracking one physical quantity, storage location, and checkout capacity.
 - **Physical storage:** Organize boxes and binders by page, row, and slot; group containers into storage units, print QR labels, and reconcile copies with Take Stock.
 - **Deck building and play:** Import lists and precons, choose commanders, simulate draws, track results, compare revisions, and reserve physical copies with storage-aware pull lists.
 - **Planning and trading:** Combine deck shortfalls into a Shopping List, add confirmed deficits to Wishlist, and review both sides of a Physical inventory exchange.

@@ -6,6 +6,7 @@ const REVERSE_CONDITION_MAP = {
 const EXPORT_STRATEGIES = {
   internal: (item) => ({
     'Card ID': item.card_id,
+    'Reverse Card ID': item.reverse_card_id || '',
     'Name': item.name || item.card_name || '',
     'Set Name': item.set_name || '',
     'Set ID': item.set_id || item.set_code || '',

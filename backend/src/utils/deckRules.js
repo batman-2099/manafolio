@@ -2,7 +2,7 @@
 // deck_cards (deck builder POST, the collection "add to deck" bulk action)
 // obeys them — the frontend checks were advisory and easy to bypass.
 const db = require('../db');
-const { validateDeckSource } = require('./collectionHelpers');
+const { validateDeckSource, planCardSources } = require('./collectionHelpers');
 
 function parseSubtypes(raw) {
   if (Array.isArray(raw)) return raw;
@@ -24,7 +24,7 @@ function isBasicLand(card, game = 'mtg') {
 // Validate setting a deck's copy count of `cardId` to `newQty`.
 // Returns { ok: true } or { ok: false, error }. Drafts enforce construction
 // rules without requiring inventory; additions also require owned copies.
-async function validateDeckAddition({ deckId, userId, cardId, newQty, dbClient, mode = 'addition' }) {
+async function validateDeckAddition({ deckId, userId, cardId, newQty, dbClient, mode = 'addition', sourceEntryId }) {
   const client = dbClient || db;
   const qty = parseInt(newQty, 10);
   if (!Number.isFinite(qty) || qty < 0) return { ok: false, error: 'Invalid quantity' };
@@ -38,12 +38,13 @@ async function validateDeckAddition({ deckId, userId, cardId, newQty, dbClient, 
   if (!deck) return { ok: false, error: 'Deck not found or unauthorized' };
   if (card.game !== deck.game) return { ok: false, error: 'Unsupported game' };
   const existing = await client.get(`SELECT quantity, source_entry_id FROM deck_cards WHERE deck_id = ? AND card_id = ?`, [deckId, cardId]);
+  const preferredSource = sourceEntryId === undefined ? existing?.source_entry_id : sourceEntryId;
   if (deck?.checked_out) {
     return existing?.quantity === qty ? { ok: true } : { ok: false, error: 'Return this deck before changing its cards' };
   }
-  if (mode !== 'draft' && qty > 0 && existing?.source_entry_id != null) {
+  if (mode !== 'draft' && qty > 0 && preferredSource != null) {
     try {
-      await validateDeckSource(userId, deckId, cardId, qty, existing.source_entry_id);
+      await validateDeckSource(userId, deckId, cardId, qty, preferredSource);
     } catch (error) {
       if (!error.status) throw error;
       return { ok: false, error: error.message };
@@ -52,12 +53,26 @@ async function validateDeckAddition({ deckId, userId, cardId, newQty, dbClient, 
   if (mode !== 'draft') {
     const inventoryType = deck.inventory_type || 'collection';
     const ownedRow = await client.get(
-      `SELECT COALESCE(SUM(quantity), 0) AS owned FROM collection
-       WHERE card_id = ? AND user_id = ? AND list_type = ?`, [cardId, userId, inventoryType]
+      `SELECT COALESCE(SUM(quantity), 0) AS owned, MAX(reverse_card_id IS NOT NULL) AS paired FROM collection
+       WHERE (card_id = ? OR reverse_card_id = ?) AND user_id = ? AND list_type = ?`, [cardId, cardId, userId, inventoryType]
     );
     const owned = ownedRow ? ownedRow.owned : 0;
     if (qty > owned) {
       return { ok: false, error: `You only own ${owned} ${owned === 1 ? 'copy' : 'copies'} of ${card.name}.` };
+    }
+    if (ownedRow?.paired) {
+      const entries = await client.all(`SELECT id AS entry_id, card_id, reverse_card_id, quantity, game, location_id, compartment_id
+        FROM collection WHERE user_id = ? AND list_type = ? AND game = ? AND quantity > 0`, [userId, inventoryType, deck.game]);
+      const cards = await client.all('SELECT card_id, quantity, source_entry_id FROM deck_cards WHERE deck_id = ? AND card_id != ? AND quantity > 0', [deckId, cardId]);
+      cards.push({ card_id: cardId, quantity: existing?.quantity || 0, source_entry_id: existing?.source_entry_id });
+      const before = planCardSources(entries, cards, deck.game).reduce((sum, plan) =>
+        sum + [...plan.values()].reduce((total, count) => total + count, 0), 0);
+      cards[cards.length - 1] = { card_id: cardId, quantity: qty, source_entry_id: preferredSource };
+      const after = planCardSources(entries, cards, deck.game).reduce((sum, plan) =>
+        sum + [...plan.values()].reduce((total, count) => total + count, 0), 0);
+      if (qty - (existing?.quantity || 0) > after - before) {
+        return { ok: false, error: 'A double-sided token can supply only one face at a time. Not enough physical copies for this deck.' };
+      }
     }
   }
 

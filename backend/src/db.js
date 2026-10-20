@@ -523,6 +523,13 @@ async function initDb() {
   }
 
   const collectionCols = await all(`PRAGMA table_info(collection)`);
+  if (!collectionCols.some(c => c.name === 'reverse_card_id')) {
+    await run(`ALTER TABLE collection ADD COLUMN reverse_card_id TEXT REFERENCES card_cache(id)`);
+  }
+  const scanDraftCols = await all(`PRAGMA table_info(scan_drafts)`);
+  if (!scanDraftCols.some(c => c.name === 'reverse_card_id')) {
+    await run(`ALTER TABLE scan_drafts ADD COLUMN reverse_card_id TEXT REFERENCES card_cache(id)`);
+  }
   if (!collectionCols.some(c => c.name === 'user_id')) {
     await run(`ALTER TABLE collection ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE`);
   }

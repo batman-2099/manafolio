@@ -4,10 +4,12 @@ const { parseCardRow } = require('./priceHelpers');
 const { isBasicLand } = require('./deckRules');
 const { normalizeMtgColorIdentity } = require('./mtgColors');
 const { normalizeBaseUrl } = require('../ollamaDeckClient');
-const { checkedOutAllocation } = require('./collectionHelpers');
+const { checkedOutAllocation, planCardSources } = require('./collectionHelpers');
 const DECK_TYPES = require('../../../shared/aiDeckTypes.json');
 const POWER_LEVELS = require('../../../shared/aiDeckPowerLevels.json');
 
+// Keep allocation details through card copies without exposing them in API JSON.
+const PHYSICAL_SOURCES = Symbol('physicalSources');
 const FORMATS = {
   'Commander / EDH': 'commander', Standard: 'standard', Pioneer: 'pioneer', Modern: 'modern',
   Legacy: 'legacy', Vintage: 'vintage', Pauper: 'pauper', Historic: 'historic',
@@ -201,71 +203,70 @@ function suggestionResponse(output) {
 async function inventory(userId, type, { include_checked_out = false, container_ids = [], sourceDeck: source } = {}) {
   inventoryType(type);
   containerIds(container_ids, type);
-  let selected;
-  const placeholders = container_ids.map(() => '?').join(',');
   if (container_ids.length) {
-    const locations = await db.all(`SELECT id FROM locations WHERE user_id = ? AND id IN (${placeholders}) AND inventory_type = 'collection'`, [userId, ...container_ids]);
+    const locations = await db.all(`SELECT id FROM locations WHERE user_id = ? AND id IN (${container_ids.map(() => '?').join(',')}) AND inventory_type = 'collection'`, [userId, ...container_ids]);
     if (locations.length !== container_ids.length) fail('Container not found.', 404);
-    const entries = await db.all(`
-      SELECT id, card_id, quantity, missing FROM collection
-      WHERE user_id = ? AND game = 'mtg' AND list_type = 'collection'
-        AND quantity > 0 AND location_id IN (${placeholders})`, [userId, ...container_ids]);
-    const allocations = include_checked_out ? new Map() : await checkedOutAllocation(userId, source?.id);
-    selected = new Map();
-    for (const entry of entries) {
-      const quantities = selected.get(entry.card_id) || { owned_qty: 0, missing_qty: 0, locked_qty: 0 };
-      if (entry.missing) quantities.missing_qty += entry.quantity;
-      else {
-        quantities.owned_qty += entry.quantity;
-        quantities.locked_qty += allocations.get(entry.id) || 0;
-      }
-      selected.set(entry.card_id, quantities);
-    }
   }
-  const rows = await db.all(`
-    WITH owned AS (
-      SELECT card_id,
-        SUM(CASE WHEN ? = 'collection' AND COALESCE(missing, 0) != 0 THEN 0 ELSE quantity END) AS owned_qty,
-        SUM(CASE WHEN ? = 'collection' AND COALESCE(missing, 0) != 0 THEN quantity ELSE 0 END) AS missing_qty
-      FROM collection WHERE user_id = ? AND game = 'mtg' AND list_type = ? AND quantity > 0 GROUP BY card_id
-    ), locked AS (
-      SELECT dc.card_id, SUM(dc.quantity) AS locked_qty FROM deck_cards dc JOIN decks d ON d.id = dc.deck_id
-      WHERE ? = 'collection' AND d.user_id = ? AND d.game = 'mtg'
-        AND d.inventory_type = 'collection' AND d.checked_out = 1 AND dc.quantity > 0
-        AND (? IS NULL OR d.id != ?) GROUP BY dc.card_id
-    )
-    SELECT cc.id, cc.name, cc.printed_name, cc.set_id, cc.set_name, cc.number, cc.game,
-      cc.supertype, cc.subtypes, cc.types, cc.color_identity, cc.cmc, cc.rarity, cc.image_url,
-      owned.owned_qty, owned.missing_qty, COALESCE(locked.locked_qty, 0) AS locked_qty
-    FROM owned JOIN card_cache cc ON cc.id = owned.card_id LEFT JOIN locked ON locked.card_id = cc.id
-    WHERE cc.game = 'mtg' ${selected ? `AND (cc.id IN (
-      SELECT card_id FROM collection WHERE user_id = ? AND location_id IN (${placeholders})
-        AND game = 'mtg' AND list_type = 'collection' AND quantity > 0
-    ) OR cc.id IN (SELECT card_id FROM deck_cards WHERE deck_id = ?))` : ''} ORDER BY cc.name, cc.id LIMIT ?`,
-  [type, type, userId, type, type, userId, source?.id ?? null, source?.id ?? null,
-    ...(selected ? [userId, ...container_ids, source?.id ?? null] : []), MAX_INVENTORY + 1]);
-  if (rows.length > MAX_INVENTORY) fail(`This inventory exceeds the ${MAX_INVENTORY}-printing AI limit; no cards were omitted or sent.`, 413);
+  const entries = await db.all(`SELECT id AS entry_id, card_id, reverse_card_id, quantity, missing,
+    location_id, compartment_id, game FROM collection
+    WHERE user_id = ? AND game = 'mtg' AND list_type = ? AND quantity > 0`, [userId, type]);
+  const allocated = type === 'collection' && !include_checked_out
+    ? await checkedOutAllocation(userId, source?.id) : new Map();
+  const reservedByFace = type === 'collection' && !include_checked_out
+    ? new Map((await db.all(`SELECT dc.card_id, SUM(dc.quantity) AS quantity
+      FROM deck_cards dc JOIN decks d ON d.id = dc.deck_id
+      WHERE d.user_id = ? AND d.inventory_type = 'collection' AND d.checked_out = 1
+        AND (? IS NULL OR d.id != ?) GROUP BY dc.card_id`, [userId, source?.id ?? null, source?.id ?? null]))
+      .map(row => [row.card_id, row.quantity])) : new Map();
+  const availableEntries = entries.filter(entry => type !== 'collection' || !entry.missing)
+    .map(entry => ({ ...entry, quantity: Math.max(0, entry.quantity - (allocated.get(entry.entry_id) || 0)) }));
+  const sourcePlans = planCardSources(availableEntries, source?.cards || [], 'mtg');
+  const sourceEntries = new Map();
+  for (const plan of sourcePlans) {
+    for (const [id, quantity] of plan) sourceEntries.set(id, (sourceEntries.get(id) || 0) + quantity);
+  }
+  const eligibleEntries = availableEntries.map(entry => ({
+    ...entry, quantity: !container_ids.length || container_ids.includes(entry.location_id)
+      ? entry.quantity : sourceEntries.get(entry.entry_id) || 0,
+  })).filter(entry => entry.quantity > 0);
   const sourceQuantities = new Map(source?.cards.map(card => [card.card_id, card.quantity]));
-  return rows.map(row => {
+  const rows = await db.all(`SELECT DISTINCT cc.* FROM card_cache cc JOIN collection c
+    ON (cc.id = c.card_id OR cc.id = c.reverse_card_id)
+    WHERE c.user_id = ? AND c.game = 'mtg' AND cc.game = 'mtg' AND c.list_type = ? AND c.quantity > 0
+      ${container_ids.length ? `AND (c.location_id IN (${container_ids.map(() => '?').join(',')})
+        OR cc.id IN (SELECT card_id FROM deck_cards WHERE deck_id = ?))` : ''}
+    ORDER BY cc.name, cc.id LIMIT ?`,
+  [userId, type, ...(container_ids.length ? [...container_ids, source?.id ?? null] : []), MAX_INVENTORY + 1]);
+  const cards = [];
+  for (const row of rows) {
+    const matches = entry => entry.card_id === row.id || entry.reverse_card_id === row.id;
+    const ownedEntries = entries.filter(matches);
+    const selected = container_ids.length ? ownedEntries.filter(entry => container_ids.includes(entry.location_id)) : ownedEntries;
+    const source_qty = sourceQuantities.get(row.id) || 0;
+    if (container_ids.length && !selected.length && !source_qty) continue;
+    const sum = (values, predicate) => values.reduce((total, entry) => total + (predicate(entry) ? entry.quantity : 0), 0);
+    const usable = entry => type !== 'collection' || !entry.missing;
+    const globalOwned = sum(ownedEntries, usable);
+    const owned_qty = Math.max(sum(selected, usable), Math.min(globalOwned, source_qty));
+    const missing_qty = Math.max(sum(selected, entry => !usable(entry)),
+      Math.min(sum(ownedEntries, entry => !usable(entry)), source_qty));
+    const sources = eligibleEntries.filter(matches);
+    const globalAvailable = Math.max(0, globalOwned - Math.max(reservedByFace.get(row.id) || 0,
+      ownedEntries.reduce((sum, entry) => sum + (allocated.get(entry.entry_id) || 0), 0)));
+    const selectedAvailable = availableEntries.filter(entry => matches(entry)
+      && (!container_ids.length || container_ids.includes(entry.location_id)))
+      .reduce((sum, entry) => sum + entry.quantity, 0);
+    const available_qty = Math.min(globalAvailable, Math.max(selectedAvailable, Math.min(globalAvailable, source_qty)));
     const card = parseCardRow(row);
-    const globalAvailable = Math.max(0, row.owned_qty - (type === 'collection' && include_checked_out ? 0 : row.locked_qty));
-    const source_qty = sourceQuantities.get(card.id) || 0;
-    const quantities = selected?.get(card.id) || (selected ? { owned_qty: 0, missing_qty: 0, locked_qty: 0 } : undefined);
-    const normalAvailable = quantities
-      ? Math.min(globalAvailable, Math.max(0, quantities.owned_qty - quantities.locked_qty))
-      : globalAvailable;
-    const available = Math.max(normalAvailable, Math.min(globalAvailable, source_qty));
-    const owned = quantities ? Math.max(quantities.owned_qty, Math.min(row.owned_qty, source_qty)) : row.owned_qty;
-    return {
-      ...card, ...(quantities ? {
-        owned_qty: owned, locked_qty: Math.max(0, owned - available),
-        missing_qty: Math.max(quantities.missing_qty, Math.min(row.missing_qty, source_qty)),
-      } : {}),
-      available_qty: available, source_qty,
+    cards.push({
+      ...card, owned_qty, missing_qty, locked_qty: Math.max(0, owned_qty - available_qty),
+      available_qty, source_qty, [PHYSICAL_SOURCES]: sources,
       color_identity: normalizeMtgColorIdentity(card.color_identity, card.subtypes.join(' '), card.name),
       color_identity_known: row.color_identity != null,
-    };
-  });
+    });
+  }
+  if (rows.length > MAX_INVENTORY) fail(`This inventory exceeds the ${MAX_INVENTORY}-printing AI limit; no cards were omitted or sent.`, 413);
+  return cards;
 }
 
 // The bulk catalog is read-only and optional. Never resolve missing cards through an external API.
@@ -320,6 +321,14 @@ function validateDraft(draft, cards) {
     byName.set(name, { total, limit });
     if (!isBasicLand(card, 'mtg') && total > limit) fail(`Cannot have more than ${limit} ${limit === 1 ? 'copy' : 'copies'} of ${card.name} across printings.`);
   }
+  const sources = new Map(cards.flatMap(card => (card[PHYSICAL_SOURCES] || []).map(entry => [entry.entry_id, entry])));
+  if (sources.size) {
+    const plans = planCardSources([...sources.values()], draft.cards, 'mtg');
+    if (draft.cards.some((card, index) =>
+      [...plans[index].values()].reduce((sum, quantity) => sum + quantity, 0) < card.quantity)) {
+      fail('The draft uses both faces of the same physical token. Each copy can supply only one face at a time. Edit the draft.', 409);
+    }
+  }
   if (commanderFormat) {
     const row = draft.cards.find(card => card.card_id === draft.commander_card_id);
     if (!row || row.quantity !== 1) fail('Choose exactly one commander included in the 100-card draft.');
@@ -357,6 +366,9 @@ function modelRequest(request, cards, sourceDeck) {
     card.mana_cost || '', card.cmc ?? null, card.color_identity || [],
     card.oracle_text || '', (format && card.legalities?.[format]) || 'unknown',
   ]);
+  const pairedSources = new Map(eligible.flatMap(card => (card[PHYSICAL_SOURCES] || [])
+    .filter(entry => entry.reverse_card_id).map(entry => [entry.entry_id, entry])));
+  const sharedTokens = [...pairedSources.values()].map(entry => [entry.card_id, entry.reverse_card_id, entry.quantity]);
   const prompt = `Help the user build and discuss a Magic: The Gathering deck using ONLY exact printing IDs from the supplied owned-card catalog.\n`
     + `Return JSON with message (a helpful response, at most 8000 characters) and draft (a complete deck or null), not a file or tool call. Do not browse, run commands, read files, use tools, or acquire cards.\n`
     + `Answer questions and ask clarifying questions with draft=null; do not replace a draft merely because the user asks about it. For a requested creation or change, return a complete revised draft, not a patch. An initial build request can use sensible defaults instead of unnecessary questions.\n`
@@ -369,8 +381,9 @@ function modelRequest(request, cards, sourceDeck) {
     + `Commander and Brawl require exactly 100 cards, a single eligible commander in the cards list, singleton nonbasics and its color identity. A legendary creature or a card with explicit commander rules is eligible; Brawl also permits planeswalkers. Other formats require commander_card_id=null. Use cached legality where present; warn when metadata is incomplete. Do not claim guaranteed tournament legality.\n`
     + `If no valid deck is possible or more information is needed, return draft=null and explain or ask in message; never invent cards or quantities.\n`
     + `Catalog rows are [id,name,available_qty,type_line,mana_cost,mana_value,color_identity,oracle_text,format_legality]. Empty rules text means unavailable metadata, not a card without abilities. Exact IDs distinguish printings; never merge their available quantities.\n`
+    + (sharedTokens.length ? `shared_token_copies rows are [front_id,reverse_id,quantity]. These quantities overlap the catalog counts, not additional copies. Each physical copy supplies either face, never both simultaneously.\n` : '')
     + (sourceDeck ? `When there is no current_draft, improve source_deck rather than building an unrelated deck. The eligible catalog already includes its owned, nonmissing cards up to source quantities even outside selected colors, sets or containers or within excluded_sets, without counting copies twice. Its own checkout is allowed for planning; other decks' reservations remain excluded unless explicitly included. Source context never grants copies missing from the catalog or overrides format legality. The original saved deck and checkout state are retained.\n` : '')
-    + JSON.stringify({ request: modelSettings, catalog, ...(sourceDeck ? { source_deck: sourceContext } : {}) });
+    + JSON.stringify({ request: modelSettings, catalog, ...(sharedTokens.length ? { shared_token_copies: sharedTokens } : {}), ...(sourceDeck ? { source_deck: sourceContext } : {}) });
   if (Buffer.byteLength(prompt, 'utf8') > MAX_PROMPT_BYTES) {
     fail(`This inventory exceeds the ${MAX_PROMPT_BYTES}-byte AI request limit; no cards were omitted or sent.`, 413);
   }

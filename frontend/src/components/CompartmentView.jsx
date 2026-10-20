@@ -25,7 +25,7 @@ function stackPocketCards(cards, highlightSet, pulledSet) {
   const priority = card => highlightSet?.has(card.entry_id) ? 2 : pulledSet?.has(card.entry_id) ? 1 : 0;
   const stacks = new Map();
   for (const card of cards) {
-    const key = `${card.card_id}|${card.printing || 'Normal'}|${card.language || 'English'}`;
+    const key = JSON.stringify([card.card_id, card.reverse_card_id || null, card.printing || 'Normal', card.language || 'English']);
     const held = stacks.get(key);
     if (!held) {
       stacks.set(key, { ...card, quantity: card.quantity || 1, stack_entries: [card] });

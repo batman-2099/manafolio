@@ -1,4 +1,13 @@
 {
+  "token.reverse": "裏面のトークン（任意）",
+  "token.pairHint": "この実物カードの裏面に印刷されたトークンを選んでください。両面で数量と保管場所を共有します。組み合わせは自動判定されません。",
+  "token.reversePrinting": "裏面の版",
+  "token.none": "別の裏面トークンなし",
+  "token.searchError": "トークンの検索に失敗しました。再検索してください。",
+  "token.noResults": "トークンが見つかりません。別の名前を試してください。",
+  "token.flip": "カードを裏返す",
+  "token.deckFace": "デッキに追加する面",
+  "token.source": "実物カードの保管元",
   "stocktake.title": "棚卸し",
   "stocktake.slot": "スロット {slot}",
   "stocktake.verified": "確認済み",

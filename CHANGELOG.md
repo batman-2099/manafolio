@@ -2,6 +2,11 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Added explicit double-sided token pairing in add/edit and scan review, with searchable faces and flippable artwork. Each pair remains one physical item with shared quantity, placement, and checkout capacity; different pairings stay separate.
+- Preserved paired identities through storage operations, account backups, and internal JSON/CSV exports. Related-token ownership, Shopping List planning, and AI draft validation account for shared physical copies without inventing reverse pairings.
+
 ## 2.3.4 — 2026-10-13
 
 - Corrected bulk-add partial-success handling: failed cards remain selected with errors for retry, and only successful Physical additions update Physical counts. Invalid bulk quantities and container layout counts are rejected instead of silently replaced.

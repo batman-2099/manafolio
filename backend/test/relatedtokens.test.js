@@ -69,6 +69,14 @@ async function main() {
       });
       const data = await response.json();
       assert.strictEqual(response.status, status, JSON.stringify(data));
+      if (data.tokens) data.tokens = data.tokens.map(({ source_entry_id, owned_qty, owned_entries, ...token }) => {
+        if (token.owned) {
+          assert.ok(owned_entries.some(entry => entry.entry_id === source_entry_id && entry.card_id === token.matched_card_id));
+          assert.strictEqual(owned_qty, owned_entries.reduce((sum, entry) => sum + entry.quantity, 0));
+          assert.strictEqual(new Set(owned_entries.map(entry => entry.entry_id)).size, owned_entries.length);
+        }
+        return token;
+      });
       return data;
     }
     const calls = [];

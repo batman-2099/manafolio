@@ -1,6 +1,8 @@
 import { useId } from 'react';
 import { CONDITIONS, getPrintings, getLanguageNamesForGame, GRADERS, GRADES } from '../utils/cardOptions';
 import { useT } from '../utils/i18n';
+import ReverseTokenField from './ReverseTokenField';
+import { isMtgToken } from '../utils/tokenFaces';
 
 // Shared quantity / purchase-price / condition / printing / language inputs for
 // the add-card and edit-card flows. Presentational only: the parent owns the
@@ -15,6 +17,7 @@ export default function CardEntryFields({
   variant = 'grid', game, quantityMax,
   grader = 'Raw', grade = '', certNumber = '',
   onGrader, onGrade, onCertNumber,
+  card, reverseCard, onReverseCard, inventoryType, disabled = false,
 }) {
   const { t } = useT();
   const fieldId = useId();
@@ -117,10 +120,13 @@ export default function CardEntryFields({
     </div>
   );
 
+  const Reverse = onReverseCard && inventoryType !== 'arena' && isMtgToken(card) && (
+    <ReverseTokenField key={card.card_id || card.id} card={card} value={reverseCard} onChange={onReverseCard} disabled={disabled} />
+  );
   if (stacked) {
     return (
       <div className="quick-add-fields-group">
-        {Quantity}{Price}{Condition}{Printing}{Language}
+        {Quantity}{Price}{Condition}{Printing}{Language}{Reverse}
       </div>
     );
   }
@@ -129,6 +135,7 @@ export default function CardEntryFields({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.75rem' }}>{Quantity}{Price}</div>
       <div className="card-entry-fields-row-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.75rem' }}>{Condition}{Printing}{Language}</div>
       {Grading}
+      {Reverse}
     </>
   );
 }

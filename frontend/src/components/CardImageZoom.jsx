@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import CardImage from './CardImage';
 import { useT } from '../utils/i18n';
+import { reverseFace } from '../utils/tokenFaces';
 
 // Full-screen card art viewer, shared by the collection inspector and the
 // Search & Add quick-add drawer so "tap the art to enlarge" works the same
@@ -17,6 +18,8 @@ export default function CardImageZoom({ card, onClose }) {
   const { t } = useT();
   const dialogRef = useRef(null);
   const closeRef = useRef(null);
+  const [flipped, setFlipped] = useState(false);
+  const reverse = reverseFace(card);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -72,8 +75,11 @@ export default function CardImageZoom({ card, onClose }) {
       >
         <X size={20} />
       </button>
+      {reverse && <button type="button" className="btn btn-secondary" aria-pressed={flipped} onClick={event => { event.stopPropagation(); setFlipped(value => !value); }} style={{ position: 'absolute', bottom: '1rem', zIndex: 10 }}>
+        {t('token.flip')}
+      </button>}
       <CardImage
-        card={card}
+        card={flipped ? reverse : card}
         onClick={(e) => e.stopPropagation()}
         style={{
           maxHeight: '88vh',

@@ -1,4 +1,13 @@
 {
+  "token.reverse": "뒷면 토큰 (선택 사항)",
+  "token.pairHint": "이 실물 카드의 뒷면에 인쇄된 토큰을 선택하세요. 양면은 수량과 보관 위치를 공유하며 자동으로 연결되지 않습니다.",
+  "token.reversePrinting": "뒷면 판본",
+  "token.none": "별도의 뒷면 토큰 없음",
+  "token.searchError": "토큰 검색에 실패했습니다. 다시 검색하세요.",
+  "token.noResults": "토큰이 없습니다. 다른 이름으로 검색하세요.",
+  "token.flip": "카드 뒤집기",
+  "token.deckFace": "덱에 추가할 면",
+  "token.source": "실물 보관 위치",
   "stocktake.title": "재고 실사",
   "stocktake.slot": "슬롯 {slot}",
   "stocktake.verified": "확인됨",

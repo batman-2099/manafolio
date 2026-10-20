@@ -1,4 +1,13 @@
 {
+  "token.reverse": "Ficha no verso (opcional)",
+  "token.pairHint": "Escolha a ficha impressa no verso desta carta física. Ambas as faces compartilham quantidade e localização; nenhuma combinação é automática.",
+  "token.reversePrinting": "Edição do verso",
+  "token.none": "Sem ficha separada no verso",
+  "token.searchError": "A busca de fichas falhou. Tente novamente.",
+  "token.noResults": "Nenhuma ficha encontrada. Tente outro nome.",
+  "token.flip": "Virar carta",
+  "token.deckFace": "Face para adicionar ao deck",
+  "token.source": "Origem física",
   "stocktake.title": "Conferência de estoque",
   "stocktake.slot": "Posição {slot}",
   "stocktake.verified": "Verificada",

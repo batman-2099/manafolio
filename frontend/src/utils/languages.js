@@ -42,6 +42,7 @@ export function getLanguagesForGame(game) {
 
 export const getLanguageNamesForGame = (game) => getLanguagesForGame(game).map(l => l.name);
 
+import { pairedCardName } from './tokenFaces.js';
 import { getCardDisplayName } from './langHelper.js';
 
 // The card name to show: providers give us the localized name (printed_name) for
@@ -49,7 +50,7 @@ import { getCardDisplayName } from './langHelper.js';
 // prefer whatever the card itself was printed with, falling back to the original name.
 export const displayName = (card) => {
   if (!card) return '';
-  return getCardDisplayName(card.name, card.printed_name);
+  return pairedCardName(card);
 };
 
 // The English name to show ALONGSIDE the localized one, or null when there isn't a
@@ -59,7 +60,7 @@ export const displayName = (card) => {
 // localized `printed_name`, so a Japanese card already carries both.
 export function translatedName(card) {
   if (!card) return null;
-  const shown = displayName(card);
+  const shown = getCardDisplayName(card.name, card.printed_name);
   const english = card.name || '';
   return english && english !== shown ? english : null;
 }

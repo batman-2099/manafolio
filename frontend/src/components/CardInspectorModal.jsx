@@ -16,6 +16,7 @@ import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
 import { getSlotNumber } from '../utils/getSlotNumber';
 import Modal from './Modal';
+import { pairedCardName, reverseFace } from '../utils/tokenFaces';
 
 // MTG color identity pip colors (WUBRG), approximating the printed mana colors.
 const MTG_COLOR_BG = {
@@ -57,6 +58,8 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   const [printing, setPrinting] = useState(card.printing || 'Normal');
   const [language, setLanguage] = useState(card.language || 'English');
   const [purchasePrice, setPurchasePrice] = useState(card.purchase_price || 0);
+  const [reverseCard, setReverseCard] = useState(() => card.reverse_card_id ? reverseFace(card) : null);
+  const [deckFace, setDeckFace] = useState(card.card_id || card.id);
   const [locationId, setLocationId] = useState(card.location_id || '');
   const [isTrade, setIsTrade] = useState(card.is_trade ? 1 : 0);
   const [favorite, setFavorite] = useState(card.favorite ? 1 : 0);
@@ -180,6 +183,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
     setPrinting(card.printing || 'Normal');
     setLanguage(card.language || 'English');
     setPurchasePrice(card.purchase_price || 0);
+    setReverseCard(card.reverse_card_id ? reverseFace(card) : null);
     setLocationId(card.location_id || '');
     setIsTrade(card.is_trade ? 1 : 0);
     setFavorite(card.favorite ? 1 : 0);
@@ -210,6 +214,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
           // Quantity and metadata always belong to this one stored entry.
           ...(qNum !== (card.quantity ?? 1) ? { quantity: qNum } : {}),
           condition,
+          reverse_card_id: reverseCard?.id || null,
           printing,
           language,
           purchase_price: parseFloat(purchasePrice) || 0,
@@ -326,11 +331,23 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   const handleAddToDeck = async (deckId) => {
     if (!targetEntryId || !deckId || !beginWrite()) return;
     try {
-      const res = await fetch('/api/collection/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entry_ids: [targetEntryId], action: 'add_to_deck', value: deckId })
-      });
+      let res;
+      if (activeCard.reverse_card_id) {
+        const response = await fetch(`/api/decks/${deckId}`);
+        const deck = await response.json();
+        if (!response.ok) throw new Error(deck.error || t('inspector.errAddDeck'));
+        const quantity = (deck.cards.find(item => item.id === deckFace)?.quantity || 0) + 1;
+        res = await fetch(`/api/decks/${deckId}/cards`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ card_id: deckFace, quantity, source_entry_id: targetEntryId }),
+        });
+      } else {
+        res = await fetch('/api/collection/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entry_ids: [targetEntryId], action: 'add_to_deck', value: deckId })
+        });
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || t('inspector.errAddDeck'));
       setStatus(data.message || t('inspector.addedToDeck'));
@@ -541,7 +558,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
             </div>
 
             <h3 id={titleId} className="section-heading" style={{ fontSize: '1.5rem', color: 'var(--text-strong)', fontWeight: 700, lineHeight: 1.2, marginBottom: '0.25rem' }}>
-              {getCardDisplayName(activeCard.name, activeCard.printed_name)}
+              {pairedCardName(activeCard)}
             </h3>
             {/* Show the English name alongside a localized printing when available. */}
             {translatedName(activeCard) && (
@@ -606,6 +623,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
               </div>
 
               <CardEntryFields
+                card={activeCard} reverseCard={reverseCard} onReverseCard={setReverseCard} inventoryType={listType} disabled={writing || localizing}
                 game={activeCard.game || activeCard.supertype}
                 quantity={q} purchasePrice={purchasePrice} condition={condition} printing={printing} language={language}
                 onQuantity={setQ} onPurchasePrice={setPurchasePrice} onCondition={setCondition} onPrinting={setPrinting} onLanguage={handleLanguageChange}
@@ -726,6 +744,14 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                 </div>
               )}
               {activeCard.list_type === 'collection' && (
+                <div>
+                {activeCard.reverse_card_id && <label>
+                  {t('token.deckFace')}
+                  <select className="select-control" value={deckFace} disabled={writing} onChange={event => setDeckFace(event.target.value)}>
+                    <option value={activeCard.card_id || activeCard.id}>{getCardDisplayName(activeCard.name, activeCard.printed_name)}</option>
+                    <option value={activeCard.reverse_card_id}>{activeCard.reverse_printed_name || activeCard.reverse_name}</option>
+                  </select>
+                </label>}
                 <AddToDeckSelect
                   key={deckListVersion}
                   disabled={writing}
@@ -733,6 +759,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                   placeholder={t('inspector.addToDeck')}
                   style={{ fontSize: '0.875rem', padding: '0.5rem', width: '100%' }}
                 />
+                </div>
               )}
 
               {activeCard.notes && (

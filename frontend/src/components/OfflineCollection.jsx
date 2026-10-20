@@ -3,6 +3,7 @@ import { useT } from '../utils/i18n';
 import { filterOfflineCards } from '../utils/offlineFilter';
 import { useOfflineSnapshot } from './OfflineSettings';
 import './OfflineCollection.css';
+import { pairedCardName } from '../utils/tokenFaces';
 
 const PAGE_SIZE = 40;
 const EMPTY_CARDS = [];
@@ -92,7 +93,7 @@ export default function OfflineCollection() {
         {!filtered.length ? <div className="view-section offline-empty"><p>{t(cards.length ? 'offline.noResults' : 'offline.emptySnapshot')}</p></div> : <ul className="offline-rows" aria-label={t('offline.resultsLabel')}>
           {filtered.slice(start, start + PAGE_SIZE).map(card => <li key={card.entry_id} className="offline-row">
             <div className="offline-card-name">
-              <h2>{card.printed_name || card.name}</h2>
+              <h2>{pairedCardName(card)}</h2>
               {card.printed_name && card.printed_name !== card.name && <p>{card.name}</p>}
               <p>{card.set_name} ({card.set_id}) · {t('offline.collectorNumber', { number: card.number })}</p>
             </div>

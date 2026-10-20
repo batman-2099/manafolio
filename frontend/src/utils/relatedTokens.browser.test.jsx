@@ -15,13 +15,13 @@ export async function runRelatedTokenRegressions() {
   const id = 'mtg-11111111-1111-1111-1111-111111111111';
   const matched = 'mtg-22222222-2222-2222-2222-222222222222';
   let deckQuantity = 2;
-  let owned = false;
+  let owned = true;
   let reject = true;
   let release;
   const writes = [];
   const response = (body, ok = true) => ({ ok, json: async () => body });
   window.fetch = async (url, options = {}) => {
-    if (url === '/api/cards/related-tokens') return response({ tokens: [{ id, matched_card_id: matched, name: 'Sample Goblin', owned, locations: [], source_cards: [{ name: 'Sample creator' }] }] });
+    if (url === '/api/cards/related-tokens') return response({ tokens: [{ id, matched_card_id: matched, name: 'Sample Goblin', owned, owned_qty: 3, source_entry_id: 42, owned_entries: [{ entry_id: 42, card_id: matched, front_card_id: id, reverse_card_id: matched, quantity: 3, location_name: 'Sample box' }], locations: [{ quantity: 3, location_name: 'Sample box' }], source_cards: [{ name: 'Sample creator' }] }] });
     if (url === '/api/decks') return response([{ id: 7, name: 'Sample deck' }]);
     if (url.startsWith('/api/locations?')) return response([{ id: 9, name: 'Sample box' }]);
     if (url === '/api/decks/7') return response({ cards: [{ id: matched, quantity: deckQuantity }] });
@@ -43,13 +43,15 @@ export async function runRelatedTokenRegressions() {
   try {
     await render({ compact: true });
     await open();
-    const deckSelect = host.querySelector('dialog select');
+    const deckSelect = host.querySelector(`dialog select[aria-label="${en['deck.addToDeck']}"]`);
     await select(deckSelect, '7');
     assert(host.querySelector('[role="alert"]').textContent === 'Sample rejection', 'rejection remains visible without closing viewer');
     assert(deckQuantity === 2, 'rejected addition preserves quantity');
     reject = false;
     await select(deckSelect, '7');
     assert(deckQuantity === 3 && writes.at(-1).card_id === matched, 'adding uses matched printing and increments rather than overwrites');
+    assert(writes.at(-1).source_entry_id === 42, 'reverse printing pins the same physical source entry');
+    assert(host.textContent.includes('3×') && host.textContent.includes('Sample box'), 'related reverse ownership shows shared quantity and location');
     const container = host.querySelector(`select[aria-label="${en['relatedTokens.addToContainer']}"]`);
     await select(container, '9');
     await select(container, '9');

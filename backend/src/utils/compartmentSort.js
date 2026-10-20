@@ -251,10 +251,10 @@ function compartmentLabel(comp, locationType) {
 // splits by condition when the owner asks it to. The SQL and JS forms have to
 // agree — one counts occupancy, the other decides where a copy is filed — so
 // both default a legacy NULL the same way.
-const STACK_KEY_SQL = `card_id || '|' || COALESCE(printing, 'Normal') || '|' || COALESCE(language, 'English')`;
+const STACK_KEY_SQL = `card_id || '|' || COALESCE(reverse_card_id, '') || '|' || COALESCE(printing, 'Normal') || '|' || COALESCE(language, 'English')`;
 function stackKey(row) {
   const id = row.card_id !== undefined ? row.card_id : row.id;
-  return `${id}|${row.printing || 'Normal'}|${row.language || 'English'}`;
+  return `${id}|${row.reverse_card_id || ''}|${row.printing || 'Normal'}|${row.language || 'English'}`;
 }
 
 async function loadCompartments(database, locationId, userId) {
@@ -325,7 +325,7 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
   }
 
   const allLocationCards = await dbClient.all(`
-    SELECT c.id as entry_id, c.card_id, c.compartment_id, c.position, c.quantity, c.condition, c.printing, c.language, c.purchase_price, c.added_at, c.is_trade, c.favorite, c.list_type,
+    SELECT c.id as entry_id, c.card_id, c.reverse_card_id, c.compartment_id, c.position, c.quantity, c.condition, c.printing, c.language, c.purchase_price, c.added_at, c.is_trade, c.favorite, c.list_type,
            cc.name, cc.printed_name, cc.supertype, cc.types, cc.subtypes, cc.rarity, cc.set_id, cc.set_name, cc.number, cc.image_url,
            cc.price_trend, cc.price_normal, cc.price_holofoil, cc.cmc, cc.color_identity
     FROM collection c

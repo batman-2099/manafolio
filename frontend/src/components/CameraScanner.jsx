@@ -5,6 +5,7 @@ import { priceText } from '../utils/formatPrice';
 import { resolveCardPrice, getPrintingPrice } from '../utils/resolveCardPrice';
 import { CONDITIONS, getPrintings } from '../utils/cardOptions';
 import CardEntryFields from './CardEntryFields';
+import { pairedCardName, reverseFace } from '../utils/tokenFaces';
 import Modal from './Modal';
 import { useBackGuard } from '../utils/useBackGuard';
 import { langName, langCode, getLanguagesForGame } from '../utils/languages';
@@ -421,6 +422,8 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
 
   // Drawer states
   const [selectedCard, setSelectedCard] = useState(null);
+  const [reverseCard, setReverseCard] = useState(null);
+  const [editingDraftId, setEditingDraftId] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [autoAddCountdown, setAutoAddCountdown] = useState(null);
   const [autoAddTargetCard, setAutoAddTargetCard] = useState(null);
@@ -1451,15 +1454,17 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     setLanguageChanging(false);
     setScanMatches([]);
     setSelectedCard(card);
+    setEditingDraftId(card.draft_id || null);
+    setReverseCard(card.reverse_card_id ? reverseFace(card) : null);
     if (priceCheck) {
       setIsDrawerOpen(true);
       return;
     }
-    setQuantity(1);
-    setCondition('Near Mint');
-    setPurchasePrice(0);
-    setPrinting('Normal');
-    setLanguage(addLanguage(card));
+    setQuantity(card.draft_id ? card.quantity : 1);
+    setCondition(card.draft_id ? card.condition : 'Near Mint');
+    setPurchasePrice(card.draft_id ? card.purchase_price : 0);
+    setPrinting(card.draft_id ? card.printing : 'Normal');
+    setLanguage(card.draft_id ? card.language : addLanguage(card));
     setIsDrawerOpen(true);
   };
 
@@ -1738,11 +1743,12 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     setDraftBusy(true);
     setDraftError('');
     try {
-      const response = await fetch('/api/scan-drafts', {
-        method: 'POST',
+      const response = await fetch(editingDraftId ? `/api/scan-drafts/${editingDraftId}` : '/api/scan-drafts', {
+        method: editingDraftId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_id: selectedCard.id,
+          reverse_card_id: reverseCard?.id || null,
           quantity: Number(quantity),
           condition,
           printing,
@@ -1756,8 +1762,8 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
         throw Object.assign(new Error('Could not save scan draft'), { detail: error?.error });
       }
       const draft = await response.json();
-      setScanDrafts(prev => [draft, ...prev]);
-      showToast(t('scan.queued', { name: getCardDisplayName(selectedCard.name, selectedCard.printed_name) }), 'success');
+      setScanDrafts(prev => editingDraftId ? prev.map(item => item.draft_id === editingDraftId ? draft : item) : [draft, ...prev]);
+      showToast(editingDraftId ? t('inspector.entryUpdated') : t('scan.queued', { name: getCardDisplayName(selectedCard.name, selectedCard.printed_name) }), 'success');
       draftBusyRef.current = false;
       closeDrawer();
     } catch (error) {
@@ -2779,12 +2785,13 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             <li key={draft.draft_id} className="scan-review-card" aria-busy={draftAction === draft.draft_id || draftAction === `foil-${draft.draft_id}` || draftAction === 'commit'}>
               <img src={draft.image_url} alt={getCardDisplayName(draft.name, draft.printed_name)} width="250" height="350" loading="lazy" />
               <div className="scan-review-details">
-                <h3>{getCardDisplayName(draft.name, draft.printed_name)}</h3>
+                <h3>{pairedCardName(draft)}</h3>
                 <p>{draft.set_name} · #{draft.number}</p>
                 <p>{draft.quantity}× · {draft.condition} · {draft.printing} · {draft.language}</p>
                 <p>{t('card.purchasePrice')}: {priceText(draft.purchase_price, draft.price_currency)}</p>
               </div>
               <div className="scan-review-actions">
+                <button type="button" className="btn btn-secondary" disabled={draftBusy || draftAction !== null || isDrawerOpen} onClick={() => openQuickAdd({ ...draft, id: draft.card_id })}>{t('common.edit')}</button>
                 <button type="button" className={`btn ${draft.printing === 'Holofoil' ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={draft.printing === 'Holofoil'} disabled={draftBusy || draftAction !== null} onClick={() => toggleDraftFoil(draft)}>
                   {draftAction === `foil-${draft.draft_id}` && <RefreshCw size={16} className="spin" aria-hidden="true" />}
                   {t('scan.foil')}
@@ -2849,7 +2856,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   is boilerplate. So they get the size, and the set name (which the
                   number already implies) drops to the small line. */}
               <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                <h3 id="scan-drawer-title" style={{ color: 'var(--text-muted)', fontSize: '0.7rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}>{t('scan.addScannedTitle')}</h3>
+                <h3 id="scan-drawer-title" style={{ color: 'var(--text-muted)', fontSize: '0.7rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}>{t(editingDraftId ? 'common.edit' : 'scan.addScannedTitle')}</h3>
                 <p style={{ color: 'var(--text-strong)', fontSize: '1.25rem', fontWeight: 800, margin: '0.1rem 0 0 0', lineHeight: 1.2, wordBreak: 'break-word' }}>
                   {getCardDisplayName(selectedCard.name, selectedCard.printed_name)} <span style={{ color: 'var(--text-primary)' }}>#{selectedCard.number}</span>
                 </p>
@@ -2890,6 +2897,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   <div className="quick-add-section-title">{t('scan.cardProperties')}</div>
                   
                   <CardEntryFields
+                    card={selectedCard} reverseCard={reverseCard} onReverseCard={setReverseCard} disabled={draftBusy || languageChanging}
                     variant="stacked"
                     quantityMax={250}
                     game={selectedCard.game || selectedCard.supertype}
@@ -2903,7 +2911,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   "Other matches" goes back to what the scanner saw (alternative visual guesses).
                   "Right name, wrong printing" lists all printings of this card name across sets. */}
               <div className="quick-add-footer">
-                <div className="quick-add-footer-tools">
+                {!editingDraftId && <div className="quick-add-footer-tools">
                   {lastMatches.length > 1 && (
                     <button
                       type="button"
@@ -2928,12 +2936,12 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   <button type="button" className="btn btn-secondary btn-sm" disabled={draftBusy} onClick={() => { setIsDrawerOpen(false); setScanMatches([selectedCard]); setShowAllMatches(true); }}>
                     <Search size={14} /> {t('scan.changeCard')}
                   </button>
-                </div>
+                </div>}
                 <div className="quick-add-footer-actions">
                   <button type="button" className="btn btn-secondary" onClick={closeDrawer} disabled={draftBusy}>{t('common.cancel')}</button>
                   <button type="submit" className="btn btn-primary" disabled={draftBusy || findingPrintings || draftsLoading || draftsError}>
                     {draftBusy && <RefreshCw size={16} className="spin" aria-hidden="true" />}
-                    {t('scan.queueCard')}
+                    {t(editingDraftId ? 'common.save' : 'scan.queueCard')}
                   </button>
                 </div>
               </div>

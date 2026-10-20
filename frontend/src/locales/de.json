@@ -1,4 +1,13 @@
 {
+  "token.reverse": "Rückseitiger Spielstein (optional)",
+  "token.pairHint": "Wähle den Spielstein auf der Rückseite dieser physischen Karte. Beide Seiten teilen sich Menge und Lagerort; die Paarung wird nicht automatisch bestimmt.",
+  "token.reversePrinting": "Druckversion der Rückseite",
+  "token.none": "Kein separater rückseitiger Spielstein",
+  "token.searchError": "Spielsteinsuche fehlgeschlagen. Suche erneut.",
+  "token.noResults": "Keine Spielsteine gefunden. Versuche einen anderen Namen.",
+  "token.flip": "Karte wenden",
+  "token.deckFace": "Seite zum Deck hinzufügen",
+  "token.source": "Physische Quelle",
   "common.showingLastLoaded": "Zuvor geladene Daten werden angezeigt. Sie sind möglicherweise nicht mehr aktuell.",
   "loc.errLoadCompartments": "Seiten oder Reihen konnten nicht geladen werden. Versuche es erneut, um diesen Behälter zu aktualisieren.",
   "loc.settingsPartialFailure": "Einige Änderungen wurden möglicherweise bereits gespeichert. Dein Entwurf bleibt erhalten. Prüfe den Behälter und versuche es erneut; vor dem Speichern werden die aktuellen Seiten und Reihen neu geladen.",

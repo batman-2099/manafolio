@@ -26,7 +26,8 @@ const CSV_FIELDS = [
   ['printing', 'csvMapping.printing', ['printing', 'foil']],
   ['language', 'csvMapping.language', ['language']],
   ['purchase_price', 'csvMapping.purchasePrice', ['purchase price', 'price']],
-  ['card_id', 'csvMapping.cardId', ['card id', 'id']]
+  ['card_id', 'csvMapping.cardId', ['card id', 'id']],
+  ['reverse_card_id', 'token.reverse', ['reverse card id', 'reverse_card_id']]
 ];
 
 const suggestedCsvMapping = (headers) => Object.fromEntries(CSV_FIELDS.map(([field, , names]) => [
@@ -255,6 +256,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   const [grader, setGrader] = useState('Raw');
   const [grade, setGrade] = useState('');
   const [certNumber, setCertNumber] = useState('');
+  const [reverseCard, setReverseCard] = useState(null);
 
   // Set codes for autocomplete; search expects codes without the game prefix.
   useEffect(() => {
@@ -679,6 +681,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
     setQuickAddError(null);
     setAddLocation(defaultAddLocation);
     setSelectedCard(card);
+    setReverseCard(null);
     setPurchasePrice(0); // Default to 0 purchase spend
     // The card itself knows which printing it is, so the copy is recorded in that
     // language rather than defaulting to English and needing a manual correction.
@@ -728,6 +731,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_id: selectedCard.id,
+          reverse_card_id: listType === 'arena' ? null : reverseCard?.id || null,
           quantity: parseInt(quantity, 10),
           condition,
           printing,
@@ -1486,6 +1490,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
 
             <form onSubmit={handleSubmit} onInvalid={event => setQuickAddError(`${event.target.labels?.[0]?.textContent || ''}: ${event.target.validationMessage}`)} style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
               <CardEntryFields
+                card={selectedCard} reverseCard={reverseCard} onReverseCard={setReverseCard} inventoryType={addToArena ? 'arena' : 'collection'} disabled={adding || localizing}
                 quantity={quantity} purchasePrice={purchasePrice} condition={condition} printing={printing} language={language}
                 onQuantity={setQuantity} onPurchasePrice={setPurchasePrice} onCondition={setCondition} onPrinting={setPrinting} onLanguage={handleLanguageChange}
                 game={selectedCard?.game || game}

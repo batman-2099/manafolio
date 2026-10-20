@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const db = require('../db');
+const { planCardSources } = require('./collectionHelpers');
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const cardKey = (card, preference) => preference === 'any' && card.name?.trim() ? `name:${card.name}` : `id:${card.card_id}`;
@@ -9,11 +10,12 @@ async function acquisitionDeckNeeds(userId) {
     FROM decks d JOIN deck_cards dc ON dc.deck_id = d.id JOIN card_cache cc ON cc.id = dc.card_id
     WHERE d.user_id = ? AND d.game = 'mtg' AND cc.game = 'mtg'
       AND d.inventory_type IN ('collection', 'arena') AND dc.quantity > 0`, [userId]);
-  const entries = await db.all(`SELECT c.card_id, cc.name, c.list_type, SUM(c.quantity) AS quantity
+  const entries = await db.all(`SELECT c.id AS entry_id, c.card_id, c.reverse_card_id, cc.name,
+    rc.name AS reverse_name, c.list_type, c.quantity, c.game
     FROM collection c JOIN card_cache cc ON cc.id = c.card_id
+    LEFT JOIN card_cache rc ON rc.id = c.reverse_card_id
     WHERE c.user_id = ? AND c.game = 'mtg' AND cc.game = 'mtg' AND c.quantity > 0
-      AND c.list_type IN ('collection', 'arena') AND COALESCE(c.missing, 0) = 0
-    GROUP BY c.card_id, c.list_type`, [userId]);
+      AND c.list_type IN ('collection', 'arena') AND COALESCE(c.missing, 0) = 0`, [userId]);
   const needs = new Map();
   for (const preference of ['exact', 'any']) {
     const owned = new Map();
@@ -30,7 +32,21 @@ async function acquisitionDeckNeeds(userId) {
     }
     for (const [id, cards] of decks) {
       if (!needs.has(id)) needs.set(id, { exact: 0, any: 0 });
-      for (const [key, quantity] of cards) needs.get(id)[preference] += Math.max(0, quantity - (owned.get(key) || 0));
+      const inventory = required.find(card => card.deck_id === id).inventory_type;
+      const candidates = entries.filter(entry => entry.list_type === inventory);
+      if (candidates.some(entry => entry.reverse_card_id)) {
+        const requests = [...cards].map(([card_id, quantity]) => ({ card_id, quantity }));
+        const plans = planCardSources(candidates.map(entry => ({
+          ...entry,
+          card_id: `${inventory}:${cardKey(entry, preference)}`,
+          reverse_card_id: entry.reverse_card_id
+            ? `${inventory}:${cardKey({ card_id: entry.reverse_card_id, name: entry.reverse_name }, preference)}` : null,
+        })), requests, 'mtg');
+        needs.get(id)[preference] = requests.reduce((sum, card, index) =>
+          sum + card.quantity - [...plans[index].values()].reduce((total, quantity) => total + quantity, 0), 0);
+      } else {
+        for (const [key, quantity] of cards) needs.get(id)[preference] += Math.max(0, quantity - (owned.get(key) || 0));
+      }
     }
   }
   return needs;
@@ -63,14 +79,32 @@ async function acquisitionPlan(userId, body) {
     row.required += card.required;
     if (!Number.isSafeInteger(row.required) || row.required > 2147483647) fail('Planned quantity is too large.');
   }
-  const entries = await db.all(`SELECT c.card_id, cc.name, c.list_type, SUM(c.quantity) AS quantity
+  const entries = await db.all(`SELECT c.id AS entry_id, c.card_id, c.reverse_card_id, cc.name,
+    rc.name AS reverse_name, c.list_type, c.quantity, c.game
     FROM collection c JOIN card_cache cc ON cc.id = c.card_id
+    LEFT JOIN card_cache rc ON rc.id = c.reverse_card_id
     WHERE c.user_id = ? AND c.game = 'mtg' AND cc.game = 'mtg' AND c.quantity > 0
-      AND ((c.list_type = ? AND COALESCE(c.missing, 0) = 0) OR (c.list_type = 'wishlist' AND ? = 'collection'))
-    GROUP BY c.card_id, c.list_type`, [userId, inventory, inventory]);
+      AND ((c.list_type = ? AND COALESCE(c.missing, 0) = 0) OR (c.list_type = 'wishlist' AND ? = 'collection'))`,
+  [userId, inventory, inventory]);
   for (const entry of entries) {
     const row = groups.get(key(entry));
     if (row) row[entry.list_type === 'wishlist' ? 'wishlist' : 'owned'] += entry.quantity;
+  }
+  if (entries.some(entry => entry.reverse_card_id)) {
+    const requests = [...groups].map(([card_id, card]) => ({ card_id, quantity: card.required }));
+    for (const listType of [inventory, 'wishlist']) {
+      const candidates = entries.filter(entry => entry.list_type === listType).map(entry => ({
+        ...entry, card_id: key(entry),
+        reverse_card_id: entry.reverse_card_id ? key({ card_id: entry.reverse_card_id, name: entry.reverse_name }) : null,
+      }));
+      const plans = planCardSources(candidates, requests, 'mtg');
+      requests.forEach((request, index) => {
+        const row = groups.get(request.card_id);
+        const supplied = [...plans[index].values()].reduce((sum, quantity) => sum + quantity, 0);
+        row[listType === 'wishlist' ? 'wishlist' : 'owned'] = supplied;
+        if (listType === inventory) request.quantity -= supplied;
+      });
+    }
   }
   const totals = {};
   let unknown = 0;

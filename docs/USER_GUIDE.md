@@ -410,6 +410,24 @@ Quantities must be positive whole numbers. Certified slabs stay separate from ra
 
 **Related tokens** provides references and inventory-scoped ownership/location information. A same-named token is not necessarily the same rules/stat version; check its artwork and text.
 
+### Track a double-sided token
+
+Record **one physical item**, not one owned copy for each face.
+
+1. Add the visible token, or open an owned token and choose **Edit Card**.
+2. In **Reverse token (optional)**, search for the other face. Use its set and collector number to narrow the results, then choose the exact **Reverse printing**. Check the artwork; Manafolio never guesses the reverse.
+3. Save the entry. Its quantity counts physical cards: three Goblin / Soldier tokens are three cards, not six. Both faces share the same storage location, missing status, and reservation.
+4. Search by either face. Open the inspector or enlarged artwork and choose **Flip card** to view the other side. Choose **Face to add to deck** when adding an owned pair to a deck.
+
+Different reverse pairings remain separate stacks. Choose **No separate reverse token** to clear an incorrect pairing; this does not delete the physical item. Return checked-out copies before changing their identity. Pairing is not available in Arena; Physical, Wishlist, and Graveyard entries retain it when transferred between those lists.
+
+In **Scan review**, confirm the reverse manually before adding the batch. Recognizing one face never establishes the other. A token can remain unpaired when its reverse is unknown.
+
+One copy can supply either face, never both simultaneously. Checkout, Shopping List planning, and AI draft validation share that physical capacity. Deck definitions may still describe missing copies; they do not create ownership. Related-token ownership includes paired reverse faces, but remains name-based—check the token's rules and stats.
+
+Complete account backups and Manafolio's own JSON/CSV exports preserve explicit pairing. The internal CSV column is **Reverse Card ID**; formats without that field cannot describe the pairing.
+
+
 ### Change several entries together
 
 1. Apply the inventory/search/filters you want.
@@ -914,7 +932,7 @@ Arena and Graveyard decks cannot be checked out, even if a checkout control is v
 
 **Expected result:** related-token references and inventory information, with explicit actions to save copies. The panel does not promise how many token copies a game will require. An empty result means no related tokens were returned, not a general ruling on every possible card interaction.
 
-The card inspector's **Related tokens** and AI drafts offer the same viewer. Ownership matches names case-insensitively, including double-faced tokens' front names. Decks prefer the commander's set or corresponding token set, then any set in their inventory. Same-named tokens can have different rules or stats: check artwork and text. Wishlist does not count, and Graveyard token ownership stays separate from Physical and Arena. Scryfall supplies the relations; references alone do not affect deck size, reserve copies, or enter deck exports. Tokens explicitly added to a deck become ordinary deck entries.
+The card inspector's **Related tokens** and AI drafts offer the same viewer. Ownership matches names case-insensitively, including explicitly paired reverse faces. Decks prefer the commander's set or corresponding token set, then any set in their inventory. If several physical sources exist, choose **Physical source** before adding to a deck. Same-named tokens can have different rules or stats: check artwork and text. Wishlist does not count, and Graveyard token ownership stays separate from Physical and Arena. Scryfall supplies the relations; references alone do not affect deck size, reserve copies, or enter deck exports. Tokens explicitly added to a deck become ordinary deck entries.
 
 ### Create a container from a deck
 

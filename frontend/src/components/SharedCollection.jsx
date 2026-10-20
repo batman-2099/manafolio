@@ -9,6 +9,7 @@ import { useBackGuard } from '../utils/useBackGuard';
 import { COLLECTION_SORT_CRITERIA, sortCardsByOrder } from '../utils/cardSort';
 import { displayName } from '../utils/languages';
 import CardImage from './CardImage';
+import CardImageZoom from './CardImageZoom';
 import Modal from './Modal';
 import { ChartDataTable } from './DashboardAnalytics';
 import { useT } from '../utils/i18n';
@@ -53,6 +54,8 @@ function SharedCollection({ shareToken }) {
   const [stackByPrinting, setStackByPrinting] = useState(false);
 
   const [activeCard, setActiveCard] = useState(null);
+  const [zoomCard, setZoomCard] = useState(null);
+  useBackGuard(!!zoomCard, () => setZoomCard(null));
   useBackGuard(!!activeCard, () => setActiveCard(null));
 
   useEffect(() => {
@@ -108,6 +111,8 @@ function SharedCollection({ shareToken }) {
     const q = searchFilter.toLowerCase();
     const result = collection.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(q) ||
+        (item.reverse_name || '').toLowerCase().includes(q) ||
+        (item.reverse_printed_name || '').toLowerCase().includes(q) ||
         (item.set_name || '').toLowerCase().includes(q) ||
         (item.number || '').includes(searchFilter);
       const matchesRarity = !rarityFilter || item.rarity === rarityFilter;
@@ -125,7 +130,7 @@ function SharedCollection({ shareToken }) {
 
     const groups = {};
     filteredCollection.forEach(item => {
-      let key = item.card_id;
+      let key = JSON.stringify([item.card_id, item.reverse_card_id || null]);
       if (stackByCondition) key += `-${item.condition}`;
       if (stackByPrinting) key += `-${item.printing}`;
 
@@ -436,7 +441,9 @@ function SharedCollection({ shareToken }) {
               <X size={16} />
             </button>
             <div style={{ flex: '1 1 240px', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
-              <CardImage card={activeCard} style={{ width: '100%', maxWidth: '260px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0,0,0,0.5), 0 0 15px rgba(255,255,255,0.05)' }} />
+              <button type="button" className="ci-image-wrap" aria-label={t('deck.previewArt')} aria-haspopup="dialog" onClick={() => setZoomCard(activeCard)}>
+                <CardImage card={activeCard} style={{ width: '100%', maxWidth: '260px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0,0,0,0.5), 0 0 15px rgba(255,255,255,0.05)' }} />
+              </button>
             </div>
             <div style={{ flex: '1 1 300px', minWidth: 0, overflowWrap: 'anywhere', display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center' }}>
               <div>
@@ -488,6 +495,7 @@ function SharedCollection({ shareToken }) {
           </div>
         </Modal>
       )}
+      {zoomCard && <CardImageZoom card={zoomCard} onClose={() => setZoomCard(null)} />}
     </main>
   );
 }

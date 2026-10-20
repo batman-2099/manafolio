@@ -1,4 +1,13 @@
 {
+  "token.reverse": "Pedina sul retro (facoltativa)",
+  "token.pairHint": "Scegli la pedina stampata sul retro di questa carta fisica. Entrambe le facce condividono quantità e posizione; l’abbinamento non è automatico.",
+  "token.reversePrinting": "Edizione del retro",
+  "token.none": "Nessuna pedina separata sul retro",
+  "token.searchError": "Ricerca delle pedine non riuscita. Riprova.",
+  "token.noResults": "Nessuna pedina trovata. Prova un altro nome.",
+  "token.flip": "Gira la carta",
+  "token.deckFace": "Faccia da aggiungere al mazzo",
+  "token.source": "Origine fisica",
   "stocktake.title": "Inventario fisico",
   "stocktake.slot": "Posizione {slot}",
   "stocktake.verified": "Verificata",

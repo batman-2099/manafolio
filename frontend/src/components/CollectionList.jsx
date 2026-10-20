@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Trash2, Edit2, LayoutGrid, List, SlidersHorizontal, X, MousePointerClick, Download, ChevronDown } from 'lucide-react';
-import { getCardDisplayName } from '../utils/langHelper';
+import { pairedCardName } from '../utils/tokenFaces';
 import { priceText } from '../utils/formatPrice';
 import { CONDITIONS, getPrintings, GRADERS } from '../utils/cardOptions';
 import { getPrintingBadgeLabel, getPrintingBadgeStyle, getFoilOverlayClass } from '../utils/cardPrinting';
@@ -262,6 +262,8 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
     const result = collection.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(rawSearch) ||
                             (item.printed_name || '').toLowerCase().includes(rawSearch) ||
+                            (item.reverse_name || '').toLowerCase().includes(rawSearch) ||
+                            (item.reverse_printed_name || '').toLowerCase().includes(rawSearch) ||
                             (item.set_name || '').toLowerCase().includes(rawSearch) ||
                             (item.number || '').includes(searchFilter);
       const matchesLocation = locationFilter.length === 0 ? true :
@@ -310,7 +312,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
     const groups = {};
     filteredCollection.forEach(item => {
-      let key = `${item.card_id}-${JSON.stringify([item.grader || 'Raw', item.grade ?? null, item.cert_number ?? null])}`;
+      let key = `${item.card_id}-${JSON.stringify([item.reverse_card_id || null, item.grader || 'Raw', item.grade ?? null, item.cert_number ?? null])}`;
       if (stackByCondition) key += `-${item.condition}`;
       if (stackByPrinting) key += `-${item.printing}`;
 
@@ -812,7 +814,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                 key={item.entry_id}
                 className="tcg-card"
                 style={{ cursor: 'pointer', touchAction: 'pan-y' }}
-                aria-label={getCardDisplayName(item.name, item.printed_name)}
+                aria-label={pairedCardName(item)}
                 aria-pressed={selectMode ? selected : undefined}
                 disabled={bulkPending}
                 aria-haspopup={selectMode ? undefined : 'dialog'}
@@ -833,7 +835,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
                 </span>
                 <span className="tcg-card-info">
-                  <span className="tcg-card-name">{getCardDisplayName(item.name, item.printed_name)}</span>
+                  <span className="tcg-card-name">{pairedCardName(item)}</span>
                   <span className="tcg-card-meta">
                     <span>{item.set_name} • #{item.number}</span>
                     <span className="tcg-card-price">{priceText(item.price_trend, item.price_currency)}</span>
@@ -877,7 +879,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                             type="checkbox"
                             checked={selected}
                             disabled={bulkPending}
-                            aria-label={getCardDisplayName(item.name, item.printed_name)}
+                            aria-label={pairedCardName(item)}
                             onChange={() => toggleSelect(item.entry_id)}
                             style={{ width: '18px', height: '18px', flexShrink: 0, cursor: 'pointer' }}
                           />
@@ -885,7 +887,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                         <button
                           type="button"
                           className="collection-card-trigger"
-                          aria-label={getCardDisplayName(item.name, item.printed_name)}
+                          aria-label={pairedCardName(item)}
                           aria-pressed={selectMode ? selected : undefined}
                           disabled={bulkPending}
                           aria-haspopup={selectMode ? undefined : 'dialog'}
@@ -899,7 +901,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                           )}
                         </button>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <button type="button" className="collection-card-trigger" disabled={bulkPending} aria-pressed={selectMode ? selected : undefined} aria-haspopup={selectMode ? undefined : 'dialog'} onClick={(e) => activateCard(item, e)} {...pressHandlers(item.entry_id)} style={{ display: 'block', maxWidth: '100%', fontWeight: 700, color: 'var(--text-strong)', fontSize: '1rem', textAlign: 'left', cursor: 'pointer' }}>{getCardDisplayName(item.name, item.printed_name)}</button>
+                          <button type="button" className="collection-card-trigger" disabled={bulkPending} aria-pressed={selectMode ? selected : undefined} aria-haspopup={selectMode ? undefined : 'dialog'} onClick={(e) => activateCard(item, e)} {...pressHandlers(item.entry_id)} style={{ display: 'block', maxWidth: '100%', fontWeight: 700, color: 'var(--text-strong)', fontSize: '1rem', textAlign: 'left', cursor: 'pointer' }}>{pairedCardName(item)}</button>
                           <div style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.3rem' }}>
                             <span>{item.set_name} • #{item.number}</span>
                             <span style={{ fontSize: '0.875rem', fontWeight: 600, ...getRarityBadgeStyle(item.rarity) }}>
@@ -914,7 +916,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                               <button className="btn btn-secondary btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => openEdit(item)} title={t('common.edit')} aria-label={t('common.edit')}>
                                 <Edit2 size={16} />
                               </button>
-                              <button className="btn btn-danger btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => handleDelete(item.entry_id, getCardDisplayName(item.name, item.printed_name))} title={t('common.delete')} aria-label={t('common.delete')}>
+                              <button className="btn btn-danger btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => handleDelete(item.entry_id, pairedCardName(item))} title={t('common.delete')} aria-label={t('common.delete')}>
                                 <Trash2 size={16} />
                               </button>
                             </div>

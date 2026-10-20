@@ -34,7 +34,7 @@ async function loadEntries(entryIds, userId) {
   if (!entryIds.length) return new Map();
   const holes = entryIds.map(() => '?').join(',');
   const rows = await db.all(`
-    SELECT c.id, c.id AS entry_id, c.card_id, c.quantity, c.printing, c.language, c.favorite, c.is_trade, c.list_type,
+    SELECT c.id, c.id AS entry_id, c.card_id, c.reverse_card_id, c.quantity, c.printing, c.language, c.favorite, c.is_trade, c.list_type,
            cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.subtypes, cc.supertype, cc.rarity, cc.image_url,
            cc.game, cc.cmc, cc.color_identity,
            cc.price_trend, cc.price_normal, cc.price_holofoil
@@ -334,8 +334,9 @@ async function stocktakeSnapshot(userId, locationId) {
   const location = await db.get('SELECT * FROM locations WHERE id = ? AND user_id = ?', [locationId, userId]);
   if (!location) throw Object.assign(new Error('Location not found'), { status: 404 });
   const compartments = await db.all('SELECT * FROM compartments WHERE location_id = ? ORDER BY id', [location.id]);
-  const rows = await db.all(`SELECT c.*, cc.name, cc.printed_name, cc.set_name, cc.set_id, cc.number, cc.image_url
-    FROM collection c LEFT JOIN card_cache cc ON cc.id = c.card_id
+  const rows = await db.all(`SELECT c.*, cc.name, cc.printed_name, cc.set_name, cc.set_id, cc.number, cc.image_url,
+      rc.name AS reverse_name, rc.image_url AS reverse_image_url
+    FROM collection c LEFT JOIN card_cache cc ON cc.id = c.card_id LEFT JOIN card_cache rc ON rc.id = c.reverse_card_id
     WHERE c.user_id = ? AND c.location_id = ? ORDER BY c.compartment_id, c.position, c.id`, [userId, location.id]);
   if (rows.some(row => row.list_type !== location.inventory_type)) {
     throw Object.assign(new Error('Container inventory has changed. Correct its placements before checking it.'), { status: 409, code: 'stocktake.stale' });
@@ -348,6 +349,7 @@ async function stocktakeSnapshot(userId, locationId) {
     location, revision,
     entries: rows.map(row => ({
       entry_id: row.id, card_id: row.card_id, name: row.name, printed_name: row.printed_name,
+      reverse_card_id: row.reverse_card_id, reverse_name: row.reverse_name, reverse_image_url: row.reverse_image_url,
       set_name: row.set_name, set_id: row.set_id, number: row.number, image_url: row.image_url, game: row.game,
       quantity: row.quantity, printing: row.printing, language: row.language, condition: row.condition,
       missing: row.missing, position: row.position, compartment_id: row.compartment_id, last_verified_at: row.last_verified_at,
@@ -421,12 +423,12 @@ router.post('/locations/:id/stocktake', async (req, res) => {
               card_id, user_id, quantity, condition, printing, language, purchase_price,
               favorite, is_trade, list_type, game, added_at, notes, grader, grade,
               cert_number, market_value, market_value_source, market_value_at, missing,
-              location_id, compartment_id, position, last_verified_at
+              location_id, compartment_id, position, last_verified_at, reverse_card_id
             )
             SELECT card_id, user_id, ?, condition, printing, language, purchase_price,
               favorite, is_trade, list_type, game, added_at, notes, grader, grade,
               cert_number, market_value, market_value_source, market_value_at, missing,
-              location_id, compartment_id, ?, last_verified_at
+              location_id, compartment_id, ?, last_verified_at, reverse_card_id
             FROM collection WHERE id = ? AND user_id = ?`,
           [segment.quantity, segment.position, entry_id, req.user.id]);
           segment.id = inserted.lastID;
@@ -459,7 +461,8 @@ router.post('/locations/:id/stocktake', async (req, res) => {
         // sourceEntries groups all variants of a card in the same compartment. Keep that
         // group usable if its selected lead is now missing but another copy is found.
         const replacement = (await physicalCardEntries(req.user.id, entry.card_id)).find(row =>
-          row.game === entry.game && row.location_id === snapshot.location.id && row.compartment_id === entry.compartment_id);
+          row.game === entry.game && row.card_id === entry.card_id && row.reverse_card_id === entry.reverse_card_id
+          && row.location_id === snapshot.location.id && row.compartment_id === entry.compartment_id);
         if (replacement) {
           await db.run(`UPDATE deck_cards SET source_entry_id = ? WHERE source_entry_id = ?
             AND deck_id IN (SELECT id FROM decks WHERE user_id = ? AND checked_out = 0 AND inventory_type = 'collection')`,
@@ -599,7 +602,7 @@ router.put('/locations/:id', async (req, res) => {
     if (rule_type !== undefined || rule_config !== undefined || game !== undefined) {
       const updated = await db.get(`SELECT id, rule_type, rule_config, game, inventory_type FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
       const stored = await db.all(`
-        SELECT c.id as entry_id, c.printing, c.language, c.favorite, c.is_trade, c.list_type,
+        SELECT c.id as entry_id, c.card_id, c.reverse_card_id, c.printing, c.language, c.favorite, c.is_trade, c.list_type,
                cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.subtypes, cc.rarity, cc.supertype, cc.game,
                cc.price_trend, cc.price_normal, cc.price_holofoil, cc.cmc, cc.color_identity
         FROM collection c
@@ -783,7 +786,7 @@ router.patch('/compartments/:id', async (req, res) => {
       const cfg = ruleConfigJson ? JSON.parse(ruleConfigJson) : null;
       const compForCheck = { ruleConfig: cfg };
       const stored = await db.all(`
-        SELECT c.id AS entry_id, c.printing, c.language,
+        SELECT c.id AS entry_id, c.card_id, c.reverse_card_id, c.printing, c.language,
                cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.subtypes, cc.rarity, cc.supertype, cc.game,
                cc.price_trend, cc.cmc, cc.color_identity
         FROM collection c JOIN card_cache cc ON c.card_id = cc.id
@@ -822,7 +825,7 @@ router.put('/compartments/:id/filters', async (req, res) => {
 // Recommendation endpoints
 router.post('/locations/:id/recommend', async (req, res) => {
   const { id } = req.params;
-  const { card_id, printing = 'Normal', language = 'English', list_type = 'collection' } = req.body;
+  const { card_id, reverse_card_id = null, printing = 'Normal', language = 'English', list_type = 'collection' } = req.body;
   try {
     const location = await db.get(`SELECT * FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
     if (!location) return res.status(404).json({ error: 'Location not found' });
@@ -834,6 +837,7 @@ router.post('/locations/:id/recommend', async (req, res) => {
     cardMetadata.language = language;
     cardMetadata.list_type = list_type;
     cardMetadata.card_id = card_id;
+    cardMetadata.reverse_card_id = reverse_card_id;
     try { cardMetadata.types = JSON.parse(cardMetadata.types || '[]'); } catch { cardMetadata.types = []; }
 
     if (!locationAcceptsCard(location, cardMetadata)) {
@@ -996,7 +1000,7 @@ router.post('/locations/:id/resort', async (req, res) => {
     }
 
     const cards = await db.all(`
-      SELECT c.id as entry_id, c.card_id, c.printing, c.language, c.quantity, c.favorite, c.is_trade, c.list_type,
+      SELECT c.id as entry_id, c.card_id, c.reverse_card_id, c.printing, c.language, c.quantity, c.favorite, c.is_trade, c.list_type,
              cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.rarity, cc.supertype, cc.image_url, cc.game,
              cc.price_trend, cc.price_normal, cc.price_holofoil, cc.cmc, cc.color_identity
       FROM collection c

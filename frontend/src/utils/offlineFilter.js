@@ -7,7 +7,7 @@ export function filterOfflineCards(cards, { query = '', inventory = 'collection'
     if (location && location !== 'unassigned' && String(card.location_id) !== location) return false;
     const colors = card.color_identity || [];
     if (color === 'C' ? colors.length !== 0 : color && !colors.includes(color)) return false;
-    const text = [card.name, card.printed_name, card.set_name, card.set_id, card.number].filter(value => value != null).join(' ').toLocaleLowerCase();
+    const text = [card.name, card.printed_name, card.reverse_name, card.reverse_printed_name, card.set_name, card.set_id, card.number].filter(value => value != null).join(' ').toLocaleLowerCase();
     return tokens.every(token => text.includes(token));
   });
 }

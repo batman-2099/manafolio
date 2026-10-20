@@ -23,6 +23,10 @@ for (const format of ['internal', 'arena', 'tcgplayer', 'dragonshield', 'manabox
   }
 }
 assert.strictEqual(parseThirdPartyCSV([{ Quantity: '', quantity: '4' }], 'internal')[0].quantity, 4);
+assert.strictEqual(parseThirdPartyCSV([{ Reverse: 'mtg-token-back' }], 'internal',
+  { reverse_card_id: 'Reverse' })[0].reverse_card_id, 'mtg-token-back');
+assert.strictEqual(parseThirdPartyCSV([{ Reverse: '' }], 'internal',
+  { reverse_card_id: 'Reverse' })[0].reverse_card_id, null);
 for (const format of ['internal', 'arena', 'tcgplayer', 'dragonshield', 'manabox', 'custom']) {
   for (const [condition, expected] of [['moderately_played', 'Moderately Played'], ['heavily_played', 'Heavily Played']]) {
     assert.strictEqual(parseThirdPartyCSV([{ Condition: condition }], format,

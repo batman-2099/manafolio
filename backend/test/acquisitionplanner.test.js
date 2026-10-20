@@ -74,6 +74,31 @@ async function run() {
     ], 'purchase needs exclude missing/archived/Wishlist copies and other accounts, but count reserved ownership and alternate printings');
     await db.run("UPDATE deck_cards SET quantity = 10 WHERE deck_id = 1 AND card_id = 'a'");
     assert.equal((await request({ ...selection, confirmed: true, revision: after.body.revision }, 'owner', true)).status, 409);
+    await db.run("INSERT INTO card_cache (id, name, game) VALUES ('token-front', 'Goblin', 'mtg'), ('token-back', 'Soldier', 'mtg')");
+    await db.run("INSERT INTO collection (user_id, card_id, reverse_card_id, quantity) VALUES (1, 'token-front', 'token-back', 1)");
+    await db.run("INSERT INTO decks (id, user_id, name, inventory_type) VALUES (9, 1, 'Paired token sample', 'collection')");
+    await db.run("INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (9, 'token-front', 1), (9, 'token-back', 1)");
+    for (const preference of ['exact', 'any']) {
+      const paired = await request({ deck_ids: [9], preference });
+      assert.equal(paired.status, 200);
+      assert.equal(paired.body.items.reduce((sum, item) => sum + item.needed, 0), 1, 'one paired token cannot cover two simultaneous needs');
+      const needs = await require('../src/utils/acquisitionPlanner').acquisitionDeckNeeds(1);
+      assert.equal(needs.get(9)[preference], 1);
+    }
+    const ai = require('../src/utils/aiDecks');
+    const tokenInventory = await ai.inventory(1, 'collection');
+    assert.equal(tokenInventory.find(card => card.id === 'token-back').available_qty, 1);
+    assert.throws(() => ai.validateDraft({
+      format: 'Casual', commander_card_id: null,
+      cards: [{ card_id: 'token-front', quantity: 1 }, { card_id: 'token-back', quantity: 1 }],
+    }, tokenInventory), /both faces/, 'AI drafts share physical token capacity');
+    await db.run("INSERT INTO collection (user_id, card_id, quantity) VALUES (1, 'token-front', 1)");
+    const supportedDraft = {
+      format: 'Casual', commander_card_id: null,
+      cards: [{ card_id: 'token-front', quantity: 1 }, { card_id: 'token-back', quantity: 1 }],
+    };
+    assert.equal(ai.validateDraft(supportedDraft, await ai.inventory(1, 'collection')), supportedDraft,
+      'a separate front copy leaves the paired token available for its reverse');
     console.log('Acquisition planner HTTP regression passed: overlap, inventories, prices, authorization, cancellation, stale plans and concurrent confirmation.');
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));

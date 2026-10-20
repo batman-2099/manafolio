@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const cardApi = require('../utils/cardApi');
 const { parseCardRow, recordPrice } = require('../utils/priceHelpers');
-const { deckCardSources, validateDeckSource, deckLocations, reserveDeckSources, deckMissingCards, checkedOutAllocation, checkedOutSources, sourceEntries, moveContainerCopies, defaultCompartmentPlan } = require('../utils/collectionHelpers');
+const { deckCardSources, validateDeckSource, deckLocations, reserveDeckSources, deckMissingCards, checkedOutAllocation, checkedOutSources, planCardSources, moveContainerCopies, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { FORMATS } = require('../utils/aiDecks');
 const scryfallApi = require('../scryfallApi');
@@ -370,28 +370,29 @@ router.post('/:id/container', async (req, res) => {
       `, [containerName, deck.inventory_type, req.user.id]);
       const compartment = await db.run(`INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, ?)`,
         [location.lastID, Math.max(defaultCompartmentPlan('Deck Box').capacity, requested)]);
-      const items = [];
-      for (const card of cards) {
-        const candidates = await db.all(`
-          SELECT c.*, c.id AS entry_id, l.locked AS location_locked, cp.locked AS compartment_locked
-          FROM collection c JOIN card_cache cc ON cc.id = c.card_id AND cc.game = 'mtg'
-          LEFT JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
-          LEFT JOIN compartments cp ON cp.id = c.compartment_id AND cp.location_id = l.id
-          WHERE c.user_id = ? AND c.card_id = ? AND c.game = 'mtg' AND c.list_type = ?
-            AND c.quantity > 0 AND COALESCE(c.missing, 0) = 0
-            AND (c.location_id IS NULL OR (l.id IS NOT NULL AND l.inventory_type = ?))
-            AND (c.compartment_id IS NULL OR cp.id IS NOT NULL)
-          ORDER BY c.location_id, c.compartment_id, c.position, c.id
-        `, [req.user.id, card.card_id, deck.inventory_type, deck.inventory_type]);
-        const entries = sourceEntries(candidates, card, deck.game)
-          // ponytail: exclude whole reserved stacks; splitting can reassign legacy allocations.
-          .filter(entry => !entry.location_locked && !entry.compartment_locked
-            && !allocated.has(entry.id) && !(entry.quantity > 1 && entry.cert_number))
-          .map(entry => ({ ...entry, available: entry.quantity }));
-        const moved = Math.min(card.quantity, entries.reduce((total, entry) => total + entry.available, 0));
-        await moveContainerCopies(req.user.id, location.lastID, compartment.lastID, entries, moved);
-        items.push({ card_id: card.card_id, name: card.name, requested: card.quantity, moved, missing: card.quantity - moved });
-      }
+      const candidates = await db.all(`
+        SELECT c.*, c.id AS entry_id, l.locked AS location_locked, cp.locked AS compartment_locked
+        FROM collection c JOIN card_cache cc ON cc.id = c.card_id AND cc.game = 'mtg'
+        LEFT JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
+        LEFT JOIN compartments cp ON cp.id = c.compartment_id AND cp.location_id = l.id
+        WHERE c.user_id = ? AND c.game = 'mtg' AND c.list_type = ?
+          AND c.quantity > 0 AND COALESCE(c.missing, 0) = 0
+          AND (c.location_id IS NULL OR (l.id IS NOT NULL AND l.inventory_type = ?))
+          AND (c.compartment_id IS NULL OR cp.id IS NOT NULL)
+        ORDER BY c.location_id, c.compartment_id, c.position, c.id
+      `, [req.user.id, deck.inventory_type, deck.inventory_type]);
+      // Exclude whole reserved stacks; their exact return placements stay intact.
+      const entries = candidates.filter(entry => !entry.location_locked && !entry.compartment_locked
+        && !allocated.has(entry.id) && !(entry.quantity > 1 && entry.cert_number));
+      const plans = planCardSources(entries, cards, deck.game);
+      const items = cards.map((card, index) => {
+        const moved = [...plans[index].values()].reduce((sum, quantity) => sum + quantity, 0);
+        return { card_id: card.card_id, name: card.name, requested: card.quantity, moved, missing: card.quantity - moved };
+      });
+      const moves = entries.map(entry => ({ ...entry,
+        available: plans.reduce((sum, plan) => sum + (plan.get(entry.entry_id) || 0), 0) })).filter(entry => entry.available);
+      await moveContainerCopies(req.user.id, location.lastID, compartment.lastID, moves,
+        moves.reduce((sum, entry) => sum + entry.available, 0));
       const count = items.reduce((total, item) => total + item.moved, 0);
       return { id: location.lastID, name: containerName, inventory_type: deck.inventory_type,
         requested, count, missing: requested - count, items };
@@ -469,18 +470,24 @@ router.get('/:id', async (req, res) => {
         cc.number,
         cc.image_url,
         cc.price_trend,
-        (SELECT COALESCE(SUM(quantity), 0) FROM collection WHERE card_id = cc.id AND user_id = ? AND list_type = ?) AS owned_qty,
-        (SELECT COALESCE(SUM(dc2.quantity), 0)
-         FROM deck_cards dc2 JOIN decks d2 ON dc2.deck_id = d2.id
-         WHERE d2.checked_out = 1 AND d2.inventory_type = ? AND d2.user_id = ? AND d2.id != ? AND dc2.card_id = cc.id) AS locked_qty,
-        (SELECT GROUP_CONCAT(d2.name, ', ')
-         FROM deck_cards dc2 JOIN decks d2 ON dc2.deck_id = d2.id
-         WHERE d2.checked_out = 1 AND d2.inventory_type = ? AND d2.user_id = ? AND d2.id != ? AND dc2.card_id = cc.id) AS locked_decks
+        (SELECT COALESCE(SUM(quantity), 0) FROM collection WHERE (card_id = cc.id OR reverse_card_id = cc.id) AND user_id = ? AND list_type = ?) AS owned_qty,
+        0 AS locked_qty, NULL AS locked_decks
       FROM deck_cards dc
       JOIN card_cache cc ON dc.card_id = cc.id
       WHERE dc.deck_id = ?
     `;
-    const cards = await db.all(cardsQuery, [req.user.id, inventoryType, inventoryType, req.user.id, id, inventoryType, req.user.id, id, id]);
+    const cards = await db.all(cardsQuery, [req.user.id, inventoryType, id]);
+    if (inventoryType === 'collection') {
+      const reservations = await checkedOutSources(req.user.id);
+      const entries = await db.all('SELECT id, card_id, reverse_card_id FROM collection WHERE user_id = ?', [req.user.id]);
+      const deckNames = new Map((await db.all('SELECT id, name FROM decks WHERE user_id = ?', [req.user.id])).map(row => [row.id, row.name]));
+      for (const card of cards) {
+        const matching = new Set(entries.filter(entry => entry.card_id === card.id || entry.reverse_card_id === card.id).map(entry => entry.id));
+        const locked = reservations.filter(source => source.deck_id !== Number(id) && matching.has(source.entry_id));
+        card.locked_qty = locked.reduce((sum, source) => sum + source.quantity, 0);
+        card.locked_decks = [...new Set(locked.map(source => deckNames.get(source.deck_id)))].join(', ') || null;
+      }
+    }
     const formatted = cards.map(parseCardRow);
 
     res.json({
@@ -554,7 +561,7 @@ router.put('/:id', async (req, res) => {
             `SELECT cc.name
              FROM deck_cards dc
              JOIN card_cache cc ON cc.id = dc.card_id
-             LEFT JOIN collection c ON c.card_id = dc.card_id AND c.user_id = ? AND c.list_type = ?
+             LEFT JOIN collection c ON (c.card_id = dc.card_id OR c.reverse_card_id = dc.card_id) AND c.user_id = ? AND c.list_type = ?
              WHERE dc.deck_id = ?
              GROUP BY dc.card_id
              HAVING COALESCE(SUM(c.quantity), 0) < dc.quantity
@@ -848,7 +855,10 @@ router.delete('/:id', async (req, res) => {
 // Add/Update Card in Deck
 router.post('/:id/cards', async (req, res) => {
   const { id } = req.params;
-  const { card_id, quantity = 1 } = req.body;
+  const { card_id, quantity = 1, source_entry_id } = req.body;
+  if (source_entry_id != null && (!Number.isSafeInteger(source_entry_id) || source_entry_id === 0)) {
+    return res.status(400).json({ error: 'source_entry_id must be a non-zero integer or null' });
+  }
 
   if (!card_id) {
     return res.status(400).json({ error: 'card_id is required' });
@@ -878,13 +888,22 @@ router.post('/:id/cards', async (req, res) => {
 
     await db.withTransaction(async () => {
       // Validate and change composition under the same lock as checkout.
-      const check = await validateDeckAddition({ deckId: id, userId: req.user.id, cardId: card_id, newQty: quantity });
+      if (source_entry_id !== undefined) {
+        const currentDeck = await db.get('SELECT checked_out FROM decks WHERE id = ?', [id]);
+        const current = await db.get('SELECT source_entry_id FROM deck_cards WHERE deck_id = ? AND card_id = ?', [id, card_id]);
+        if (currentDeck.checked_out && (current?.source_entry_id ?? null) !== source_entry_id) {
+          throw Object.assign(new Error('Return this deck before changing its sources'), { status: 400 });
+        }
+        await validateDeckSource(req.user.id, id, card_id, parseInt(quantity, 10), source_entry_id);
+        if (current) await db.run('UPDATE deck_cards SET source_entry_id = ? WHERE deck_id = ? AND card_id = ?', [source_entry_id, id, card_id]);
+      }
+      const check = await validateDeckAddition({ deckId: id, userId: req.user.id, cardId: card_id, newQty: quantity, sourceEntryId: source_entry_id });
       if (!check.ok) throw Object.assign(new Error(check.error), { status: 400 });
       await db.run(`
-        INSERT INTO deck_cards (deck_id, card_id, quantity)
-        VALUES (?, ?, ?)
-        ON CONFLICT(deck_id, card_id) DO UPDATE SET quantity = ?
-      `, [id, card_id, parseInt(quantity, 10), parseInt(quantity, 10)]);
+        INSERT INTO deck_cards (deck_id, card_id, quantity, source_entry_id)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(deck_id, card_id) DO UPDATE SET quantity = excluded.quantity
+      `, [id, card_id, parseInt(quantity, 10), source_entry_id ?? null]);
       if (parseInt(quantity, 10) === 0) {
         await db.run(`UPDATE decks SET commander_card_id = NULL WHERE id = ? AND commander_card_id = ?`, [id, card_id]);
       }

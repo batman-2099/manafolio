@@ -4,6 +4,7 @@ const db = require('../db');
 const cardApi = require('../utils/cardApi');
 const languages = require('../utils/languages');
 const { checkedOutAllocation } = require('../utils/collectionHelpers');
+const { validateReverseCard } = require('../utils/tokenPairing');
 const router = express.Router();
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -14,8 +15,10 @@ async function entries(userId) {
   const reserved = await checkedOutAllocation(userId);
   const rows = await db.all(`SELECT c.*, cc.name, cc.printed_name, cc.set_name, cc.number,
     cc.image_url, cc.price_normal, cc.price_holofoil, cc.price_currency, cc.last_updated,
-    l.name AS location_name, cp.label AS compartment_label, cp.idx AS compartment_idx
+    l.name AS location_name, cp.label AS compartment_label, cp.idx AS compartment_idx,
+    rc.name AS reverse_name, rc.image_url AS reverse_image_url
     FROM collection c JOIN card_cache cc ON cc.id = c.card_id AND cc.game = c.game
+    LEFT JOIN card_cache rc ON rc.id = c.reverse_card_id
     LEFT JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
     LEFT JOIN compartments cp ON cp.id = c.compartment_id AND cp.location_id = l.id
     WHERE c.user_id = ? AND c.game = 'mtg' AND c.list_type = 'collection'
@@ -24,7 +27,7 @@ async function entries(userId) {
       AND (c.compartment_id IS NULL OR (cp.id IS NOT NULL AND COALESCE(cp.locked, 0) = 0))
     ORDER BY cc.name, c.id`, [userId]);
   return rows.filter(row => !reserved.get(row.id)).map(row => ({ ...row, entry_id: row.id,
-    snapshot: hash([row.id, row.card_id, row.quantity, row.printing, row.language, row.condition,
+    snapshot: hash([row.id, row.card_id, row.reverse_card_id, row.quantity, row.printing, row.language, row.condition,
       row.location_id, row.compartment_id, row.position, row.grader, row.grade, row.cert_number, row.added_at]) }));
 }
 
@@ -52,7 +55,8 @@ function payload(body) {
         || !['Normal', 'Holofoil'].includes(row.printing)
         || !['Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged'].includes(row.condition)
         || !languages.LANGUAGES.some(language => language.name === row.language)) fail('Invalid receiving card details.');
-    return { card_id: row.card_id, quantity: row.quantity, printing: row.printing, condition: row.condition, language: row.language };
+    return { card_id: row.card_id, quantity: row.quantity, printing: row.printing, condition: row.condition, language: row.language,
+      ...(row.reverse_card_id != null ? { reverse_card_id: row.reverse_card_id } : {}) };
   });
   return { trade_id: body.trade_id, giving, receiving };
 }
@@ -65,6 +69,7 @@ async function prepareReceiving(rows) {
     if (!card || card.game !== 'mtg' || languages.toName(card.language) !== row.language) {
       fail('Receiving printing or language no longer matches. Search for the exact printing again.');
     }
+    await validateReverseCard(card, row.reverse_card_id ?? null, 'collection');
     result.push(quote({ ...card, ...row }));
   }
   return result;
@@ -116,17 +121,18 @@ router.post('/confirm', async (req, res) => {
       await validateGiving(req.user.id, request.giving);
       // Revalidate cached receiving identities inside the same write boundary.
       for (const row of request.receiving) {
-        const card = await db.get('SELECT game, language FROM card_cache WHERE id = ?', [row.card_id]);
+        const card = await db.get('SELECT * FROM card_cache WHERE id = ?', [row.card_id]);
         if (!card || card.game !== 'mtg' || languages.toName(card.language) !== row.language) fail('Receiving printing changed. Review again.', 409);
+        await validateReverseCard(card, row.reverse_card_id ?? null, 'collection');
       }
       for (const row of request.giving) {
         await db.run('UPDATE collection SET quantity = quantity - ? WHERE id = ? AND user_id = ?', [row.quantity, row.entry_id, req.user.id]);
         await db.run('DELETE FROM collection WHERE id = ? AND user_id = ? AND quantity = 0', [row.entry_id, req.user.id]);
       }
       for (const row of request.receiving) {
-        await db.run(`INSERT INTO collection (user_id, card_id, quantity, printing, language, condition,
-          list_type, game, purchase_price, location_id, compartment_id) VALUES (?, ?, ?, ?, ?, ?, 'collection', 'mtg', NULL, NULL, NULL)`,
-        [req.user.id, row.card_id, row.quantity, row.printing, row.language, row.condition]);
+        await db.run(`INSERT INTO collection (user_id, card_id, quantity, printing, language, condition, reverse_card_id,
+          list_type, game, purchase_price, location_id, compartment_id) VALUES (?, ?, ?, ?, ?, ?, ?, 'collection', 'mtg', NULL, NULL, NULL)`,
+        [req.user.id, row.card_id, row.quantity, row.printing, row.language, row.condition, row.reverse_card_id ?? null]);
       }
       const given = request.giving.reduce((sum, row) => sum + row.quantity, 0);
       const received = request.receiving.reduce((sum, row) => sum + row.quantity, 0);

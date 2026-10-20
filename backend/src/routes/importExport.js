@@ -10,6 +10,8 @@ const { assertStorageInventory, checkedOutSources, moveContainerCopies } = requi
 const { normalizeCardBack } = require('../utils/cardBack');
 const { normalizeUploadedImage } = require('../utils/uploadedImage');
 const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
+const { assertTokenPair, validateReverseCard } = require('../utils/tokenPairing');
+const cardApi = require('../utils/cardApi');
 const validImportQuantity = quantity => Number.isSafeInteger(quantity) && quantity > 0 && quantity <= 2147483647;
 
 function parseCsvRows(data) {
@@ -151,6 +153,10 @@ async function parseCompleteBackup(data) {
   }
 
   const cardIds = new Set(backup.card_cache.map(card => card.id));
+  const cachedCards = new Map(backup.card_cache.map(card => [card.id, card]));
+  for (const entry of backup.collection) {
+    if (entry.reverse_card_id != null) assertTokenPair(cachedCards.get(entry.card_id), cachedCards.get(entry.reverse_card_id), entry.list_type);
+  }
   const locationIds = new Set(backup.locations.map(location => location.id));
   const compartmentIds = new Set(backup.compartments.map(compartment => compartment.id));
   const deckIds = new Set(backup.decks.map(deck => deck.id));
@@ -170,7 +176,7 @@ async function parseCompleteBackup(data) {
           || !Number.isSafeInteger(card.quantity) || card.quantity < 1
           || (card.source_entry_id != null && (snapshot.inventory_type !== 'collection'
             || !Number.isSafeInteger(card.source_entry_id) || card.source_entry_id === 0
-            || (entries.has(card.source_entry_id) && entries.get(card.source_entry_id).card_id !== card.card_id))))
+            || (entries.has(card.source_entry_id) && ![entries.get(card.source_entry_id).card_id, entries.get(card.source_entry_id).reverse_card_id].includes(card.card_id)))))
         || (snapshot.commander_card_id !== null && (!/commander|edh|brawl/i.test(snapshot.format)
           || !snapshot.cards.some(card => card.card_id === snapshot.commander_card_id)))) {
       throw new Error('Invalid backup deck history');
@@ -180,13 +186,13 @@ async function parseCompleteBackup(data) {
   if (!Array.isArray(allocations)
       || backup.deck_cards.some(card => card.source_entry_id != null && (
         !Number.isSafeInteger(card.source_entry_id) || card.source_entry_id === 0
-        || (entries.has(card.source_entry_id) && entries.get(card.source_entry_id).card_id !== card.card_id)
+        || (entries.has(card.source_entry_id) && ![entries.get(card.source_entry_id).card_id, entries.get(card.source_entry_id).reverse_card_id].includes(card.card_id))
         || (backup.decks.find(deck => deck.id === card.deck_id)?.inventory_type ?? 'collection') !== 'collection'))
       || allocations.some(source => !source || !Number.isSafeInteger(source.entry_id) || source.entry_id === 0
         || !validImportQuantity(source.quantity)
         || (backup.decks.find(deck => deck.id === source.deck_id)?.inventory_type ?? 'collection') !== 'collection'
         || !backup.deck_cards.some(card => card.deck_id === source.deck_id && card.card_id === source.card_id)
-        || (entries.has(source.entry_id) && entries.get(source.entry_id).card_id !== source.card_id))) {
+        || (entries.has(source.entry_id) && ![entries.get(source.entry_id).card_id, entries.get(source.entry_id).reverse_card_id].includes(source.card_id)))) {
     throw new Error('Invalid backup deck sources');
   }
   if (
@@ -315,15 +321,15 @@ async function restoreCompleteBackup(backup, userId) {
         INSERT INTO collection (
           card_id, quantity, condition, printing, language, purchase_price, location_id, compartment_id,
           position, favorite, is_trade, list_type, game, added_at, notes, grader, grade, cert_number,
-          market_value, market_value_source, market_value_at, missing, user_id, last_verified_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          market_value, market_value_source, market_value_at, missing, user_id, last_verified_at, reverse_card_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         card.card_id, card.quantity, card.condition, card.printing, card.language, card.purchase_price,
         card.location_id == null ? null : locationIds.get(card.location_id),
         card.compartment_id == null ? null : compartmentIds.get(card.compartment_id),
         card.position, card.favorite || 0, card.is_trade || 0, card.list_type, card.game, card.added_at,
         card.notes || '', card.grader || 'Raw', card.grade, card.cert_number, card.market_value,
-        card.market_value_source, card.market_value_at, card.missing || 0, userId, card.last_verified_at ?? null
+        card.market_value_source, card.market_value_at, card.missing || 0, userId, card.last_verified_at ?? null, card.reverse_card_id ?? null
       ]);
       entryIds.set(card.id, result.lastID);
     }
@@ -390,12 +396,14 @@ router.get('/export', async (req, res) => {
             SELECT * FROM card_cache WHERE id IN (
               SELECT card_id FROM collection WHERE user_id = ?
               UNION
+              SELECT reverse_card_id FROM collection WHERE user_id = ?
+              UNION
               SELECT dc.card_id FROM deck_cards dc JOIN decks d ON d.id = dc.deck_id WHERE d.user_id = ?
               UNION
               SELECT json_extract(card.value, '$.card_id') FROM deck_revisions r
                 JOIN decks d ON d.id = r.deck_id, json_each(r.snapshot, '$.cards') card WHERE d.user_id = ?
             ) ORDER BY id
-          `, [req.user.id, req.user.id, req.user.id])
+          `, [req.user.id, req.user.id, req.user.id, req.user.id])
         ]);
         return {
           format: 'manafolio-backup',
@@ -428,6 +436,7 @@ router.get('/export', async (req, res) => {
         c.purchase_price,
         c.added_at,
         cc.id as card_id,
+        c.reverse_card_id,
         cc.name as name,
         cc.supertype,
         cc.types,
@@ -661,6 +670,20 @@ router.post('/import', async (req, res) => {
     } else {
       onProgress?.({ stage: 'resolved', matched: rawItems.length, unmatched: 0 });
     }
+    for (const reverseId of new Set(rawItems.map(item => item.reverse_card_id).filter(id => id != null))) {
+      if (typeof reverseId !== 'string' || !cardApi.isMtgId(reverseId)) {
+        throw Object.assign(new Error('Invalid reverse_card_id'), { status: 400 });
+      }
+      if (!await db.get('SELECT id FROM card_cache WHERE id = ?', [reverseId])) {
+        await cardApi.getCardById(reverseId, { game: 'mtg' });
+      }
+    }
+    for (const item of rawItems.filter(item => item.reverse_card_id != null)) {
+      const frontId = item.card_id || item.id;
+      if (!await db.get('SELECT id FROM card_cache WHERE id = ?', [frontId])) {
+        await cardApi.getCardById(frontId, { game: 'mtg' });
+      }
+    }
 
     let importedCount = 0;
     let addedItems = [];
@@ -671,7 +694,7 @@ router.post('/import', async (req, res) => {
       for (const item of rawItems) {
         const cardId = item.card_id || item.id;
         const cached = typeof cardId === 'string'
-          ? await db.get(`SELECT id, game FROM card_cache WHERE id = ?`, [cardId]) : null;
+          ? await db.get(`SELECT * FROM card_cache WHERE id = ?`, [cardId]) : null;
         const idGame = cached ? cached.game : (typeof cardId === 'string' && cardId.startsWith('mtg-') ? 'mtg' : null);
         if (idGame !== 'mtg' || (item.game !== undefined && item.game !== idGame)) {
           throw Object.assign(new Error('Unsupported card ID or game'), { status: 400 });
@@ -698,11 +721,12 @@ router.post('/import', async (req, res) => {
             ]
           );
         }
+        const reverseCardId = await validateReverseCard(cached || await db.get('SELECT * FROM card_cache WHERE id = ?', [cardId]), item.reverse_card_id, list_type);
 
         await db.run(
           `INSERT INTO collection 
-           (card_id, user_id, quantity, condition, printing, language, purchase_price, list_type, game, added_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+           (card_id, user_id, quantity, condition, printing, language, purchase_price, list_type, game, reverse_card_id, added_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
           [
             cardId,
             req.user.id,
@@ -712,7 +736,8 @@ router.post('/import', async (req, res) => {
             item.language || 'English',
             item.purchase_price || 0,
             list_type,
-            game
+            game,
+            reverseCardId
           ]
         );
         importedCount++;

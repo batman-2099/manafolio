@@ -108,12 +108,14 @@ async function main() {
   const expectedIds = [physical, secondPhysical, missing, unassigned, arena, wishlist, crossLocation, crossCompartment, crossUnit, legacy];
   assert.deepStrictEqual(snapshot.cards.map(card => card.entry_id), expectedIds);
   const cards = new Map(snapshot.cards.map(card => [card.entry_id, card]));
-  const fields = ['entry_id', 'card_id', 'name', 'printed_name', 'set_id', 'set_name', 'number', 'quantity', 'list_type',
-    'printing', 'language', 'condition', 'color_identity', 'missing', 'location_id', 'location_name', 'storage_unit_name',
-    'location_type', 'compartment_idx', 'compartment_label', 'position', 'reserved_quantity'].sort();
-  for (const card of snapshot.cards) assert.deepStrictEqual(Object.keys(card).sort(), fields);
+  for (const card of snapshot.cards) {
+    for (const field of ['notes', 'purchase_price', 'market_value', 'image_url', 'reverse_image_url']) {
+      assert.ok(!Object.hasOwn(card, field), `offline snapshot must omit ${field}`);
+    }
+  }
   assert.deepStrictEqual(cards.get(physical), {
     entry_id: physical, card_id: 'mtg-offline', name: 'Sample Card', printed_name: 'Beispielkarte',
+    reverse_card_id: null, reverse_name: null, reverse_printed_name: null,
     set_id: 'mtg-tst', set_name: 'Sample Set', number: '007', quantity: 4, list_type: 'collection',
     printing: 'Holofoil', language: 'German', condition: 'Lightly Played', color_identity: ['U', 'R'], missing: 0,
     location_id: ownLocation.id, location_name: 'Sample Binder', storage_unit_name: 'Sample Shelf', location_type: 'Binder',

@@ -1,4 +1,13 @@
 {
+  "token.reverse": "Jeton au verso (facultatif)",
+  "token.pairHint": "Choisissez le jeton imprimé au verso de cette carte physique. Les deux faces partagent la quantité et l’emplacement ; aucune association n’est automatique.",
+  "token.reversePrinting": "Édition du verso",
+  "token.none": "Aucun jeton distinct au verso",
+  "token.searchError": "La recherche de jetons a échoué. Réessayez.",
+  "token.noResults": "Aucun jeton trouvé. Essayez un autre nom.",
+  "token.flip": "Retourner la carte",
+  "token.deckFace": "Face à ajouter au deck",
+  "token.source": "Source physique",
   "stocktake.title": "Inventaire physique",
   "stocktake.slot": "Emplacement {slot}",
   "stocktake.verified": "Vérifiée",

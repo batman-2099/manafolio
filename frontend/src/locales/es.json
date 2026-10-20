@@ -1,4 +1,13 @@
 {
+  "token.reverse": "Ficha del reverso (opcional)",
+  "token.pairHint": "Elige la ficha impresa al otro lado de esta carta física. Ambas caras comparten cantidad y ubicación; no se emparejan automáticamente.",
+  "token.reversePrinting": "Edición del reverso",
+  "token.none": "Sin ficha separada en el reverso",
+  "token.searchError": "Error al buscar fichas. Vuelve a buscar.",
+  "token.noResults": "No se encontraron fichas. Prueba otro nombre.",
+  "token.flip": "Voltear carta",
+  "token.deckFace": "Cara para añadir al mazo",
+  "token.source": "Origen físico",
   "stocktake.title": "Inventario físico",
   "stocktake.slot": "Posición {slot}",
   "stocktake.verified": "Verificada",

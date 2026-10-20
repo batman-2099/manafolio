@@ -80,6 +80,7 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
                   {t(inventoryType === 'arena'
                     ? token.owned ? 'relatedTokens.ownedArena' : 'relatedTokens.notOwnedArena'
                     : token.owned ? 'relatedTokens.owned' : 'relatedTokens.notOwned')}
+                  {token.owned && token.owned_qty != null && ` · ${token.owned_qty}×`}
                 </span>
               </div>
               {token.owned && inventoryType === 'collection' && (
@@ -88,6 +89,7 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
                     const slot = getSlotNumber(location);
                     return (
                       <li key={index}>
+                        {location.quantity != null && `${location.quantity}× · `}
                         {location.location_name
                           ? `${location.location_name}${location.compartment_display ? ` • ${location.compartment_display}` : ''}${slot !== null ? ` • ${t('wizard.slot', { slot })}` : ''}`
                           : t('bulk.unassignedPile')}
@@ -121,6 +123,7 @@ function TokenViewer({ token, inventoryType, disabled, onClose, onChanged }) {
   const pending = useRef(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [sourceEntryId, setSourceEntryId] = useState(token.source_entry_id || '');
 
   useEffect(() => {
     if (inventoryType === 'arena') return;
@@ -141,17 +144,19 @@ function TokenViewer({ token, inventoryType, disabled, onClose, onChanged }) {
     setError('');
     try {
       let quantity = 1;
+      const source = token.owned_entries?.find(entry => String(entry.entry_id) === String(sourceEntryId));
+      const cardId = kind === 'deck' && source ? source.card_id : token.id;
       if (kind === 'deck') {
         const response = await fetch(`/api/decks/${destination}`);
         const deck = await response.json();
         if (!response.ok) throw new Error(deck.error || t('inspector.errAddDeck'));
-        quantity += deck.cards.find(card => card.id === token.id)?.quantity || 0;
+        quantity += deck.cards.find(card => card.id === cardId)?.quantity || 0;
       }
       const response = await fetch(kind === 'deck' ? `/api/decks/${destination}/cards` : '/api/collection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(kind === 'deck'
-          ? { card_id: token.id, quantity }
+          ? { card_id: cardId, quantity, ...(inventoryType === 'collection' && sourceEntryId ? { source_entry_id: Number(sourceEntryId) } : {}) }
           : { card_id: token.id, quantity: 1, list_type: inventoryType, location_id: Number(destination), condition: 'Near Mint', printing: 'Normal', language: token.language || 'English' }),
       });
       const saved = await response.json();
@@ -173,6 +178,12 @@ function TokenViewer({ token, inventoryType, disabled, onClose, onChanged }) {
       <div className="glass-panel" style={{ width: 'min(440px, 100%)', maxHeight: '90dvh', overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={onClose}>{t('common.close')}</button>
         <CardImage card={token} style={{ width: '100%', maxHeight: '55dvh', objectFit: 'contain' }} />
+        {inventoryType === 'collection' && token.owned_entries?.length > 0 && <label>
+          {t('token.source')}
+          <select className="select-control" disabled={busy || disabled} value={sourceEntryId} onChange={event => setSourceEntryId(event.target.value)}>
+            {token.owned_entries.map(entry => <option key={entry.entry_id} value={entry.entry_id}>{entry.quantity}× · {entry.location_name || t('bulk.unassignedPile')}{entry.compartment_display ? ` · ${entry.compartment_display}` : ''} · #{entry.entry_id}</option>)}
+          </select>
+        </label>}
         <AddToDeckSelect disabled={busy || disabled} onAdd={id => add('deck', id)} style={{ width: '100%' }} />
         {inventoryType !== 'arena' && (
           <select className="select-control" aria-label={t('relatedTokens.addToContainer')} value="" disabled={disabled || busy || !locations.length} onChange={event => { if (event.target.value) add('container', event.target.value); }}>
