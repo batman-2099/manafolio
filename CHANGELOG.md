@@ -9,6 +9,7 @@ Release history starts with Manafolio 2.0.
 - Restricted reverse-token selection to the front face's set, with server-side enforcement for additions, edits, scan drafts, trades, and imports.
 - Added an automatic reverse-side prompt before interactive token additions, with same-set selection, explicit unknown/blank-back continuation, and cancellation before inventory is added.
 - Kept successive reverse prompts and scanner dialog handoffs on the current page by serializing shared browser-history cleanup.
+- Recognize cards from sets named with “Token” or “Tokens” as tokens regardless of type metadata, including reverse pairing, add prompts, and related-token suppression.
 
 ## 2.3.4 — 2026-10-13
 

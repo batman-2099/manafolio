@@ -19,3 +19,15 @@ test('explicit token pair remains one searchable entry with independent reverse 
   assert.equal(reverseFace({ ...token, image_url_back: '/native-back.png' }).image_url, '/native-back.png');
   assert.equal(reverseFace({ ...token, card_faces: [{}, { name: 'Native back', image_uris: { normal: '/native.png' } }] }).name, 'Native back');
 });
+
+test('token set names identify cards without token type metadata', () => {
+  for (const set_name of ['Sample Token Set', 'Sample Tokens', 'SAMPLE TOKENS']) {
+    assert.equal(isMtgToken({ game: 'mtg', set_name, subtypes: ['Card'] }), true);
+    assert.equal(isMtgToken({ supertype: 'MTG', set_name }), true);
+    assert.equal(isMtgToken({ game: 'pokemon', set_name }), false);
+  }
+  for (const set_name of [undefined, '', 'Ordinary Set', 'Tokenized Set']) {
+    assert.equal(isMtgToken({ game: 'mtg', set_name }), false);
+  }
+  assert.equal(isMtgToken(null), false);
+});

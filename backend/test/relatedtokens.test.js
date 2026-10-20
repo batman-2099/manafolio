@@ -37,6 +37,7 @@ async function main() {
     card(14, { name: 'Soldier' }),
     card(16, { name: 'Merfolk', layout: 'token', all_parts: [part(3), part(16)] }),
     card(17, { name: 'Merfolk // Soldier', layout: 'double_faced_token', all_parts: [part(3), part(17)] }),
+    card(18, { name: 'Helper card', set_name: 'Sample TOKENS', type_line: 'Card', all_parts: [part(3)] }),
   ];
   const expected = { tokens: [
     { id: cardId(3), name: 'Soldier', image_url: 'https://cards.scryfall.io/soldier.jpg', owned: false, locations: [], source_cards: [{ id: cardId(1), name: 'Card 1' }, { id: cardId(2), name: 'Card 2' }] },
@@ -108,7 +109,7 @@ async function main() {
     assert.deepStrictEqual(await request({ card_ids: [cardId(5)] }), { tokens: [] });
     assert.deepStrictEqual(await request({ card_ids: [cardId(3)] }), { tokens: [] },
       'a token does not list itself as a related token');
-    for (const n of [4, 16, 17]) {
+    for (const n of [4, 16, 17, 18]) {
       assert.deepStrictEqual(await request({ card_ids: [cardId(n)] }), { tokens: [] },
         'token layouts and token faces do not expose other tokens as their creations');
     }
@@ -135,7 +136,7 @@ async function main() {
     api.client.get = bulk.client.get = async () => { throw new Error('Provider must not be used with local raw cards'); };
     assert.deepStrictEqual(await request({ card_ids: [cardId(1), cardId(2)] }), expected);
     assert.deepStrictEqual(await request({ card_ids: [cardId(5)] }), { tokens: [] });
-    for (const n of [3, 4, 16, 17]) {
+    for (const n of [3, 4, 16, 17, 18]) {
       assert.deepStrictEqual(await request({ card_ids: [cardId(n)] }), { tokens: [] },
         'bulk-catalog tokens do not supply related-token lists');
     }

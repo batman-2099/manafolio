@@ -873,7 +873,7 @@ async function getRelatedTokens(cardIds) {
   const producers = new Map();
   for (const id of sourceIds) {
     const source = sources.get(id);
-    if (source.layout === 'token' || source.layout === 'double_faced_token'
+    if (source.layout === 'token' || source.layout === 'double_faced_token' || /\btokens?\b/i.test(source.set_name)
       || /\bToken\b/.test(source.type_line) || source.card_faces?.some(face => /\bToken\b/.test(face.type_line))) continue;
     const parts = source.all_parts;
     if (parts != null && !Array.isArray(parts)) throw new Error('Invalid Scryfall related parts');

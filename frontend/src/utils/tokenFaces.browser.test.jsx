@@ -15,8 +15,8 @@ export async function runTokenFaceRegressions() {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
-  const front = { id: 'mtg-front', name: 'Goblin', game: 'mtg', set_id: 'tst', subtypes: ['Token'], image_url: '/mtg-card-back.webp' };
-  const back = { id: 'mtg-back', name: 'Soldier', game: 'mtg', set_id: 'tst', subtypes: ['Token'], set_name: 'Fixture tokens', number: '2', language: 'English', image_url: '/logo.svg' };
+  const front = { id: 'mtg-front', name: 'Goblin', game: 'mtg', set_id: 'tst', set_name: 'Fixture Tokens', subtypes: [], image_url: '/mtg-card-back.webp' };
+  const back = { id: 'mtg-back', name: 'Soldier', game: 'mtg', set_id: 'tst', subtypes: [], set_name: 'Fixture tokens', number: '2', language: 'English', image_url: '/logo.svg' };
   let selected = null;
   let fail = true;
   let searches = 0;
@@ -24,7 +24,7 @@ export async function runTokenFaceRegressions() {
     if (String(url).startsWith('/api/search?')) {
       searches++;
       assert(new URL(String(url), location.origin).searchParams.get('set') === 'tst', 'reverse search stays in the front set');
-      return { ok: !fail, json: async () => [front, { ...back, id: 'non-token', subtypes: ['Creature'] }, { ...back, id: 'other-set', set_id: 'else' }, back] };
+      return { ok: !fail, json: async () => [front, { ...back, id: 'non-token', set_name: 'Ordinary Set', subtypes: ['Creature'] }, { ...back, id: 'other-set', set_id: 'else' }, back] };
     }
     if (String(url).startsWith('/api/card-art')) return { ok: true, json: async () => [] };
     throw new Error(`Unexpected request: ${url}`);

@@ -168,6 +168,14 @@ async function testTokenPairing() {
       card_ids: mixed.failed.map(failure => failure.card_id), reverse_card_ids: { [cardId(2)]: cardId(1) },
     });
     assert.deepStrictEqual([retry.added, retry.failed], [1, []]);
+    await db.run('UPDATE card_cache SET subtypes = ?, set_name = ? WHERE id IN (?, ?)',
+      ['[]', 'Sample tOkEnS', cardId(1), cardId(2)]);
+    const setPair = await request('/collection', 'POST', { card_id: cardId(1), reverse_card_id: cardId(2), quantity: 1 });
+    assert.strictEqual((await db.get('SELECT reverse_card_id FROM collection WHERE id = ?', [setPair.id])).reverse_card_id, cardId(2),
+      'token-set cards can pair without token type metadata');
+    await request('/collection', 'POST', { card_id: cardId(1), reverse_card_id: cardId(2), list_type: 'arena' }, 400);
+    await db.run('UPDATE card_cache SET set_id = ? WHERE id = ?', ['other', cardId(2)]);
+    await request('/collection', 'POST', { card_id: cardId(1), reverse_card_id: cardId(2) }, 400);
   } finally {
     scryfall.getRelatedTokens = originalRelated;
     scryfall.client.get = originalGet;

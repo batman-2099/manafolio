@@ -1,7 +1,8 @@
 import { getCardDisplayName } from './langHelper.js';
 
 export function isMtgToken(card) {
-  return (card?.game === 'mtg' || card?.supertype === 'MTG') && (card.subtypes || []).includes('Token');
+  return (card?.game === 'mtg' || card?.supertype === 'MTG')
+    && ((card.subtypes || []).includes('Token') || /\btokens?\b/i.test(card.set_name));
 }
 
 export function pairedCardName(card) {
