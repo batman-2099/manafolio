@@ -386,7 +386,7 @@ This does not move cards into one storage pocket or merge their real-world locat
 ### Use the card inspector
 
 1. Open a card. If it represents a stack, choose the stored entry you mean to change.
-2. Read its printing, language, condition or grade, price information, quantity, and recorded location. Click the artwork for a larger view.
+2. Read its printing, language, condition or grade, price information, quantity, and recorded location. The set name and available set symbol appear directly beneath **Printing**. Click the artwork for a larger view.
 3. Choose **Edit Card** to change quantity, copy details, purchase price, grading details, **Value for this copy**, **Storage Container**, or **Notes**.
 4. Choose **Save Changes**. **Cancel** discards every unsaved edit and restores the saved entry. While saving or duplicating, wait for completion before making another change or closing; a failure stays inside the inspector and keeps the draft for correction.
 5. Recheck the entry and location after a quantity, language, or placement change.

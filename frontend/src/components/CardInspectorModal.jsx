@@ -36,6 +36,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   const { requestReverse, reversePrompt } = useReverseTokenPrompt();
   const [mode, setMode] = useState(startInEdit ? 'edit' : 'view');
   const [locations, setLocations] = useState([]);
+  const [setSymbols, setSetSymbols] = useState({});
   const [locationsLoading, setLocationsLoading] = useState(true);
   const [locationsError, setLocationsError] = useState(false);
   const [locationsVersion, setLocationsVersion] = useState(0);
@@ -106,6 +107,17 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   useEffect(() => () => { printingRequest.current++; }, []);
 
   const activeCard = card && localizedCard?.targetId === targetEntryId ? localizedCard.card : card;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/sets?game=mtg', { signal: controller.signal })
+      .then(response => response.ok ? response.json() : [])
+      .then(sets => {
+        if (!controller.signal.aborted) setSetSymbols(Object.fromEntries(sets.map(set => [set.id.replace(/^mtg-/, ''), set.symbol_url])));
+      })
+      .catch(() => {}); // Optional symbols must not hide the set name or card details.
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (!targetEntryId) return;
@@ -708,7 +720,13 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                 {activeCard.cert_number && (
                   <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specCert')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.cert_number}</span></div>
                 )}
-                <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.printing}</span></div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.printing}</span>
+                  {(activeCard.set_name || setCode(activeCard)) && <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.35rem', color: 'var(--text-secondary)' }}>
+                    {setSymbols[setCode(activeCard)] && <img key={setCode(activeCard)} src={setSymbols[setCode(activeCard)]} alt="" width="20" height="20" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+                    <span>{activeCard.set_name || setCode(activeCard)}</span>
+                  </div>}
+                </div>
                 <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specLanguage')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.language}</span></div>
               </div>
 

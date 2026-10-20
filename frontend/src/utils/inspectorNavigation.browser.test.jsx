@@ -15,12 +15,13 @@ export async function runInspectorNavigationRegressions() {
   document.body.append(trigger, host);
   trigger.focus();
   const root = createRoot(host);
-  const cards = [1, 2, 3].map(entry_id => ({ entry_id, id: 'sample-printing', card_id: 'sample-printing', name: `Sample ${entry_id}`, quantity: entry_id, game: 'mtg', list_type: 'collection' }));
+  const cards = [1, 2, 3].map(entry_id => ({ entry_id, id: 'sample-printing', card_id: 'sample-printing', name: `Sample ${entry_id}`, quantity: entry_id, game: 'mtg', list_type: 'collection', printing: 'Normal', set_id: `set${entry_id}`, set_name: `Sample Set ${entry_id}` }));
   cards[2] = { ...cards[2], stack_entries: [{ ...cards[2] }, { ...cards[2], entry_id: 4, quantity: 1 }] };
   let settle;
   let updates = 0;
   window.fetch = async (url, options = {}) => {
     if (options.method === 'PUT') return new Promise(resolve => { settle = () => resolve({ ok: true }); });
+    if (url === '/api/sets?game=mtg') return { ok: true, json: async () => [{ id: 'mtg-set1', symbol_url: '/logo.svg' }] };
     if (url.startsWith('/api/locations?') || url === '/api/decks' || url.includes('price-history')) return { ok: true, json: async () => [] };
     if (url.includes('card-art')) return { ok: true, json: async () => ({}) };
     throw new Error(`Unexpected sample request: ${url}`);
@@ -33,11 +34,14 @@ export async function runInspectorNavigationRegressions() {
   const click = async node => { assert(node, 'expected button exists'); await act(async () => node.click()); };
   const previous = () => button(en['inspector.previousCard']);
   const next = () => button(en['inspector.nextCard']);
+  const printing = () => [...host.querySelectorAll('span')].find(node => node.textContent === en['inspector.specPrinting']).parentElement;
   try {
     await act(async () => root.render(<Preview />));
     assert(previous().disabled && !next().disabled, 'first card has only next available');
+    assert(printing().textContent.includes('Sample Set 1') && printing().querySelector('img')?.getAttribute('src') === '/logo.svg', 'printing details show the current set name and symbol');
     await click(next());
     assert(host.querySelector('.section-heading').textContent.includes('Sample 2'), 'same-printing entries navigate by entry identity');
+    assert(printing().textContent.includes('Sample Set 2') && !printing().querySelector('img'), 'navigation keeps the set name without leaking the previous set symbol');
     await click(button(en['inspector.editCard']));
     const notes = host.querySelector('textarea');
     await act(async () => {
