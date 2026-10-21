@@ -419,7 +419,7 @@ Cards in sets whose names contain **Token** or **Tokens** (case-insensitive) are
 1. Add the visible token, or open an owned token and choose **Edit Card**.
 2. In **Reverse token (optional)**, search for the other face. **Set** is fixed to the visible face's set. A card-number search with exactly one valid result selects that **Reverse printing** automatically; name-only searches or multiple results require you to choose a printing. Both faces must belong to the same set. Check the artwork before saving.
 3. Save the entry. Its quantity counts physical cards: three Goblin / Soldier tokens are three cards, not six. Both faces share the same storage location, missing status, and reservation.
-4. Search by either face. Open the inspector or enlarged artwork and choose **Flip card** to view the other side. Choose **Face to add to deck** when adding an owned pair to a deck.
+4. Search by either face. The inspector shows the saved reverse image beneath the front image; select either image to enlarge that face. The enlarged front artwork also offers **Flip card**. Choose **Face to add to deck** when adding an owned pair to a deck.
 
 Adding an unpaired token through Quick Add, Rapid Add, bulk selection, scanning, a related token's container action, or duplication opens **What is on the reverse side?** before saving. Trade also asks when selecting a token to receive. Choose **Use selected reverse**, **Continue without reverse** for an unknown/blank back, or **Cancel** to stop the addition. Arena and already-paired additions skip the prompt. Bulk selection asks about each token before adding any selected cards.
 

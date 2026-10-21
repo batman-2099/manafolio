@@ -77,7 +77,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   const printingRequest = useRef(0);
   const printingPending = useRef(false);
   const [localizing, setLocalizing] = useState(false);
-  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [zoomCard, setZoomCard] = useState(null);
   const [creatingCommanderDeck, setCreatingCommanderDeck] = useState(false);
   const [deckListVersion, setDeckListVersion] = useState(0);
   const creatingCommanderDeckRef = useRef(false);
@@ -99,7 +99,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
     };
   }, [isOpen, returnFocusRef]);
 
-  useBackGuard(isFullScreen, () => setIsFullScreen(false));
+  useBackGuard(!!zoomCard, () => setZoomCard(null));
 
   const targetEntryId = card?.entry_id || card?.id;
   const targetRef = useRef(targetEntryId);
@@ -107,6 +107,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   useEffect(() => () => { printingRequest.current++; }, []);
 
   const activeCard = card && localizedCard?.targetId === targetEntryId ? localizedCard.card : card;
+  const reverseImage = activeCard?.reverse_card_id ? reverseFace(activeCard) : null;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -470,14 +471,16 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
 
         {/* Left side: Main Card Image Focus */}
         <div className="ci-image-col" style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          {(reverseImage ? [activeCard, reverseImage] : [activeCard]).map((face, index) => (
           <button
             type="button"
-            aria-label={t('inspector.zoomHint')}
+            key={face.card_id || face.id}
+            aria-label={index === 0 ? t('inspector.zoomHint') : `${t('token.reversePrinting')}: ${getCardDisplayName(face.name, face.printed_name)} — ${t('inspector.zoomHint')}`}
             aria-haspopup="dialog"
             className="ci-image-wrap"
-            onClick={() => setIsFullScreen(true)}
+            onClick={() => setZoomCard(face)}
             title={t('inspector.zoomHint')}
-            style={{ position: 'relative', width: '100%', maxWidth: '300px', cursor: 'pointer' }}
+            style={{ position: 'relative', width: '100%', maxWidth: '300px', cursor: 'pointer', marginTop: index === 0 ? 0 : '0.75rem' }}
           >
             {/* CardImage, not a bare <img>: this was the last call site still
                 reading card.image_url directly, so contributed art uploaded
@@ -485,7 +488,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                 uploads it, and a card with no provider art rendered as a broken
                 image icon here alone. */}
             <CardImage
-              card={activeCard}
+              card={face}
               style={{
                 width: '100%',
                 aspectRatio: 0.718,
@@ -513,6 +516,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
               <span>{t('inspector.fullScreen')}</span>
             </span>
           </button>
+          ))}
           {onNavigate && (
             <div style={{ display: 'flex', gap: '0.5rem', width: '100%', maxWidth: '300px', marginTop: '0.75rem' }}>
               <button type="button" className="btn btn-secondary" disabled={!previousCard || mode === 'edit' || writing || localizing || creatingCommanderDeck} onClick={() => navigate(previousCard)} style={{ flex: 1, minHeight: '44px' }}>
@@ -957,8 +961,8 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
       </fieldset>
       {reversePrompt}
 
-      {isFullScreen && (
-        <CardImageZoom card={activeCard} onClose={() => setIsFullScreen(false)} />
+      {zoomCard && (
+        <CardImageZoom card={zoomCard} onClose={() => setZoomCard(null)} />
       )}
     </dialog>
   );
