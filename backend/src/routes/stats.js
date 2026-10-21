@@ -200,6 +200,7 @@ router.get('/stats', async (req, res) => {
         c.quantity, c.condition, c.printing, c.language, c.purchase_price, c.is_trade, c.favorite, c.list_type,
         c.grader, c.grade, c.cert_number, c.market_value, c.missing, c.notes,
         cc.id as card_id, cc.name, cc.printed_name, cc.rarity, cc.set_name, cc.set_id, cc.number, cc.image_url,
+        cc.image_url_back, cc.name_back,
         cc.game, cc.supertype, cc.subtypes, cc.types, cc.cmc, cc.color_identity, cc.price_trend,
         cc.price_normal, cc.price_holofoil, cc.price_currency
       FROM collection c
@@ -272,6 +273,7 @@ router.get('/stats', async (req, res) => {
              c.quantity, c.condition, c.printing, c.language, c.purchase_price, c.added_at, c.is_trade, c.favorite, c.list_type,
              c.grader, c.grade, c.cert_number, c.market_value, c.missing, c.notes,
              cc.id as card_id, cc.name, cc.printed_name, cc.rarity, cc.set_name, cc.set_id, cc.number, cc.image_url,
+             cc.image_url_back, cc.name_back,
              cc.game, cc.supertype, cc.subtypes, cc.types, cc.cmc, cc.color_identity,
              cc.price_trend, cc.price_normal, cc.price_holofoil, cc.price_currency
       FROM collection c

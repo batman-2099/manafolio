@@ -1,4 +1,5 @@
 const axios = require('axios');
+const tokenContents = require('../../shared/preconTokens.json');
 
 const client = axios.create({
   baseURL: 'https://mtgjson.com/api/v5',
@@ -26,15 +27,23 @@ async function searchDecks(query) {
   return (await getDeckList())
     .filter(deck => [deck.name, deck.code, deck.type].some(value => String(value || '').toLowerCase().includes(needle)))
     .slice(0, 20)
-    .map(({ code, fileName, name, releaseDate, type }) => ({ code, fileName, name, releaseDate, type }));
+    .map(({ code, fileName, name, releaseDate, type }) => ({
+      code, fileName, name, releaseDate, type,
+      ...(tokenContents[fileName] ? { token_editions: tokenContents[fileName].editions.map(({ id, label }) => ({ id, label })) } : {}),
+    }));
 }
 
-async function getDeck(fileName) {
+async function getDeck(fileName, tokenEdition = '') {
   const file = String(fileName || '');
   const listed = (await getDeckList()).find(deck => deck.fileName === file);
   if (!listed) return null;
+  const edition = tokenContents[file]?.editions.find(item => item.id === tokenEdition);
+  if (tokenEdition !== '' && !edition) {
+    throw Object.assign(new Error('Unknown token edition for this precon'), { status: 400 });
+  }
   const response = await client.get(`/decks/${encodeURIComponent(file)}.json`);
-  return response.data?.data || null;
+  const deck = response.data?.data || null;
+  return deck && edition ? { ...deck, tokens: edition.tokens } : deck;
 }
 
 function deckCardRows(deck) {
@@ -49,8 +58,11 @@ function deckCardRows(deck) {
       if (!id && !(set_id && number)) continue;
       const printing = card.isFoil ? 'Holofoil' : 'Normal';
       const language = card.language || 'English';
-      const key = `${isToken}|${id || `${set_id}|${number}`}|${printing}|${language}`;
-      const row = rows.get(key) || { id, set_id, number, name: card.name, printing, language, quantity: 0, isToken };
+      const reverse_card_id = isToken ? card.reverse_card_id || null : null;
+      const key = `${isToken}|${id || `${set_id}|${number}`}|${reverse_card_id || ''}|${printing}|${language}`;
+      const row = rows.get(key) || { id, set_id, number, name: card.name, printing, language, quantity: 0, isToken,
+        ...(reverse_card_id ? { reverse_card_id, reverse_name: card.reverse_name } : {}),
+      };
       row.quantity += Math.max(1, parseInt(card.count, 10) || 1);
       rows.set(key, row);
     }

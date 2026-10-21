@@ -224,6 +224,8 @@ async function initDb() {
       set_name TEXT,
       number TEXT,
       image_url TEXT,
+      image_url_back TEXT,
+      name_back TEXT,
       price_trend REAL,
       price_normal REAL,
       price_holofoil REAL,
@@ -470,8 +472,8 @@ async function initDb() {
   if (!cardCacheCols.some(c => c.name === 'printed_name')) {
     await run(`ALTER TABLE card_cache ADD COLUMN printed_name TEXT`);
   }
-  // Store marketplace URLs supplied by the provider rather than guessing from names.
-  for (const col of ['tcgplayer_url', 'cardmarket_url']) {
+  // Store provider artwork and marketplace URLs without guessing them.
+  for (const col of ['tcgplayer_url', 'cardmarket_url', 'image_url_back', 'name_back']) {
     if (!cardCacheCols.some(c => c.name === col)) {
       await run(`ALTER TABLE card_cache ADD COLUMN ${col} TEXT`);
     }

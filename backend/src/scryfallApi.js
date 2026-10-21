@@ -222,6 +222,8 @@ function normalizeCard(raw, lang) {
     set_name: raw.set_name || '',
     number: raw.collector_number || '',
     image_url: imgSrc.normal || imgSrc.large || imgSrc.small || '',
+    image_url_back: raw.card_faces?.[1]?.image_uris?.normal || raw.card_faces?.[1]?.image_uris?.large || null,
+    name_back: raw.card_faces?.[1]?.printed_name || raw.card_faces?.[1]?.name || null,
     price_trend: usd != null ? usd : (usdFoil != null ? usdFoil : 0),
     price_normal: usd,
     price_holofoil: usdFoil,

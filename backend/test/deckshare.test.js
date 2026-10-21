@@ -18,6 +18,7 @@ async function testSharing() {
     await db.run(`INSERT INTO card_cache (id, name, printed_name, game, supertype, types, subtypes, color_identity, price_trend)
       VALUES ('mtg-public', 'Public card', 'Printed card', 'mtg', 'Creature', '["Creature"]', '["Elf"]', '["G"]', 999),
       ('mtg-private', 'Private collection card', NULL, 'mtg', 'Land', '[]', '[]', '[]', 500)`);
+    await db.run(`UPDATE card_cache SET image_url_back = 'https://example.invalid/public-back.jpg', name_back = 'Public back' WHERE id = 'mtg-public'`);
     await db.run(`INSERT INTO collection (card_id, quantity, user_id, notes, purchase_price, game)
       VALUES ('mtg-private', 17, 1, 'Secret collection notes', 123, 'mtg')`);
     const id = (await db.run(`INSERT INTO decks (user_id, name, description, notes, game, format, category, target_size, commander_card_id)
@@ -68,11 +69,13 @@ async function testSharing() {
       name: 'Shared sample', description: 'Public strategy', game: 'mtg', format: 'Commander',
       category: 'Casual', wins: 8, losses: 3, commander_card_id: 'mtg-public'
     });
-    assert.deepStrictEqual(shared.body.cards, [{
-      id: 'mtg-public', name: 'Public card', printed_name: 'Printed card', set_id: null, set_name: null,
-      number: null, image_url: null, game: 'mtg', supertype: 'Creature', types: ['Creature'], subtypes: ['Elf'],
-      rarity: null, cmc: null, color_identity: ['G'], quantity: 3
-    }]);
+    assert.deepStrictEqual(shared.body.cards.map(({ id, quantity }) => ({ id, quantity })), [{ id: 'mtg-public', quantity: 3 }]);
+    const publicCardFields = new Set(['id', 'name', 'printed_name', 'set_id', 'set_name', 'number',
+      'image_url', 'image_url_back', 'name_back', 'game', 'supertype', 'types', 'subtypes', 'rarity', 'cmc', 'color_identity', 'quantity']);
+    assert.ok(shared.body.cards.every(card => Object.keys(card).every(key => publicCardFields.has(key))),
+      'public card responses must not expose inventory, price, source, or private account fields');
+    assert.strictEqual(shared.body.cards[0].image_url_back, 'https://example.invalid/public-back.jpg');
+    assert.strictEqual(shared.body.cards[0].name_back, 'Public back');
     assert.strictEqual((await request('GET', `/shared/${token}`)).status, 404, 'deck capabilities cannot expose collections');
     const owner = await db.get('SELECT share_token, share_enabled FROM users WHERE id = 1');
     assert.strictEqual(owner.share_enabled, 0);

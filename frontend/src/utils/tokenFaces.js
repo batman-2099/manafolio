@@ -15,5 +15,5 @@ export function reverseFace(card) {
   const faces = card?.card_faces;
   const back = Array.isArray(faces) ? faces[1] : null;
   const image = card?.image_url_back || back?.image_uris?.normal || back?.image_url;
-  return image ? { name: back?.name || card.name, image_url: image, game: card.game } : null;
+  return image ? { name: card.name_back || back?.name || card.name, image_url: image, game: card.game } : null;
 }

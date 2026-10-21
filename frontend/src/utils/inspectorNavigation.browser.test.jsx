@@ -85,6 +85,14 @@ export async function runInspectorNavigationRegressions() {
     assert(previous().disabled && host.querySelector('.section-heading').textContent.includes('Sample 1'), 'previous returns to first without wrapping');
     await click(button(en['common.close']));
     assert(!host.querySelector('dialog') && document.activeElement === trigger, 'close restores original trigger after multiple card changes');
+    await act(async () => root.render(<CardInspectorModal card={{ ...cards[1], subtypes: ['Token'], image_url: '/logo.svg?native-front', image_url_back: '/logo.svg?native-back', name_back: 'Phyrexian' }} onClose={() => {}} />));
+    const nativeFaces = host.querySelectorAll('.ci-image-col .ci-image-wrap');
+    assert(nativeFaces.length === 2 && nativeFaces[1].querySelector('img').alt === 'Phyrexian', 'native token back is visible without an explicit reverse ID');
+    await click(nativeFaces[1]);
+    const nativeZoom = host.querySelector(`dialog[aria-label="${en['inspector.fullScreen']}"]`);
+    assert(nativeZoom.querySelector('img').getAttribute('src') === '/logo.svg?native-back', 'native reverse zoom uses back artwork, not the front');
+    await act(async () => nativeZoom.dispatchEvent(new Event('cancel', { cancelable: true })));
+    await new Promise(resolve => setTimeout(resolve, 40));
     return { passed: ['paired token face order and independent zoom', 'entry-identity ordering and boundaries', 'edit preservation and reset', 'pending write guard', 'parent refresh', 'aggregate member safety', 'original focus restoration'] };
   } finally {
     await act(async () => root.unmount());

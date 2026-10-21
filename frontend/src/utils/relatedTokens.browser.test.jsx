@@ -15,7 +15,7 @@ export async function runRelatedTokenRegressions() {
   const id = 'mtg-11111111-1111-1111-1111-111111111111';
   const matched = 'mtg-22222222-2222-2222-2222-222222222222';
   const printing = { id: matched, name: 'Sample Goblin', game: 'mtg', subtypes: ['Token'], set_id: 'ttst', set_name: 'Sample token set', number: '2', language: 'English' };
-  const reverse = { ...printing, id, name: 'Sample Soldier', number: '1' };
+  const reverse = { ...printing, id, name: 'Sample Soldier', number: '1', set_id: 'other' };
   let metadataFailure = false;
   let deckQuantity = 2;
   let owned = true;
@@ -30,8 +30,8 @@ export async function runRelatedTokenRegressions() {
     if (url === '/api/decks/7') return response({ cards: [{ id: matched, quantity: deckQuantity }] });
     if (url === `/api/cards/${matched}/printing?lang=en&game=mtg`) return metadataFailure ? response({ error: 'Sample metadata unavailable' }, false) : response(printing);
     if (url.startsWith('/api/search?')) {
-      assert(new URL(url, location.origin).searchParams.get('set') === printing.set_id, 'reverse lookup uses fetched printing set');
-      return response([printing, reverse, { ...reverse, id: 'mtg-33333333-3333-3333-3333-333333333333', set_id: 'other' }]);
+      const set = new URL(url, location.origin).searchParams.get('set');
+      return response([printing, reverse].filter(card => !set || card.set_id === set));
     }
     if (options.method === 'POST') {
       const body = JSON.parse(options.body);
@@ -82,9 +82,14 @@ export async function runRelatedTokenRegressions() {
     await click(en['common.cancel'], prompt(), true);
     assert(!prompt() && writes.length === 2 && !container.disabled, 'reverse cancellation preserves the viewer without adding inventory');
     await select(container, '9');
+    await act(async () => {
+      const field = [...prompt().querySelectorAll('label')].find(label => label.textContent === en['collection.fSet']).querySelector('input');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, 'other');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     await click(en['shared.search'], prompt());
     const reverseSelect = prompt().querySelector('select');
-    assert(reverseSelect.options.length === 2, 'reverse choices exclude the front and other sets');
+    assert(reverseSelect.options.length === 2, 'a token from another set can be selected');
     await select(reverseSelect, id);
     await click(en['token.useReverse'], prompt(), true);
     await select(container, '9');
@@ -104,7 +109,7 @@ export async function runRelatedTokenRegressions() {
     assert(host.querySelectorAll('dialog select').length === 1, 'Arena never offers physical containers');
     await render({ inventoryType: 'arena', disabled: true });
     assert(host.querySelector('dialog select').disabled, 'unsaved deck guard disables additions');
-    return { passed: ['error recovery', 'matched-printing increment', 'deck prompt exclusion', 'metadata retry', 'reverse cancellation', 'same-set reverse pairing', 'explicit unpaired continuation', 'pending duplicate guard', 'container destination and ownership refresh', 'Arena isolation', 'unsaved deck guard'] };
+    return { passed: ['error recovery', 'matched-printing increment', 'deck prompt exclusion', 'metadata retry', 'reverse cancellation', 'cross-set reverse pairing', 'explicit unpaired continuation', 'pending duplicate guard', 'container destination and ownership refresh', 'Arena isolation', 'unsaved deck guard'] };
   } finally {
     await act(async () => root.unmount());
     host.remove();

@@ -254,7 +254,13 @@ This workflow adds the published main-board, commander, and sideboard cards to *
 
 Precon imports also add tokens that MTGJSON lists with a positive whole-number quantity. **More details → Tokens** shows these importable token printings and counts. They go into Physical Collection and the optional Deck Box, but not the playable deck list, target size, or checkout reservations. Deck Box totals and over-limit warnings continue to exclude tokens.
 
-Missing token lists and unspecified or invalid token quantities are not guessed; add those tokens manually after checking the product. Reverse faces are not guessed either—use [double-sided token pairing](#track-a-double-sided-token) to record a known same-set reverse after import. The **Deck Builder → Create Deck** precon chooser still creates only a playable deck definition, without adding owned cards or tokens.
+Missing token lists and unspecified or invalid token quantities are not guessed; add those tokens manually after checking the product. Reverse faces are not guessed either—use [double-sided token pairing](#track-a-double-sided-token) to record a known reverse after import. The **Deck Builder → Create Deck** precon chooser still creates only a playable deck definition, without adding owned cards or tokens.
+
+When **Token contents** offers a verified edition, select it only if it matches your physical product, then reopen **More details** to review its fronts and reverse pairs. Verified-edition imports are atomic even with **Create Deck** disabled: an unresolved face or failed addition saves none of that import.
+
+For **Multiverse Reforged**, **Angel — 4/4 W (TFRC #1)** uses the [published white-Angel product contents](https://magic.wizards.com/en/news/announcements/reality-fracture-multiverse-reforged-commander-decklist): 100 playable cards and 10 physical tokens. Nine tokens get explicit reverses, including Spirit/Jace and Angel/Treasure across TFRC/TFRA set codes; Incubator/Phyrexian retains its native back image. This edition must not be used for the earlier blue 3/3 Angel printing.
+
+**Already imported this product?** Do not import the entire deck again. Review the verified token preview, edit the existing token entries to add their reverses, and add only the missing white Angel (TFRC #1) to the existing container. For Spirit, choose Jace (TFRA #5); for Angel, choose Treasure (TFRA #15). Do not add reverse faces as separate owned copies. For an older Incubator entry whose back image is missing, search TFRC #13 in **Search & Add** without adding a copy, then reopen the container; a successful provider lookup refreshes its cached artwork.
 
 **Warning:** this imports copies, rather than merely recording that you own a product. Do not import it again to inspect its contents; use **More details** instead.
 
@@ -420,10 +426,10 @@ Quantities must be positive whole numbers. Certified slabs stay separate from ra
 
 Record **one physical item**, not one owned copy for each face.
 
-Cards in sets whose names contain **Token** or **Tokens** (case-insensitive) are treated as tokens even when their card type does not say Token. They receive the same reverse-side prompt and same-set pairing options.
+Cards in sets whose names contain **Token** or **Tokens** (case-insensitive) are treated as tokens even when their card type does not say Token. They receive the same reverse-side prompt and pairing options.
 
 1. Add the visible token, or open an owned token and choose **Edit Card**.
-2. In **Reverse token (optional)**, search for the other face. **Set** is fixed to the visible face's set. A card-number search with exactly one valid result selects that **Reverse printing** automatically; name-only searches or multiple results require you to choose a printing. Both faces must belong to the same set. Check the artwork before saving.
+2. In **Reverse token (optional)**, search for the other face. **Set** starts with the saved reverse's set code, or the visible face's set code for a new pair. Change it to another set code or clear it to search all sets. A card-number search with exactly one valid result selects that **Reverse printing** automatically; name-only searches or multiple results require you to choose a printing. Both faces must be distinct Magic tokens, but they may come from different sets. Check the artwork before saving.
 3. Save the entry. Its quantity counts physical cards: three Goblin / Soldier tokens are three cards, not six. Both faces share the same storage location, missing status, and reservation.
 4. Search by either face. The inspector shows the saved reverse image beneath the front image; select either image to enlarge that face. The enlarged front artwork also offers **Flip card**. Choose **Face to add to deck** when adding an owned pair to a deck.
 

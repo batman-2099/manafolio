@@ -16,7 +16,7 @@ import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
 import { getSlotNumber } from '../utils/getSlotNumber';
 import Modal from './Modal';
-import { pairedCardName, reverseFace } from '../utils/tokenFaces';
+import { isMtgToken, pairedCardName, reverseFace } from '../utils/tokenFaces';
 import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
 
 // MTG color identity pip colors (WUBRG), approximating the printed mana colors.
@@ -107,7 +107,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   useEffect(() => () => { printingRequest.current++; }, []);
 
   const activeCard = card && localizedCard?.targetId === targetEntryId ? localizedCard.card : card;
-  const reverseImage = activeCard?.reverse_card_id ? reverseFace(activeCard) : null;
+  const reverseImage = activeCard?.reverse_card_id || isMtgToken(activeCard) ? reverseFace(activeCard) : null;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -474,7 +474,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
           {(reverseImage ? [activeCard, reverseImage] : [activeCard]).map((face, index) => (
           <button
             type="button"
-            key={face.card_id || face.id}
+            key={index === 0 ? 'front' : 'reverse'}
             aria-label={index === 0 ? t('inspector.zoomHint') : `${t('token.reversePrinting')}: ${getCardDisplayName(face.name, face.printed_name)} — ${t('inspector.zoomHint')}`}
             aria-haspopup="dialog"
             className="ci-image-wrap"

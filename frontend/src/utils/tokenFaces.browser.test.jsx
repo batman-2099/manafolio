@@ -16,7 +16,7 @@ export async function runTokenFaceRegressions() {
   document.body.append(host);
   const root = createRoot(host);
   const front = { id: 'mtg-front', name: 'Goblin', game: 'mtg', set_id: 'tst', set_name: 'Fixture Tokens', subtypes: [], image_url: '/mtg-card-back.webp' };
-  const back = { id: 'mtg-back', name: 'Soldier', game: 'mtg', set_id: 'tst', subtypes: [], set_name: 'Fixture tokens', number: '2', language: 'English', image_url: '/logo.svg' };
+  const back = { id: 'mtg-back', name: 'Soldier', game: 'mtg', set_id: 'else', subtypes: [], set_name: 'Fixture tokens', number: '2', language: 'English', image_url: '/logo.svg' };
   let selected = null;
   let fail = true;
   let searches = 0;
@@ -24,8 +24,8 @@ export async function runTokenFaceRegressions() {
   window.fetch = async url => {
     if (String(url).startsWith('/api/search?')) {
       searches++;
-      assert(new URL(String(url), location.origin).searchParams.get('set') === 'tst', 'reverse search stays in the front set');
-      return { ok: !fail, json: async () => candidates || [front, { ...back, id: 'non-token', set_name: 'Ordinary Set', subtypes: ['Creature'] }, { ...back, id: 'other-set', set_id: 'else' }, back] };
+      const set = new URL(String(url), location.origin).searchParams.get('set');
+      return { ok: !fail, json: async () => (candidates || [front, { ...back, id: 'non-token', set_name: 'Ordinary Set', subtypes: ['Creature'] }, back]).filter(card => !set || card.set_id === set) };
     }
     if (String(url).startsWith('/api/card-art')) return { ok: true, json: async () => [] };
     throw new Error(`Unexpected request: ${url}`);
@@ -36,6 +36,12 @@ export async function runTokenFaceRegressions() {
   }
   const input = () => host.querySelector('input[id$="-search"]');
   const choice = () => host.querySelector('select[id$="-choice"]');
+  const changeSet = async value => act(async () => {
+    const field = [...host.querySelectorAll('label')].find(label => label.textContent === en['collection.fSet']).querySelector('input');
+    assert(!field.readOnly, 'reverse set can be changed');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, value);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   const search = async () => act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === en['shared.search']).click());
   const select = async value => act(async () => {
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(choice(), value);
@@ -44,6 +50,7 @@ export async function runTokenFaceRegressions() {
   try {
     await act(async () => root.render(<Fields />));
     assert(input()?.labels.length === 1 && selected === null && !choice(), 'reverse selector is labeled and never invents a pair');
+    await changeSet('else');
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input(), 'Soldier');
       input().dispatchEvent(new Event('input', { bubbles: true }));
@@ -58,6 +65,7 @@ export async function runTokenFaceRegressions() {
     assert(selected.id === back.id && host.querySelector('img')?.alt === 'Soldier', 'explicit selected printing is previewed');
     await select('');
     assert(selected === null, 'reverse can be cleared explicitly');
+    await changeSet('');
     const numberInput = [...host.querySelectorAll('label')].find(label => label.textContent === en['search.cardNumber']).querySelector('input');
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(numberInput, '2');
@@ -106,10 +114,11 @@ export async function runTokenFaceRegressions() {
     await closePrompt(async () => action(en['token.continueWithout']).click());
     assert((await decision).reverseCard === null, 'explicit skip proceeds without inventing a reverse');
     await act(async () => { decision = requestReverse(front); });
+    await changeSet('else');
     await search();
     await select(back.id);
     await closePrompt(async () => action(en['token.useReverse']).click());
-    assert((await decision).reverseCard.id === back.id, 'confirmation returns the selected same-set printing');
+    assert((await decision).reverseCard.id === back.id, 'confirmation returns the selected cross-set printing');
     await act(async () => { decision = requestReverse(front); });
     await closePrompt(async () => root.render(null));
     assert(await decision === null, 'unmount cancels the pending addition');

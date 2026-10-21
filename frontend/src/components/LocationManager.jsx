@@ -2465,6 +2465,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       {section.cards.map(card => {
                   const selected = storage.selectedIds.has(card.entry_id);
                   const foilQuantity = card.foil_quantity ?? (card.printing === 'Holofoil' ? card.quantity : 0);
+                  const reverseImage = card.reverse_card_id || section.tokens ? reverseFace(card) : null;
                   return (
                     <button
                       key={card.entry_id}
@@ -2474,7 +2475,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', padding: '0.25rem', border: selected ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', background: selected ? 'rgba(255,71,71,0.12)' : 'rgba(255,255,255,0.03)', cursor: 'pointer' }}
                     >
                       <CardImage card={card} style={{ width: '100%', borderRadius: '3px' }} />
-                      {card.reverse_card_id && <CardImage card={reverseFace(card)} style={{ width: '100%', borderRadius: '3px', marginTop: '0.5rem' }} />}
+                      {reverseImage && <CardImage card={reverseImage} style={{ width: '100%', borderRadius: '3px', marginTop: '0.5rem' }} />}
                       {card.quantity > 1 && (
                         <span style={{ position: 'absolute', top: '0.35rem', right: '0.35rem', padding: '0.25rem 0.5rem', borderRadius: '999px', background: 'rgba(0,0,0,0.85)', color: 'white', fontSize: '1rem', fontWeight: 800 }}>
                           ×{card.quantity}

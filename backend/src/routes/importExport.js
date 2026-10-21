@@ -272,13 +272,13 @@ async function restoreCompleteBackup(backup, userId) {
           id, name, supertype, subtypes, types, rarity, set_id, set_name, number, image_url,
           price_trend, price_normal, price_holofoil, price_avg1, price_avg7,
           price_avg30, price_currency, price_source, cmc, color_identity, game,
-          language, printed_name, tcgplayer_product_id, last_updated
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          language, printed_name, tcgplayer_product_id, last_updated, image_url_back, name_back
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         card.id, card.name, card.supertype, card.subtypes, card.types, card.rarity, card.set_id, card.set_name, card.number, card.image_url,
         card.price_trend, card.price_normal, card.price_holofoil, card.price_avg1, card.price_avg7,
         card.price_avg30, card.price_currency, card.price_source, card.cmc, card.color_identity, card.game,
-        card.language, card.printed_name, card.tcgplayer_product_id, card.last_updated
+        card.language, card.printed_name, card.tcgplayer_product_id, card.last_updated, card.image_url_back ?? null, card.name_back ?? null
       ]);
     }
 

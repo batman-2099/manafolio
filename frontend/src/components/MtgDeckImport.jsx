@@ -13,6 +13,7 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
   const [detailsLoading, setDetailsLoading] = useState(null);
   const [containerSelections, setContainerSelections] = useState({});
   const [deckSelections, setDeckSelections] = useState({});
+  const [tokenEditions, setTokenEditions] = useState({});
 
   const search = async (event) => {
     event?.preventDefault();
@@ -42,7 +43,7 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
       const response = await fetch(`/api/mtg-decks/${encodeURIComponent(deck.fileName)}/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ create_container: containerSelections[deck.fileName] ?? true, create_deck: deckSelections[deck.fileName] ?? true }),
+        body: JSON.stringify({ create_container: containerSelections[deck.fileName] ?? true, create_deck: deckSelections[deck.fileName] ?? true, token_edition: tokenEditions[deck.fileName] || '' }),
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) return showToast?.(body?.error || t('mtgDeck.errAdd'), 'error');
@@ -60,7 +61,7 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
     if (details?.fileName === deck.fileName) return setDetails(null);
     setDetailsLoading(deck.fileName);
     try {
-      const response = await fetch(`/api/mtg-decks/${encodeURIComponent(deck.fileName)}`);
+      const response = await fetch(`/api/mtg-decks/${encodeURIComponent(deck.fileName)}?token_edition=${encodeURIComponent(tokenEditions[deck.fileName] || '')}`);
       const body = await response.json().catch(() => null);
       if (!response.ok) return showToast?.(body?.error || t('mtgDeck.errDetails'), 'error');
       setDetails({ ...body, fileName: deck.fileName });
@@ -128,6 +129,22 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
                     <input type="checkbox" checked={deckSelections[deck.fileName] ?? true} disabled={adding === deck.fileName} onChange={event => setDeckSelections(current => ({ ...current, [deck.fileName]: event.target.checked }))} />
                     {t('mtgDeck.createDeck')}
                   </label>
+                  </div>
+                )}
+                {!onChoose && deck.token_editions?.length > 0 && (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <label>
+                      {t('mtgDeck.tokenEdition')}
+                      <select className="select-control" value={tokenEditions[deck.fileName] || ''} disabled={adding === deck.fileName || detailsLoading === deck.fileName}
+                        onChange={event => {
+                          setTokenEditions(current => ({ ...current, [deck.fileName]: event.target.value }));
+                          if (detail) setDetails(null);
+                        }} style={{ width: '100%', marginTop: '0.35rem' }}>
+                        <option value="">{t('mtgDeck.listedTokens')}</option>
+                        {deck.token_editions.map(edition => <option key={edition.id} value={edition.id}>{edition.label}</option>)}
+                      </select>
+                    </label>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.4rem' }}>{t('mtgDeck.tokenEditionHint')}</p>
                   </div>
                 )}
                 {detail && (

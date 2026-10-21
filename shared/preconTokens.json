@@ -1,0 +1,23 @@
+{
+  "MultiverseReforged_FRC": {
+    "source": "https://magic.wizards.com/en/news/announcements/reality-fracture-multiverse-reforged-commander-decklist",
+    "editions": [
+      {
+        "id": "white-angel",
+        "label": "Angel — 4/4 W (TFRC #1)",
+        "tokens": [
+          { "name": "Kobolds of Kher Keep", "count": 1, "setCode": "TFRC", "number": "10", "reverse_card_id": "mtg-e9c68c64-f3b9-45b7-83d1-bd1439a49942", "reverse_name": "Phyrexian Mite" },
+          { "name": "Soldier", "count": 1, "setCode": "TFRC", "number": "3", "reverse_card_id": "mtg-91613970-c25c-4959-b5b0-b6e2a7657634", "reverse_name": "Map" },
+          { "name": "Spirit", "count": 1, "setCode": "TFRC", "number": "4", "reverse_card_id": "mtg-8d1e424f-6407-4f8c-bed2-eaf148237c81", "reverse_name": "Jace" },
+          { "name": "Warrior", "count": 1, "setCode": "TFRC", "number": "5", "reverse_card_id": "mtg-21a614b0-2e65-4ea0-94c3-9c9afa0bc03c", "reverse_name": "Shark" },
+          { "name": "Zombie Army", "count": 1, "setCode": "TFRC", "number": "8", "reverse_card_id": "mtg-0c7f299e-4774-4e8b-bb0e-db27d57d2621", "reverse_name": "Goblin" },
+          { "name": "Insect", "count": 1, "setCode": "TFRC", "number": "2", "reverse_card_id": "mtg-0526330e-40eb-4c5f-b0f5-5489839e5f44", "reverse_name": "Rogue" },
+          { "name": "Angel", "count": 1, "setCode": "TFRC", "number": "1", "reverse_card_id": "mtg-03992f88-7a15-4234-9bed-b7617d7ff09c", "reverse_name": "Treasure" },
+          { "name": "Gingerbrute Token", "count": 1, "setCode": "TFRC", "number": "12", "reverse_card_id": "mtg-e41f83c6-c20f-455a-b630-5fad99fa54ad", "reverse_name": "Myr" },
+          { "name": "The Monarch", "count": 1, "setCode": "TFRC", "number": "17", "reverse_card_id": "mtg-b7171de9-476d-4bfa-8cc0-b4fbc168cf4d", "reverse_name": "Citizen" },
+          { "name": "Incubator // Phyrexian", "count": 1, "setCode": "TFRC", "number": "13" }
+        ]
+      }
+    ]
+  }
+}

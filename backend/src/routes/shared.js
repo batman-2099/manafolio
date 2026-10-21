@@ -20,6 +20,7 @@ router.get('/decks/:token', async (req, res) => {
       const { id, owner, ...deck } = row;
       const cards = await db.all(`SELECT cc.id, cc.name, cc.printed_name, cc.set_id, cc.set_name,
         cc.number, cc.image_url, cc.game, cc.supertype, cc.types, cc.subtypes, cc.rarity,
+        cc.image_url_back, cc.name_back,
         cc.cmc, cc.color_identity, dc.quantity
         FROM deck_cards dc JOIN card_cache cc ON cc.id = dc.card_id
         WHERE dc.deck_id = ? AND cc.game = 'mtg'
@@ -71,6 +72,7 @@ router.get('/:share_token/containers/:id', async (req, res) => {
              c.reverse_card_id, rc.name AS reverse_name, rc.printed_name AS reverse_printed_name, rc.image_url AS reverse_image_url,
              cc.name, cc.printed_name, cc.supertype, cc.subtypes, cc.types, cc.rarity,
              cc.set_id, cc.set_name, cc.number, cc.image_url, cc.game, cc.cmc, cc.color_identity,
+             cc.image_url_back, cc.name_back,
              cc.price_trend, cc.price_normal, cc.price_holofoil, cc.price_currency
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
@@ -149,6 +151,7 @@ router.get('/:share_token', async (req, res) => {
         cc.set_name,
         cc.number,
         cc.image_url,
+        cc.image_url_back, cc.name_back,
         cc.price_trend,
         cc.price_normal,
         cc.price_holofoil,

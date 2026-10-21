@@ -24,7 +24,7 @@ async function testTokenPairing() {
     for (const id of [1, 2]) await db.run(`INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, DATETIME('now', '+1 hour'))`, [`pair-${id}`, id]);
     const names = ['Goblin', 'Soldier', 'Spirit', 'Ordinary Creature'];
     const rawCards = names.map((name, i) => ({
-      id: cardId(i + 1).slice(4), name, lang: 'en', set: 'pair', set_name: 'Pair fixtures',
+      id: cardId(i + 1).slice(4), name, lang: 'en', set: i === 0 ? 'pair' : 'other', set_name: 'Pair fixtures',
       collector_number: String(i + 1), type_line: i < 3 ? `Token Creature — ${name}` : 'Creature — Wizard',
       colors: [], color_identity: [], rarity: 'common', image_uris: { normal: `https://example.invalid/${i}.jpg` }, prices: {},
     }));
@@ -73,12 +73,9 @@ async function testTokenPairing() {
     assert.strictEqual(related.owned_qty, 2);
     assert.strictEqual(related.owned_entries[0].entry_id, added.id);
     assert.strictEqual(related.owned_entries[0].location_name, 'Token binder');
-    await db.run('UPDATE card_cache SET set_id = ? WHERE id = ?', ['other', cardId(3)]);
-    await request('/collection', 'POST', { ...pair, reverse_card_id: cardId(3) }, 400);
-    await request(entryUrl, 'PUT', { reverse_card_id: cardId(3) }, 400);
-    await request('/scan-drafts', 'POST', { card_id: cardId(1), reverse_card_id: cardId(3) }, 400);
-    assert.strictEqual((await request('/collection'))[0].reverse_card_id, cardId(2), 'cross-set rejection preserves the saved pair');
-    await db.run('UPDATE card_cache SET set_id = ? WHERE id = ?', ['PAIR', cardId(3)]);
+    await request(entryUrl, 'PUT', { reverse_card_id: cardId(3) });
+    assert.strictEqual((await request('/collection'))[0].reverse_card_id, cardId(3), 'editing accepts a reverse from another set');
+    await request(entryUrl, 'PUT', { reverse_card_id: cardId(2) });
     for (const fields of [
       { reverse_card_id: cardId(1) }, { reverse_card_id: cardId(4) }, { reverse_card_id: cardId(9) },
       { reverse_card_id: '' }, { reverse_card_id: {} }, { list_type: 'arena' }, { card_id: cardId(4) },
@@ -157,13 +154,12 @@ async function testTokenPairing() {
       { card_id: cardId(2), reverse_card_id: cardId(3), quantity: 2 },
       { card_id: cardId(4), reverse_card_id: null, quantity: 2 },
     ], 'per-card pairs and explicit null override the legacy shared reverse; missing keys retain it');
-    await db.run('UPDATE card_cache SET set_id = ? WHERE id = ?', ['other', cardId(3)]);
     const mixed = await request('/collection/bulk-add', 'POST', {
       card_ids: [cardId(1), cardId(2)],
-      reverse_card_ids: { [cardId(1)]: cardId(2), [cardId(2)]: cardId(3) },
+      reverse_card_ids: { [cardId(1)]: cardId(2), [cardId(2)]: cardId(4) },
     });
     assert.strictEqual(mixed.added, 1);
-    assert.deepStrictEqual(mixed.failed.map(failure => failure.card_id), [cardId(2)], 'bulk validates each reverse against the same-set rule and retains partial failures');
+    assert.deepStrictEqual(mixed.failed.map(failure => failure.card_id), [cardId(2)], 'bulk rejects non-token reverses and retains partial failures');
     const retry = await request('/collection/bulk-add', 'POST', {
       card_ids: mixed.failed.map(failure => failure.card_id), reverse_card_ids: { [cardId(2)]: cardId(1) },
     });
@@ -174,8 +170,6 @@ async function testTokenPairing() {
     assert.strictEqual((await db.get('SELECT reverse_card_id FROM collection WHERE id = ?', [setPair.id])).reverse_card_id, cardId(2),
       'token-set cards can pair without token type metadata');
     await request('/collection', 'POST', { card_id: cardId(1), reverse_card_id: cardId(2), list_type: 'arena' }, 400);
-    await db.run('UPDATE card_cache SET set_id = ? WHERE id = ?', ['other', cardId(2)]);
-    await request('/collection', 'POST', { card_id: cardId(1), reverse_card_id: cardId(2) }, 400);
   } finally {
     scryfall.getRelatedTokens = originalRelated;
     scryfall.client.get = originalGet;

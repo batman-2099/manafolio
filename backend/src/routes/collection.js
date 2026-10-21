@@ -453,6 +453,7 @@ router.get('/collection', async (req, res) => {
         cc.set_name,
         cc.number,
         cc.image_url,
+        cc.image_url_back, cc.name_back,
         cc.price_trend,
         cc.price_normal,
         cc.price_holofoil,
@@ -1145,7 +1146,7 @@ function deckDetails(deck) {
       [...cards.values()].sort((a, b) => a.name.localeCompare(b.name)),
     ])),
     tokens: mtgjsonApi.deckCardRows({ tokens: deck.tokens })
-      .map(row => ({ name: row.name, setCode: row.set_id, number: row.number, count: row.quantity }))
+      .map(row => ({ name: row.reverse_name ? `${row.name} // ${row.reverse_name}` : row.name, setCode: row.set_id, number: row.number, count: row.quantity }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
@@ -1163,10 +1164,11 @@ router.get('/mtg-decks', searchLimiter, async (req, res) => {
 
 router.get('/mtg-decks/:fileName', searchLimiter, async (req, res) => {
   try {
-    const deck = await mtgjsonApi.getDeck(req.params.fileName);
+    const deck = await mtgjsonApi.getDeck(req.params.fileName, req.query?.token_edition);
     if (!deck) return res.status(404).json({ error: 'MTGJSON deck not found' });
     res.json({ name: deck.name, ...deckDetails(deck) });
   } catch (error) {
+    if (error.status === 400) return res.status(400).json({ error: error.message });
     console.error('MTGJSON deck details failed:', error.message);
     res.status(502).json({ error: 'Failed to load MTGJSON deck details' });
   }
@@ -1177,16 +1179,22 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
     return res.status(400).json({ error: 'create_deck must be a boolean' });
   }
   try {
-    const deck = await mtgjsonApi.getDeck(req.params.fileName);
+    const deck = await mtgjsonApi.getDeck(req.params.fileName, req.body?.token_edition);
     if (!deck) return res.status(404).json({ error: 'MTGJSON deck not found' });
 
     const rows = mtgjsonApi.deckCardRows(deck);
     if (!rows.length) return res.status(422).json({ error: 'This MTGJSON deck has no importable cards' });
     const total = rows.reduce((sum, row) => sum + row.quantity, 0);
     const deckTotal = rows.reduce((sum, row) => sum + (row.isToken ? 0 : row.quantity), 0);
-    const { cards, pairs } = await scryfallApi.bulkFetchByIdentifier(rows, undefined, { localFirst: true });
+    const reverseRows = rows.filter(row => row.reverse_card_id).map(row => ({ id: row.reverse_card_id, reverseOnly: true }));
+    const { cards, pairs: resolved } = await scryfallApi.bulkFetchByIdentifier([...rows, ...reverseRows], undefined, { localFirst: true });
+    const pairs = resolved.filter(({ row }) => !row.reverseOnly);
+    const resolvedIds = new Set(cards.map(card => card.id));
+    if (reverseRows.some(row => !resolvedIds.has(row.id))) {
+      return res.status(422).json({ error: 'All reverse token faces must resolve before importing this edition.' });
+    }
     const missing = total - pairs.reduce((sum, { row }) => sum + row.quantity, 0);
-    if (req.body?.create_deck && missing) {
+    if ((req.body?.create_deck || req.body?.token_edition) && missing) {
       return res.status(422).json({ error: 'All cards must resolve before creating and checking out a deck.' });
     }
     await scryfallApi.cacheCards(cards);
@@ -1224,6 +1232,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
       try {
         const addedCard = await addCardToCollection(req.user, {
           card_id: card.id,
+          reverse_card_id: row.reverse_card_id,
           quantity: row.quantity,
           printing: row.printing,
           language: row.language,
@@ -1240,7 +1249,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
         }
         added += row.quantity;
       } catch (error) {
-        if (deckId || !(error instanceof AddCardError)) throw error;
+        if (deckId || req.body?.token_edition || !(error instanceof AddCardError)) throw error;
         failed.push({ name: row.name, error: error.message });
       }
     }
@@ -1261,7 +1270,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
       failed,
     });
   } catch (error) {
-    if (error instanceof AddCardError) return res.status(error.status).json({ error: error.message });
+    if (error instanceof AddCardError || error.status === 400) return res.status(error.status).json({ error: error.message });
     console.error('MTGJSON deck import failed:', error.message);
     res.status(502).json({ error: 'Failed to import MTGJSON deck' });
   }

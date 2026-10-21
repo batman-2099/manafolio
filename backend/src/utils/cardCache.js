@@ -4,7 +4,7 @@ const db = require('../db');
 
 const COLUMNS = [
   'id', 'name', 'supertype', 'subtypes', 'types', 'rarity', 'set_id', 'set_name',
-  'number', 'image_url', 'price_trend', 'price_normal', 'price_holofoil',
+  'number', 'image_url', 'image_url_back', 'name_back', 'price_trend', 'price_normal', 'price_holofoil',
   'price_avg1', 'price_avg7', 'price_avg30', 'cmc',
   'color_identity', 'game', 'language', 'printed_name',
   'tcgplayer_url', 'cardmarket_url', 'tcgplayer_product_id',
@@ -46,7 +46,7 @@ async function cacheNormalizedCards(cards, game) {
         c.id, c.name || '', c.supertype || '',
         JSON.stringify(c.subtypes || []), JSON.stringify(c.types || []),
         c.rarity || 'Common', c.set_id || '', c.set_name || '', c.number || '',
-        c.image_url || '', num(c.price_trend), num(c.price_normal),
+        c.image_url || '', c.image_url_back || null, c.name_back || null, num(c.price_trend), num(c.price_normal),
         num(c.price_holofoil), num(c.price_avg1),
         num(c.price_avg7), num(c.price_avg30), num(c.cmc),
         JSON.stringify(c.color_identity || []), game,

@@ -235,6 +235,15 @@ export async function runUiContainerRegressions() {
     await act(async () => tokenSection().querySelector('img[alt="Goblin"]').click());
     assert(host.textContent.includes('0 selected') && button('loc.removeFromStorage').disabled, 'both token faces toggle the same owned entry');
     cases.push('separate token gallery preserves classification, pairing, stacking, filtering, sorting and selection');
+    await clear();
+    cards = [{ ...cards[0], card_id: 'sample-incubator', name: 'Incubator', set_name: 'Sample Tokens',
+      image_url: '/logo.svg?native-front', image_url_back: '/logo.svg?native-back', name_back: 'Phyrexian' }];
+    await act(async () => root.render(<LocationManager onUpdate={() => {}} showToast={() => {}} />));
+    await act(async () => [...host.querySelectorAll('button')].find(node => node.textContent.includes('Token box')).click());
+    const nativeImages = tokenSection()?.querySelectorAll('img');
+    assert(nativeImages?.length === 2 && nativeImages[1].alt === 'Phyrexian'
+      && nativeImages[1].getAttribute('src') === '/logo.svg?native-back', 'native double-faced token renders both artworks without creating a second owned entry');
+    cases.push('native token reverse artwork in container gallery');
     return { passed: cases.length, cases };
   } finally {
     await act(async () => root.unmount());

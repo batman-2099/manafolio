@@ -469,6 +469,7 @@ router.get('/:id', async (req, res) => {
         cc.set_name,
         cc.number,
         cc.image_url,
+        cc.image_url_back, cc.name_back,
         cc.price_trend,
         (SELECT COALESCE(SUM(quantity), 0) FROM collection WHERE (card_id = cc.id OR reverse_card_id = cc.id) AND user_id = ? AND list_type = ?) AS owned_qty,
         0 AS locked_qty, NULL AS locked_decks
