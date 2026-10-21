@@ -21,7 +21,7 @@ Built with React, Express, and SQLite, it runs as one Docker service or from sou
 - **[Double-sided tokens](docs/USER_GUIDE.md#track-a-double-sided-token):** Choose a same-set reverse when adding a token, or leave an unknown/blank back unpaired. A unique collector-number match selects the reverse automatically. Search either face and see both images in card details and container galleries, while tracking one physical quantity, storage location, and checkout allocation. Cards from Token/Tokens sets are recognized as tokens even without token type metadata.
 - **Physical storage:** Organize boxes and binders by page, row, and slot; group containers into storage units, print QR labels, and reconcile copies with Take Stock.
 - **[Tokens in storage](docs/USER_GUIDE.md#capacity-stacking-and-locks):** Container galleries give tokens their own section. Deck Boxes exclude tokens from card totals and over-limit warnings; other container types still count them. Tokens remain selectable and included in Take Stock.
-- **Deck building and play:** Import lists and precons, choose commanders, simulate draws, track results, compare revisions, and reserve physical copies with storage-aware pull lists.
+- **Deck building and play:** Import lists and precons, including supplied tokens with known quantities when adding a precon to Physical Collection; tokens stay separate from playable deck totals. Choose commanders, simulate draws, track results, compare revisions, and reserve physical copies with storage-aware pull lists.
 - **Planning and trading:** Combine deck shortfalls into a Shopping List, add confirmed deficits to Wishlist, and review both sides of a Physical inventory exchange.
 - **Import, export, and recovery:** Review collection imports, export filtered views or decklists, and create complete account backups and server snapshots.
 - **Scanning and price checks:** Identify printing candidates with local models and OCR. Review scans before adding inventory, or check prices without adding cards. Requires [server scan setup](docs/INSTALLATION.md#card-scanning).
@@ -61,7 +61,7 @@ Deck definitions and the inventory supplying them.
 ![Manafolio Deck Builder showing decks](docs/images/manafolio-decks.webp)
 
 <details>
-<summary>More screenshots: collection, storage, trading, card backs, and AI</summary>
+<summary>More screenshots: collection, storage, tokens, trading, card backs, and AI</summary>
 
 ### Collection
 
@@ -70,6 +70,12 @@ Deck definitions and the inventory supplying them.
 ### Storage
 
 ![Manafolio storage gallery with sample card containers](docs/images/manafolio-storage.webp)
+
+### Tokens inside a container
+
+Tokens have their own section, with a paired token's front and reverse shown together as one item. This screenshot uses **sample data and an illustrative pairing**, not a personal collection.
+
+![Manafolio sample deck box showing a separate Tokens section with Goblin and Soldier artwork stacked for a paired token, alongside unpaired tokens](docs/images/manafolio-container-tokens.webp)
 
 ### Trade workbench
 

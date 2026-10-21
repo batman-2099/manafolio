@@ -252,6 +252,10 @@ Quantities must be whole numbers from 1 to 2,147,483,647. Missing quantities def
 
 This workflow adds the published main-board, commander, and sideboard cards to **physical Collection**. **Create Storage Container** creates a sized Deck Box. **Create Deck** also creates a Physical deck and checks it out, reserving the imported cards; disable it if you only want collection records. With deck creation selected, an unresolved card or import failure leaves no partial collection/container/deck from that operation.
 
+Precon imports also add tokens that MTGJSON lists with a positive whole-number quantity. **More details → Tokens** shows these importable token printings and counts. They go into Physical Collection and the optional Deck Box, but not the playable deck list, target size, or checkout reservations. Deck Box totals and over-limit warnings continue to exclude tokens.
+
+Missing token lists and unspecified or invalid token quantities are not guessed; add those tokens manually after checking the product. Reverse faces are not guessed either—use [double-sided token pairing](#track-a-double-sided-token) to record a known same-set reverse after import. The **Deck Builder → Create Deck** precon chooser still creates only a playable deck definition, without adding owned cards or tokens.
+
 **Warning:** this imports copies, rather than merely recording that you own a product. Do not import it again to inspect its contents; use **More details** instead.
 
 ### Optional: add a graded slab

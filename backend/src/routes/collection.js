@@ -1139,10 +1139,15 @@ function deckDetails(deck) {
       group.set(key, row);
     }
   }
-  return Object.fromEntries(Object.entries(groups).map(([name, cards]) => [
-    name,
-    [...cards.values()].sort((a, b) => a.name.localeCompare(b.name)),
-  ]));
+  return {
+    ...Object.fromEntries(Object.entries(groups).map(([name, cards]) => [
+      name,
+      [...cards.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    ])),
+    tokens: mtgjsonApi.deckCardRows({ tokens: deck.tokens })
+      .map(row => ({ name: row.name, setCode: row.set_id, number: row.number, count: row.quantity }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  };
 }
 
 // Product deck names and files come from MTGJSON, but this proxy keeps their
@@ -1178,6 +1183,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
     const rows = mtgjsonApi.deckCardRows(deck);
     if (!rows.length) return res.status(422).json({ error: 'This MTGJSON deck has no importable cards' });
     const total = rows.reduce((sum, row) => sum + row.quantity, 0);
+    const deckTotal = rows.reduce((sum, row) => sum + (row.isToken ? 0 : row.quantity), 0);
     const { cards, pairs } = await scryfallApi.bulkFetchByIdentifier(rows, undefined, { localFirst: true });
     const missing = total - pairs.reduce((sum, { row }) => sum + row.quantity, 0);
     if (req.body?.create_deck && missing) {
@@ -1200,7 +1206,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
         VALUES (?, 'Deck Box', 'mtg', ?)
       `, [deck.name, req.user.id]);
       locationId = location.lastID;
-      await db.createCompartments(locationId, plan.count, Math.max(plan.capacity, total));
+      await db.createCompartments(locationId, plan.count, Math.max(plan.capacity, deckTotal));
     }
 
     let added = 0;
@@ -1210,7 +1216,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
       const created = await db.run(
         `INSERT INTO decks (name, game, format, target_size, inventory_type, user_id)
          VALUES (?, 'mtg', ?, ?, 'collection', ?)`,
-        [deck.name, deck.commander?.length ? 'Commander / EDH' : 'Standard', total, req.user.id]
+        [deck.name, deck.commander?.length ? 'Commander / EDH' : 'Standard', deckTotal, req.user.id]
       );
       deckId = created.lastID;
     }
@@ -1224,7 +1230,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
           game: 'mtg',
           location_id: locationId,
         }, card, true);
-        if (deckId) {
+        if (deckId && !row.isToken) {
           const entry = await db.get('SELECT card_id FROM collection WHERE id = ? AND user_id = ?', [addedCard.id, req.user.id]);
           await db.run(
             `INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, ?)

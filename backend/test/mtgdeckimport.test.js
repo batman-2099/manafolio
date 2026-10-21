@@ -38,6 +38,13 @@ async function testMtgDeckImport() {
   const originalGet = mtgjsonApi.client.get;
   const originalBulkFetch = scryfallApi.bulkFetchByIdentifier;
   const originalCacheCards = scryfallApi.cacheCards;
+  const tokens = [
+    { name: 'Goblin', count: 3, setCode: 'ttst', number: '1', identifiers: { scryfallId: '44444444-4444-4444-4444-444444444444' } },
+    { name: 'Soldier', count: 2, isFoil: true, setCode: 'ttst', number: '2' },
+    ...[undefined, null, 0, -1, 1.5, '2', '2 copies', Number.MAX_SAFE_INTEGER + 1].map(count => (
+      { name: 'Unknown quantity', count, setCode: 'ttst', number: '3' }
+    )),
+  ];
   try {
     await db.initDb();
     mtgjsonApi.resetDeckListCache();
@@ -54,15 +61,22 @@ async function testMtgDeckImport() {
           { name: 'Example Spell', count: 1, type: 'Instant', types: ['Instant'], setCode: 'tst', number: '3', identifiers: { scryfallId: '33333333-3333-3333-3333-333333333333' } },
         ],
         sideBoard: [{ name: 'Side Card', count: 1, isFoil: true, type: 'Land', types: ['Land'], setCode: 'tst', number: '2', identifiers: { scryfallId: '22222222-2222-2222-2222-222222222222' } }],
+        tokens,
       } } };
     };
     scryfallApi.bulkFetchByIdentifier = async rows => {
-      const cards = rows.map((row, index) => ({ id: `mtg-${index + 1}`, name: row.name, game: 'mtg', language: 'English' }));
+      const cards = rows.map((row, index) => ({
+        id: `mtg-${index + 1}`, name: row.name, game: 'mtg', language: 'English',
+        set_id: row.set_id, set_name: row.isToken ? 'Test Tokens' : 'Test',
+        number: row.number, supertype: 'Creature', subtypes: row.isToken ? '["Token"]' : '[]',
+      }));
       return { cards, pairs: rows.map((row, index) => ({ row, card: cards[index] })) };
     };
     scryfallApi.cacheCards = async cards => {
       for (const card of cards) {
-        await db.run('INSERT OR REPLACE INTO card_cache (id, name, game, language) VALUES (?, ?, ?, ?)', [card.id, card.name, card.game, card.language]);
+        await db.run(`INSERT OR REPLACE INTO card_cache (id, name, game, language, set_id, set_name, number, supertype, subtypes)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [card.id, card.name, card.game, card.language, card.set_id, card.set_name, card.number, card.supertype, card.subtypes]);
       }
     };
 
@@ -76,21 +90,42 @@ async function testMtgDeckImport() {
       creatures: [{ name: 'Example Card', count: 3, type: 'Creature — Wizard', setCode: 'tst', number: '1' }],
       spells: [{ name: 'Example Spell', count: 1, type: 'Instant', setCode: 'tst', number: '3' }],
       lands: [{ name: 'Side Card', count: 1, type: 'Land', setCode: 'tst', number: '2' }],
+      tokens: [
+        { name: 'Goblin', count: 3, setCode: 'ttst', number: '1' },
+        { name: 'Soldier', count: 2, setCode: 'ttst', number: '2' },
+      ],
     });
+    for (const absent of [undefined, null, []]) {
+      assert.deepStrictEqual(mtgjsonApi.deckCardRows({ tokens: absent }), []);
+    }
+    const tokenRows = mtgjsonApi.deckCardRows({ tokens });
+    assert.strictEqual(tokenRows[0].id, tokens[0].identifiers.scryfallId);
+    assert.deepStrictEqual(tokenRows.map(row => [row.set_id, row.number, row.quantity, row.printing]),
+      [['ttst', '1', 3, 'Normal'], ['ttst', '2', 2, 'Holofoil']]);
 
     const importRes = response();
     await importDeck({ params: { fileName: 'ExampleDeck_TST' }, body: { create_container: true, create_deck: true }, user: { id: 1 } }, importRes);
     assert.strictEqual(importRes.statusCode, 200);
-    assert.strictEqual(importRes.body.added, 5, 'commander, main board, and sideboard counts must all be added');
+    assert.strictEqual(importRes.body.added, 10, 'import includes five playable cards and five known-quantity tokens');
     assert.strictEqual(importRes.body.missing, 0);
-    assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM collection WHERE user_id = 1')).count, 5);
+    assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM collection WHERE user_id = 1')).count, 10);
     assert.strictEqual((await db.get(`SELECT printing FROM collection WHERE card_id = 'mtg-3'`)).printing, 'Holofoil');
     assert.ok(importRes.body.location_id);
     assert.deepStrictEqual(
       await db.get('SELECT name, type, game FROM locations WHERE id = ?', [importRes.body.location_id]),
       { name: 'Example Deck', type: 'Deck Box', game: 'mtg' }
     );
-    assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM collection WHERE location_id = ?', [importRes.body.location_id])).count, 5);
+    assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM collection WHERE location_id = ?', [importRes.body.location_id])).count, 10);
+    assert.deepStrictEqual(await db.all(`SELECT c.card_id, SUM(c.quantity) AS quantity, c.printing, c.reverse_card_id
+      FROM collection c WHERE c.card_id IN ('mtg-4', 'mtg-5') GROUP BY c.card_id ORDER BY c.card_id`),
+    [
+      { card_id: 'mtg-4', quantity: 3, printing: 'Normal', reverse_card_id: null },
+      { card_id: 'mtg-5', quantity: 2, printing: 'Holofoil', reverse_card_id: null },
+    ], 'tokens preserve supplied quantities and finishes without guessing reverse faces');
+    assert.strictEqual((await db.get('SELECT target_size FROM decks WHERE id = ?', [importRes.body.deck_id])).target_size, 5);
+    assert.strictEqual((await db.get(`SELECT COALESCE(SUM(quantity), 0) AS count FROM deck_card_allocations
+      WHERE deck_id = ? AND card_id IN ('mtg-4', 'mtg-5')`, [importRes.body.deck_id])).count, 0,
+    'imported tokens do not become playable deck entries or reservations');
     const importedDeck = await db.get('SELECT name, checked_out, checked_out_at, user_id, inventory_type FROM decks WHERE id = ?', [importRes.body.deck_id]);
     assert.strictEqual(importedDeck.name, 'Example Deck');
     assert.strictEqual(importedDeck.checked_out, 1);
@@ -121,12 +156,20 @@ async function testMtgDeckImport() {
     assert.strictEqual(failedImport.statusCode, 502);
     assert.deepStrictEqual(await counts(), beforeFailure, 'failed deck creation must roll back newly imported copies and deck');
     await db.run('DROP TRIGGER fail_precon');
+    await db.run(`CREATE TRIGGER fail_token BEFORE INSERT ON collection WHEN NEW.card_id = 'mtg-4' BEGIN SELECT RAISE(ABORT, 'test token failure'); END`);
+    const failedToken = response();
+    await importDeck({ params: { fileName: 'ExampleDeck_TST' }, body: { create_deck: true }, user: { id: 1 } }, failedToken);
+    assert.strictEqual(failedToken.statusCode, 502);
+    assert.deepStrictEqual(await counts(), beforeFailure, 'a token failure must also roll back playable cards and the deck');
+    await db.run('DROP TRIGGER fail_token');
     const fullFetch = scryfallApi.bulkFetchByIdentifier;
-    scryfallApi.bulkFetchByIdentifier = async rows => fullFetch(rows.slice(1));
-    const incomplete = response();
-    await importDeck({ params: { fileName: 'ExampleDeck_TST' }, body: { create_deck: true }, user: { id: 1 } }, incomplete);
-    assert.strictEqual(incomplete.statusCode, 422);
-    assert.deepStrictEqual(await counts(), beforeFailure);
+    for (const resolveRows of [rows => rows.slice(1), rows => rows.filter(row => !row.isToken)]) {
+      scryfallApi.bulkFetchByIdentifier = async rows => fullFetch(resolveRows(rows));
+      const incomplete = response();
+      await importDeck({ params: { fileName: 'ExampleDeck_TST' }, body: { create_deck: true }, user: { id: 1 } }, incomplete);
+      assert.strictEqual(incomplete.statusCode, 422);
+      assert.deepStrictEqual(await counts(), beforeFailure);
+    }
     scryfallApi.bulkFetchByIdentifier = fullFetch;
     const createRes = response();
     await createDeck({

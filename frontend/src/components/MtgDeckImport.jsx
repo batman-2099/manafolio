@@ -104,12 +104,12 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
             const detail = details?.fileName === deck.fileName ? details : null;
             return (
               <div key={deck.fileName} style={{ padding: '0.75rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
                   <div>
                     <div style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{deck.name}</div>
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.2rem' }}>{[deck.type, deck.code, deck.releaseDate].filter(Boolean).join(' · ')}</div>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                     <button type="button" className="btn btn-primary" disabled={detailsLoading === deck.fileName} onClick={() => showDetails(deck)} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
                       <List size={15} /> {detailsLoading === deck.fileName ? t('common.loading') : detail ? t('mtgDeck.hideDetails') : t('mtgDeck.details')}
                     </button>
@@ -136,6 +136,7 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose }) {
                       ['creatures', t('mtgDeck.creatures')],
                       ['spells', t('mtgDeck.spells')],
                       ['lands', t('mtgDeck.lands')],
+                      ['tokens', t('tokens.title')],
                     ].filter(([key]) => detail[key]?.length).map(([key, title]) => (
                       <section key={key}>
                         <h3 style={{ margin: '0 0 0.35rem', color: 'var(--text-strong)', fontSize: '0.82rem' }}>{title}</h3>

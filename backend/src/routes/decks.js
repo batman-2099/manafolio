@@ -227,7 +227,7 @@ router.post('/', async (req, res) => {
     if (precon_file) {
       const precon = await mtgjsonApi.getDeck(precon_file);
       if (!precon) return res.status(404).json({ error: 'MTGJSON deck not found' });
-      const rows = mtgjsonApi.deckCardRows(precon);
+      const rows = mtgjsonApi.deckCardRows(precon).filter(row => !row.isToken);
       if (!rows.length) return res.status(422).json({ error: 'This MTGJSON deck has no importable cards' });
       const { cards, pairs } = await scryfallApi.bulkFetchByIdentifier(rows, undefined, { localFirst: true });
       if (!pairs.length) return res.status(422).json({ error: 'No MTGJSON cards matched Scryfall' });

@@ -2,6 +2,10 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Import precon tokens into Physical Collection and the optional Deck Box when MTGJSON supplies positive whole-number quantities. Preview them separately under Tokens; exclude them from playable deck lists, target sizes, and reservations. Missing quantities and reverse pairings are not guessed.
+
 ## 2.4.0 — 2026-10-21
 
 - Added explicit double-sided token pairing in add/edit and scan review, with searchable faces and flippable artwork. Each pair remains one physical item with shared quantity, placement, and checkout capacity; different pairings stay separate.

@@ -39,16 +39,18 @@ async function getDeck(fileName) {
 
 function deckCardRows(deck) {
   const rows = new Map();
-  for (const section of ['commander', 'mainBoard', 'sideBoard']) {
+  for (const section of ['commander', 'mainBoard', 'sideBoard', 'tokens']) {
     for (const card of deck[section] || []) {
+      const isToken = section === 'tokens';
+      if (isToken && (!Number.isSafeInteger(card.count) || card.count <= 0)) continue;
       const id = card.identifiers?.scryfallId;
       const set_id = card.setCode;
       const number = card.number;
       if (!id && !(set_id && number)) continue;
       const printing = card.isFoil ? 'Holofoil' : 'Normal';
       const language = card.language || 'English';
-      const key = `${id || `${set_id}|${number}`}|${printing}|${language}`;
-      const row = rows.get(key) || { id, set_id, number, name: card.name, printing, language, quantity: 0 };
+      const key = `${isToken}|${id || `${set_id}|${number}`}|${printing}|${language}`;
+      const row = rows.get(key) || { id, set_id, number, name: card.name, printing, language, quantity: 0, isToken };
       row.quantity += Math.max(1, parseInt(card.count, 10) || 1);
       rows.set(key, row);
     }
