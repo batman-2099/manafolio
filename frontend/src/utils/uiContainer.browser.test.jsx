@@ -22,6 +22,7 @@ export async function runUiContainerRegressions() {
   const requests = [];
   let settle;
   let closes = 0;
+  let cards = [];
   let locations = [1, 2].map(id => ({ id, name: `Binder ${id}`, type: 'Binder', compartment_count: 1, total_cards: 0, total_capacity: 9 }));
   locations.push({ id: 3, name: 'Token box', type: 'Deck Box', sort_order: 'custom', compartment_count: 1, total_cards: 0, occupied_slots: 2, total_capacity: 1 });
   const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
@@ -38,7 +39,9 @@ export async function runUiContainerRegressions() {
     if (url === '/api/admin/models') return response({ models: [], catalogs: [] });
     if (url === '/api/admin/catalogs') return response({ catalogs: [] });
     if (url === '/api/locations' || url === '/api/locations?inventory_type=collection') return response(locations);
-    if (['/api/storage-units', '/api/sets', '/api/collection?list_type=collection'].includes(url)) return response([]);
+    if (url === '/api/collection?list_type=collection') return response(cards);
+    if (['/api/storage-units', '/api/sets', '/api/decks'].includes(url)) return response([]);
+    if (url === '/api/card-art/index') return response({});
     if (url === '/api/locations/3/compartments') return response([{ id: 30, location_id: 3, idx: 1, display_label: 'Token row', capacity: 1, count: locations[2].occupied_slots, capacity_count: locations[2].total_cards }]);
     throw new Error(`Unexpected fixture request: ${url}`);
   };
@@ -196,6 +199,36 @@ export async function runUiContainerRegressions() {
     const settingsWarnings = host.querySelectorAll('.storage-capacity-warning');
     assert(settingsWarnings.length > 0 && [...settingsWarnings].every(node => node.textContent === overLimit), 'settings warns for excess non-token cards only');
     cases.push('deck box token-excluding capacity, real overflow and token-only actions');
+    await clear();
+    cards = [
+      { entry_id: 1, card_id: 'sample-spell', name: 'Sample spell', set_name: 'Sample Set' },
+      { entry_id: 2, card_id: 'sample-token', name: 'Goblin', subtypes: ['Token'], set_name: 'Sample Set', reverse_name: 'Soldier', reverse_card_id: 'sample-reverse' },
+      { entry_id: 3, card_id: 'sample-set-token', name: 'Treasure', set_name: 'Sample Tokens' },
+      { entry_id: 4, card_id: 'sample-token', name: 'Goblin', subtypes: ['Token'], set_name: 'Sample Set', reverse_name: 'Soldier', reverse_card_id: 'sample-reverse' },
+    ].map(card => ({ ...card, id: card.card_id, game: 'mtg', location_id: 3, compartment_id: 30, position: card.entry_id * 1000, quantity: 1 }));
+    await act(async () => root.render(<LocationManager onUpdate={() => {}} showToast={() => {}} />));
+    await act(async () => [...host.querySelectorAll('button')].find(node => node.textContent.includes('Token box')).click());
+    await act(async () => host.querySelector(`button[title="${en['loc.detailView']}"]`).click());
+    const tokenSection = () => host.querySelector(`section[aria-label="${en['tokens.title']}"]`);
+    assert(tokenSection()?.querySelectorAll('button').length === 2, 'typed and token-set cards share a separate section, with duplicate pairs stacked');
+    assert(!tokenSection().textContent.includes('Sample spell') && tokenSection().previousElementSibling.textContent.includes('Sample spell'), 'ordinary cards precede the token section');
+    const searchSelector = `input[aria-label="${en['shared.search']}"]`;
+    await change(searchSelector, 'Soldier');
+    assert(tokenSection()?.querySelectorAll('button').length === 1 && tokenSection().textContent.includes('Goblin'), 'reverse-face search retains the paired token in its section');
+    await change(searchSelector, 'Sample spell');
+    assert(!tokenSection(), 'no empty token section appears when filters exclude tokens');
+    await change(searchSelector, '');
+    await act(async () => {
+      const sort = host.querySelector(`select[aria-label="${en['collection.sortBy']}"]`);
+      sort.value = 'name-asc';
+      sort.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    assert(tokenSection()?.querySelectorAll('button').length === 2, 'sorting keeps one separate token section');
+    await click('collection.select');
+    assert(tokenSection().querySelectorAll('button').length === 3, 'selection exposes every stored token entry rather than ambiguous stacks');
+    await act(async () => tokenSection().querySelector('button').click());
+    assert(host.textContent.includes('1 selected') && !button('loc.removeFromStorage').disabled, 'tokens remain selectable for existing container actions');
+    cases.push('separate token gallery preserves classification, pairing, stacking, filtering, sorting and selection');
     return { passed: cases.length, cases };
   } finally {
     await act(async () => root.unmount());

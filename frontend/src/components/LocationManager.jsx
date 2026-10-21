@@ -21,6 +21,7 @@ import StorageUnitDialog, { StorageUnitSelect } from './StorageUnitDialog';
 import { prepareStorageImage } from '../utils/prepareImage';
 import StocktakeDialog from './StocktakeDialog';
 import ContainerLabel from './ContainerLabel';
+import { isMtgToken } from '../utils/tokenFaces';
 
 async function checkStorageResponse(response, fallback) {
   if (!response.ok) {
@@ -1197,24 +1198,30 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   }, [containerListCards, stackContainerCards, stackContainerByCondition, stackContainerByPrinting]);
 
   const displayContainerListCards = storage.selectMode ? containerListCards : processedContainerListCards;
-  const inspectorCards = useMemo(() => !inspectorCard?.location_id ? unsortedCards
-    : containerViewMode === 'list' ? displayContainerListCards
-    : compartments.flatMap(compartment => cardsByCompartment.get(compartment.id) || []),
-  [inspectorCard?.location_id, unsortedCards, containerViewMode, displayContainerListCards, compartments, cardsByCompartment]);
   const selectableContainerCards = containerViewMode === 'list' ? containerListCards : cardsInActiveLocation;
 
   const containerListSections = useMemo(() => {
     const field = CONTAINER_LIST_SORTS[containerSortBy]?.[0]?.by;
-    if (!field) return [{ label: null, cards: displayContainerListCards }];
     const sections = [];
+    const tokens = [];
     for (const card of displayContainerListCards) {
-      const label = getSortCategories(card, [{ by: field, divider: true }])[0]?.label || 'Other';
+      if (isMtgToken(card)) {
+        tokens.push(card);
+        continue;
+      }
+      const label = field ? getSortCategories(card, [{ by: field, divider: true }])[0]?.label || 'Other' : null;
       const section = sections.at(-1);
       if (!section || section.label !== label) sections.push({ label, cards: [card] });
       else section.cards.push(card);
     }
+    if (tokens.length) sections.push({ label: t('tokens.title'), cards: tokens, tokens: true });
     return sections;
-  }, [containerSortBy, displayContainerListCards]);
+  }, [containerSortBy, displayContainerListCards, t]);
+
+  const inspectorCards = useMemo(() => !inspectorCard?.location_id ? unsortedCards
+    : containerViewMode === 'list' ? containerListSections.flatMap(section => section.cards)
+    : compartments.flatMap(compartment => cardsByCompartment.get(compartment.id) || []),
+  [inspectorCard?.location_id, unsortedCards, containerViewMode, containerListSections, compartments, cardsByCompartment]);
 
   const openCompartmentRules = (comp) => {
     let draft = [];
@@ -2452,7 +2459,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             {containerViewMode === 'list' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {containerListSections.map(section => (
-                  <section key={section.label || 'storage'}>
+                  <section key={section.tokens ? 'tokens' : `cards:${section.label || 'storage'}`} aria-label={section.label || undefined}>
                     {section.label && <h3 style={{ margin: '0 0 0.4rem', color: 'var(--text-strong)', fontSize: '0.85rem' }}>{section.label}</h3>}
                     <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${110 * containerCardScale}px), 1fr))`, gap: '0.75rem' }}>
                       {section.cards.map(card => {

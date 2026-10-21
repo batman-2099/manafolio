@@ -13,6 +13,7 @@ Release history starts with Manafolio 2.0.
 - Automatically select the sole valid reverse printing returned by a token card-number search; name-only searches and ambiguous results still require a choice.
 - Show the set symbol beside the existing set name beneath the card title in the inspector, without duplicating the set beneath Printing.
 - Exclude tokens from Deck Box card totals, capacity displays, and over-limit warnings, including individual rows. Tokens remain visible, included in stocktaking, and accessible in token-only containers. Other container totals are unchanged.
+- Group tokens in a separate section in container card galleries while preserving filtering, sorting, stacking, selection, and inspector navigation. Physical storage positions remain unchanged.
 
 ## 2.3.4 — 2026-10-13
 
