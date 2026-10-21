@@ -1432,7 +1432,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       onUpdate();
       showToast(data.evicted ? `Container updated. ${data.evicted} card${data.evicted === 1 ? '' : 's'} moved to Unsorted.` : 'Container updated.', 'success');
       setShowRulesModal(false);
-      if (sortChanged && newSort !== 'custom' && (selectedLoc.total_cards || 0) > 0) {
+      if (sortChanged && newSort !== 'custom' && (selectedLoc.occupied_slots ?? selectedLoc.total_cards ?? 0) > 0) {
         if (window.confirm(t('loc.confirmResortAfterChange'))) startResort(true);
       }
     } catch (err) {
@@ -1744,9 +1744,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 <strong style={{ display: 'block', fontSize: '2rem', fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{location.total_cards || 0}</strong>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', lineHeight: 1.3 }}>{t('collection.cardUnit', { count: location.total_cards || 0 })}</span>
               </span>
-              {location.total_cards > location.total_capacity && (
+              {(location.occupied_slots ?? location.total_cards) > location.total_capacity && (
                 <span className="storage-capacity-warning" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
-                  {t('loc.overLimit', { used: location.total_cards.toLocaleString(locale), capacity: location.total_capacity.toLocaleString(locale) })}
+                  {t('loc.overLimit', { used: (location.occupied_slots ?? location.total_cards).toLocaleString(locale), capacity: location.total_capacity.toLocaleString(locale) })}
                 </span>
               )}
             </div>
@@ -1964,10 +1964,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   not loc.cardsCurrentlyStored, whose sentence carries a {count}
                   this row has nowhere to put. */}
               <span style={{ color: 'var(--text-muted)' }}>{t(selectedLoc.allow_stacking ? 'loc.slotsUsedLabel' : 'loc.cardsStoredLabel')}</span>
-              <strong style={{ fontSize: '0.9rem', color: 'var(--text-strong)' }}>{selectedLoc.total_cards || 0} / {selectedLoc.total_capacity || 0}</strong>
+              <strong style={{ fontSize: '0.9rem', color: 'var(--text-strong)' }}>{selectedLoc.occupied_slots ?? selectedLoc.total_cards ?? 0} / {selectedLoc.total_capacity || 0}</strong>
             </div>
-            {selectedLoc.total_cards > selectedLoc.total_capacity && (
-              <span className="storage-capacity-warning">{t('loc.overLimit', { used: selectedLoc.total_cards.toLocaleString(locale), capacity: selectedLoc.total_capacity.toLocaleString(locale) })}</span>
+            {(selectedLoc.occupied_slots ?? selectedLoc.total_cards) > selectedLoc.total_capacity && (
+              <span className="storage-capacity-warning">{t('loc.overLimit', { used: (selectedLoc.occupied_slots ?? selectedLoc.total_cards).toLocaleString(locale), capacity: selectedLoc.total_capacity.toLocaleString(locale) })}</span>
             )}
 
             <div style={{ background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #d97706', padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
@@ -2140,7 +2140,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 </button>
               </div>
             )}
-            {!filingMode && !moveMode && (selectedLoc.total_cards || 0) > 0 && (
+            {!filingMode && !moveMode && (selectedLoc.occupied_slots ?? selectedLoc.total_cards ?? 0) > 0 && (
               <button
                 type="button"
                 className={`btn ${storage.selectMode ? 'btn-primary' : 'btn-secondary'}`}
@@ -2251,7 +2251,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   >
                     <Trash2 size={14} /> {t(isBinderType ? 'loc.removeLastPage' : 'loc.removeLastCompartment')}
                   </button>,
-                  <button key="Re-sort Container" className="kebab-item" onClick={() => { setShowKebabMenu(false); startResort(false, true); }} disabled={!!selectedLoc.locked || (selectedLoc.total_cards || 0) === 0}>
+                  <button key="Re-sort Container" className="kebab-item" onClick={() => { setShowKebabMenu(false); startResort(false, true); }} disabled={!!selectedLoc.locked || (selectedLoc.occupied_slots ?? selectedLoc.total_cards ?? 0) === 0}>
                     <RefreshCw size={14} /> Re-sort Container
                   </button>,
                   <button key={t(selectedLoc.locked ? 'loc.unlockContainer' : 'loc.lockContainer')} className="kebab-item" onClick={() => { setShowKebabMenu(false); handleToggleContainerLock(); }} title={t('loc.lockKebabHint')}>

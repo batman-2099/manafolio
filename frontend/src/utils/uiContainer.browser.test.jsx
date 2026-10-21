@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import CreateContainerModal from '../components/CreateContainerModal';
 import SetupWizard from '../components/SetupWizard';
+import LocationManager from '../components/LocationManager';
 import en from '../locales/en.json';
 
 // Run on an isolated Vite page; every request is mocked, never a real database.
@@ -9,6 +10,7 @@ import en from '../locales/en.json';
 export async function runUiContainerRegressions() {
   const assert = (condition, message) => { if (!condition) throw new Error(message); };
   const originalFetch = window.fetch;
+  const originalConfirm = window.confirm;
   const originalAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
   const originalState = history.state;
   const originalUrl = location.href;
@@ -21,6 +23,7 @@ export async function runUiContainerRegressions() {
   let settle;
   let closes = 0;
   let locations = [1, 2].map(id => ({ id, name: `Binder ${id}`, type: 'Binder', compartment_count: 1, total_cards: 0, total_capacity: 9 }));
+  locations.push({ id: 3, name: 'Token box', type: 'Deck Box', sort_order: 'custom', compartment_count: 1, total_cards: 0, occupied_slots: 2, total_capacity: 1 });
   const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
   window.fetch = async (url, options = {}) => {
     if (options.method && options.method !== 'GET') {
@@ -34,7 +37,9 @@ export async function runUiContainerRegressions() {
     }
     if (url === '/api/admin/models') return response({ models: [], catalogs: [] });
     if (url === '/api/admin/catalogs') return response({ catalogs: [] });
-    if (url === '/api/locations') return response(locations);
+    if (url === '/api/locations' || url === '/api/locations?inventory_type=collection') return response(locations);
+    if (['/api/storage-units', '/api/sets', '/api/collection?list_type=collection'].includes(url)) return response([]);
+    if (url === '/api/locations/3/compartments') return response([{ id: 30, location_id: 3, idx: 1, capacity: 1 }]);
     throw new Error(`Unexpected fixture request: ${url}`);
   };
   const button = key => [...host.querySelectorAll('button')].find(node => node.textContent.trim() === en[key]);
@@ -120,6 +125,12 @@ export async function runUiContainerRegressions() {
     await click('common.next');
     await click('common.next');
     assert(document.activeElement.id === 'setup-step-title', 'setup storage heading receives focus');
+    let deleteWarning;
+    window.confirm = message => { deleteWarning = message; return false; };
+    await act(async () => host.querySelector('button[aria-label="Delete Token box"]').click());
+    assert(deleteWarning === en['setup.storage.confirmDeleteCards.other'].replace('{name}', 'Token box').replace('{count}', '2'), 'token-only box deletion warns about occupied slots');
+    assert(requests.length === 0, 'cancelled deletion leaves stored tokens untouched');
+    cases.push('token-only setup deletion warning');
     await change('#setup-location-name', 'New binder');
     await act(async () => { button('setup.storage.add').click(); button('setup.storage.add').click(); });
     assert(requests.length === 1 && host.querySelector('#setup-location-name').matches(':disabled'), 'setup add owns draft and rejects same-tick duplicate');
@@ -155,6 +166,20 @@ export async function runUiContainerRegressions() {
     await act(async () => settle());
     assert(closes === closesBeforeFinish && host.querySelector('dialog[open]'), 'old completion cannot close a new wizard instance');
     cases.push('setup pending completion close/history lock and stale-instance isolation');
+    await clear();
+    await act(async () => root.render(<LocationManager onUpdate={() => {}} showToast={() => {}} />));
+    const tokenBox = [...host.querySelectorAll('button')].find(node => node.textContent.includes('Token box'));
+    assert(tokenBox?.querySelector('.storage-card-quantity strong')?.textContent === '0', 'deck box badge excludes tokens');
+    assert(tokenBox.querySelector('.storage-capacity-warning')?.textContent === en['loc.overLimit'].replace('{used}', '2').replace('{capacity}', '1'), 'gallery warning includes token occupancy');
+    await act(async () => tokenBox.click());
+    assert(button('collection.select') && !button('collection.select').disabled, 'token-only box keeps selection enabled');
+    await click('nav.more');
+    const resort = [...host.querySelectorAll('button')].find(node => node.textContent.trim() === 'Re-sort Container');
+    assert(resort && !resort.disabled, 'token-only box keeps re-sort enabled');
+    await click('loc.containerSettings');
+    assert(host.querySelector('#container-settings-title') && host.textContent.includes('2 / 1'), 'settings capacity includes token occupancy');
+    assert(host.querySelector('.storage-capacity-warning'), 'settings warns when tokens exceed capacity');
+    cases.push('deck box display count, occupied capacity, overflow and token-only actions');
     return { passed: cases.length, cases };
   } finally {
     await act(async () => root.unmount());
@@ -162,6 +187,7 @@ export async function runUiContainerRegressions() {
     host.remove();
     history.replaceState(originalState, '', originalUrl);
     window.fetch = originalFetch;
+    window.confirm = originalConfirm;
     globalThis.IS_REACT_ACT_ENVIRONMENT = originalAct;
   }
 }

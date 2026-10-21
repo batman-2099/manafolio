@@ -624,6 +624,7 @@ To apply the container card view's selected order physically, choose the order (
 
 - **Add Page** or **Add Compartment** expands a container. **Container Settings** also exposes its page/row count and capacity; a row/page has **Change capacity** controls.
 - Capacity is a warning, not a move restriction. Cards moved into a full eligible container stay there. The gallery, container view, and affected page/row show **Over limit** with usage and capacity; the warning clears when usage falls back within the limit. Stacked storage counts distinct pockets per page/row, while unstacked storage counts copies.
+- **Deck Box** card totals exclude tokens, including cards from sets whose names contain **Token** or **Tokens**. For example, 60 regular cards plus 5 tokens shows **60 cards**, but still uses **65** physical spaces. Tokens remain visible and selectable, count toward capacity warnings, and are included in stocktaking. Other container types still include tokens in their totals.
 - Only the last empty row/page can be removed with the remove-last control. Remove or relocate its cards first.
 - Binder settings offer **Stack duplicates in one pocket**. That is a real storage-capacity setting, unlike Collection's display-only **Stack Duplicates**. Check that your actual pockets can safely hold the copies you record.
 - **More → Lock Container** prevents routine movement, arrangement, deletion, layout/settings changes, and automatic filing into that container. **Unlock Container** makes it editable again.

@@ -235,8 +235,9 @@ export default function SetupWizard({ user, onClose }) {
     if (busy.current) return;
     // Deleting a location unfiles its cards rather than deleting them, but that is
     // not obvious from a trash icon, so say it before doing it.
-    const warn = loc.total_cards > 0
-      ? t('setup.storage.confirmDeleteCards', { name: loc.name, count: loc.total_cards })
+    const occupiedSlots = loc.occupied_slots ?? loc.total_cards;
+    const warn = occupiedSlots > 0
+      ? t('setup.storage.confirmDeleteCards', { name: loc.name, count: occupiedSlots })
       : t('setup.storage.confirmDelete', { name: loc.name });
     if (!window.confirm(warn)) return;
     busy.current = true;

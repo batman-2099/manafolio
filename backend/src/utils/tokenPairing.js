@@ -1,9 +1,12 @@
 const db = require('../db');
 
-function assertTokenPair(front, reverse, listType) {
-  const isToken = card => card?.game === 'mtg' && (/\bToken\b/.test(
+function isMtgToken(card) {
+  return card?.game === 'mtg' && (/\bToken\b/.test(
     [card.supertype, card.subtypes, card.type_line].join(' ')) || /\btokens?\b/i.test(card.set_name));
-  if (listType === 'arena' || !isToken(front) || !isToken(reverse) || front.id === reverse.id) {
+}
+
+function assertTokenPair(front, reverse, listType) {
+  if (listType === 'arena' || !isMtgToken(front) || !isMtgToken(reverse) || front.id === reverse.id) {
     throw Object.assign(new Error('Reverse faces require two distinct Magic tokens outside Arena'), { status: 400 });
   }
   if (!front.set_id || !reverse.set_id || front.set_id.toLowerCase() !== reverse.set_id.toLowerCase()) {
@@ -21,4 +24,4 @@ async function validateReverseCard(front, reverseId, listType = 'collection') {
   return reverseId;
 }
 
-module.exports = { assertTokenPair, validateReverseCard };
+module.exports = { isMtgToken, assertTokenPair, validateReverseCard };

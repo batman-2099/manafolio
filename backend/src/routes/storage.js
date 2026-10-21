@@ -12,6 +12,7 @@ const {
 } = require('../utils/compartmentSort');
 const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, checkedOutSources, physicalCardEntries } = require('../utils/collectionHelpers');
 const { normalizeMtgColorIdentity } = require('../utils/mtgColors');
+const { isMtgToken } = require('../utils/tokenPairing');
 const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
 const { normalizeUploadedImage } = require('../utils/uploadedImage');
 const { createHash } = require('crypto');
@@ -209,22 +210,40 @@ router.get('/locations', async (req, res) => {
       SELECT l.*, su.name AS storage_unit_name, cover.id AS resolved_cover_card_id, cover.name AS cover_name,
              cover.game AS cover_game, cover.image_url AS cover_image_url,
              (SELECT COUNT(*) FROM compartments WHERE location_id = l.id) as compartment_count,
-             (SELECT COALESCE(SUM(capacity), 0) FROM compartments WHERE location_id = l.id) as total_capacity,
-             -- Measured against total_capacity, which counts slots: on a stacking
-             -- container the duplicates sharing a pocket are one occupant, so
-             -- counting cards there would report a nine-pocket page as overfull.
-             (SELECT CASE WHEN l.allow_stacking
-                       THEN COUNT(DISTINCT COALESCE(compartment_id, 0) || '|' || ${STACK_KEY_SQL})
-                       ELSE COALESCE(SUM(quantity), 0) END
-                FROM collection
-                WHERE user_id = l.user_id AND COALESCE(list_type, 'collection') = l.inventory_type
-                  AND compartment_id IN (SELECT id FROM compartments WHERE location_id = l.id)) as total_cards
+             (SELECT COALESCE(SUM(capacity), 0) FROM compartments WHERE location_id = l.id) as total_capacity
       FROM locations l
       LEFT JOIN storage_units su ON su.id = l.storage_unit_id AND su.user_id = l.user_id
       LEFT JOIN ranked_covers rc ON rc.location_id = l.id AND rc.cover_rank = 1
       LEFT JOIN card_cache cover ON cover.id = rc.card_id
       WHERE l.user_id = ? AND l.inventory_type = ?
     `, [req.user.id, inventoryType, req.user.id, inventoryType]);
+    // Count physical slots once, grouping Deck Box contents by printing for token classification.
+    const occupancies = await db.all(`
+      WITH contents AS (
+        SELECT l.id AS location_id, CASE WHEN l.type = 'Deck Box' THEN c.card_id END AS card_id,
+               CASE WHEN l.allow_stacking
+                 THEN COUNT(DISTINCT COALESCE(compartment_id, 0) || '|' || ${STACK_KEY_SQL})
+                 ELSE COALESCE(SUM(quantity), 0) END AS occupied_slots
+        FROM locations l
+        JOIN compartments p ON p.location_id = l.id
+        JOIN collection c ON c.compartment_id = p.id AND c.user_id = l.user_id
+          AND COALESCE(c.list_type, 'collection') = l.inventory_type
+        WHERE l.user_id = ? AND l.inventory_type = ?
+        GROUP BY l.id, CASE WHEN l.type = 'Deck Box' THEN c.card_id END
+      )
+      SELECT contents.location_id, contents.occupied_slots, cc.game, cc.supertype, cc.subtypes, cc.set_name
+      FROM contents LEFT JOIN card_cache cc ON cc.id = contents.card_id
+    `, [req.user.id, inventoryType]);
+    const locationsById = new Map(locations.map(location => {
+      location.total_cards = 0;
+      location.occupied_slots = 0;
+      return [location.id, location];
+    }));
+    for (const contents of occupancies) {
+      const location = locationsById.get(contents.location_id);
+      location.occupied_slots += contents.occupied_slots;
+      if (!isMtgToken(contents)) location.total_cards += contents.occupied_slots;
+    }
     const identities = await db.all(`
       SELECT DISTINCT c.location_id, cc.types AS card_colors
       FROM collection c
