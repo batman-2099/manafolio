@@ -1744,9 +1744,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 <strong style={{ display: 'block', fontSize: '2rem', fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{location.total_cards || 0}</strong>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', lineHeight: 1.3 }}>{t('collection.cardUnit', { count: location.total_cards || 0 })}</span>
               </span>
-              {(location.occupied_slots ?? location.total_cards) > location.total_capacity && (
+              {location.total_cards > location.total_capacity && (
                 <span className="storage-capacity-warning" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
-                  {t('loc.overLimit', { used: (location.occupied_slots ?? location.total_cards).toLocaleString(locale), capacity: location.total_capacity.toLocaleString(locale) })}
+                  {t('loc.overLimit', { used: location.total_cards.toLocaleString(locale), capacity: location.total_capacity.toLocaleString(locale) })}
                 </span>
               )}
             </div>
@@ -1964,10 +1964,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   not loc.cardsCurrentlyStored, whose sentence carries a {count}
                   this row has nowhere to put. */}
               <span style={{ color: 'var(--text-muted)' }}>{t(selectedLoc.allow_stacking ? 'loc.slotsUsedLabel' : 'loc.cardsStoredLabel')}</span>
-              <strong style={{ fontSize: '0.9rem', color: 'var(--text-strong)' }}>{selectedLoc.occupied_slots ?? selectedLoc.total_cards ?? 0} / {selectedLoc.total_capacity || 0}</strong>
+              <strong style={{ fontSize: '0.9rem', color: 'var(--text-strong)' }}>{selectedLoc.total_cards ?? 0} / {selectedLoc.total_capacity || 0}</strong>
             </div>
-            {(selectedLoc.occupied_slots ?? selectedLoc.total_cards) > selectedLoc.total_capacity && (
-              <span className="storage-capacity-warning">{t('loc.overLimit', { used: (selectedLoc.occupied_slots ?? selectedLoc.total_cards).toLocaleString(locale), capacity: selectedLoc.total_capacity.toLocaleString(locale) })}</span>
+            {selectedLoc.total_cards > selectedLoc.total_capacity && (
+              <span className="storage-capacity-warning">{t('loc.overLimit', { used: selectedLoc.total_cards.toLocaleString(locale), capacity: selectedLoc.total_capacity.toLocaleString(locale) })}</span>
             )}
 
             <div style={{ background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #d97706', padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
@@ -2065,7 +2065,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 >
                   {compartments.map((c, idx) => (
                     <option key={c.id} value={idx}>
-                      {c.display_label || t('loc.pageName', { number: idx + 1 })} ({idx + 1}/{compartments.length}){c.count > c.capacity ? ` · ${t('loc.overLimit', { used: c.count.toLocaleString(locale), capacity: c.capacity.toLocaleString(locale) })}` : ''}
+                      {c.display_label || t('loc.pageName', { number: idx + 1 })} ({idx + 1}/{compartments.length}){(c.capacity_count ?? c.count) > c.capacity ? ` · ${t('loc.overLimit', { used: (c.capacity_count ?? c.count).toLocaleString(locale), capacity: c.capacity.toLocaleString(locale) })}` : ''}
                     </option>
                   ))}
                   <option value="__add_new__" disabled={!!selectedLoc.locked}>+ {t('loc.addPage')}</option>
@@ -2637,15 +2637,15 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                           }}
                           style={{ fontSize: '0.8rem', padding: '0.2rem 0.4rem' }}
                         >
-                          {compartments.map(c => <option key={c.id} value={c.id}>{c.display_label}{c.count > c.capacity ? ` · ${t('loc.overLimit', { used: c.count.toLocaleString(locale), capacity: c.capacity.toLocaleString(locale) })}` : ''}</option>)}
+                          {compartments.map(c => <option key={c.id} value={c.id}>{c.display_label}{(c.capacity_count ?? c.count) > c.capacity ? ` · ${t('loc.overLimit', { used: (c.capacity_count ?? c.count).toLocaleString(locale), capacity: c.capacity.toLocaleString(locale) })}` : ''}</option>)}
                           <option value="__add_new__" disabled={!!selectedLoc.locked}>+ {t('loc.addRow')}</option>
                         </select>
                         <button className="btn btn-secondary btn-icon-only" aria-label={t('common.next')} disabled={activeCompIdx >= compartments.length - 1} onClick={() => setActiveCompartmentId(compartments[activeCompIdx + 1]?.id)} style={{ width: '24px', height: '24px', padding: 0 }}>
                           &rarr;
                         </button>
                       </div>
-                      {activeComp.count > activeComp.capacity && (
-                        <span className="storage-capacity-warning">{t('loc.overLimit', { used: activeComp.count.toLocaleString(locale), capacity: activeComp.capacity.toLocaleString(locale) })}</span>
+                      {(activeComp.capacity_count ?? activeComp.count) > activeComp.capacity && (
+                        <span className="storage-capacity-warning">{t('loc.overLimit', { used: (activeComp.capacity_count ?? activeComp.count).toLocaleString(locale), capacity: activeComp.capacity.toLocaleString(locale) })}</span>
                       )}
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

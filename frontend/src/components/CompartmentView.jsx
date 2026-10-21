@@ -535,8 +535,8 @@ export default function CompartmentView({
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', height: '100%' }}>
-        {compartment.count > compartment.capacity && (
-          <span className="storage-capacity-warning">{t('loc.overLimit', { used: compartment.count.toLocaleString(locale), capacity: compartment.capacity.toLocaleString(locale) })}</span>
+        {(compartment.capacity_count ?? compartment.count) > compartment.capacity && (
+          <span className="storage-capacity-warning">{t('loc.overLimit', { used: (compartment.capacity_count ?? compartment.count).toLocaleString(locale), capacity: compartment.capacity.toLocaleString(locale) })}</span>
         )}
         {onRename && (
           <div className="row-flash" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
@@ -580,7 +580,7 @@ export default function CompartmentView({
 
             {onSetCapacity && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.1rem', fontSize: '0.6rem', color: 'var(--text-muted)' }}>
-                <span>{compartment.count} /</span>
+                <span>{compartment.capacity_count ?? compartment.count} /</span>
                 <input
                   type="number" min="1" className="input-control" defaultValue={compartment.capacity}
                   onBlur={(e) => { const v = parseInt(e.target.value, 10); if (v > 0 && v !== compartment.capacity) onSetCapacity(v, e.currentTarget); }}

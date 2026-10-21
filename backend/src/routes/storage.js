@@ -673,6 +673,26 @@ router.get('/locations/:id/compartments', async (req, res) => {
     const loc = await db.get(`SELECT * FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
     if (!loc) return res.status(404).json({ error: 'Location not found' });
     const compartments = await loadCompartments(db, id, req.user.id);
+    const compartmentsById = new Map(compartments.map(c => {
+      c.capacity_count = c.count;
+      return [c.id, c];
+    }));
+    if (loc.type === 'Deck Box') {
+      const contents = await db.all(`
+        WITH contents AS (
+          SELECT c.compartment_id, c.card_id,
+                 ${loc.allow_stacking ? `COUNT(DISTINCT ${STACK_KEY_SQL})` : 'SUM(quantity)'} AS count
+          FROM collection c JOIN compartments p ON p.id = c.compartment_id
+          WHERE p.location_id = ? AND c.user_id = ? AND COALESCE(c.list_type, 'collection') = ?
+          GROUP BY c.compartment_id, c.card_id
+        )
+        SELECT contents.*, cc.game, cc.supertype, cc.subtypes, cc.set_name
+        FROM contents LEFT JOIN card_cache cc ON cc.id = contents.card_id
+      `, [id, req.user.id, loc.inventory_type || 'collection']);
+      for (const row of contents) {
+        if (isMtgToken(row)) compartmentsById.get(row.compartment_id).capacity_count -= row.count;
+      }
+    }
     res.json(compartments.map(c => ({ ...c, display_label: compartmentLabel(c, loc.type) })));
   } catch (error) {
     console.error(error);

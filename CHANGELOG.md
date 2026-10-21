@@ -12,7 +12,7 @@ Release history starts with Manafolio 2.0.
 - Recognize cards from sets named with “Token” or “Tokens” as tokens regardless of type metadata, including reverse pairing, add prompts, and related-token suppression.
 - Automatically select the sole valid reverse printing returned by a token card-number search; name-only searches and ambiguous results still require a choice.
 - Show the set symbol beside the existing set name beneath the card title in the inspector, without duplicating the set beneath Printing.
-- Exclude tokens from Deck Box card totals while retaining their physical capacity usage, visibility, stocktaking, and token-only container controls. Other container totals are unchanged.
+- Exclude tokens from Deck Box card totals, capacity displays, and over-limit warnings, including individual rows. Tokens remain visible, included in stocktaking, and accessible in token-only containers. Other container totals are unchanged.
 
 ## 2.3.4 — 2026-10-13
 

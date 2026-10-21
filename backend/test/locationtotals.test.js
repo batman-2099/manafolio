@@ -49,7 +49,7 @@ let server;
       }
     }
     const tokens = await location('Deck Box');
-    await store(tokens, 'set-tokens', 7);
+    await store(tokens, 'set-tokens', 70);
     const empty = await location('Deck Box');
     const metadata = await location('Deck Box');
     await store(metadata, 'unknown', 2);
@@ -69,6 +69,7 @@ let server;
     await store(stacked, 'super-token', 3, { reverse: 'sub-token' });
     await store(stacked, 'super-token', 4, { reverse: 'set-token' });
     await store(stacked, 'super-token', 2);
+    await db.run('UPDATE compartments SET capacity = 3 WHERE id = ?', [stacked.compartment]);
     const scoped = await location('Deck Box');
     await store(scoped, 'spell', 60, { inventory: null });
     await store(scoped, 'super-token', 2);
@@ -83,6 +84,9 @@ let server;
     await store(foreign, 'spell', 9);
     await store(foreign, 'sub-token', 3);
     await store(foreign, 'spell', 90, { user: 1 });
+    const over = await location('Deck Box');
+    await store(over, 'spell', 61);
+    await store(over, 'super-token', 2);
 
     const app = express();
     app.use((req, res, next) => { req.user = { id: Number(req.headers['x-test-user'] || 1) }; next(); });
@@ -98,14 +102,34 @@ let server;
       return (await response.json()).map(row => [row.id, row.total_cards, row.occupied_slots]).sort((a, b) => a[0] - b[0]);
     };
     assert.deepEqual(await summaries(), [
-      [deck.id, 60, 74], [normal.id, 74, 74], [tokens.id, 0, 7], [empty.id, 0, 0],
-      [metadata.id, 10, 10], [stacked.id, 4, 7], [scoped.id, 60, 62],
+      [deck.id, 60, 74], [normal.id, 74, 74], [tokens.id, 0, 70], [empty.id, 0, 0],
+      [metadata.id, 10, 10], [stacked.id, 4, 7], [scoped.id, 60, 62], [over.id, 61, 63],
     ], 'only Deck Box display totals exclude tokens; occupancy retains copies, separate pockets and reverse/finish/language stacks');
     assert.deepEqual(await summaries('graveyard'), [[archived.id, 6, 8]], 'archived totals retain inventory scope');
     assert.deepEqual(await summaries('collection', 2), [[foreign.id, 9, 12]], 'totals retain owner scope');
+    const compartments = async (box, user = box.user) => {
+      const response = await fetch(`http://127.0.0.1:${server.address().port}/api/locations/${box.id}/compartments`, {
+        headers: { 'x-test-user': String(user) },
+      });
+      assert.equal(response.status, 200);
+      return (await response.json()).map(row => [row.id, row.capacity_count, row.count, row.free]);
+    };
+    assert.deepEqual(await compartments(tokens), [[tokens.compartment, 0, 70, -10]], 'tokens alone never exceed Deck Box capacity but still physically occupy it');
+    assert.deepEqual(await compartments(deck), [[deck.compartment, 60, 74, -14]], 'mixed Deck Box at capacity excludes every token classification');
+    assert.deepEqual(await compartments(over), [[over.compartment, 61, 63, -3]], 'non-token cards can still exceed Deck Box capacity');
+    assert.deepEqual(await compartments(normal), [[normal.compartment, 74, 74, -14]], 'normal boxes include tokens in capacity');
+    assert.deepEqual(await compartments(empty), [[empty.compartment, 0, 0, 60]], 'empty Deck Box capacity remains zero');
+    assert.deepEqual(await compartments(metadata), [[metadata.compartment, 10, 10, 50]], 'unknown metadata and non-Magic cards still count toward capacity');
+    assert.deepEqual(await compartments(stacked), [[stacked.compartment, 3, 6, -3], [secondPocket, 1, 1, 0]], 'capacity preserves separate pockets and language/finish stacks while physical occupancy retains token reverse-face stacks');
+    assert.deepEqual(await compartments(scoped), [[scoped.compartment, 60, 62, -2]], 'capacity retains owner, legacy inventory and compartment scope');
+    assert.deepEqual(await compartments(archived), [[archived.compartment, 6, 8, 52]], 'capacity retains graveyard inventory scope');
+    assert.deepEqual(await compartments(foreign), [[foreign.compartment, 9, 12, 48]], 'capacity retains second account scope');
+    const forbidden = await fetch(`http://127.0.0.1:${server.address().port}/api/locations/${foreign.id}/compartments`);
+    assert.equal(forbidden.status, 404, 'compartments remain inaccessible to another owner');
     await db.run('UPDATE locations SET type = ? WHERE id = ?', ['Box', stacked.id]);
     assert.deepEqual((await summaries()).find(row => row[0] === stacked.id), [stacked.id, 7, 7], 'normal stacked containers still count every occupied pocket');
-    console.log('Location totals: Deck Box tokens, physical occupancy, stacking and account/inventory scope passed');
+    assert.deepEqual(await compartments(stacked), [[stacked.compartment, 6, 6, -3], [secondPocket, 1, 1, 0]], 'normal stacked containers include tokens in capacity');
+    console.log('Location and compartment totals: Deck Box token capacity, physical occupancy, stacking and account/inventory scope passed');
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
     await new Promise(resolve => db.dbConnection.close(resolve));
