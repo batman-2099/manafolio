@@ -38,6 +38,8 @@ Keyboard users can use **Skip to content** to bypass navigation. Changing the ma
 
 ### Catch up with recent changes
 
+For **2.4.0**, learn how to [pair double-sided tokens](#track-a-double-sided-token), [view both faces in container galleries](#create-a-container), and [exclude tokens from Deck Box totals and capacity warnings](#capacity-stacking-and-locks).
+
 For changes introduced in **2.3.3–2.3.4**, start with these procedures:
 
 - [Add cards to a default container](#add-a-card-by-searching) and [correct Rapid add receipts with Foil or Undo](#rapid-add-work-through-one-set-by-collector-number).

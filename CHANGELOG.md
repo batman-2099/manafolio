@@ -2,7 +2,7 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.4.0 — 2026-10-21
 
 - Added explicit double-sided token pairing in add/edit and scan review, with searchable faces and flippable artwork. Each pair remains one physical item with shared quantity, placement, and checkout capacity; different pairings stay separate.
 - Preserved paired identities through storage operations, account backups, and internal JSON/CSV exports. Related-token ownership, Shopping List planning, and AI draft validation account for shared physical copies without inventing reverse pairings.

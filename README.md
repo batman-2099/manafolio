@@ -18,8 +18,9 @@ Built with React, Express, and SQLite, it runs as one Docker service or from sou
 
 - **Separate inventories:** Physical and Arena collections, Wishlist acquisition plans, and Graveyard archives. Wishlist and Graveyard do not inflate owned totals.
 - **Collection management:** Search exact printings, track condition, finish, language, purchase prices, and graded slabs; check set completion and estimated value.
-- **[Double-sided tokens](docs/USER_GUIDE.md#track-a-double-sided-token):** A prompt lets you choose a same-set reverse when adding a token, or continue with an unknown/blank back. Search either face and flip the artwork while tracking one physical quantity, storage location, and checkout capacity.
+- **[Double-sided tokens](docs/USER_GUIDE.md#track-a-double-sided-token):** Choose a same-set reverse when adding a token, or leave an unknown/blank back unpaired. A unique collector-number match selects the reverse automatically. Search either face and see both images in card details and container galleries, while tracking one physical quantity, storage location, and checkout allocation. Cards from Token/Tokens sets are recognized as tokens even without token type metadata.
 - **Physical storage:** Organize boxes and binders by page, row, and slot; group containers into storage units, print QR labels, and reconcile copies with Take Stock.
+- **[Tokens in storage](docs/USER_GUIDE.md#capacity-stacking-and-locks):** Container galleries give tokens their own section. Deck Boxes exclude tokens from card totals and over-limit warnings; other container types still count them. Tokens remain selectable and included in Take Stock.
 - **Deck building and play:** Import lists and precons, choose commanders, simulate draws, track results, compare revisions, and reserve physical copies with storage-aware pull lists.
 - **Planning and trading:** Combine deck shortfalls into a Shopping List, add confirmed deficits to Wishlist, and review both sides of a Physical inventory exchange.
 - **Import, export, and recovery:** Review collection imports, export filtered views or decklists, and create complete account backups and server snapshots.
