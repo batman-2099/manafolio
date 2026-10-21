@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import { priceText } from '../utils/formatPrice';
 import { resolveCardPrice } from '../utils/resolveCardPrice';
 import CardEntryFields from './CardEntryFields';
+import SetCodeField from './SetCodeField';
 import CardImageZoom from './CardImageZoom';
 import Modal from './Modal';
 import { getCardDisplayName } from '../utils/langHelper';
@@ -118,10 +119,6 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   } = useMultiSelect({ showToast, guard: () => bulkPending.current ? t('search.adding') : null });
   const [bulkAdding, setBulkAdding] = useState(false);
   const [bulkErrors, setBulkErrors] = useState([]);
-
-  // Set suggestions, sourced from the sets already cached in the DB.
-  const [knownSets, setKnownSets] = useState([]);
-  const [setsOpen, setSetsOpen] = useState(false);
 
   // Rapid add: set code stays pinned, type a collector number, press Enter, the
   // card goes straight in. `rapidLog` is the running receipt with undo.
@@ -259,26 +256,6 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   const [grade, setGrade] = useState('');
   const [certNumber, setCertNumber] = useState('');
   const [reverseCard, setReverseCard] = useState(null);
-
-  // Set codes for autocomplete; search expects codes without the game prefix.
-  useEffect(() => {
-    let cancelled = false;
-    setKnownSets([]);
-    fetch(`/api/sets?game=${game}&lang=${encodeURIComponent(searchLang)}`)
-      .then(r => (r.ok ? r.json() : []))
-      .then(rows => {
-        if (cancelled) return;
-        const seen = new Set();
-        setKnownSets(rows
-          .filter(s => !s.game || s.game === game)
-          .map(s => ({ code: String(s.id || '').replace(/^mtg-/, ''), name: s.name, symbol_url: s.symbol_url }))
-          .filter(s => s.code && !seen.has(s.code) && seen.add(s.code))
-          .reverse()); // newest first — that is what people are adding
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [game, searchLang]);
-
 
   // pageNum > 1 appends to the existing results instead of replacing them.
   const runSearch = async (pageNum, size = pageSize, criteria = null) => {
@@ -1020,47 +997,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                 onChange={(e) => setNumberQuery(e.target.value)}
               />
             </div>
-            <div className="search-sets-field" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', position: 'relative' }}
-              onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setSetsOpen(false); }}
-              onKeyDown={event => { if (event.key === 'Escape') setSetsOpen(false); }}>
-              <label className="control-label" htmlFor="search-set-codes">{t('search.sets')}</label>
-              <input
-                id="search-set-codes"
-                type="text"
-                className="input-control"
-                autoComplete="off"
-                placeholder={t('search.setsPlaceholderMtg')}
-                value={setCodeQuery}
-                onFocus={() => setSetsOpen(true)}
-                onChange={event => { setSetCodeQuery(event.target.value); setSetsOpen(true); }}
-              />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {knownSets.filter(set => setCodeQuery.toLowerCase().split(/[\s,]+/).includes(set.code.toLowerCase())).map(set => (
-                  <span key={set.code} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem' }}>
-                    {set.symbol_url && <img src={set.symbol_url} alt="" width="20" height="20" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px' }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
-                    {set.name} ({set.code.toUpperCase()})
-                  </span>
-                ))}
-              </div>
-              {setsOpen && (
-                <section id="known-set-codes" aria-label={t('search.setSuggestions')} style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: '260px', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)' }}>
-                  {knownSets.filter(set => {
-                    const term = setCodeQuery.split(/[\s,]+/).at(-1).toLowerCase();
-                    return !term || set.code.toLowerCase().includes(term) || set.name.toLowerCase().includes(term);
-                  }).map(set => (
-                    <button key={set.code} type="button" className="btn btn-secondary"
-                      style={{ display: 'flex', width: '100%', justifyContent: 'flex-start', gap: '0.5rem', textAlign: 'left' }}
-                      onClick={() => {
-                        setSetCodeQuery(previous => previous.replace(/[^\s,]*$/, set.code));
-                        setSetsOpen(false);
-                      }}>
-                      {set.symbol_url && <img src={set.symbol_url} alt="" width="24" height="24" loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px' }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
-                      {set.name} ({set.code.toUpperCase()})
-                    </button>
-                  ))}
-                </section>
-              )}
-            </div>
+            <SetCodeField id="search-set-codes" label={t('search.sets')} value={setCodeQuery} onChange={setSetCodeQuery} lang={searchLang} />
           </div>
 
           <div className="search-actions" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>

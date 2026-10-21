@@ -24,6 +24,7 @@ export async function runRelatedTokenRegressions() {
   const writes = [];
   const response = (body, ok = true) => ({ ok, json: async () => body });
   window.fetch = async (url, options = {}) => {
+    if (url.startsWith('/api/sets?')) return response([]);
     if (url === '/api/cards/related-tokens') return response({ tokens: [{ id, matched_card_id: matched, name: 'Sample Goblin', owned, owned_qty: 3, source_entry_id: 42, owned_entries: [{ entry_id: 42, card_id: matched, front_card_id: id, reverse_card_id: matched, quantity: 3, location_name: 'Sample box' }], locations: [{ quantity: 3, location_name: 'Sample box' }], source_cards: [{ name: 'Sample creator' }] }] });
     if (url === '/api/decks') return response([{ id: 7, name: 'Sample deck' }]);
     if (url.startsWith('/api/locations?')) return response([{ id: 9, name: 'Sample box' }]);
@@ -83,7 +84,7 @@ export async function runRelatedTokenRegressions() {
     assert(!prompt() && writes.length === 2 && !container.disabled, 'reverse cancellation preserves the viewer without adding inventory');
     await select(container, '9');
     await act(async () => {
-      const field = [...prompt().querySelectorAll('label')].find(label => label.textContent === en['collection.fSet']).querySelector('input');
+      const field = [...prompt().querySelectorAll('label')].find(label => label.textContent === en['collection.fSet']).control;
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, 'other');
       field.dispatchEvent(new Event('input', { bubbles: true }));
     });

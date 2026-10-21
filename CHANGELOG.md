@@ -8,6 +8,7 @@ Release history starts with Manafolio 2.0.
 - Added an explicit white-4/4-Angel token edition for Multiverse Reforged, using Wizards' published contents to import ten physical tokens and nine reverse pairs atomically, including cross-set Spirit/Jace and Angel/Treasure; existing collections are not modified automatically.
 - Preserve native back artwork and face names in the card cache and account backups, and show native token backs beneath their fronts in card details and container galleries.
 - Allow reverse-token pairings across sets in additions, edits, scan drafts, trades, and imports. The reverse search set code is editable and can be cleared to search all sets; token-only validation and Arena restrictions remain intact.
+- Use the main Add Cards set picker in add/edit and reverse-token dialogs, with matching set-name/code suggestions, symbols, selected-set labels, and comma-separated codes.
 
 ## 2.4.0 — 2026-10-21
 

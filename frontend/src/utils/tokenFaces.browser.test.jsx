@@ -22,6 +22,7 @@ export async function runTokenFaceRegressions() {
   let searches = 0;
   let candidates = null;
   window.fetch = async url => {
+    if (String(url).startsWith('/api/sets?')) return { ok: true, json: async () => [{ id: 'mtg-else', name: 'Other Tokens', symbol_url: '/logo.svg' }] };
     if (String(url).startsWith('/api/search?')) {
       searches++;
       const set = new URL(String(url), location.origin).searchParams.get('set');
@@ -37,7 +38,7 @@ export async function runTokenFaceRegressions() {
   const input = () => host.querySelector('input[id$="-search"]');
   const choice = () => host.querySelector('select[id$="-choice"]');
   const changeSet = async value => act(async () => {
-    const field = [...host.querySelectorAll('label')].find(label => label.textContent === en['collection.fSet']).querySelector('input');
+    const field = [...host.querySelectorAll('label')].find(label => label.textContent === en['collection.fSet']).control;
     assert(!field.readOnly, 'reverse set can be changed');
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, value);
     field.dispatchEvent(new Event('input', { bubbles: true }));
@@ -50,7 +51,9 @@ export async function runTokenFaceRegressions() {
   try {
     await act(async () => root.render(<Fields />));
     assert(input()?.labels.length === 1 && selected === null && !choice(), 'reverse selector is labeled and never invents a pair');
-    await changeSet('else');
+    await changeSet('Other');
+    await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent.includes('Other Tokens (ELSE)')).click());
+    assert(host.querySelector('input[id$="-set"]').value === 'else', 'choosing a set name supplies its code for reverse lookup');
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input(), 'Soldier');
       input().dispatchEvent(new Event('input', { bubbles: true }));
@@ -62,7 +65,7 @@ export async function runTokenFaceRegressions() {
     assert(searches === 2 && choice().options.length === 2, 'retry works and only a different token may be selected');
     assert(selected === null, 'search results alone do not select a reverse');
     await select(back.id);
-    assert(selected.id === back.id && host.querySelector('img')?.alt === 'Soldier', 'explicit selected printing is previewed');
+    assert(selected.id === back.id && host.querySelector('img[alt="Soldier"]'), 'explicit selected printing is previewed');
     await select('');
     assert(selected === null, 'reverse can be cleared explicitly');
     await changeSet('');

@@ -1,6 +1,6 @@
 {
   "token.reverse": "Reverse token (optional)",
-  "token.pairHint": "Choose the token printed on the other side of this physical card. Change the set code or clear it to search all sets. Both faces share one quantity and storage location; no pairing is inferred.",
+  "token.pairHint": "Choose the token printed on the other side of this physical card. Find a set by name or code, or clear the set field to search all sets. Both faces share one quantity and storage location; no pairing is inferred.",
   "token.promptTitle": "What is on the reverse side?",
   "token.promptHint": "Choose a token from any set, or continue without a reverse if it is unknown or blank. Cancel stops this addition.",
   "token.continueWithout": "Continue without reverse",

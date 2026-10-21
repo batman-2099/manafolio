@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import CardImage from './CardImage';
+import SetCodeField from './SetCodeField';
 import { isMtgToken } from '../utils/tokenFaces';
 import { useT } from '../utils/i18n';
 
@@ -42,7 +43,7 @@ export default function ReverseTokenField({ card, value, onChange, disabled = fa
     <label htmlFor={`${id}-search`}>{t('token.reverse')}</label>
     <p id={`${id}-hint`} style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{t('token.pairHint')}</p>
     <div className="card-entry-fields-row-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.75rem' }}>
-      <label style={{ minWidth: 0 }}>{t('collection.fSet')}<input className="input-control" style={{ width: '100%', minWidth: 0 }} value={setCode} disabled={disabled} onChange={event => setSetCode(event.target.value)} /></label>
+      <SetCodeField id={`${id}-set`} label={t('collection.fSet')} value={setCode} onChange={setSetCode} disabled={disabled} />
       <label style={{ minWidth: 0 }}>{t('search.cardNumber')}<input className="input-control" style={{ width: '100%', minWidth: 0 }} value={number} disabled={disabled} onChange={event => setNumber(event.target.value)} /></label>
     </div>
     <div style={{ display: 'flex', gap: '0.5rem' }}>
