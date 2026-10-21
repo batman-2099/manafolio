@@ -21,7 +21,7 @@ import StorageUnitDialog, { StorageUnitSelect } from './StorageUnitDialog';
 import { prepareStorageImage } from '../utils/prepareImage';
 import StocktakeDialog from './StocktakeDialog';
 import ContainerLabel from './ContainerLabel';
-import { isMtgToken } from '../utils/tokenFaces';
+import { isMtgToken, reverseFace } from '../utils/tokenFaces';
 
 async function checkStorageResponse(response, fallback) {
   if (!response.ok) {
@@ -2474,6 +2474,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', padding: '0.25rem', border: selected ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', background: selected ? 'rgba(255,71,71,0.12)' : 'rgba(255,255,255,0.03)', cursor: 'pointer' }}
                     >
                       <CardImage card={card} style={{ width: '100%', borderRadius: '3px' }} />
+                      {card.reverse_card_id && <CardImage card={reverseFace(card)} style={{ width: '100%', borderRadius: '3px', marginTop: '0.5rem' }} />}
                       {card.quantity > 1 && (
                         <span style={{ position: 'absolute', top: '0.35rem', right: '0.35rem', padding: '0.25rem 0.5rem', borderRadius: '999px', background: 'rgba(0,0,0,0.85)', color: 'white', fontSize: '1rem', fontWeight: 800 }}>
                           ×{card.quantity}

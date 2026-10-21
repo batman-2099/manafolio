@@ -212,6 +212,10 @@ export async function runUiContainerRegressions() {
     const tokenSection = () => host.querySelector(`section[aria-label="${en['tokens.title']}"]`);
     assert(tokenSection()?.querySelectorAll('button').length === 2, 'typed and token-set cards share a separate section, with duplicate pairs stacked');
     assert(!tokenSection().textContent.includes('Sample spell') && tokenSection().previousElementSibling.textContent.includes('Sample spell'), 'ordinary cards precede the token section');
+    const tokenButtons = tokenSection().querySelectorAll('button');
+    const pairedImages = tokenButtons[0].querySelectorAll('img');
+    assert(pairedImages.length === 2 && pairedImages[0].alt === 'Goblin' && pairedImages[1].alt === 'Soldier', 'paired token displays its front and reverse together in order');
+    assert(tokenButtons[1].querySelectorAll('img').length === 1, 'unpaired token keeps one image');
     const searchSelector = `input[aria-label="${en['shared.search']}"]`;
     await change(searchSelector, 'Soldier');
     assert(tokenSection()?.querySelectorAll('button').length === 1 && tokenSection().textContent.includes('Goblin'), 'reverse-face search retains the paired token in its section');
@@ -226,8 +230,10 @@ export async function runUiContainerRegressions() {
     assert(tokenSection()?.querySelectorAll('button').length === 2, 'sorting keeps one separate token section');
     await click('collection.select');
     assert(tokenSection().querySelectorAll('button').length === 3, 'selection exposes every stored token entry rather than ambiguous stacks');
-    await act(async () => tokenSection().querySelector('button').click());
+    await act(async () => tokenSection().querySelector('img[alt="Soldier"]').click());
     assert(host.textContent.includes('1 selected') && !button('loc.removeFromStorage').disabled, 'tokens remain selectable for existing container actions');
+    await act(async () => tokenSection().querySelector('img[alt="Goblin"]').click());
+    assert(host.textContent.includes('0 selected') && button('loc.removeFromStorage').disabled, 'both token faces toggle the same owned entry');
     cases.push('separate token gallery preserves classification, pairing, stacking, filtering, sorting and selection');
     return { passed: cases.length, cases };
   } finally {

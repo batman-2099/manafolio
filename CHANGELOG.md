@@ -15,6 +15,7 @@ Release history starts with Manafolio 2.0.
 - Exclude tokens from Deck Box card totals, capacity displays, and over-limit warnings, including individual rows. Tokens remain visible, included in stocktaking, and accessible in token-only containers. Other container totals are unchanged.
 - Group tokens in a separate section in container card galleries while preserving filtering, sorting, stacking, selection, and inspector navigation. Physical storage positions remain unchanged.
 - Show a paired token's reverse image directly beneath its front image in card details, with independent zoom controls for both faces.
+- Show both saved token faces together in container galleries, keeping the pair as one selectable item with one quantity.
 
 ## 2.3.4 — 2026-10-13
 
