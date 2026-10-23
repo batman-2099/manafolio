@@ -70,7 +70,7 @@ export async function runUiStorageRegressions({ pressKey, dragCard } = {}) {
   const locationsData = cards.map(card => ({ card_id: card.card_id, locations: [{
     entry_id: card.entry_id, location_id: 7, location_name: 'Fixture binder',
     compartment_id: 70, compartment_display: 'Page 1', position: card.position,
-    card_name: card.name, take: 1,
+    card_name: card.name, image_url: card.image_url, take: 1,
   }] }));
   function WizardFixture({ mode = 'checkout' }) {
     const [open, setOpen] = useState(true);
@@ -171,6 +171,15 @@ export async function runUiStorageRegressions({ pressKey, dragCard } = {}) {
     cases.push('checkout modal name/focus, mixed state/live progress, completion/reopen/correction');
 
     await act(async () => { render(<WizardFixture key="checkin" mode="checkin" />); });
+    const returnCards = host.querySelectorAll('.card-grid button');
+    assert(returnCards.length === 2 && [...returnCards].every(button => button.querySelector('img')?.getAttribute('src') === cards[0].image_url), 'return guide must show each returning entry with its artwork');
+    await activate(returnCards[0], 'Space');
+    assert(returnCards[0].getAttribute('aria-pressed') === 'true' && host.querySelector('.btn-primary').disabled, 'return card selection must track progress without finishing early');
+    await activate(returnCards[1], 'Enter');
+    assert(!host.querySelector('.btn-primary').disabled, 'returning every card must enable Done');
+    await activate(returnCards[0], 'Enter');
+    assert(host.querySelector('.btn-primary').disabled, 'return grid must allow correcting a returned card');
+    cases.push('return artwork grid keyboard selection and correction');
     await act(async () => {
       if (pressKey) await pressKey('Escape');
       else host.querySelector('dialog').dispatchEvent(new Event('cancel', { cancelable: true }));

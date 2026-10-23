@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useId } from 'react';
 import { X, Check, Minus, MapPin, Package, AlertTriangle } from 'lucide-react';
 import CompartmentView from './CompartmentView';
+import CardImage from './CardImage';
 import { sortCardsByOrder } from '../utils/cardSort';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
@@ -36,9 +37,9 @@ const MODES = ['checkout', 'checkin'];
 // Post-checkout / return locator. A "where does each card go" checklist backed
 // by the locations payload the backend computed. Never mutates the collection
 // (checkout no longer unassigns, so a card's stored slot is both where you grab
-// it and where it returns). Located pages render their compartment layout with
-// the cards highlighted by entry_id. Select-all works per page, per container,
-// and globally.
+// it and where it returns). Checkout highlights the physical compartment layout;
+// check-in shows only returning cards in an artwork grid. Select-all works per
+// page, per container, and globally.
 const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCancel }) => {
   const { t } = useT();
   const kind = MODES.includes(mode) ? mode : 'checkout';
@@ -109,14 +110,15 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
   }, [locationsData, t]);
 
   useEffect(() => {
+    if (kind === 'checkin') return;
     fetch('/api/sets').then(r => r.json()).then(setSetsList).catch(() => {});
-  }, []);
+  }, [kind]);
 
   // Load each located page's compartment layout so pulled cards can be
   // highlighted in their physical grid (by entry_id, order-independent).
   useEffect(() => {
     let active = true;
-    if (pagesFlat.length === 0) { setGrids({}); return; }
+    if (kind === 'checkin' || pagesFlat.length === 0) { setGrids({}); return; }
 
     const locCache = new Map();
     const fetchLocation = async (locationId) => {
@@ -149,7 +151,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
     })();
 
     return () => { active = false; };
-  }, [pagesFlat, setsList]);
+  }, [pagesFlat, setsList, kind]);
 
   const doneCount = done.size;
   const allComplete = totalPulls > 0 && doneCount === totalPulls;
@@ -164,7 +166,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
 
 
   const renderRows = (pulls) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+    <div className={kind === 'checkin' ? 'card-grid' : undefined} style={kind === 'checkin' ? { gridTemplateColumns: 'repeat(auto-fill, minmax(min(110px, 100%), 1fr))' } : { display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
       {pulls.map(pull => {
         const isDone = done.has(pull.entry_id);
         const slot = slotOf(pull.position);
@@ -175,13 +177,14 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
             aria-pressed={isDone}
             onClick={() => toggleOne(pull.entry_id)}
             style={{
-              textAlign: 'left', width: '100%', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.75rem',
+              textAlign: 'left', width: '100%', minWidth: 0, cursor: 'pointer',
+              display: 'flex', flexDirection: kind === 'checkin' ? 'column' : 'row', alignItems: kind === 'checkin' ? 'stretch' : 'center', gap: '0.75rem', padding: '0.65rem 0.75rem',
               background: isDone ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)',
               border: isDone ? '1px solid var(--accent-green)' : '1px solid var(--border-glass)',
               borderRadius: 'var(--radius-sm)', transition: 'background 0.15s, border-color 0.15s'
             }}
           >
+            {kind === 'checkin' && <CardImage card={pull} alt="" loading="lazy" style={{ width: '100%', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />}
             <div style={{
               width: '22px', height: '22px', flexShrink: 0, borderRadius: '50%',
               border: isDone ? 'none' : '2px solid var(--text-muted)',
@@ -191,7 +194,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
               {isDone && <Check size={14} color="#000" strokeWidth={3} />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: 'var(--text-strong)', fontSize: '0.9rem', fontWeight: 600, textDecoration: isDone ? 'line-through' : 'none', opacity: isDone ? 0.6 : 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ color: 'var(--text-strong)', fontSize: '0.9rem', fontWeight: 600, textDecoration: isDone ? 'line-through' : 'none', overflowWrap: 'anywhere', whiteSpace: kind === 'checkin' ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {pull.card_name}
               </div>
               <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
@@ -315,7 +318,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
                 <div id={panelId} hidden={collapsed}>
                 {singlePage ? (
                   <>
-                    {!container.unassigned && renderGrid(container.pages[0])}
+                    {kind === 'checkout' && !container.unassigned && renderGrid(container.pages[0])}
                     {renderRows(container.pages[0].pulls)}
                   </>
                 ) : (
@@ -326,7 +329,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600 }}>{page.compartment_display || t('wizard.page')}</span>
                         <SelectAll ids={page.pulls.map(p => p.entry_id)} done={done} setChecked={setChecked} />
                       </div>
-                      {renderGrid(page)}
+                      {kind === 'checkout' && renderGrid(page)}
                       {renderRows(page.pulls)}
                     </div>
                   ))

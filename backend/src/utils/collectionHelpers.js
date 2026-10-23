@@ -23,7 +23,7 @@ async function physicalCardEntries(userId, cardId = null, legacyCheckout = false
   return db.all(`
     SELECT c.id AS entry_id, c.card_id, c.reverse_card_id, c.quantity, c.position, c.location_id, c.compartment_id,
       c.printing, c.language, c.condition, c.game,
-      cc.name AS card_name, cc.printed_name, cc.set_name, cc.number,
+      cc.name AS card_name, cc.printed_name, cc.set_name, cc.number, cc.image_url,
       su.name AS storage_unit_name,
       l.name AS location_name, l.type AS location_type, cp.label AS compartment_label, cp.idx AS compartment_idx
     FROM collection c JOIN card_cache cc ON cc.id = c.card_id
@@ -230,7 +230,7 @@ async function deckLocations(deck, userId) {
   const entries = deck.checked_out
     ? await db.all(`
         SELECT c.id AS entry_id, c.card_id, c.reverse_card_id, c.position, c.location_id, c.compartment_id,
-          cc.name AS card_name, cc.printed_name, cc.set_name, cc.number,
+          cc.name AS card_name, cc.printed_name, cc.set_name, cc.number, cc.image_url,
           su.name AS storage_unit_name,
           l.name AS location_name, l.type AS location_type, cp.label AS compartment_label, cp.idx AS compartment_idx
         FROM collection c JOIN card_cache cc ON cc.id = c.card_id
