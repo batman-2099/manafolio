@@ -38,6 +38,8 @@ export async function runUiScannerRegressions() {
   let scanRequests = 0;
   let detectorRequests = 0;
   let videoDraws = 0;
+  let framedCapture = null;
+  const torchConstraints = [];
   let printingReply;
   let saveFailure = false;
   const saved = [];
@@ -115,7 +117,7 @@ export async function runUiScannerRegressions() {
     patch(navigator, 'mediaDevices', { value: { getUserMedia: async () => {
       cameraCalls++;
       if (cameraCalls === 1) throw new DOMException('Fixture permission denial', 'NotAllowedError');
-      const track = { stop: () => { stopped++; }, getCapabilities: () => ({ exposureCompensation: { min: -2, max: 2, step: 0.5 } }), getSettings: () => ({ exposureCompensation: 0 }), applyConstraints: async () => {} };
+      const track = { stop: () => { stopped++; }, getCapabilities: () => ({ torch: true, exposureCompensation: { min: -2, max: 2, step: 0.5 } }), getSettings: () => ({ exposureCompensation: 0 }), applyConstraints: async constraints => { if (constraints.advanced?.[0]?.torch !== undefined) torchConstraints.push(constraints.advanced[0].torch); } };
       return { getTracks: () => [track], getVideoTracks: () => [track] };
     } } });
     patch(HTMLMediaElement.prototype, 'srcObject', { get() { return this.fixtureStream; }, set(value) { this.fixtureStream = value; } });
@@ -130,7 +132,12 @@ export async function runUiScannerRegressions() {
     const drawImage = CanvasRenderingContext2D.prototype.drawImage;
     patch(CanvasRenderingContext2D.prototype, 'drawImage', { value(image, ...args) {
       if (image instanceof HTMLVideoElement) { videoDraws++; this.fillStyle = '#888'; this.fillRect(0, 0, this.canvas.width, this.canvas.height); }
-      else drawImage.call(this, image, ...args);
+      else {
+        if (image instanceof HTMLCanvasElement) {
+          framedCapture = { transform: this.getTransform(), width: this.canvas.width, height: this.canvas.height, sourceWidth: image.width, sourceHeight: image.height };
+        }
+        drawImage.call(this, image, ...args);
+      }
     } });
     patch(window, 'Worker', { value: class {
       postMessage() { detectorRequests++; queueMicrotask(() => { if (!this.stopped) this.onmessage?.({ data: detectorHasCard ? { detected: true, quad: [{ x: 0.05, y: 0.05 }, { x: 0.95, y: 0.05 }, { x: 0.95, y: 0.95 }, { x: 0.05, y: 0.95 }], pick: { fill: 0.81 } } : { detected: false } }); }); }
@@ -179,6 +186,46 @@ export async function runUiScannerRegressions() {
     assert(cameraCalls === 1 && button('Retry Camera'), 'permission failure must offer native retry');
     await click(button('Retry Camera'));
     assert(cameraCalls === 2, 'one retry click must request exactly one camera stream');
+    const torch = host.querySelector(`button[aria-label="${en['scan.torch']}"]`);
+    assert(torch?.getAttribute('aria-pressed') === 'false' && torch.querySelector('svg[aria-hidden="true"]'), 'torch must expose a stable translated label, off state, and decorative icon');
+    await click(torch);
+    assert(torch.getAttribute('aria-pressed') === 'true' && torchConstraints.at(-1) === true, 'torch activation must update both camera constraint and pressed state');
+    await click(torch);
+    assert(torch.getAttribute('aria-pressed') === 'false' && torchConstraints.at(-1) === false, 'torch deactivation must retain its label and report off');
+    const adjustments = host.querySelector('.scan-guide-adjustments');
+    await click(adjustments.querySelector('summary'));
+    assert(adjustments.open, 'native disclosure must reveal optional guide controls');
+    for (const id of ['x', 'y', 'angle', 'scale']) {
+      const input = host.querySelector(`#scan-guide-${id}`);
+      assert(input?.labels.length === 1 && input.labels[0].textContent.trim(), `${id} guide adjustment must have a visible native label`);
+    }
+    const guide = host.querySelector('.scan-card-guide');
+    const scale = host.querySelector('#scan-guide-scale');
+    await change(host.querySelector('#scan-guide-x'), '12');
+    await change(host.querySelector('#scan-guide-y'), '-8');
+    await change(host.querySelector('#scan-guide-angle'), '15');
+    await change(scale, '1.25');
+    assert(guide.style.transform === 'translate(12px, -8px) rotate(15deg) scale(1.25)', 'non-gesture controls must set the actual guide transform');
+    framedCapture = null;
+    await until(() => framedCapture, 'adjusted guide must continue feeding live capture');
+    const videoRect = host.querySelector('video').getBoundingClientRect();
+    const guideRect = guide.getBoundingClientRect();
+    const cover = Math.max(videoRect.width / framedCapture.sourceWidth, videoRect.height / framedCapture.sourceHeight);
+    const center = new DOMPoint(
+      (guideRect.left + guideRect.width / 2 - videoRect.left - (videoRect.width - framedCapture.sourceWidth * cover) / 2) / cover,
+      (guideRect.top + guideRect.height / 2 - videoRect.top - (videoRect.height - framedCapture.sourceHeight * cover) / 2) / cover,
+    ).matrixTransform(framedCapture.transform);
+    assert(Math.abs(center.x - framedCapture.width / 2) < 0.01 && Math.abs(center.y - framedCapture.height / 2) < 0.01, 'capture must use the adjusted guide center');
+    const cropWidth = Math.round(guide.offsetWidth * 1.25 / cover * 1.1);
+    assert(Math.abs(framedCapture.transform.a - framedCapture.width / cropWidth * Math.cos(Math.PI / 12)) < 0.0001, 'capture must use the adjusted scale and rotation');
+    await change(host.querySelector('#scan-guide-x'), '');
+    assert(guide.style.transform.includes('translate(12px, -8px)'), 'an incomplete numeric edit must not corrupt capture coordinates');
+    await change(scale, '0.1');
+    assert(guide.style.transform.endsWith('scale(0.3)'), 'scale control must preserve the gesture minimum');
+    await change(scale, '4');
+    assert(guide.style.transform.endsWith('scale(3)'), 'scale control must preserve the gesture maximum');
+    await click(button(en['scan.resetBox'], adjustments));
+    assert(guide.style.transform === 'translate(0px, 0px) rotate(0deg) scale(1)' && host.querySelector('#scan-guide-x').value === '0' && scale.value === '1', 'reset must synchronize gestures, numeric edits, and all guide controls');
     await click(host.querySelector('button[aria-label="Scan settings"]'));
     for (const id of ['scan-fill', 'scan-steady', 'scan-exposure']) {
       const input = host.querySelector(`#${id}`);

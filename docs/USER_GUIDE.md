@@ -152,7 +152,7 @@ The **Add cards to** selector in **Search & Add** chooses **Collection** (physic
 
 The add form shows **Already in Physical Collection** or **Already in Arena** for the exact selected printing (set, collector number, and language), summed across finishes and conditions. This is the recorded count, including missing or reserved copies—not checkout availability. Wishlist, Graveyard, other printings, and other accounts are excluded. The count refreshes when you open the form or change language; a failed lookup offers **Retry** instead of showing zero.
 
-Pressing **Enter** in the quick-add form submits to the selected Physical or Arena destination; use **Add to Wishlist** explicitly for planned purchases. Check the destination in the success message. While saving, the form blocks repeated submissions and dismissal. If saving fails, the error stays in the form and your quantity and copy details remain available for correction and retry.
+Pressing **Enter** in the quick-add form submits to the selected Physical or Arena destination; use **Add to Wishlist** explicitly for planned purchases. Check the destination in the success message. While saving, all copy-detail and destination controls are locked, and the form blocks repeated submissions and dismissal. If saving fails, the error stays in the form and your quantity and copy details remain available for correction and retry.
 
 Changing the language in an add form can resolve a different printing, rather than merely relabeling the same card. Recheck the artwork and identification after changing it. Finish and condition are choices you make; the application does not inspect a card to determine them.
 
@@ -167,7 +167,7 @@ Rapid add is useful when you have a pile from one known set and do not want to r
 1. In **Search & Add**, enter one set code in the set field and choose the search language.
 2. Choose the destination in **Add cards to**. For Physical cards, choose **Default container** on the main page before entering numbers, or leave **Unassigned Pile** selected. Rapid add uses that default without opening a placement dialog; check the confirmation for any fallback to Unassigned Pile.
 3. Choose **Rapid add**. The button changes to **Rapid add on**.
-4. Check the condition, printing/finish, and **Copies added per Enter**. These settings apply to subsequent rapid additions.
+4. Check the condition, printing/finish, and **Copies added per Enter**. Quantity must be a positive whole number; blank, zero, negative, or fractional values stop the addition before lookup. These settings apply to subsequent rapid additions.
 5. Type a collector number in **Card number, then Enter** and press Enter.
 6. If the lookup identifies one printing, it saves immediately and clears the number field for the next card. If several printings match, pick the correct result instead of assuming one was added.
 7. Review **Added this session** as you work. Each receipt has a **Foil** toggle before **Undo**. Toggle it to change that addition between foil and nonfoil; it affects all copies in that receipt, not the finish for future additions. Both controls are disabled while a change saves. A failed change keeps the previous finish and can be retried. **Undo** removes that addition; check Collection after correcting an addition, especially when you entered multiple copies.
@@ -295,6 +295,8 @@ The scanner displays upper-left title OCR separately from artwork candidates, in
    To discard the whole reviewed batch, choose **Clear** and confirm. This removes only the drafts shown when you clicked Clear, not owned collection cards or newly queued scans.
 8. Tap **Scanning** to switch to **Paused** whenever you need to stop identification. Leaving the scanning view releases its camera stream.
 
+Use **Adjust scan guide** below the camera to set horizontal/vertical position, rotation, and scale without dragging or multi-touch gestures. Keyboard and single-pointer controls change the same guide used for capture; **Reset box** restores its initial position and size. **Camera light** reports its on/off state where the device supports a torch.
+
 **Expected result:** scans wait in your account's saved **Scan review** grid, including after a refresh or leaving the scanner. They do not count toward owned totals, valuation, storage occupancy, or available deck copies. Review the cards, then choose the single **Add to Collection** button to add the entire displayed batch to physical Collection. The batch is atomic: a failure adds none of its cards and retains all drafts for correction or retry. Cards queued after submission stay in Scan review for the next batch. Temporary scan drafts are not part of collection exports or account JSON backups; full database backups retain them.
 
 #### Scan review actions
@@ -411,7 +413,7 @@ Useful inspector actions include:
 
 - **Mark as Favorite / Remove Favorite** to flag an entry for later filtering.
 - **Mark as missing / Mark as found** to record availability without forgetting its location.
-- **Obtained** on a Wishlist entry to move it into physical Collection.
+- **Obtained** on a Wishlist entry to move it into physical Collection. While editing, **Mark obtained** remains available to check or uncheck before saving, without discarding other draft fields.
 - **Archive to Graveyard**, or the explicit physical/Arena restore actions on an archived entry.
 - **Duplicate card**, when available for an eligible raw card, to record one additional copy. It is not a “copy to clipboard” action.
 - **Delete Card** to remove the record; use archival instead when you want to retain its history and metadata.
@@ -449,7 +451,7 @@ Complete account backups and Manafolio's own JSON/CSV exports preserve explicit 
 1. Apply the inventory/search/filters you want.
 2. Choose **Select**, or long-press a card, then select entries. On desktop, Shift-click can select a range.
 3. Read the selected count. **Select all matching cards (…)** includes matching entries across pages, not only the currently visible page.
-4. Choose the relevant action: **Mark Trade**, **Untrade**, **Set condition…**, **Set printing…**, an inventory transfer, or **Move to container…** followed by **Apply Move**. Physical and Graveyard storage must stay within the matching inventory.
+4. Open **Actions** beside the selected count and **Clear**, then choose **Mark Trade**, **Untrade**, **Set condition…**, **Set printing…**, an inventory transfer, or **Move to container…** followed by **Apply Move**. Physical and Graveyard storage must stay within the matching inventory. This action area scrolls with the page rather than covering cards beneath the navigation.
 5. Choose **Done** to leave selection mode.
 
 For a purchase containing several cards, the price splitter offers **Total paid**, **By value** or **Evenly**, and **Split across …**. Apply it only to the entries belonging to that purchase.
@@ -551,6 +553,8 @@ Choose **Automatic image** to let the gallery use a recent eligible card. If a m
 Layout counts must be positive whole numbers. **Next** or Enter validates the layout without replacing invalid values. While creation is saving, wait before using Back, closing, or leaving; a failure keeps the draft available for correction.
 
 Storage opens as a gallery. Search container names/types or sort by name/quantity, then open a container. Select **More → Container Settings** on its toolbar. **Choose container image** selects a card-art cover; **Automatic image** returns to an automatic cover. The container's **More** actions are alphabetized by their displayed labels, including the current Lock/Unlock and Move to Graveyard/Restore action. Page navigation, views, selection, and Arrange remain directly available. For a ManaBox container import, choose **Create Container**, then **Import ManaBox container** in the first (**Type**) step; it is no longer a separate More-menu action.
+
+Browser **Back** closes the current storage dialog first, then returns an open container to the gallery. The toolbar's **Storage** button also returns to the gallery. In binder layouts, use the page's **Rename** button to edit its label; Enter saves, Escape discards, and either returns keyboard focus to the button.
 
 In the container's card view, a **FOIL** badge identifies foil copies. If **Stack Duplicates** is enabled and **Split by Holo/Printing** is off, mixed-finish stacks show the foil count—for example, **FOIL 1/3** means one of the three copies is foil. Normal-only cards and stacks have no foil badge.
 
@@ -729,6 +733,8 @@ Available Giving entries are paged in groups of 60; changing pages does not clea
 
 If a card changed or became unavailable, no side is changed: go back, remove the stale selection, **Refresh available cards**, select again, and review. If a connection drops during confirmation, keep the page open and retry the **same confirmation**: its completed trade ID prevents a second inventory mutation. Do not create another trade to retry an uncertain result. Success reports the given/received quantities. Complete account backups retain private completed-ID receipts (ID, request fingerprint, counts, and time), not a negotiator or price history; restoring an older backup preserves already-known receipt IDs to prevent replay. The static demo explicitly rejects trade operations.
 
+If available entries fail to load, use **Retry**. Previously loaded entries remain visible; an unavailable request is not reported as an empty inventory. Refreshing available entries does not clear an unrelated trade-confirmation error.
+
 ## Build and manage decks
 
 ### Understand the deck screen
@@ -745,7 +751,7 @@ In Table view, **Color Identity** shows card-copy counts for white, blue, black,
 
 **Missing cards** appears in red in both Grid and Table view when required copies are unavailable, even if the deck has reached its target size. Physical decks exclude archived copies and other decks' reservations; Arena decks use Arena ownership only; Graveyard decks use archived copies only. A checked-out Physical deck keeps its Return action and reservations, but archived or missing reserved copies still show **Missing cards**. Use the matching status filter to find affected decks; the target-reached filter excludes them.
 
-An open deck keeps its properties, imports, exports, and other tools directly available beneath the header. On desktop, Description, analytics, commander, private Notes, sleeves, card back, and wins/losses appear above **Add Cards to Deck**, **Deck Cards**, and **Tokens**. On narrow screens, card editing comes first and the overview follows below; its sections remain visible rather than hidden in collapsible panels. Some charts appear only when the deck contains relevant cards.
+An open deck keeps **Save** and its play/return action prominent. **More deck actions** groups properties, history, sharing, simulation, AI, import/export, and container creation; it starts expanded on desktop and collapsed on narrow screens. On desktop, Description, analytics, commander, private Notes, sleeves, card back, and wins/losses appear above **Add Cards to Deck**, **Deck Cards**, and **Tokens**. On narrow screens, card editing comes first and the overview follows below; its sections remain visible rather than hidden in collapsible panels. Some charts appear only when the deck contains relevant cards.
 
 Below Description, the summary panel groups **Supertype Breakdown**, **Color & Land Distribution**, **Containers needed**, and **Deck Health & Rules**. Labeled, color-coded bars show exact counts relative to the deck's total card count; multicolor cards can contribute to more than one color. The panel stacks on phones. For Physical decks, **Containers needed** lists source containers, Unassigned Pile, and unavailable-copy counts from the saved pull-list plan (reserved locations when checked out). Save draft changes to refresh it; Arena decks have no physical-container list.
 
@@ -783,7 +789,7 @@ The selection is anchored to an existing collection copy and follows its current
 
 ### Add cards, change quantities, and save
 
-1. Open the deck and find **Add Cards to Deck**, or use **Jump to add cards** near the header. **Jump to cards** moves directly to the deck list. On phones and tablets, card editing appears before the overview, Description, Notes, and appearance; those sections remain available below it.
+1. Open the deck and find **Add Cards to Deck**. Keyboard users can tab to **Jump to add cards** or **Jump to cards** near the header; these shortcuts appear when focused. On phones and tablets, card editing appears before the overview, Description, Notes, and appearance; those sections remain available below it.
 2. Search by card name using the search button, or select **Browse Collection** to browse the deck's matching Physical, Arena, or Graveyard inventory. Graveyard decks use archived cards only.
    After browsing, open **Filters** for the same set, type, color, rarity, condition, finish, language, and deck-status filters as Unsorted. Choices come from the browsed inventory; colors use actual card colors, not Commander color identity. Combined filters must match the same owned entry. **Clear filters** clears the search and filters and reloads the inventory. Filtering narrows the displayed printings; owned totals, copy limits, and source-location selection remain unchanged.
 3. Inspect the set and collector number before adding a printing. Select its add control.
@@ -921,7 +927,9 @@ In a binder with stacking enabled, the highlighted shared pocket acts on a reque
 
 Completing a group keeps its rows open so you can correct a checkmark. Use the container heading to collapse or reopen it. Tab reaches card and group controls; Enter or Space activates them. In storage layouts, these keys also select/open binder pockets and pick/place cards in Arrange; arrow keys move between coverflow cards.
 
-If you use the guide's **Cancel**/X, click outside it, or use its back action, Manafolio attempts to undo the checkout. Do not treat closing it as completion. After a network or undo error, inspect the deck's current status before trying again.
+If you use the guide's **Cancel**/X, click outside it, or use its back action, Manafolio attempts to undo the checkout. The guide and its checkmarks stay open while cancellation runs; repeated cancellation and completion are blocked. If undo fails, read the inline status and use **Retry cancellation** or finish the guide. Do not treat cancellation as completion.
+
+If checkout succeeds but its locations cannot load, the recovery guide says the deck is checked out. **Retry** loads the guide without submitting another checkout.
 
 Arena and Graveyard decks cannot be checked out, even if a checkout control is visible. Wishlist and Graveyard do not supply Physical checkout. If copies are missing or another deck needs the same quantities, resolve that situation rather than assuming a deck definition proves the cards are ready.
 
@@ -939,7 +947,7 @@ Arena and Graveyard decks cannot be checked out, even if a checkout control is v
 2. Follow the card grid, grouped by container and page/row, to put cards back at their recorded locations. The wider desktop guide shows three large cards per row; narrow screens use fewer columns. Each card shows its artwork, printing, slot, and quantity when more than one copy is returning.
 3. Select each card to mark it returned (select it again to correct a checkmark), or use **Select all**, then select **Done**.
 
-**Expected result:** checkout is cleared and the quantities become available for other Physical decks. Recorded storage placements stay unchanged. The guide's Cancel/X/back/outside-click path attempts to reverse the return and check the deck out again; check the resulting status if undo fails. Physically returning the cards is still your responsibility.
+**Expected result:** checkout is cleared and the quantities become available for other Physical decks. Recorded storage placements stay unchanged. Locations must load before the return is submitted; a location error leaves the deck checked out and offers **Retry**. The guide's Cancel/X/back/outside-click path attempts to reverse the return and check the deck out again. If undo fails, the guide retains its checkmarks and offers **Retry cancellation**. Physically returning the cards is still your responsibility.
 
 ### Check related tokens
 
@@ -1140,6 +1148,8 @@ Only enable this on a trusted device. Browser-profile access can expose saved da
 
 **Expected result:** unauthenticated, read-only views available to anyone who possesses the current token while sharing is enabled. Standard sharing shows Physical cards; trade sharing shows Physical cards marked for trade; Wishlist has its own view. Arena and Graveyard are not exposed by collection sharing.
 
+Public collection grids show up to 60 cards per page. **Previous page** and **Next page** reach the remaining matches; changing filters, sort, or stacking returns to the first page. Totals continue to describe the full shared collection. A **Mixed** badge identifies stacks containing different finishes; open the card for its copy breakdown.
+
 **Privacy warning:** these are bearer links, not invited-user permissions. All three list links use the same share token; a trade or Wishlist link is a view selector, not a restriction preventing its holder from opening the standard Physical share. Do not use it as a way to expose only a hand-picked subset of an otherwise private account.
 
 Public data includes the account username, card names/printings, quantities, condition, finish, language, and displayed values, including per-copy valuations. Purchase prices and private notes are not exposed. Enabling locations reveals container information; container links expose the corresponding Physical layout and cards. Anyone who can open a link can retain what they see, so later disabling sharing cannot retract screenshots or saved copies. **Regenerate Link** invalidates existing standard/trade/Wishlist/container links using that token. Shared links include your active theme when copied; theme parameters change appearance, not permissions.
@@ -1148,7 +1158,7 @@ Combined public stacks show **Mixed** for differing copy details; open a card fo
 
 ### Share one deck
 
-1. Open a saved deck in **Deck Builder** and select **Share deck** in its top actions.
+1. Open a saved deck in **Deck Builder**, expand **More deck actions** if needed, and select **Share deck**.
 2. Save any draft changes first, then create and copy the link.
 3. Send the URL to someone who should see the deck. They do not need an account.
 4. Opening **Share deck** again shows the current link. Choose **Generate new link** and confirm to replace it immediately; the old URL stops working. Use **Revoke link** to stop sharing without creating a replacement.

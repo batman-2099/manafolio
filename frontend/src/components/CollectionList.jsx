@@ -729,11 +729,13 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
       {/* Bulk action bar */}
       {selectMode && (
-        <fieldset disabled={bulkPending} aria-busy={bulkPending} className="glass-panel bulk-action-bar" style={{ minWidth: 0, margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', position: 'sticky', top: '0.5rem', zIndex: 30 }}>
-          <span style={{ fontWeight: 800, color: 'var(--text-strong)', fontSize: '0.85rem' }}>{t('bulk.selected', { count: selectedIds.size })}</span>
-          <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={() => setSelectedIds(new Set(filteredCollection.map(i => i.entry_id)))}>{t('collection.selectAllMatches', { count: filteredCollection.length })}</button>
-          <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={clearSelection}>{t('bulk.clear')}</button>
-          <div style={{ width: '1px', height: '22px', background: 'var(--border-glass)' }} />
+        <fieldset disabled={bulkPending} aria-busy={bulkPending} className="glass-panel collection-bulk-bar">
+          <span style={{ fontWeight: 800, color: 'var(--text-strong)' }}>{t('bulk.selected', { count: selectedIds.size })}</span>
+          <button className="btn btn-secondary" onClick={clearSelection}>{t('bulk.clear')}</button>
+          <details className="collection-bulk-actions">
+            <summary className="btn btn-secondary">{t('bulk.actions')}</summary>
+            <div className="collection-bulk-options">
+          <button className="btn btn-secondary" onClick={() => setSelectedIds(new Set(filteredCollection.map(i => i.entry_id)))}>{t('collection.selectAllMatches', { count: filteredCollection.length })}</button>
           <button className="btn btn-danger" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} disabled={!selectedIds.size} onClick={() => runBulk('delete', null, t('bulk.confirmDelete', { count: selectedIds.size }))}>{t('bulk.delete')}</button>
           <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} disabled={!selectedIds.size} onClick={() => runBulk('trade', null)}>{t('bulk.markTrade')}</button>
           <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} disabled={!selectedIds.size} onClick={() => runBulk('untrade', null)}>{t('bulk.untrade')}</button>
@@ -786,6 +788,8 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
             </>
           )}
           <button className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', marginLeft: 'auto' }} onClick={exitSelectMode}>{t('bulk.done')}</button>
+            </div>
+          </details>
         </fieldset>
       )}
 
@@ -823,7 +827,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
               >
                 <span className="tcg-card-inner" style={{ ...rarityStyle, ...(selected ? { outline: '3px solid var(--accent-red)', outlineOffset: '2px' } : {}) }}>
                   {selectMode && (
-                    <span aria-hidden="true" style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 20, width: '22px', height: '22px', borderRadius: '50%', background: selected ? 'var(--accent-red)' : 'rgba(0,0,0,0.6)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.8rem', fontWeight: 900 }}>{selected ? '✓' : ''}</span>
+                    <span aria-hidden="true" style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 20, width: '22px', height: '22px', borderRadius: '50%', background: selected ? 'var(--accent-red)' : 'rgba(0,0,0,0.6)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-on-accent)', fontSize: '0.8rem', fontWeight: 900 }}>{selected ? '✓' : ''}</span>
                   )}
                   <CardImage card={item} className="tcg-card-image" loading="lazy" draggable={false} />
                   {getFoilOverlayClass(item.printing) && (
@@ -895,7 +899,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                           {...pressHandlers(item.entry_id)}
                           style={{ position: 'relative', width: '56px', height: '78px', flexShrink: 0, overflow: 'hidden', borderRadius: '4px', cursor: 'pointer', touchAction: 'pan-y', ...getCardRarityBorder(item.rarity) }}
                         >
-                          <CardImage card={item} className="collection-row-thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} draggable={false} />
+                          <CardImage card={item} thumbnail loading="lazy" className="collection-row-thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} draggable={false} />
                           {getFoilOverlayClass(item.printing) && (
                             <span aria-hidden="true" className={`${getFoilOverlayClass(item.printing)} collection-foil-overlay`} style={{ borderRadius: '4px' }} />
                           )}

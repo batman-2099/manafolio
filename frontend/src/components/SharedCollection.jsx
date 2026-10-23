@@ -15,6 +15,8 @@ import { ChartDataTable } from './DashboardAnalytics';
 import { useT } from '../utils/i18n';
 import themes from '../../../shared/themes.json';
 
+const PAGE_SIZE = 60;
+
 const COLORS = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
   '#ec4899', '#14b8a6', '#f43f5e', '#a855f7', '#6366f1'
@@ -47,6 +49,7 @@ function SharedCollection({ shareToken }) {
   const [typeFilter, setTypeFilter] = useState('');
   const [sortBy, setSortBy] = useState('added-newest');
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(1);
 
   // Stacking state (default to stacked)
   const [stackCards, setStackCards] = useState(true);
@@ -149,6 +152,29 @@ function SharedCollection({ shareToken }) {
     if (sortBy === 'qty-desc') stacked.sort((a, b) => b.quantity - a.quantity);
     return stacked;
   }, [filteredCollection, stackCards, stackByCondition, stackByPrinting, sortBy]);
+
+  const pageCount = Math.max(1, Math.ceil(processedCollection.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageCards = processedCollection.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  useEffect(() => {
+    setPage(1);
+  }, [processedCollection, shareToken, listType]);
+
+  const paginationControls = pageCount > 1 && (
+    <nav aria-label={t('collection.pagination')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '0.75rem', margin: '1rem 0' }}>
+      <button type="button" className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} style={{ minHeight: '44px' }}>
+        {t('collection.previousPage')}
+      </button>
+      <span role="status" style={{ fontSize: '0.875rem', textAlign: 'center' }}>
+        {t('collection.pageCount', { page: currentPage, count: pageCount })}
+        <br />
+        {t('collection.pageRange', { start: (currentPage - 1) * PAGE_SIZE + 1, end: Math.min(currentPage * PAGE_SIZE, processedCollection.length), count: processedCollection.length })}
+      </span>
+      <button type="button" className="btn btn-secondary" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)} style={{ minHeight: '44px' }}>
+        {t('collection.nextPage')}
+      </button>
+    </nav>
+  );
 
   const { owner, stats } = loadedData || {};
   const { summary, types = [], rarities = [], sets = [] } = stats || {};
@@ -343,7 +369,7 @@ function SharedCollection({ shareToken }) {
         </div>
       ) : (
         <div className="card-grid">
-          {processedCollection.map(card => {
+          {pageCards.map(card => {
             return (
               <button type="button" key={card.entry_id} className="tcg-card" onClick={() => setActiveCard(card)} aria-haspopup="dialog" aria-label={`${t('shared.cardDetails')} ${displayName(card)}`} style={{ textAlign: 'left', font: 'inherit', color: 'inherit' }}>
                 <span className="tcg-card-inner">
@@ -352,11 +378,11 @@ function SharedCollection({ shareToken }) {
                     <span className={getFoilOverlayClass(card.printing)} style={{ borderRadius: 'var(--radius-sm)' }} />
                   )}
                   {getPrintingBadgeLabel(card.printing) && (
-                    <span style={{ position: 'absolute', top: '6px', left: '6px', fontSize: '0.6rem', fontWeight: 800, padding: '2px 5px', borderRadius: '3px', zIndex: 6, ...getPrintingBadgeStyle(card.printing) }}>
+                    <span className="collection-card-tag" style={{ position: 'absolute', top: '6px', left: '6px', zIndex: 6, ...getPrintingBadgeStyle(card.printing) }}>
                       {getPrintingBadgeLabel(card.printing)}
                     </span>
                   )}
-                  {card.members?.length > 1 && card.printing === null && <span className="tcg-card-quantity-tag" style={{ top: '6px', bottom: 'auto' }}>{t('shared.mixed')}</span>}
+                  {card.members?.length > 1 && card.printing === null && <span className="collection-card-tag" style={{ position: 'absolute', top: '6px', left: '6px', background: 'var(--bg-secondary)', color: 'var(--text-strong)' }}>{t('shared.mixed')}</span>}
                   {card.quantity > 1 && (
                     <span className="tcg-card-quantity-tag">x{card.quantity}</span>
                   )}
@@ -364,12 +390,12 @@ function SharedCollection({ shareToken }) {
                 <span className="tcg-card-info">
                   <span className="tcg-card-name">{displayName(card)}</span>
                   <span className="tcg-card-meta">
-                    <span style={{ fontSize: '0.7rem' }}>{card.set_name} • #{card.number}</span>
+                    <span>{card.set_name} • #{card.number}</span>
                     <span className="tcg-card-price">{priceText(card.price_trend, card.price_currency)}</span>
                   </span>
                   {shareLocations && (card.location || (card.members?.length > 1 && card.location === null)) && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                      <MapPin size={11} /> {card.location ?? t('shared.mixed')}
+                    <span className="tcg-card-meta" style={{ justifyContent: 'flex-start', alignItems: 'center', marginTop: '0.15rem' }}>
+                      <MapPin size={14} aria-hidden="true" /> {card.location ?? t('shared.mixed')}
                     </span>
                   )}
                 </span>
@@ -378,6 +404,7 @@ function SharedCollection({ shareToken }) {
           })}
         </div>
       )}
+      {paginationControls}
       <section className="shared-analytics" aria-labelledby="shared-analytics-title" style={{ marginTop: '2rem' }}>
       <h2 id="shared-analytics-title" className="section-heading">{t('dash.analytics')}</h2>
       <div className="dashboard-details" style={{ marginTop: '1rem', marginBottom: '1.5rem' }}>
@@ -421,7 +448,7 @@ function SharedCollection({ shareToken }) {
                 <CardImage card={card} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }} />
                 <span style={{ flex: 1, overflow: 'hidden' }}>
                   <span style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName(card)}</span>
-                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.set_name} • {card.rarity}</span>
+                  <span className="tcg-card-meta">{card.set_name} • {card.rarity}</span>
                 </span>
                 <span style={{ fontWeight: 800, color: 'var(--accent-yellow)', fontSize: '0.9rem' }}>{priceText(card.price_trend, card.price_currency)}</span>
               </button>

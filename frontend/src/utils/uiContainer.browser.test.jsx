@@ -184,6 +184,15 @@ export async function runUiContainerRegressions() {
     await click('loc.containerSettings');
     assert(host.querySelector('#container-settings-title') && host.textContent.includes('0 / 1'), 'settings capacity excludes tokens');
     assert(!host.querySelector('.storage-capacity-warning'), 'settings does not warn for token-only occupancy');
+    await back();
+    assert(!host.querySelector('#container-settings-title') && button('collection.select'), 'Back closes container settings before leaving its workspace');
+    await back();
+    assert(button('loc.createContainer') && !host.querySelector('.storage-workspace-identity'), 'Back from an opened container returns to the gallery');
+    await act(async () => [...host.querySelectorAll('button')].find(node => node.textContent.includes('Token box')).click());
+    await act(async () => host.querySelector(`button[aria-label="${en['nav.storage']}"]`).click());
+    await new Promise(resolve => setTimeout(resolve, 40));
+    assert(button('loc.createContainer'), 'the explicit Storage button returns to the same gallery state');
+    cases.push('storage Back unwinds settings then workspace and matches the gallery button');
     await clear();
     locations[2] = { ...locations[2], total_cards: 2, occupied_slots: 4 };
     await act(async () => root.render(<LocationManager onUpdate={() => {}} showToast={() => {}} />));

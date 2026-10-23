@@ -15,7 +15,7 @@ export async function runUiPublicTradeRegressions() {
   const root = createRoot(host);
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   localStorage.setItem('manafolio_ui_lang', 'en');
-  const response = body => ({ ok: true, status: 200, json: async () => body });
+  const response = (body, status = 200) => ({ ok: status < 300, status, json: async () => body });
   const base = { card_id: 'public-fixture', id: 'public-fixture', name: 'Public fixture', set_name: 'Fixture set', number: '7', game: 'mtg', types: [], subtypes: [], rarity: 'Common', condition: 'Near Mint', printing: 'Normal', language: 'English', quantity: 2, price_trend: 1, price_currency: 'USD', grader: 'Raw' };
   const copies = [{ ...base, entry_id: 987651, added_at: '2026-10-13T12:00:00Z', location: 'Blue binder' }, { ...base, entry_id: 987652, added_at: '2026-10-12T12:00:00Z', quantity: 3, condition: 'Played', printing: 'Holofoil', language: 'German', location: 'Red box' }];
   const entries = copies.map((card, index) => ({ ...card, snapshot: `fixture-${index}`, location_name: card.location }));
@@ -24,10 +24,18 @@ export async function runUiPublicTradeRegressions() {
   let mutations = 0;
   let updates = 0;
   let reviewRequest;
+  let entriesFailure = true;
+  let entryData = [];
+  let deferEntries = false;
+  let settleEntries;
+  let searchFailure = false;
   window.fetch = async (url, options = {}) => {
     if (String(url).startsWith('/api/shared/')) return response({ owner: 'Fixture owner', shareLocations, collection: copies, stats: { summary: { totalValue: 5, totalCards: 5, uniqueCards: 1 }, sets: [], types: [], rarities: [] } });
-    if (url === '/api/trades/entries') return response(entries);
-    if (String(url).startsWith('/api/search?')) return response([{ ...base, id: 'receive-fixture', name: 'Receiving fixture' }]);
+    if (url === '/api/trades/entries') {
+      if (deferEntries) return new Promise(resolve => { settleEntries = () => resolve(response({ error: 'Fixture refresh failed' }, 503)); });
+      return entriesFailure ? response({ error: 'Fixture entries unavailable' }, 503) : response(entryData);
+    }
+    if (String(url).startsWith('/api/search?')) return searchFailure ? response({ error: 'Fixture receiving search failed' }, 503) : response([{ ...base, id: 'receive-fixture', name: 'Receiving fixture' }]);
     if (url === '/api/trades/review') {
       reviewRequest = JSON.parse(options.body);
       return response({ request: reviewRequest, giving: [{ ...entries[0], estimate: 1, currency: 'USD' }], receiving: [{ ...base, estimate: 1, currency: 'USD' }] });
@@ -78,6 +86,27 @@ export async function runUiPublicTradeRegressions() {
 
     const navigationGuardRef = { current: null };
     await render(<TradeWorkbench navigationGuardRef={navigationGuardRef} onUpdate={() => updates++} />);
+    assert(host.querySelector('[role="alert"]')?.textContent.includes('Fixture entries unavailable') && !host.textContent.includes(en['trade.empty']), 'failed initial entry load never displays successful-empty guidance');
+    entriesFailure = false;
+    await click(button('common.retry'));
+    assert(!host.querySelector('[role="alert"]') && host.textContent.includes(en['trade.empty']), 'successful empty retry clears only entry load error and displays empty guidance');
+    entryData = entries;
+    await click(button('trade.refresh'));
+    assert(host.querySelectorAll('.trade-results li').length === 2, 'refresh restores available entries');
+    const failedSearchForm = host.querySelector('.trade-columns form');
+    searchFailure = true;
+    await change(failedSearchForm.querySelector('input'), 'Receiving');
+    await act(async () => failedSearchForm.requestSubmit());
+    assert(host.textContent.includes('Fixture receiving search failed'), 'unrelated operation error is visible');
+    deferEntries = true;
+    await click(button('trade.refresh'));
+    assert(host.querySelectorAll('.trade-results li').length === 2 && button('trade.refresh').disabled, 'entry refresh preserves visible data while loading');
+    await act(async () => settleEntries());
+    assert(host.querySelectorAll('.trade-results li').length === 2 && !host.textContent.includes(en['trade.empty']) && host.textContent.includes('Fixture refresh failed'), 'failed refresh retains previous data and exposes retry');
+    deferEntries = false;
+    await click(button('common.retry'));
+    assert(!host.textContent.includes('Fixture refresh failed') && host.textContent.includes('Fixture receiving search failed') && host.querySelectorAll('.trade-results li').length === 2, 'successful entry retry clears its own error without hiding unrelated errors or data');
+    searchFailure = false;
     let add = host.querySelector('.trade-results button');
     add.focus();
     // Native keyboard activation dispatches a click with detail=0; no custom key handler is required.

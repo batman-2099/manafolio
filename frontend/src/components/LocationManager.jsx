@@ -215,6 +215,13 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const cardsReady = loadedCardsKey === cardsKey;
   const [setsList, setSetsList] = useState([]);
   const [showGallery, setShowGallery] = useState(true);
+  const returnToGallery = () => {
+    if (storage.bulkPending) return false;
+    storage.exitSelectMode();
+    setActiveLocationId(null);
+    setShowGallery(true);
+  };
+  useBackGuard(!showGallery, returnToGallery);
   const [gallerySearch, setGallerySearch] = useState('');
   const [gallerySort, setGallerySort] = useState('name-asc');
   const [storageUnits, setStorageUnits] = useState([]);
@@ -252,6 +259,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const [coverLoading, setCoverLoading] = useState(false);
   const [coverError, setCoverError] = useState('');
   const [coverRetry, setCoverRetry] = useState(0);
+  const closeCover = () => {
+    if (savingCover) return false;
+    setCoverLocation(null);
+  };
+  useBackGuard(!!coverLocation, closeCover);
   useEffect(() => {
     setCoverError('');
     if (!coverLocation?.isUnit) return;
@@ -346,7 +358,6 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   useBackGuard(!!rulesComp, () => setRulesComp(null));
   useBackGuard(showRulesModal, () => savingSettings ? false : setShowRulesModal(false));
   useBackGuard(!!capacityUpdatePending, cancelCapacityUpdate);
-  useBackGuard(!!selectedLocationId, () => setSelectedLocationId && setSelectedLocationId(null));
   const [compRuleDraft, setCompRuleDraft] = useState([]);
 
   const [unsortedFilters, setUnsortedFilters] = useState({ search: '', set: '', type: '', color: '', rarity: '', condition: '', printing: '', language: '', deckStatus: '' });
@@ -1537,7 +1548,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   </div> : unitsLoading ? <p role="status">{t('common.loading')}</p> : null;
 
   const coverDialog = coverLocation && (
-        <Modal onClose={() => { if (!savingCover) setCoverLocation(null); }} aria-labelledby="container-cover-title">
+        <Modal onClose={closeCover} aria-labelledby="container-cover-title">
         <div className="dialog-panel-spacing" style={{ width: 'min(700px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)' }}>
           <h3 id="container-cover-title">{t(coverLocation.isUnit ? 'storageUnit.chooseCover' : 'loc.chooseCover')} — {coverLocation.name}</h3>
           {coverLocation.isUnit && <p>{t('storageUnit.coverHint')}</p>}
@@ -1566,7 +1577,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem' }}>
             <button type="button" className="btn btn-secondary" aria-pressed={coverLocation.cover_card_id == null && !coverLocation.cover_image} disabled={savingCover} onClick={() => saveCover(null)}>{t('loc.automaticCover')}</button>
-            <button className="btn btn-secondary" disabled={savingCover} onClick={() => setCoverLocation(null)}>{t('common.close')}</button>
+            <button className="btn btn-secondary" disabled={savingCover} onClick={closeCover}>{t('common.close')}</button>
           </div>
         </div>
         </Modal>
@@ -2012,7 +2023,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         {unitsFeedback}
         <div className="view-toolbar storage-workspace-toolbar" style={{ justifyContent: 'space-between' }}>
           <div className="storage-workspace-identity" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', minWidth: 0 }}>
-            <button className="btn btn-secondary" disabled={storage.bulkPending} onClick={() => { storage.exitSelectMode(); setActiveLocationId(null); setShowGallery(true); }} title={t('nav.storage')} aria-label={t('nav.storage')}><LayoutGrid size={16} /></button>
+            <button className="btn btn-secondary" disabled={storage.bulkPending} onClick={returnToGallery} title={t('nav.storage')} aria-label={t('nav.storage')}><LayoutGrid size={16} /></button>
             {inventorySelector}
             <select
               className="select-control"

@@ -476,6 +476,7 @@ export default function CompartmentView({
   // --- Binder Grid State ---
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelDraft, setLabelDraft] = useState(compartment?.display_label || '');
+  const restoreRenameFocus = useRef(false);
   const [binderActiveEntryId, setBinderActiveEntryId] = useState(null);
 
   const currentActiveId = activeEntryId !== undefined ? activeEntryId : binderActiveEntryId;
@@ -544,20 +545,28 @@ export default function CompartmentView({
               <input
                 autoFocus
                 className="input-control"
-                aria-label={t('compartment.renameHint')}
+                aria-label={t('compartment.renamePageRow')}
                 value={labelDraft}
                 onChange={(e) => setLabelDraft(e.target.value)}
                 onBlur={() => { if (editingLabel) { setEditingLabel(false); onRename(labelDraft); } }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') { setEditingLabel(false); onRename(labelDraft); }
-                  else if (e.key === 'Escape') setEditingLabel(false);
+                  if (e.key === 'Enter' || e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    restoreRenameFocus.current = true;
+                    setEditingLabel(false);
+                    if (e.key === 'Enter') onRename(labelDraft);
+                  }
                 }}
                 style={{ padding: '0.15rem 0.4rem', fontSize: '0.75rem', width: '110px' }}
               />
             ) : (
-              <strong onDoubleClick={() => { setLabelDraft(compartment.label || ''); setEditingLabel(true); }} title={t('compartment.renameHint')} style={{ cursor: 'pointer', fontSize: '0.8rem' }}>
-                {compartment.display_label}
-              </strong>
+              <button type="button" className="btn btn-secondary"
+                ref={node => { if (node && restoreRenameFocus.current) { restoreRenameFocus.current = false; node.focus(); } }}
+                onClick={() => { setLabelDraft(compartment.label || ''); setEditingLabel(true); }}
+                aria-label={`${t('compartment.renamePageRow')}: ${compartment.display_label}`}>
+                {compartment.display_label} · {t('common.rename')}
+              </button>
             )}
             
             {(compartment.assignedFilters || []).length > 0 && (

@@ -168,6 +168,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
   const [guideOffset, setGuideOffset] = useState({ x: 0, y: 0 });
   const [guideAngle, setGuideAngle] = useState(0);
   const [guideScale, setGuideScale] = useState(1);
+  const [guideInput, setGuideInput] = useState(null);
   const guidePtrs = useRef(new Map());     // active pointerId -> {x,y}
   const guideGesture = useRef(null);        // snapshot taken at each pointer-count change
   
@@ -421,7 +422,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
     snapshotGuideGesture(); // rebase any remaining finger
   };
-  const resetGuide = () => { setGuideOffset({ x: 0, y: 0 }); setGuideAngle(0); setGuideScale(1); };
+  const resetGuide = () => { setGuideInput(null); setGuideOffset({ x: 0, y: 0 }); setGuideAngle(0); setGuideScale(1); };
 
   // Drawer states
   const [selectedCard, setSelectedCard] = useState(null);
@@ -1863,6 +1864,9 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             <button
                 type="button"
                 className={`btn ${isTorchOn ? 'btn-primary' : 'btn-secondary'}`}
+                aria-label={t('scan.torch')}
+                title={t('scan.torch')}
+                aria-pressed={isTorchOn}
                 style={{
                   position: 'absolute',
                   top: '1rem',
@@ -1877,7 +1881,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 }}
                 onClick={(e) => { e.stopPropagation(); toggleTorch(); }}
               >
-                {isTorchOn ? <Zap size={18} /> : <ZapOff size={18} />}
+                {isTorchOn ? <Zap size={18} aria-hidden="true" /> : <ZapOff size={18} aria-hidden="true" />}
               </button>
 
             {/* Auto-scan state, where the capture countdown used to be. There is no
@@ -1966,6 +1970,51 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
               )}
             </div>
           </div>
+
+          <details className="scan-guide-adjustments">
+            <summary style={{ minHeight: 44, padding: '0.5rem', cursor: 'pointer', color: 'var(--text-primary)' }}>
+              {t('scan.adjustGuide')}
+            </summary>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 10rem), 1fr))', gap: '0.75rem', padding: '0.5rem' }}>
+              {[
+                { id: 'x', label: 'scan.guideX', value: guideOffset.x, set: value => setGuideOffset(previous => ({ ...previous, x: value })) },
+                { id: 'y', label: 'scan.guideY', value: guideOffset.y, set: value => setGuideOffset(previous => ({ ...previous, y: value })) },
+                { id: 'angle', label: 'scan.guideAngle', value: guideAngle, set: setGuideAngle },
+              ].map(control => (
+                <label key={control.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', color: 'var(--text-secondary)' }}>
+                  {t(control.label)}
+                  <input
+                    id={`scan-guide-${control.id}`}
+                    type="number"
+                    step="any"
+                    className="input-control"
+                    style={{ width: '100%', minWidth: 0, minHeight: 44, fontSize: '1rem' }}
+                    value={guideInput?.id === control.id ? guideInput.value : control.value}
+                    onChange={event => {
+                      setGuideInput({ id: control.id, value: event.target.value });
+                      if (Number.isFinite(event.target.valueAsNumber)) control.set(event.target.valueAsNumber);
+                    }}
+                    onBlur={() => setGuideInput(null)}
+                  />
+                </label>
+              ))}
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', color: 'var(--text-secondary)' }}>
+                {t('scan.guideScale')} ({Math.round(guideScale * 100)}%)
+                <input
+                  id="scan-guide-scale"
+                  type="range"
+                  min="0.3"
+                  max="3"
+                  step="0.01"
+                  value={guideScale}
+                  aria-valuetext={`${Math.round(guideScale * 100)}%`}
+                  onChange={event => setGuideScale(Number(event.target.value))}
+                  style={{ width: '100%', minHeight: 44, accentColor: 'var(--accent-red)' }}
+                />
+              </label>
+              <button type="button" className="btn btn-secondary" onClick={resetGuide}>{t('scan.resetBox')}</button>
+            </div>
+          </details>
 
           {/* Advanced scan settings; auto-queue and the set filter stay on the main page. */}
           {showScanSettings && (

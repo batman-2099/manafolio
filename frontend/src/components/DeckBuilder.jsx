@@ -175,6 +175,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [newDeckTargetSize, setNewDeckTargetSize] = useState(String(NEW_DECK_DEFAULTS.targetSize));
   const [newDeckImportText, setNewDeckImportText] = useState('');
   const [newDeckImportFormat, setNewDeckImportFormat] = useState('plain');
+  const manaBoxFileRef = useRef(null);
   const [showImportDecklistArea, setShowImportDecklistArea] = useState(false);
   const [newDeckPreconFile, setNewDeckPreconFile] = useState('');
   const [showPreconPicker, setShowPreconPicker] = useState(false);
@@ -261,6 +262,10 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [checkoutLocations, setCheckoutLocations] = useState([]);
   const [checkoutMode, setCheckoutMode] = useState('checkout'); // 'checkout' | 'checkin'
   const [checkoutDeckId, setCheckoutDeckId] = useState(null); // deck the open modal acts on
+  const checkoutBusyRef = useRef(false);
+  const [checkoutLocationsError, setCheckoutLocationsError] = useState(false);
+  const [checkoutCancelError, setCheckoutCancelError] = useState(false);
+  const [returnLocationsDeck, setReturnLocationsDeck] = useState(null);
   const [deckCardLocations, setDeckCardLocations] = useState({});
   const [deckLocationsError, setDeckLocationsError] = useState(false);
   const [savingSleeved, setSavingSleeved] = useState(false);
@@ -826,11 +831,34 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   };
 
   // --- CHECKOUT / RETURN ---
+  const loadGuideLocations = async (id) => {
+    const response = await fetch(`/api/decks/${id}/locations`);
+    if (!response.ok) throw new Error('Could not load deck locations');
+    return response.json();
+  };
+
+  const retryCheckoutLocations = async () => {
+    if (checkoutBusyRef.current) return;
+    checkoutBusyRef.current = true;
+    setCheckingOut(true);
+    try {
+      setCheckoutLocations(await loadGuideLocations(checkoutDeckId));
+      setCheckoutLocationsError(false);
+    } catch {
+      setCheckoutLocationsError(true);
+    } finally {
+      checkoutBusyRef.current = false;
+      setCheckingOut(false);
+    }
+  };
+
   const handleCheckout = async (deck = null) => {
     const targetDeck = deck || activeDeck;
     if (!targetDeck || targetDeck.inventory_type !== 'collection') return;
-    if (editorBusy) return;
+    if (editorBusy || checkoutBusyRef.current) return;
     if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
+    checkoutBusyRef.current = true;
+    setReturnLocationsDeck(null);
     try {
       setCheckingOut(true);
       const res = await fetch(`/api/decks/${targetDeck.id}/checkout`, { method: 'PUT' });
@@ -840,14 +868,16 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           setActiveDeck(prev => ({ ...prev, checked_out: 1, checked_out_at: new Date().toISOString() }));
         }
         fetchDecks();
-
-        const locRes = await fetch(`/api/decks/${targetDeck.id}/locations`);
-        if (locRes.ok) {
-          const locData = await locRes.json();
-          setCheckoutLocations(locData);
-          setCheckoutMode('checkout');
-          setCheckoutDeckId(targetDeck.id);
-          setShowCheckoutModal(true);
+        setCheckoutLocations([]);
+        setCheckoutLocationsError(false);
+        setCheckoutCancelError(false);
+        setCheckoutMode('checkout');
+        setCheckoutDeckId(targetDeck.id);
+        setShowCheckoutModal(true);
+        try {
+          setCheckoutLocations(await loadGuideLocations(targetDeck.id));
+        } catch {
+          setCheckoutLocationsError(true);
         }
       } else {
         const errData = await res.json().catch(() => null);
@@ -861,6 +891,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
       console.error(err);
       showToast(t('deck.errCheckoutGeneric'), 'error');
     } finally {
+      checkoutBusyRef.current = false;
       setCheckingOut(false);
     }
   };
@@ -868,15 +899,19 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const handleReturn = async (deck = null) => {
     const targetDeck = deck || activeDeck;
     if (!targetDeck || targetDeck.inventory_type !== 'collection') return;
-    if (editorBusy) return;
+    if (editorBusy || checkoutBusyRef.current) return;
     if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
+    checkoutBusyRef.current = true;
     try {
       setCheckingOut(true);
-      // Capture where each card lives before flipping the flag, so the check-in
-      // guide can show where to return them (cards stay in their slots either
-      // way, but fetch first to be safe).
-      const locRes = await fetch(`/api/decks/${targetDeck.id}/locations`);
-      const locData = locRes.ok ? await locRes.json() : null;
+      let locData;
+      try {
+        locData = await loadGuideLocations(targetDeck.id);
+      } catch {
+        setReturnLocationsDeck(targetDeck);
+        return;
+      }
+      setReturnLocationsDeck(null);
       const res = await fetch(`/api/decks/${targetDeck.id}/return`, { method: 'PUT' });
       if (res.ok) {
         showToast(t('deck.returned', { name: targetDeck.name }), 'success');
@@ -884,12 +919,12 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           setActiveDeck(prev => ({ ...prev, checked_out: 0, checked_out_at: null }));
         }
         fetchDecks();
-        if (locData) {
-          setCheckoutLocations(locData);
-          setCheckoutMode('checkin');
-          setCheckoutDeckId(targetDeck.id);
-          setShowCheckoutModal(true);
-        }
+        setCheckoutLocations(locData);
+        setCheckoutLocationsError(false);
+        setCheckoutCancelError(false);
+        setCheckoutMode('checkin');
+        setCheckoutDeckId(targetDeck.id);
+        setShowCheckoutModal(true);
       } else {
         showToast(t('deck.errReturn'), 'error');
       }
@@ -897,30 +932,39 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
       console.error(err);
       showToast(t('deck.errReturnGeneric'), 'error');
     } finally {
+      checkoutBusyRef.current = false;
       setCheckingOut(false);
     }
   };
 
   // Closing the guide via X / back = cancel: revert the toggle we just committed
   // by calling the opposite endpoint. (Done button keeps the status.)
-  const handleCheckoutCancel = async () => {
-    const id = checkoutDeckId;
-    setShowCheckoutModal(false);
-    if (!id) return;
+  const handleCheckoutCancel = () => {
+    if (checkoutBusyRef.current || !checkoutDeckId) return false;
+    checkoutBusyRef.current = true;
+    setCheckingOut(true);
+    setCheckoutCancelError(false);
     const undo = checkoutMode === 'checkout' ? 'return' : 'checkout';
-    try {
-      const res = await fetch(`/api/decks/${id}/${undo}`, { method: 'PUT' });
-      if (!res.ok) { showToast(t('deck.errUndo'), 'error'); return; }
-      if (activeDeck && activeDeck.id === id) {
-        const back = checkoutMode === 'checkout';
-        setActiveDeck(prev => ({ ...prev, checked_out: back ? 0 : 1, checked_out_at: back ? null : new Date().toISOString() }));
+    (async () => {
+      try {
+        const res = await fetch(`/api/decks/${checkoutDeckId}/${undo}`, { method: 'PUT' });
+        if (!res.ok) throw new Error('Could not undo deck status');
+        if (activeDeck && activeDeck.id === checkoutDeckId) {
+          const back = checkoutMode === 'checkout';
+          setActiveDeck(prev => ({ ...prev, checked_out: back ? 0 : 1, checked_out_at: back ? null : new Date().toISOString() }));
+        }
+        fetchDecks();
+        setShowCheckoutModal(false);
+        showToast(t(checkoutMode === 'checkout' ? 'deck.checkoutCanceled' : 'deck.returnCanceled'), 'success');
+      } catch {
+        setCheckoutCancelError(true);
+      } finally {
+        checkoutBusyRef.current = false;
+        setCheckingOut(false);
       }
-      fetchDecks();
-      showToast(t(checkoutMode === 'checkout' ? 'deck.checkoutCanceled' : 'deck.returnCanceled'), 'success');
-    } catch (err) {
-      console.error(err);
-      showToast(t('deck.errUndo'), 'error');
-    }
+    })();
+    // The back guard requires a synchronous veto until the reversal succeeds.
+    return false;
   };
 
   // --- DRAW SIMULATOR LOGIC ---
@@ -1436,6 +1480,12 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {showAcquisitionPlanner && <AcquisitionPlanner decks={decks} onClose={() => setShowAcquisitionPlanner(false)} />}
+      {returnLocationsDeck && (
+        <div role="alert" className="deck-source-error">
+          <p>{t('deck.returnLocationsFailed', { name: returnLocationsDeck.name })}</p>
+          <button className="btn btn-secondary" disabled={checkingOut} onClick={() => handleReturn(returnLocationsDeck)}>{t('common.retry')}</button>
+        </div>
+      )}
       
       {showAiBuilder && (
         <AiDeckBuilder
@@ -2049,7 +2099,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               }} />
             ) : null}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div className="deck-editor-identity" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <button className="btn btn-secondary btn-icon-only" onClick={leaveDeck} aria-label={t('deck.backToDecks')} style={{ borderRadius: '50%' }}>
                 <ChevronLeft size={16} />
               </button>
@@ -2088,7 +2138,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div className="deck-primary-actions">
               {/* Checkout / Return button */}
               {activeDeck.inventory_type === 'collection' && (activeDeck.checked_out ? (
                 <button
@@ -2110,6 +2160,10 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 </button>
               ))}
               <button className="btn btn-primary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
+            </div>
+            <details className="deck-actions-disclosure" open={!compactEditor}>
+              <summary>{t('deck.moreActions')}</summary>
+              <div className="deck-tools">
               <button className="btn btn-secondary" disabled={editorBusy || savingRecord} onClick={() => setShowHistory(true)}>{t('history.title')}</button>
               {activeDeck.game === 'mtg' && (
                 <button className="btn btn-secondary" disabled={editorBusy || savingRecord} onClick={event => {
@@ -2122,17 +2176,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 <button className="btn btn-secondary" onClick={startSimulator} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <Play size={14} /> Draw Simulator
                 </button>
-            </div>
-            <div className="deck-jump-controls">
-              <button type="button" className="btn btn-secondary" onClick={() => cardsHeadingRef.current?.focus()}>
-                {t('deck.jumpToCards')} <ArrowRight size={14} aria-hidden="true" />
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => addCardsInputRef.current?.focus()}>
-                {t('deck.jumpToAddCards')} <ArrowRight size={14} aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-            <div className="deck-tools">
               {activeDeck.game === 'mtg' && activeDeck.inventory_type !== 'graveyard' && (
                 <button
                   className="btn btn-secondary"
@@ -2194,6 +2237,16 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   {hasUnsavedChanges && <p id="deck-container-save-first" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>{t('deck.saveFirst')}</p>}
                 </div>
               )}
+            </div>
+            </details>
+          </div>
+            <div className="deck-jump-controls">
+              <button type="button" className="btn btn-secondary" onClick={() => cardsHeadingRef.current?.focus()}>
+                {t('deck.jumpToCards')} <ArrowRight size={14} aria-hidden="true" />
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => addCardsInputRef.current?.focus()}>
+                {t('deck.jumpToAddCards')} <ArrowRight size={14} aria-hidden="true" />
+              </button>
             </div>
           {saveDeckError && !previewDeckCard && <p role="alert" className="deck-source-error">{saveDeckError} {t('deck.saveRetryHint')}</p>}
 
@@ -2772,10 +2825,12 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         <option value="manabox">{t('deck.importFormatManaBox')}</option>
                       </select>
                       {newDeckImportFormat === 'manabox' && (
-                        <label className="btn btn-secondary" style={{ margin: 0, padding: '0.3rem 0.5rem', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <Upload size={13} /> {t('deck.chooseManaBoxFile')}
-                          <input type="file" accept=".txt,text/plain" onChange={handleManaBoxDeckFile} style={{ display: 'none' }} />
-                        </label>
+                        <>
+                          <button type="button" className="btn btn-secondary" onClick={() => manaBoxFileRef.current?.click()}>
+                            <Upload size={13} aria-hidden="true" /> {t('deck.chooseManaBoxFile')}
+                          </button>
+                          <input ref={manaBoxFileRef} type="file" accept=".txt,text/plain" onChange={handleManaBoxDeckFile} hidden />
+                        </>
                       )}
                     </div>
                     <textarea
@@ -3142,7 +3197,11 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           locationsData={checkoutLocations}
           mode={checkoutMode}
           onCancel={handleCheckoutCancel}
-          onClose={() => setShowCheckoutModal(false)}
+          busy={checkingOut}
+          locationsError={checkoutLocationsError}
+          cancelError={checkoutCancelError}
+          onRetryLocations={retryCheckoutLocations}
+          onClose={() => { if (!checkoutBusyRef.current) setShowCheckoutModal(false); }}
         />
       )}
 

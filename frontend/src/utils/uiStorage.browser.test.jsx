@@ -87,6 +87,33 @@ export async function runUiStorageRegressions({ pressKey, dragCard } = {}) {
     await activate(host.querySelector('.binder-pocket'), 'Space');
     assert(opened.join() === '1', 'second binder activation must open the selected card');
     cases.push('binder Enter selects and Space opens');
+    const renamed = [];
+    await act(async () => { render(<CompartmentView compartment={compartment} cards={cards} locationType="Binder" onRename={name => renamed.push(name)} />); });
+    const renameButton = () => host.querySelector('button[aria-label^="Rename page/row"]');
+    await activate(renameButton(), 'Enter');
+    const renameInput = host.querySelector('input[aria-label="Rename page/row"]');
+    assert(document.activeElement === renameInput, 'renaming must focus the editable page name');
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(renameInput, 'Draft page');
+      renameInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      if (pressKey) await pressKey('Escape');
+      else renameInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    assert(renamed.length === 0 && document.activeElement === renameButton(), 'Escape must discard a rename and restore the initiating button');
+    await activate(renameButton(), 'Space');
+    await act(async () => {
+      const input = host.querySelector('input[aria-label="Rename page/row"]');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Saved page');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      if (pressKey) await pressKey('Enter');
+      else host.querySelector('input[aria-label="Rename page/row"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    assert(renamed.join() === 'Saved page' && document.activeElement === renameButton(), 'Enter must save the page name once and restore focus');
+    cases.push('binder rename keyboard activation, cancellation, save and focus restoration');
 
     await act(async () => { render(<ArrangeFixture />); });
     if (dragCard) {

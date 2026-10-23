@@ -1985,6 +1985,27 @@ button.collection-card-trigger {
   padding: 0.75rem 1rem;
 }
 
+.collection-bulk-bar {
+  min-width: 0;
+  margin: 0 0 1rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+.collection-bulk-actions { flex: 1; min-width: 0; }
+.collection-bulk-actions > summary { width: fit-content; min-height: 44px; }
+.collection-bulk-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.collection-bulk-bar .btn,
+.collection-bulk-bar .select-control { min-height: 44px; }
+
 @media (max-width: 1024px) {
   .quick-add-grid {
     grid-template-columns: 180px 1fr;

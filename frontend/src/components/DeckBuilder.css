@@ -31,11 +31,54 @@
   padding: 1rem;
 }
 
+.deck-primary-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.deck-actions-disclosure {
+  width: 100%;
+  min-width: 0;
+}
+
+.deck-actions-disclosure > summary {
+  width: fit-content;
+  min-height: 44px;
+  padding: 0.65rem 0.5rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.deck-actions-disclosure > summary:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+.deck-editor-identity {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .deck-jump-controls {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  width: 1px;
+  position: absolute;
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+}
+
+.deck-jump-controls:focus-within {
+  position: static;
   width: 100%;
+  clip-path: none;
+  height: auto;
+  overflow: visible;
 }
 
 .deck-jump-controls .btn {

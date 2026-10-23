@@ -40,10 +40,13 @@ const MODES = ['checkout', 'checkin'];
 // it and where it returns). Checkout highlights the physical compartment layout;
 // check-in shows only returning cards in an artwork grid. Select-all works per
 // page, per container, and globally.
-const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCancel }) => {
+const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCancel, busy = false, locationsError = false, cancelError = false, onRetryLocations }) => {
   const { t } = useT();
   const kind = MODES.includes(mode) ? mode : 'checkout';
-  const cancel = onCancel || onClose; // X / overlay / back = cancel (revert the toggle)
+  const cancel = () => {
+    if (busy) return false;
+    return (onCancel || onClose)();
+  };
   const [done, setDone] = useState(new Set());
   const [collapsedContainers, setCollapsedContainers] = useState({});
   const titleId = useId();
@@ -253,7 +256,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
               <h2 id={titleId} style={{ fontSize: '1.35rem', color: 'var(--text-strong)', fontWeight: 800, margin: '0 0 0.25rem 0' }}>{t(`wizard.${kind}.title`)}</h2>
               <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.85rem' }}>{t(`wizard.${kind}.subtitle`)}</p>
             </div>
-            <button className="btn btn-secondary btn-icon-only" onClick={cancel} aria-label={t('common.cancel')}>
+            <button className="btn btn-secondary btn-icon-only" onClick={cancel} disabled={busy} aria-label={t('common.cancel')}>
               <X size={16} />
             </button>
           </div>
@@ -273,7 +276,20 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
 
         {/* Body */}
         <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {totalPulls === 0 && missing.length === 0 && (
+          {busy && <p role="status">{t('common.loading')}</p>}
+          {locationsError && (
+            <div role="alert">
+              <p>{t('deck.checkoutLocationsFailed')}</p>
+              <button className="btn btn-secondary" disabled={busy} onClick={onRetryLocations}>{t('common.retry')}</button>
+            </div>
+          )}
+          {cancelError && (
+            <div role="alert">
+              <p>{t(`wizard.${kind}.cancelFailed`)}</p>
+              <button className="btn btn-secondary" disabled={busy} onClick={cancel}>{t('wizard.retryCancel')}</button>
+            </div>
+          )}
+          {!busy && !locationsError && totalPulls === 0 && missing.length === 0 && (
             <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1.5rem 0', fontSize: '0.9rem' }}>{t('wizard.nothingToMove')}</div>
           )}
 
@@ -342,7 +358,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
 
         {/* Footer */}
         <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border-glass)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', flexShrink: 0 }}>
-          <button className="btn btn-primary" onClick={onClose} disabled={totalPulls > 0 && !allComplete}>{t('bulk.done')}</button>
+          <button className="btn btn-primary" onClick={onClose} disabled={busy || locationsError || (totalPulls > 0 && !allComplete)}>{t('bulk.done')}</button>
         </div>
       </div>
     </Modal>

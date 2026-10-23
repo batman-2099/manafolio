@@ -463,6 +463,7 @@ for (const group of ['AdminSettings', 'Search', 'Container', 'PublicTrade', 'Sto
   const module = await import(`/src/utils/ui${group}.browser.test.jsx`);
   console.log(group, await module[`runUi${group}Regressions`]());
 }
+console.log(await (await import('/src/utils/publicCollection.browser.test.jsx')).runPublicCollectionRegressions());
 ```
 
 The storage runner additionally accepts `{ pressKey, dragCard }`: `pressKey(key)` sends a trusted browser key to the focused element, and `dragCard(fromSelector, toSelector)` performs a real pointer drag between the supplied elements, allowing a paint after activation and before release. Without these callbacks, the runner verifies native click activation and reports `trustedKeyboard: false` and `pointerDrag: false`; test actual keyboard, pointer filing, and focus restoration separately.

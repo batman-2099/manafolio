@@ -38,21 +38,21 @@ export default function CardEntryFields({
     <div className="form-group quick-add-full-width" style={groupStyle}>
       <label htmlFor={`${fieldId}-quantity`}>{t('card.quantity')}</label>
       <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'stretch', width: '100%', boxSizing: 'border-box' }}>
-        <button type="button" className="btn btn-secondary" onClick={() => stepQty(-1)} aria-label={t('card.quantityDown')} style={{ width: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 800, flexShrink: 0 }}>&minus;</button>
-        <input id={`${fieldId}-quantity`} type="number" className="input-control" min="1" max={quantityMax} step="1" value={quantity} onChange={(e) => onQuantity(e.target.value)} required style={{ flex: 1, minWidth: 0, textAlign: 'center', fontWeight: 700, height: '44px' }} />
-        <button type="button" className="btn btn-secondary" onClick={() => stepQty(1)} aria-label={t('card.quantityUp')} style={{ width: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 800, flexShrink: 0 }}>+</button>
+        <button type="button" className="btn btn-secondary" disabled={disabled} onClick={() => stepQty(-1)} aria-label={t('card.quantityDown')} style={{ width: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 800, flexShrink: 0 }}>&minus;</button>
+        <input id={`${fieldId}-quantity`} type="number" className="input-control" disabled={disabled} min="1" max={quantityMax} step="1" value={quantity} onChange={(e) => onQuantity(e.target.value)} required style={{ flex: 1, minWidth: 0, textAlign: 'center', fontWeight: 700, height: '44px' }} />
+        <button type="button" className="btn btn-secondary" disabled={disabled} onClick={() => stepQty(1)} aria-label={t('card.quantityUp')} style={{ width: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 800, flexShrink: 0 }}>+</button>
       </div>
     </div>
   ) : (
     <div className="form-group" style={groupStyle}>
       <label htmlFor={`${fieldId}-quantity`}>{t('card.quantity')}</label>
-      <input id={`${fieldId}-quantity`} type="number" className="input-control" min="1" max={quantityMax} step="1" value={quantity} onChange={(e) => onQuantity(e.target.value)} required />
+      <input id={`${fieldId}-quantity`} type="number" className="input-control" disabled={disabled} min="1" max={quantityMax} step="1" value={quantity} onChange={(e) => onQuantity(e.target.value)} required />
     </div>
   );
   const Price = (
     <div className="form-group" style={groupStyle}>
       <label htmlFor={`${fieldId}-price`}>{t('card.purchasePrice')}</label>
-      <input id={`${fieldId}-price`} type="number" step="any" min="0" className="input-control" value={purchasePrice} onChange={(e) => onPurchasePrice(e.target.value)} placeholder="0.00" />
+      <input id={`${fieldId}-price`} type="number" step="any" min="0" className="input-control" disabled={disabled} value={purchasePrice} onChange={(e) => onPurchasePrice(e.target.value)} placeholder="0.00" />
     </div>
   );
   const Condition = (
@@ -62,7 +62,7 @@ export default function CardEntryFields({
           the owner's opinion — so the picker is disabled rather than hidden, which
           would leave the reader wondering where it went. The stored value is left
           untouched: cracking a slab restores whatever it said before. */}
-      <select id={`${fieldId}-condition`} className="select-control" value={graded ? 'Near Mint' : condition} disabled={graded}
+      <select id={`${fieldId}-condition`} className="select-control" value={graded ? 'Near Mint' : condition} disabled={disabled || graded}
         title={graded ? t('card.conditionGradedHint') : undefined}
         onChange={(e) => onCondition(e.target.value)}>
         {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -72,7 +72,7 @@ export default function CardEntryFields({
   const Printing = (
     <div className="form-group" style={groupStyle}>
       <label htmlFor={`${fieldId}-printing`}>{t('card.printing')}</label>
-      <select id={`${fieldId}-printing`} className="select-control" value={printing} onChange={(e) => onPrinting(e.target.value)}>
+      <select id={`${fieldId}-printing`} className="select-control" disabled={disabled} value={printing} onChange={(e) => onPrinting(e.target.value)}>
         {printings.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
       </select>
     </div>
@@ -81,7 +81,7 @@ export default function CardEntryFields({
     <div className={stacked ? 'form-group quick-add-full-width' : 'form-group'} style={groupStyle}>
       {/* The language the card was printed in — not the app's language. */}
       <label htmlFor={`${fieldId}-language`}>{t('card.language')}</label>
-      <select id={`${fieldId}-language`} className="select-control" value={language} onChange={(e) => onLanguage(e.target.value)}>
+      <select id={`${fieldId}-language`} className="select-control" disabled={disabled} value={language} onChange={(e) => onLanguage(e.target.value)}>
         {gameLanguages.map(l => <option key={l} value={l}>{l}</option>)}
       </select>
     </div>
@@ -94,7 +94,7 @@ export default function CardEntryFields({
     <div className="card-entry-fields-row-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.75rem' }}>
       <div className="form-group" style={groupStyle}>
         <label htmlFor={`${fieldId}-grader`}>{t('card.grader')}</label>
-        <select id={`${fieldId}-grader`} className="select-control" value={grader} onChange={(e) => {
+        <select id={`${fieldId}-grader`} className="select-control" disabled={disabled} value={grader} onChange={(e) => {
           const next = e.target.value;
           onGrader(next);
           // Switching back to Raw clears the grade and cert here as well as on the
@@ -107,14 +107,14 @@ export default function CardEntryFields({
       </div>
       <div className="form-group" style={groupStyle}>
         <label htmlFor={`${fieldId}-grade`}>{t('card.grade')}</label>
-        <select id={`${fieldId}-grade`} className="select-control" value={grade ?? ''} disabled={!graded} onChange={(e) => onGrade(e.target.value)}>
+        <select id={`${fieldId}-grade`} className="select-control" value={grade ?? ''} disabled={disabled || !graded} onChange={(e) => onGrade(e.target.value)}>
           <option value="">{t('card.gradeNone')}</option>
           {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
       </div>
       <div className="form-group" style={groupStyle}>
         <label htmlFor={`${fieldId}-cert-number`}>{t('card.certNumber')}</label>
-        <input id={`${fieldId}-cert-number`} type="text" inputMode="numeric" className="input-control" value={certNumber ?? ''} disabled={!graded}
+        <input id={`${fieldId}-cert-number`} type="text" inputMode="numeric" className="input-control" value={certNumber ?? ''} disabled={disabled || !graded}
           onChange={(e) => onCertNumber(e.target.value)} placeholder={graded ? t('card.certPlaceholder') : ''} />
       </div>
     </div>

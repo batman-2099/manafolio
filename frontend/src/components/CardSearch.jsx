@@ -128,6 +128,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   const [rapidLog, setRapidLog] = useState([]);
   const rapidEdits = useRef(new Set());
   const rapidInputRef = useRef(null);
+  const rapidQuantityRef = useRef(null);
   const textImportInput = useRef(null);
   const csvImportInput = useRef(null);
   const importTriggerRef = useRef(null);
@@ -474,7 +475,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   // One card straight into the collection, no drawer. Stacked on purpose: one
   // Enter press becomes exactly one row, so undo removes exactly what it added
   // (an unstacked qty-3 add would leave two orphan copies behind).
-  const addCardNow = async (card) => {
+  const addCardNow = async (card, copies) => {
     const choice = await requestReverse(card, { inventoryType: addToArena ? 'arena' : 'collection' });
     if (!choice) return null;
     const response = await fetch('/api/collection', {
@@ -483,7 +484,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
       body: JSON.stringify({
         card_id: card.id,
         reverse_card_id: choice.reverseCard?.id || null,
-        quantity: parseInt(quantity, 10) || 1,
+        quantity: copies,
         condition,
         printing,
         language,
@@ -506,6 +507,13 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
     const submitted = criteria || { query: '', numberQuery: rapidNumber.trim(), setCodeQuery, game, searchLang };
     const number = submitted.numberQuery;
     if (!number || rapidBusy || searchPending.current) return;
+    const copies = Number(quantity);
+    if (!Number.isInteger(copies) || copies < 1) {
+      rapidQuantityRef.current?.focus();
+      rapidQuantityRef.current?.reportValidity();
+      showToast(t('search.errQuantity'), 'error');
+      return;
+    }
     if (!submitted.setCodeQuery.trim()) { showToast(t('search.errNoSetCode'), 'error'); return; }
     searchPending.current = true;
     setSearchError(null);
@@ -552,19 +560,19 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
         return;
       }
 
-      const result = await addCardNow(hit);
+      const result = await addCardNow(hit, copies);
       if (!result) return;
       if (!addToArena && defaultAddLocation) {
         showToast(result.placement
           ? t('search.addedToContainer', { name: displayName(hit), location: result.placement.label })
           : t('search.addedUnassigned', { name: displayName(hit) }), 'success');
       }
-      setRapidLog(prev => [{ entryId: result.id, card: hit, qty: parseInt(quantity, 10) || 1, printing }, ...prev].slice(0, 25));
+      setRapidLog(prev => [{ entryId: result.id, card: hit, qty: copies, printing }, ...prev].slice(0, 25));
       setRapidNumber('');
       // Keep the owned badge honest if the card is also on screen.
       if (!addToArena) {
         setCards(prev => prev.map(c => (c.id === hit.id
-          ? { ...c, owned_qty: (c.owned_qty || 0) + (parseInt(quantity, 10) || 1) }
+          ? { ...c, owned_qty: (c.owned_qty || 0) + copies }
           : c)));
       }
       onAddSuccess();
@@ -1113,9 +1121,12 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
             <div className="form-group" style={{ margin: 0 }}>
               <label className="control-label" htmlFor="rapid-quantity">{t('card.quantity')}</label>
             <input
+              ref={rapidQuantityRef}
               id="rapid-quantity"
               type="number"
               min="1"
+              step="1"
+              required
               className="input-control"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
@@ -1454,7 +1465,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
               {!addToArena && (
                 <div className="form-group">
                   <label htmlFor="quick-add-container">{t('search.container')}</label>
-                  <select id="quick-add-container" className="select-control" value={addLocation} onChange={event => setAddLocation(event.target.value)} disabled={adding}>
+                  <select id="quick-add-container" className="select-control" value={addLocation} onChange={event => setAddLocation(event.target.value)} disabled={adding || localizing}>
                     <option value="">{t('bulk.unassignedPile')}</option>
                     {(addLocations || []).map(location => <option key={location.id} value={location.id}>{location.name}</option>)}
                   </select>

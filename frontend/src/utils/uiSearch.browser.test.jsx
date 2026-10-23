@@ -18,6 +18,7 @@ export async function runUiSearchRegressions() {
   const requests = [];
   const unexpected = [];
   const singleWrites = [];
+  let lookupCount = 0;
   let tokenResults = null;
   const toasts = [];
   let refreshes = 0;
@@ -28,6 +29,7 @@ export async function runUiSearchRegressions() {
   const front = { id: 'mtg-front', name: 'Goblin', game: 'mtg', language: 'English', set_id: 'tst', set_name: 'Fixture tokens', number: '1', subtypes: ['Token'], image_url: image };
   const back = { ...front, id: 'mtg-back', name: 'Soldier', number: '2' };
   window.fetch = async (url, options = {}) => {
+    if (String(url).startsWith('/api/search?')) lookupCount++;
     if (url === '/api/card-art/index') return response([]);
     if (url === '/api/collection' && options.method === 'POST') {
       singleWrites.push(JSON.parse(options.body));
@@ -171,6 +173,7 @@ export async function runUiSearchRegressions() {
       quick().querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
     assert(prompt() && singleWrites.length === 0, 'Quick Add guards duplicate submits while awaiting reverse choice');
+    assert([...quick().querySelectorAll('input, select')].every(control => control.matches(':disabled')), 'pending Quick Add disables all entry fields and its container');
     const quickToasts = toasts.length;
     await closeOverlay(async () => promptButton(en['common.cancel']).click());
     assert(singleWrites.length === 0 && toasts.length === quickToasts && quick().querySelector('input[id$="-quantity"]').value === '3', 'Quick Add cancel retains the form without a write or success toast');
@@ -180,9 +183,17 @@ export async function runUiSearchRegressions() {
 
     await change(host.querySelector('#search-set-codes'), 'tst');
     await click(button(en['search.rapid']));
-    await change(host.querySelector('#rapid-quantity'), '2');
     await change(host.querySelector('#rapid-card-number'), '1');
     const rapidSubmit = async () => act(async () => host.querySelector('#rapid-card-number').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    const beforeInvalidLookup = lookupCount;
+    for (const invalid of ['', '0', '-1', '1.5']) {
+      await change(host.querySelector('#rapid-quantity'), invalid);
+      await rapidSubmit();
+      assert(lookupCount === beforeInvalidLookup && singleWrites.length === 1 && !prompt(), `invalid Rapid Add quantity ${JSON.stringify(invalid)} cannot look up or save a card`);
+      assert(document.activeElement === host.querySelector('#rapid-quantity') && !host.querySelector('#rapid-quantity').checkValidity(), 'invalid Rapid Add quantity receives focus and native validation');
+      assert(toasts.at(-1)[0] === en['search.errQuantity'] && toasts.at(-1)[1] === 'error', 'invalid Rapid Add quantity announces actionable feedback');
+    }
+    await change(host.querySelector('#rapid-quantity'), '2');
     await rapidSubmit();
     await rapidSubmit();
     const rapidToasts = toasts.length;

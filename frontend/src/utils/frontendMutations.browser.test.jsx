@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import CardInspectorModal from '../components/CardInspectorModal';
 import AddToDeckSelect from '../components/AddToDeckSelect';
 import PackPriceSplitter from '../components/PackPriceSplitter';
+import CardEntryFields from '../components/CardEntryFields';
 import { useMultiSelect } from './useMultiSelect';
 
 // Run on an isolated Vite page, with no application mounted:
@@ -70,6 +71,18 @@ export async function runFrontendMutationRegressions() {
     </>;
   }
   try {
+    const fieldProps = { quantity: '2', purchasePrice: '3', condition: 'Played', printing: 'Normal', language: 'English', game: 'mtg', quantityMax: 250, onQuantity: () => {}, onPurchasePrice: () => {}, onCondition: () => {}, onPrinting: () => {}, onLanguage: () => {}, onGrader: () => {}, onGrade: () => {}, onCertNumber: () => {} };
+    for (const variant of ['grid', 'stacked']) {
+      await act(async () => root.render(<CardEntryFields {...fieldProps} variant={variant} grader="PSA" grade="9" certNumber="123" disabled />));
+      assert([...host.querySelectorAll('input, select, button')].every(control => control.disabled), `${variant} disables every entry control, including quantity steppers and grading`);
+      assert(host.querySelector('input[id$="-quantity"]').max === '250', 'pending controls retain quantity limits');
+    }
+    for (const grader of ['Raw', 'PSA']) {
+      await act(async () => root.render(<CardEntryFields {...fieldProps} grader={grader} />));
+      assert(!host.querySelector('input[id$="-quantity"]').disabled && !host.querySelector('select[id$="-grader"]').disabled, 'released pending state enables editable fields');
+      assert(host.querySelector('select[id$="-condition"]').disabled === (grader !== 'Raw'), 'graded condition remains locked');
+      assert(host.querySelector('select[id$="-grade"]').disabled === (grader === 'Raw') && host.querySelector('input[id$="-cert-number"]').disabled === (grader === 'Raw'), 'grade and certificate retain Raw constraints');
+    }
     await act(async () => { root.render(<SelectionFixture />); });
     await act(async () => { selection.arm(1); selection.setBulkMoveTarget('7'); });
     const originalSetter = selection.setSelectedIds;
@@ -145,6 +158,15 @@ export async function runFrontendMutationRegressions() {
     await inspectorCase({ ...card, list_type: 'wishlist' }, async () => {
       await act(async () => { host.querySelector('#markOwned').click(); });
     }, payload => assert(payload.list_type === 'collection' && payload.location_id === 7, 'explicit inventory change must preserve chosen-container resolution'));
+    await inspectorCase({ ...card, list_type: 'wishlist' }, async () => {
+      await changeValue(host.querySelector('#inspector-notes'), 'Keep this draft');
+      await changeValue(host.querySelector('input[id$="-quantity"]'), '4');
+      await changeValue(host.querySelector('select[id$="-printing"]'), 'Holofoil');
+      await act(async () => { host.querySelector('#markOwned').click(); });
+      assert(host.querySelector('#markOwned')?.checked, 'Mark obtained remains visible after checking');
+      await act(async () => { host.querySelector('#markOwned').click(); });
+      assert(!host.querySelector('#markOwned').checked && host.querySelector('#inspector-notes').value === 'Keep this draft' && host.querySelector('input[id$="-quantity"]').value === '4', 'unchecking retains unrelated draft fields');
+    }, payload => assert(payload.list_type === 'wishlist' && payload.notes === 'Keep this draft' && payload.quantity === 4 && payload.printing === 'Holofoil' && !('location_id' in payload), 'reversible Mark obtained preserves draft and original inventory'));
 
     const second = { ...card, entry_id: 43, quantity: 2, condition: 'Lightly Played', printing: 'Holofoil', language: 'German', location_id: 8, location_name: 'Other binder', position: 5000, notes: 'Second entry' };
     const stack = { ...card, quantity: 3, stack_entries: [card, second] };

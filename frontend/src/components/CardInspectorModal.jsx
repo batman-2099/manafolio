@@ -622,9 +622,9 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
 
           {mode === 'edit' ? (
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {listType !== 'collection' && listType !== 'graveyard' ? (
+              {(card.list_type || 'collection') !== 'collection' && card.list_type !== 'graveyard' ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(74,222,128,0.1)', padding: '0.6rem 0.9rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(74,222,128,0.2)' }}>
-                  <input type="checkbox" checked={listType === 'collection'} onChange={(e) => setListType(e.target.checked ? 'collection' : activeCard.list_type)} id="markOwned" style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
+                  <input type="checkbox" checked={listType === 'collection'} onChange={(e) => setListType(e.target.checked ? 'collection' : card.list_type)} id="markOwned" style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
                   <label htmlFor="markOwned" style={{ cursor: 'pointer', margin: 0, fontWeight: 700, color: 'var(--accent-green)', fontSize: '0.85rem' }}>
                     {t('inspector.markObtained')}
                   </label>

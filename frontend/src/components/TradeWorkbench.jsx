@@ -32,6 +32,7 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [entriesError, setEntriesError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [uncertain, setUncertain] = useState(false);
   const tradeId = useRef(null);
@@ -49,8 +50,8 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
   const requestController = useRef(null);
   const load = useCallback(async (signal) => {
     setLoading(true);
-    try { setEntries(await api('trades/entries', null, signal)); setPage(1); }
-    catch (err) { if (err.name !== 'AbortError') setError(err.message); }
+    try { setEntries(await api('trades/entries', null, signal)); setPage(1); setEntriesError(null); }
+    catch (err) { if (err.name !== 'AbortError') setEntriesError(err); }
     finally { if (!signal?.aborted) setLoading(false); }
   }, []);
   useEffect(() => {
@@ -152,17 +153,17 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
         <div className="trade-columns">
           <section><h3 ref={givingHeading} tabIndex={-1}>{t('trade.giving')}</h3><p>{t('trade.eligible')}</p>
             <label>{t('trade.filter')}<input className="input-control" value={filter} onChange={event => { setFilter(event.target.value); setPage(1); }} /></label>
-            <button className="btn btn-secondary" disabled={loading} onClick={() => { setError(''); load(); }}>{t('trade.refresh')}</button>
+            <button className="btn btn-secondary" disabled={loading} onClick={() => load()}>{t(entriesError ? 'common.retry' : 'trade.refresh')}</button>
+            {entriesError && <p role="alert" className="trade-error">{t('trade.entriesError')} {entriesError.message}</p>}
             {giving.length >= MAX_ROWS && <p id="trade-giving-limit" role="status">{t('trade.rowLimit', { max: MAX_ROWS })}</p>}
-            {loading ? <p role="status">{t('common.loading')}</p> : <>
+            {loading && <p role="status">{t('common.loading')}</p>}
               <ul ref={givingResults} className="scan-review-list trade-results">{pageEntries.map((card, index) => <li className="scan-review-card" key={card.entry_id}><CardImage card={card} loading="lazy" /><strong>{identity(card)}</strong><p>{card.quantity} × {card.printing} · {card.condition} · {card.location_name || t('trade.unassigned')} · #{card.entry_id}</p><button className="btn btn-secondary" disabled={giving.length >= MAX_ROWS} aria-describedby={giving.length >= MAX_ROWS ? 'trade-giving-limit' : undefined} onClick={event => { if (giving.length >= MAX_ROWS) return; if (event.detail === 0) focusAfterGiving.current = index; setSuccess(null); setGiving([...giving, { ...card, available: card.quantity, quantity: 1 }]); }}>{t('trade.add')}</button></li>)}</ul>
               {pageCount > 1 && <nav className="trade-pagination" aria-label={t('trade.pagination')}>
                 <button className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>{t('collection.previousPage')}</button>
                 <span role="status">{t('collection.pageCount', { page: currentPage, count: pageCount })}<br />{t('collection.pageRange', { start: (currentPage - 1) * PAGE_SIZE + 1, end: Math.min(currentPage * PAGE_SIZE, matching.length), count: matching.length })}</span>
                 <button className="btn btn-secondary" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>{t('collection.nextPage')}</button>
               </nav>}
-              {!entries.length ? <p role="status">{t('trade.empty')}</p> : !remaining.length ? <p role="status">{t('trade.allSelected')}</p> : !matching.length && <div><p role="status">{t('trade.noMatches')}</p><button className="btn btn-secondary" onClick={() => { setFilter(''); setPage(1); }}>{t('trade.clearFilter')}</button></div>}
-            </>}
+              {!loading && !entriesError && (!entries.length ? <p role="status">{t('trade.empty')}</p> : !remaining.length ? <p role="status">{t('trade.allSelected')}</p> : !matching.length && <div><p role="status">{t('trade.noMatches')}</p><button className="btn btn-secondary" onClick={() => { setFilter(''); setPage(1); }}>{t('trade.clearFilter')}</button></div>)}
           </section>
           <section><h3>{t('trade.receiving')}</h3><p>{t('trade.destination')}</p>
             <form onSubmit={event => { event.preventDefault(); run(async signal => { setResults(await api(`search?${new URLSearchParams({ name: query, lang: language, prints: '1', scope: 'database', limit: '60' })}`, null, signal)); }); }}>
