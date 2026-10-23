@@ -936,7 +936,7 @@ Arena and Graveyard decks cannot be checked out, even if a checkout control is v
 ### Return a deck after play
 
 1. Save any pending deck edits, then select **Return to Storage** in the deck toolbar, or **Return** in **Your decks**.
-2. Follow the card grid, grouped by container and page/row, to put cards back at their recorded locations. Each card shows its artwork, printing, slot, and quantity when more than one copy is returning.
+2. Follow the card grid, grouped by container and page/row, to put cards back at their recorded locations. The wider desktop guide shows three large cards per row; narrow screens use fewer columns. Each card shows its artwork, printing, slot, and quantity when more than one copy is returning.
 3. Select each card to mark it returned (select it again to correct a checkmark), or use **Select all**, then select **Done**.
 
 **Expected result:** checkout is cleared and the quantities become available for other Physical decks. Recorded storage placements stay unchanged. The guide's Cancel/X/back/outside-click path attempts to reverse the return and check the deck out again; check the resulting status if undo fails. Physically returning the cards is still your responsibility.

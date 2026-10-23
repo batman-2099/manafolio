@@ -166,7 +166,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
 
 
   const renderRows = (pulls) => (
-    <div className={kind === 'checkin' ? 'card-grid' : undefined} style={kind === 'checkin' ? { gridTemplateColumns: 'repeat(auto-fill, minmax(min(110px, 100%), 1fr))' } : { display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+    <div className={kind === 'checkin' ? 'card-grid' : undefined} style={kind === 'checkin' ? { gridTemplateColumns: 'repeat(auto-fill, minmax(min(190px, 100%), 1fr))' } : { display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
       {pulls.map(pull => {
         const isDone = done.has(pull.entry_id);
         const slot = slotOf(pull.position);
@@ -243,7 +243,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
     <Modal onClose={cancel} aria-labelledby={titleId}>
       <div
         className="glass-panel"
-        style={{ maxWidth: '640px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+        style={{ maxWidth: kind === 'checkin' ? '800px' : '640px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
