@@ -582,7 +582,8 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
 async function rebalanceCompartmentByScheme(database, compartmentId, sortOrder, foilSorting) {
   const dbClient = database || db;
   const cards = await dbClient.all(
-    `SELECT c.*, cc.name, cc.printed_name, cc.set_id as set_code, cc.set_name, cc.number, cc.types, cc.rarity, cc.price_trend
+    `SELECT c.*, cc.name, cc.printed_name, cc.set_id as set_code, cc.set_name, cc.number, cc.types, cc.rarity, cc.price_trend,
+            cc.cmc, cc.color_identity
      FROM collection c
      LEFT JOIN card_cache cc ON c.card_id = cc.id
      WHERE c.compartment_id = ? AND COALESCE(c.list_type, 'collection') = (

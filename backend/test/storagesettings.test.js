@@ -291,6 +291,35 @@ async function main() {
   assert.strictEqual((await save(`/locations/${otherLocation.lastID}/resort`, 'POST', { sort_order: descending })).status, 404);
   assert.deepStrictEqual(await db.get('SELECT * FROM locations WHERE id = ?', [otherLocation.lastID]), foreignBefore);
   console.log('PASS: resort persists alphabetical rules atomically and subsequent filing preserves physical order');
+
+  // Adding a card must use the same color/mana-value metadata as a full resort.
+  for (const [key, name, color, cmc] of [
+    ['white', 'Zebra', 'W', 1], ['red', 'Alpha', 'R', 3], ['blue', 'Middle', 'U', 2]
+  ]) {
+    await db.run(`INSERT INTO card_cache (id, name, game, color_identity, cmc)
+      VALUES (?, ?, 'mtg', ?, ?)`, [`order-${key}`, name, JSON.stringify([color]), cmc]);
+  }
+  for (const by of ['color_identity', 'color', 'cmc']) {
+    const order = JSON.stringify([{ by, dir: 'asc' }, { by: 'name', dir: 'asc' }]);
+    const container = await db.run(`INSERT INTO locations (name, type, sort_order, user_id)
+      VALUES ('Ordering sample', 'Box', ?, ?)`, [order, userId]);
+    const row = await db.run(`INSERT INTO compartments (location_id, idx, capacity)
+      VALUES (?, 1, 100)`, [container.lastID]);
+    for (const [index, key] of ['white', 'red'].entries()) {
+      await db.run(`INSERT INTO collection (card_id, user_id, location_id, compartment_id, position)
+        VALUES (?, ?, ?, ?, ?)`, [`order-${key}`, userId, container.lastID, row.lastID, (index + 1) * 1000]);
+    }
+    const added = await save('/collection', 'POST', { card_id: 'order-blue', location_id: container.lastID });
+    assert.strictEqual(added.status, 200);
+    const positions = await db.all(`SELECT card_id, position FROM collection
+      WHERE location_id = ? ORDER BY position, id`, [container.lastID]);
+    assert.deepStrictEqual(positions, [
+      { card_id: 'order-white', position: 1000 },
+      { card_id: 'order-blue', position: 2000 },
+      { card_id: 'order-red', position: 3000 },
+    ], `adding a card must preserve ${by} ordering instead of falling back to name`);
+  }
+  console.log('PASS: adding cards preserves color and mana-value storage order');
 }
 
 main()
