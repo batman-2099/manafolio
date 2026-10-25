@@ -231,14 +231,18 @@ router.post('/', async (req, res) => {
       if (!rows.length) return res.status(422).json({ error: 'This MTGJSON deck has no importable cards' });
       const { cards, pairs } = await scryfallApi.bulkFetchByIdentifier(rows, undefined, { localFirst: true });
       if (!pairs.length) return res.status(422).json({ error: 'No MTGJSON cards matched Scryfall' });
+      if (rows.some(row => row.isCommander) && !pairs.some(({ row }) => row.isCommander)) {
+        return res.status(422).json({ error: 'The precon commander must resolve before creating a deck.' });
+      }
       await scryfallApi.cacheCards(cards);
       preconPairs = pairs;
     }
 
+    const preconCommanderId = preconPairs?.find(({ row }) => row.isCommander)?.card.id || null;
     const result = await db.withTransaction(async () => {
       const deck = await db.run(
-        `INSERT INTO decks (name, description, game, format, category, accent_color, target_size, inventory_type, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [name, description, deckGame, format, category, accent_color, targetSizeNum, inventoryType, req.user.id]
+        `INSERT INTO decks (name, description, game, format, category, accent_color, target_size, inventory_type, user_id, commander_card_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, description, deckGame, preconCommanderId ? 'Commander / EDH' : format, category, accent_color, targetSizeNum, inventoryType, req.user.id, preconCommanderId]
       );
       if (commander_card_id !== undefined) {
         const check = await validateDeckAddition({ deckId: deck.lastID, userId: req.user.id, cardId: commander_card_id, newQty: 1, mode: 'draft' });

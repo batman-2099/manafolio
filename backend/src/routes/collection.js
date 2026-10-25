@@ -15,7 +15,7 @@ const { compartmentLabel, isBinderType, rebalanceCompartmentByScheme, stackKey }
 const { checkedOutAllocation, checkedOutSources, physicalCardEntries, sourceEntries, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { splitPrice } = require('../utils/splitPrice');
-const { validateReverseCard } = require('../utils/tokenPairing');
+const { isMtgToken, validateReverseCard } = require('../utils/tokenPairing');
 
 const router = express.Router();
 const LIST_TYPES = ['collection', 'wishlist', 'arena', 'graveyard'];
@@ -1174,9 +1174,39 @@ router.get('/mtg-decks/:fileName', searchLimiter, async (req, res) => {
   }
 });
 
+router.get('/mtg-decks/:fileName/tokens', searchLimiter, async (req, res) => {
+  try {
+    const deck = await mtgjsonApi.getDeck(req.params.fileName, req.query?.token_edition);
+    if (!deck) return res.status(404).json({ error: 'MTGJSON deck not found' });
+    const rows = mtgjsonApi.deckCardRows({ tokens: deck.tokens });
+    const { cards, pairs, unmatchedRows } = await scryfallApi.bulkFetchByIdentifier(rows, undefined, { localFirst: true });
+    if (unmatchedRows.length) {
+      return res.status(422).json({ error: 'All token fronts must resolve before reviewing this deck.' });
+    }
+    await scryfallApi.cacheCards(cards);
+    const review = [];
+    const seen = new Set();
+    for (const { row, card } of pairs) {
+      const front = await cardApi.printingInLanguage(card, row.language) || card;
+      if (!row.reverse_card_id && seen.has(front.id)) continue;
+      if (!row.reverse_card_id) seen.add(front.id);
+      review.push({ ...front, reverse_card_id: row.reverse_card_id || null });
+    }
+    res.json({ cards: review });
+  } catch (error) {
+    if (error.status === 400) return res.status(400).json({ error: error.message });
+    console.error('MTGJSON token review failed:', error.message);
+    res.status(502).json({ error: 'Failed to load MTGJSON tokens' });
+  }
+});
+
 router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
   if (req.body?.create_deck !== undefined && typeof req.body.create_deck !== 'boolean') {
     return res.status(400).json({ error: 'create_deck must be a boolean' });
+  }
+  const choices = req.body?.reverse_card_ids;
+  if (choices !== undefined && (!choices || typeof choices !== 'object' || Array.isArray(choices))) {
+    return res.status(400).json({ error: 'reverse_card_ids must be an object' });
   }
   try {
     const deck = await mtgjsonApi.getDeck(req.params.fileName, req.body?.token_edition);
@@ -1194,13 +1224,31 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
       return res.status(422).json({ error: 'All reverse token faces must resolve before importing this edition.' });
     }
     const missing = total - pairs.reduce((sum, { row }) => sum + row.quantity, 0);
-    if ((req.body?.create_deck || req.body?.token_edition) && missing) {
-      return res.status(422).json({ error: 'All cards must resolve before creating and checking out a deck.' });
+    if ((req.body?.create_deck || req.body?.token_edition || choices !== undefined) && missing) {
+      return res.status(422).json({ error: 'All cards must resolve before importing a reviewed deck or token edition.' });
     }
     await scryfallApi.cacheCards(cards);
     // Resolve language printings before acquiring the write transaction.
     for (const pair of pairs) {
       pair.card = await cardApi.printingInLanguage(pair.card, pair.row.language) || pair.card;
+    }
+    if (choices !== undefined) {
+      const unpaired = new Map(pairs
+        .filter(({ row, card }) => row.isToken && isMtgToken(card) && !row.reverse_card_id && !card.image_url_back)
+        .map(({ card }) => [card.id, card]));
+      for (const [frontId, reverseId] of Object.entries(choices)) {
+        if (!unpaired.has(frontId)) throw new AddCardError(400, 'Reverse choices must identify unpaired tokens in this deck');
+        if (reverseId !== null) {
+          if (typeof reverseId !== 'string' || !reverseId.trim()) throw new AddCardError(400, 'Invalid reverse_card_id');
+          if (!await cardApi.getCardById(reverseId)) throw new AddCardError(422, 'Selected reverse token could not be resolved');
+        }
+        await validateReverseCard(unpaired.get(frontId), reverseId);
+      }
+      for (const { row, card } of pairs) {
+        if (row.isToken && !row.reverse_card_id && !card.image_url_back && Object.hasOwn(choices, card.id)) {
+          row.reverse_card_id = choices[card.id];
+        }
+      }
     }
 
     const result = await db.withTransaction(async () => {
@@ -1222,9 +1270,10 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
     let deckId = null;
     if (req.body?.create_deck) {
       const created = await db.run(
-        `INSERT INTO decks (name, game, format, target_size, inventory_type, user_id)
-         VALUES (?, 'mtg', ?, ?, 'collection', ?)`,
-        [deck.name, deck.commander?.length ? 'Commander / EDH' : 'Standard', deckTotal, req.user.id]
+        `INSERT INTO decks (name, game, format, target_size, inventory_type, user_id, commander_card_id)
+         VALUES (?, 'mtg', ?, ?, 'collection', ?, ?)`,
+        [deck.name, deck.commander?.length ? 'Commander / EDH' : 'Standard', deckTotal, req.user.id,
+          pairs.find(({ row }) => row.isCommander)?.card.id || null]
       );
       deckId = created.lastID;
     }
@@ -1249,7 +1298,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
         }
         added += row.quantity;
       } catch (error) {
-        if (deckId || req.body?.token_edition || !(error instanceof AddCardError)) throw error;
+        if (deckId || req.body?.token_edition || choices !== undefined || !(error instanceof AddCardError)) throw error;
         failed.push({ name: row.name, error: error.message });
       }
     }

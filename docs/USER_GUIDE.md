@@ -38,6 +38,8 @@ Keyboard users can use **Skip to content** to bypass navigation. Changing the ma
 
 ### Catch up with recent changes
 
+For **2.4.1**, [precon imports](#add-cards-from-a-published-preconstructed-product) designate their commander and let you review unknown token backs before saving.
+
 For **2.4.0**, learn how to [pair double-sided tokens](#track-a-double-sided-token), [view both faces in container galleries](#create-a-container), and [exclude tokens from Deck Box totals and capacity warnings](#capacity-stacking-and-locks).
 
 For changes introduced in **2.3.3–2.3.4**, start with these procedures:
@@ -247,14 +249,16 @@ Quantities must be whole numbers from 1 to 2,147,483,647. Missing quantities def
 2. Search the MTGJSON product catalog by deck name, set code, or type using at least two characters, then choose **Search decks**.
 3. Choose **More details** on the matching product and inspect the listed contents.
 4. Review **Create Storage Container** and **Create Deck**. Both start enabled. Turn either off if you do not want that additional result.
-5. Choose **Add deck** and confirm the prompt to add all cards.
-6. Check Collection and, if requested, the new storage container.
+5. Choose **Add deck** and confirm the prompt to add all cards. For tokens without a known back, select the reverse printing or explicitly choose **Continue without reverse**. **Cancel** stops the entire import before any owned cards are saved.
+6. Check Collection and, if requested, the new storage container. Each token pair remains one physical entry, not two owned copies.
 
 This workflow adds the published main-board, commander, and sideboard cards to **physical Collection**. **Create Storage Container** creates a sized Deck Box. **Create Deck** also creates a Physical deck and checks it out, reserving the imported cards; disable it if you only want collection records. With deck creation selected, an unresolved card or import failure leaves no partial collection/container/deck from that operation.
 
+Both precon creation paths automatically designate the first commander listed by MTGJSON using its resolved card printing; Deck Builder also selects **Commander / EDH** for that precon. Manafolio currently stores one designated commander, so any additional listed commanders remain ordinary deck entries. Products without a listed commander do not get one assigned.
+
 Precon imports also add tokens that MTGJSON lists with a positive whole-number quantity. **More details → Tokens** shows these importable token printings and counts. They go into Physical Collection and the optional Deck Box, but not the playable deck list, target size, or checkout reservations. Deck Box totals and over-limit warnings continue to exclude tokens.
 
-Missing token lists and unspecified or invalid token quantities are not guessed; add those tokens manually after checking the product. Reverse faces are not guessed either—use [double-sided token pairing](#track-a-double-sided-token) to record a known reverse after import. The **Deck Builder → Create Deck** precon chooser still creates only a playable deck definition, without adding owned cards or tokens.
+Missing token lists and unspecified or invalid token quantities are not guessed; add those tokens manually after checking the product. Verified pairings and native double-faced tokens keep their backs without prompting. Other token backs are reviewed before import using [double-sided token pairing](#track-a-double-sided-token); one choice applies to matching unpaired copies of that printing. Failed imports retain completed choices while the page stays open, and imports with reviewed choices are atomic even with **Create Deck** disabled. The **Deck Builder → Create Deck** precon chooser still creates only a playable deck definition, without adding owned cards or tokens.
 
 When **Token contents** offers a verified edition, select it only if it matches your physical product, then reopen **More details** to review its fronts and reverse pairs. Verified-edition imports are atomic even with **Create Deck** disabled: an unresolved face or failed addition saves none of that import.
 

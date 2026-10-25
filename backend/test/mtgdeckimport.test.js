@@ -38,6 +38,7 @@ async function testMtgDeckImport() {
   const originalGet = mtgjsonApi.client.get;
   const originalBulkFetch = scryfallApi.bulkFetchByIdentifier;
   const originalCacheCards = scryfallApi.cacheCards;
+  let includeCommander = true;
   const tokens = [
     { name: 'Goblin', count: 3, setCode: 'ttst', number: '1', identifiers: { scryfallId: '44444444-4444-4444-4444-444444444444' } },
     { name: 'Soldier', count: 2, isFoil: true, setCode: 'ttst', number: '2' },
@@ -55,7 +56,7 @@ async function testMtgDeckImport() {
       assert.strictEqual(url, '/decks/ExampleDeck_TST.json');
       return { data: { data: {
         name: 'Example Deck',
-        commander: [{ name: 'Example Card', count: 1, type: 'Creature — Wizard', types: ['Creature'], setCode: 'tst', number: '1', identifiers: { scryfallId: '11111111-1111-1111-1111-111111111111' } }],
+        commander: includeCommander ? [{ name: 'Example Card', count: 1, type: 'Creature — Wizard', types: ['Creature'], setCode: 'tst', number: '1', identifiers: { scryfallId: '11111111-1111-1111-1111-111111111111' } }] : [],
         mainBoard: [
           { name: 'Example Card', count: 2, type: 'Creature — Wizard', types: ['Creature'], setCode: 'tst', number: '1', identifiers: { scryfallId: '11111111-1111-1111-1111-111111111111' } },
           { name: 'Example Spell', count: 1, type: 'Instant', types: ['Instant'], setCode: 'tst', number: '3', identifiers: { scryfallId: '33333333-3333-3333-3333-333333333333' } },
@@ -123,6 +124,8 @@ async function testMtgDeckImport() {
       { card_id: 'mtg-5', quantity: 2, printing: 'Holofoil', reverse_card_id: null },
     ], 'tokens preserve supplied quantities and finishes without guessing reverse faces');
     assert.strictEqual((await db.get('SELECT target_size FROM decks WHERE id = ?', [importRes.body.deck_id])).target_size, 5);
+    assert.strictEqual((await db.get('SELECT commander_card_id FROM decks WHERE id = ?', [importRes.body.deck_id])).commander_card_id, 'mtg-1',
+      'collection precon import must designate the resolved commander, not the provider UUID');
     assert.strictEqual((await db.get(`SELECT COALESCE(SUM(quantity), 0) AS count FROM deck_card_allocations
       WHERE deck_id = ? AND card_id IN ('mtg-4', 'mtg-5')`, [importRes.body.deck_id])).count, 0,
     'imported tokens do not become playable deck entries or reservations');
@@ -170,6 +173,11 @@ async function testMtgDeckImport() {
       assert.strictEqual(incomplete.statusCode, 422);
       assert.deepStrictEqual(await counts(), beforeFailure);
     }
+    scryfallApi.bulkFetchByIdentifier = async rows => fullFetch(rows.filter(row => !row.isCommander));
+    const missingCommander = response();
+    await createDeck({ body: { name: 'Unresolved commander', precon_file: 'ExampleDeck_TST' }, user: { id: 1 } }, missingCommander);
+    assert.strictEqual(missingCommander.statusCode, 422);
+    assert.deepStrictEqual(await counts(), beforeFailure, 'an unresolved commander must not create a commander-less deck');
     scryfallApi.bulkFetchByIdentifier = fullFetch;
     const createRes = response();
     await createDeck({
@@ -178,6 +186,9 @@ async function testMtgDeckImport() {
     }, createRes);
     assert.strictEqual(createRes.statusCode, 201);
     assert.strictEqual((await db.get('SELECT game FROM decks WHERE id = ?', [createRes.body.id])).game, 'mtg');
+    assert.deepStrictEqual(await db.get('SELECT format, commander_card_id FROM decks WHERE id = ?', [createRes.body.id]),
+      { format: 'Commander / EDH', commander_card_id: 'mtg-1' },
+      'deck-only precon creation must retain its commander and Commander format');
     assert.deepStrictEqual(
       await db.get('SELECT COUNT(*) AS types, SUM(quantity) AS copies FROM deck_cards WHERE deck_id = ?', [createRes.body.id]),
       { types: 3, copies: 5 },
@@ -191,12 +202,19 @@ async function testMtgDeckImport() {
         user: { id: 2 }
       }, unowned);
       assert.strictEqual(unowned.statusCode, 201, JSON.stringify(unowned.body));
+      assert.strictEqual((await db.get('SELECT commander_card_id FROM decks WHERE id = ?', [unowned.body.id])).commander_card_id, 'mtg-1');
       assert.deepStrictEqual(
         await db.get('SELECT COUNT(*) AS types, SUM(quantity) AS copies FROM deck_cards WHERE deck_id = ?', [unowned.body.id]),
         { types: 3, copies: 5 }
       );
     }
     assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM collection WHERE user_id = 2')).count, 0);
+    includeCommander = false;
+    const standard = response();
+    await createDeck({ body: { name: 'Non-Commander precon', precon_file: 'ExampleDeck_TST' }, user: { id: 1 } }, standard);
+    assert.strictEqual(standard.statusCode, 201);
+    assert.deepStrictEqual(await db.get('SELECT format, commander_card_id FROM decks WHERE id = ?', [standard.body.id]),
+      { format: 'Standard', commander_card_id: null }, 'ordinary precons must not designate a main-board card');
   } finally {
     mtgjsonApi.client.get = originalGet;
     mtgjsonApi.resetDeckListCache();

@@ -61,6 +61,8 @@ function deckCardRows(deck) {
       const reverse_card_id = isToken ? card.reverse_card_id || null : null;
       const key = `${isToken}|${id || `${set_id}|${number}`}|${reverse_card_id || ''}|${printing}|${language}`;
       const row = rows.get(key) || { id, set_id, number, name: card.name, printing, language, quantity: 0, isToken,
+        // ponytail: decks have one commander slot; designate the first listed.
+        isCommander: section === 'commander' && card === deck.commander[0],
         ...(reverse_card_id ? { reverse_card_id, reverse_name: card.reverse_name } : {}),
       };
       row.quantity += Math.max(1, parseInt(card.count, 10) || 1);

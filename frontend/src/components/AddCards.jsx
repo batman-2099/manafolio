@@ -73,7 +73,7 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, navigationGuardRef, i
         {mode === 'scan' && <CameraScanner onAddSuccess={onAddSuccess} showToast={showToast} setActiveTab={setActiveTab} />}
         {mode === 'search' && <CardSearch onAddSuccess={onAddSuccess} showToast={showToast} navigationGuardRef={modeGuardRef} />}
         {mode === 'slab' && <SlabLookup onAddSuccess={onAddSuccess} showToast={showToast} />}
-        {mode === 'deck' && <MtgDeckImport onAddSuccess={onAddSuccess} showToast={showToast} />}
+        {mode === 'deck' && <MtgDeckImport onAddSuccess={onAddSuccess} showToast={showToast} navigationGuardRef={modeGuardRef} />}
       </div>
     </div>
   );

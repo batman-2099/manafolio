@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import AddCards from '../components/AddCards';
+import MtgDeckImport from '../components/MtgDeckImport';
 import en from '../locales/en.json';
 
 // Run on an isolated Vite page; every fetch is mocked and no collection is touched.
@@ -8,6 +9,7 @@ import en from '../locales/en.json';
 export async function runUiSearchRegressions() {
   const assert = (condition, message) => { if (!condition) throw new Error(message); };
   const originalFetch = window.fetch;
+  const originalConfirm = window.confirm;
   const originalAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
   const originalUrl = window.location.href;
   const originalHistory = window.history.state;
@@ -28,7 +30,26 @@ export async function runUiSearchRegressions() {
   const image = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="10" height="14"/%3E';
   const front = { id: 'mtg-front', name: 'Goblin', game: 'mtg', language: 'English', set_id: 'tst', set_name: 'Fixture tokens', number: '1', subtypes: ['Token'], image_url: image };
   const back = { ...front, id: 'mtg-back', name: 'Soldier', number: '2' };
+  const precon = { fileName: 'fixture-precon', name: 'Fixture precon', token_editions: [{ id: 'fixture-edition', label: 'Fixture edition' }] };
+  const preconWrites = [];
+  let preconTokens = [];
+  let tokenLookups = 0;
+  let tokenLookupPending = false;
+  let tokenLookupFailure = false;
+  let settleTokens;
+  let settlePrecon;
   window.fetch = async (url, options = {}) => {
+    if (String(url).startsWith('/api/mtg-decks?')) return response([precon, { ...precon, fileName: 'other-precon', name: 'Other precon' }]);
+    if (String(url).startsWith(`/api/mtg-decks/${precon.fileName}/tokens?`)) {
+      tokenLookups++;
+      assert(new URL(String(url), location.origin).searchParams.get('token_edition') === 'fixture-edition', 'token preparation receives the selected edition');
+      if (tokenLookupPending) return new Promise(resolve => { settleTokens = () => resolve(response({ cards: preconTokens })); });
+      return tokenLookupFailure ? response({ error: 'Fixture token preparation failed' }, 502) : response({ cards: preconTokens });
+    }
+    if (url === `/api/mtg-decks/${precon.fileName}/import`) {
+      preconWrites.push(JSON.parse(options.body));
+      return new Promise(resolve => { settlePrecon = (body, status) => resolve(response(body, status)); });
+    }
     if (String(url).startsWith('/api/search?')) lookupCount++;
     if (url === '/api/card-art/index') return response([]);
     if (url === '/api/collection' && options.method === 'POST') {
@@ -211,12 +232,74 @@ export async function runUiSearchRegressions() {
     await change(host.querySelector('#rapid-card-number'), '1');
     await rapidSubmit();
     assert(!prompt() && singleWrites.length === 4 && singleWrites[3].list_type === 'arena' && singleWrites[3].reverse_card_id === null, 'Arena token addition skips physical reverse prompting');
+
+    window.confirm = () => true;
+    await click(button(en['addCards.deck']));
+    await change(host.querySelector('input[type="search"]'), 'Fixture');
+    await click(button(en['mtgDeck.search']));
+    await change(host.querySelector('select'), 'fixture-edition');
+    const verified = { ...front, id: 'mtg-verified', reverse_card_id: back.id };
+    const native = { ...front, id: 'mtg-native', image_url_back: image };
+    preconTokens = [verified, native, front, front, back];
+    tokenLookupPending = true;
+    const addPrecon = button(en['mtgDeck.add']);
+    await act(async () => { addPrecon.click(); addPrecon.click(); });
+    assert(tokenLookups === 1 && preconWrites.length === 0 && !prompt(), 'same-turn precon submits prepare tokens once before any write');
+    assert([...host.querySelectorAll('input, select')].every(control => control.disabled), 'precon preparation locks search and import options');
+    assert([...host.querySelectorAll('button')].filter(node => node.textContent.trim() === en['mtgDeck.add']).every(node => node.disabled), 'another precon cannot import during preparation');
+    await click(button(en['addCards.slab']));
+    assert(button(en['addCards.deck']).getAttribute('aria-pressed') === 'true' && guard.current() === false, 'precon preparation blocks mode and application navigation');
+    const unload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(unload);
+    assert(unload.defaultPrevented, 'precon preparation protects browser unload');
+    await act(async () => settleTokens());
+    tokenLookupPending = false;
+    assert(prompt()?.textContent.includes(front.name), 'verified and native reverse sides bypass review');
+    const beforePreconRefreshes = refreshes;
+    await closeOverlay(async () => promptButton(en['token.continueWithout']).click());
+    assert(prompt()?.textContent.includes(back.name) && preconWrites.length === 0, 'duplicate fronts share one decision and all review precedes writes');
+    await closeOverlay(async () => promptButton(en['common.cancel']).click());
+    assert(preconWrites.length === 0 && refreshes === beforePreconRefreshes && guard.current() === true && !button(en['mtgDeck.add']).disabled, 'later precon cancellation writes nothing and restores controls/navigation');
+    assert(document.activeElement === addPrecon, 'cancelled precon review restores focus to its enabled Add deck trigger');
+
+    await click(button(en['mtgDeck.add']));
+    await chooseReverse(back.id);
+    await closeOverlay(async () => promptButton(en['token.continueWithout']).click());
+    const preconBody = preconWrites[0];
+    assert(preconWrites.length === 1 && preconBody.reverse_card_ids[front.id] === back.id && preconBody.reverse_card_ids[back.id] === null, 'precon import submits the selected reverse and explicit skip');
+    assert(Object.keys(preconBody.reverse_card_ids).length === 2 && preconBody.token_edition === 'fixture-edition' && preconBody.create_container && preconBody.create_deck, 'known faces are not overridden and existing import options survive');
+    await click(button(en['mtgDeck.adding']));
+    assert(preconWrites.length === 1 && guard.current() === false, 'in-flight precon write prevents duplicate submission and navigation');
+    await act(async () => settlePrecon({ error: 'Fixture import failed' }, 500));
+    assert(toasts.at(-1)[0] === 'Fixture import failed' && guard.current() === true && !button(en['mtgDeck.add']).disabled, 'import failure restores retry controls and announces the error');
+    await click(button(en['mtgDeck.add']));
+    assert(!prompt() && preconWrites.length === 2 && JSON.stringify(preconWrites[1]) === JSON.stringify(preconBody), 'failed import retry retains completed reverse decisions');
+    await act(async () => settlePrecon({ added: 5 }));
+    assert(refreshes === beforePreconRefreshes + 1 && guard.current() === true, 'successful precon import refreshes once and releases navigation');
+
+    tokenLookupFailure = true;
+    await click(button(en['mtgDeck.add']));
+    assert(preconWrites.length === 2 && toasts.at(-1)[0] === 'Fixture token preparation failed' && guard.current() === true, 'token resolution failure never writes and permits retry');
+    tokenLookupFailure = false;
+    preconTokens = [verified, native];
+    await click(button(en['mtgDeck.add']));
+    assert(!prompt() && preconWrites.length === 3 && !Object.hasOwn(preconWrites[2], 'reverse_card_ids'), 'known-only import skips review and omits manual overrides');
+    await act(async () => settlePrecon({ added: 2 }));
+    let chosen = null;
+    const beforeChooseLookups = tokenLookups;
+    await act(async () => root.render(<MtgDeckImport onChoose={deck => { chosen = deck; }} />));
+    await change(host.querySelector('input[type="search"]'), 'Fixture');
+    await click(button(en['mtgDeck.search']));
+    window.confirm = () => { throw new Error('Choosing a definition must not confirm an inventory import'); };
+    await click(button(en['mtgDeck.choose']));
+    assert(chosen?.fileName === precon.fileName && tokenLookups === beforeChooseLookups && preconWrites.length === 3 && !prompt(), 'deck-definition selection does not prepare tokens or write inventory');
     assert(unexpected.length === 0, `no unmocked requests: ${unexpected.join(', ')}`);
-    return { passed: ['bulk quantity native validation', 'pending duplicate and draft/navigation ownership', 'mixed success and failed-only retry', 'all-failed retry recovery', 'Arena preserves Physical badges', 'named mode group pressed state', 'bulk token cancellation before every write', 'per-card bulk reverse choices', 'Quick Add token cancel and paired write', 'Rapid Add token cancel and paired stack', 'already-selected reverse and Arena skip prompt'] };
+    return { passed: ['bulk quantity native validation', 'pending duplicate and draft/navigation ownership', 'mixed success and failed-only retry', 'all-failed retry recovery', 'Arena preserves Physical badges', 'named mode group pressed state', 'bulk token cancellation before every write', 'per-card bulk reverse choices', 'Quick Add token cancel and paired write', 'Rapid Add token cancel and paired stack', 'already-selected reverse and Arena skip prompt', 'precon sequential choice/skip/cancel without writes', 'precon native/verified bypass', 'precon preparation and import duplicate/navigation guards', 'precon preparation/import recovery and retained choices', 'precon definition-only selection'] };
   } finally {
     await act(async () => root.unmount());
     host.remove();
     window.fetch = originalFetch;
+    window.confirm = originalConfirm;
     globalThis.IS_REACT_ACT_ENVIRONMENT = originalAct;
     window.history.replaceState(originalHistory, '', originalUrl);
   }

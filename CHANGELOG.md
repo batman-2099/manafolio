@@ -2,13 +2,16 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.4.1 — 2026-10-25
 
 - Import precon tokens into Physical Collection and the optional Deck Box when MTGJSON supplies positive whole-number quantities. Preview them separately under Tokens; exclude them from playable deck lists, target sizes, and reservations. Missing quantities and reverse pairings are not guessed.
 - Added an explicit white-4/4-Angel token edition for Multiverse Reforged, using Wizards' published contents to import ten physical tokens and nine reverse pairs atomically, including cross-set Spirit/Jace and Angel/Treasure; existing collections are not modified automatically.
 - Preserve native back artwork and face names in the card cache and account backups, and show native token backs beneath their fronts in card details and container galleries.
 - Allow reverse-token pairings across sets in additions, edits, scan drafts, trades, and imports. The reverse search set code is editable and can be cleared to search all sets; token-only validation and Arena restrictions remain intact.
 - Use the main Add Cards set picker in add/edit and reverse-token dialogs, with matching set-name/code suggestions, symbols, selected-set labels, and comma-separated codes.
+- Automatically designate the resolved commander when creating a precon deck through Add Cards or Deck Builder.
+- Review unknown token backs before precon imports, with explicit unpaired continuation, cancellation before inventory writes, and retained choices after failed imports. Verified pairs and native double-faced tokens bypass review; reviewed imports are atomic.
+- Preserve color-identity and mana-value storage ordering when additions and moves rebalance card positions.
 
 ## 2.4.0 — 2026-10-21
 
