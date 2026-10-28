@@ -2,6 +2,14 @@
 
 Release history starts with Manafolio 2.0.
 
+## 2.4.2 — 2026-10-28
+
+- Added desktop packages with bundled servers: Linux x86-64 AppImage, Apple Silicon macOS DMG, and a per-user Windows x64 installer.
+- Added dedicated app windows, native file dialogs, clipboard/navigation/zoom/print controls, camera permissions, and confirmed shutdown that waits for server requests and database writes.
+- Keep desktop data and configuration outside the installed application, with startup diagnostics and platform-specific migration, update, and security guidance.
+- Bundle the Microsoft Visual C++ runtime DLLs needed by ONNX Runtime in Windows packages.
+- Added platform packaging smoke checks and README download/install instructions. Server-only archives remain available; scan models/catalogs and native OCR prerequisites are not bundled.
+
 ## 2.4.1 — 2026-10-25
 
 - Import precon tokens into Physical Collection and the optional Deck Box when MTGJSON supplies positive whole-number quantities. Preview them separately under Tokens; exclude them from playable deck lists, target sizes, and reservations. Missing quantities and reverse pairings are not guessed.
