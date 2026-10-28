@@ -218,7 +218,8 @@ async function autoUpdateCatalogs() {
 
 // Initialize Database on startup
 let dbReady = false;
-db.initDb()
+const databaseInitialization = db.initDb();
+databaseInitialization
   .then(async () => {
     dbReady = true;
     console.log('Database tables verified/created successfully.');
@@ -408,13 +409,14 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-for (const signal of ['SIGINT', 'SIGTERM', 'SIGUSR2']) {
+for (const signal of process.platform === 'win32' ? ['SIGINT', 'SIGTERM'] : ['SIGINT', 'SIGTERM', 'SIGUSR2']) {
   process.once(signal, () => {
     require('./codexDeckClient').shutdown().finally(() => process.kill(process.pid, signal));
   });
 }
 
 // Start Express Server
+let httpsServer;
 const httpServer = app.listen(PORT, '0.0.0.0', () => {
   console.log(`=========================================`);
   console.log(`Manafolio Server running on port ${PORT}`);
@@ -422,6 +424,39 @@ const httpServer = app.listen(PORT, '0.0.0.0', () => {
   console.log(`=========================================`);
   // Camera scanning needs a secure context, so a LAN/Docker install serves TLS
   // too when HTTPS_PORT is set. Certificates live beside the database.
-  startHttps(app, path.join(path.dirname(db.dbPath), 'ssl'));
-  if (process.send) process.send({ type: 'listening', port: httpServer.address().port });
+  httpsServer = startHttps(app, path.join(path.dirname(db.dbPath), 'ssl'));
+  if (process.connected) process.send({ type: 'listening', port: httpServer.address().port });
+  if (process.env.MANAFOLIO_MAC_APP === '1' || process.env.MANAFOLIO_LINUX_APP === '1') {
+    console.log(`MANAFOLIO_READY:${httpServer.address().port}`);
+  }
 });
+
+// Windows has no graceful child.kill signal. Only the owning desktop's IPC
+// channel can request this shutdown; a crashed desktop disconnects it too.
+if (process.env.MANAFOLIO_WINDOWS_APP === '1' && process.send) {
+  let stopping = false;
+  const stopDesktopServer = async () => {
+    if (stopping) return;
+    stopping = true;
+    try {
+      await databaseInitialization;
+      const listeners = [httpServer, await httpsServer].filter(Boolean);
+      await Promise.all([
+        require('./codexDeckClient').shutdown(),
+        ...listeners.map(server => new Promise((resolve, reject) => {
+          server.close(error => error ? reject(error) : resolve());
+        })),
+      ]);
+      // Drain the existing query/transaction queue before closing SQLite.
+      await db.get('SELECT 1');
+      await new Promise((resolve, reject) => db.dbConnection.close(error => error ? reject(error) : resolve()));
+      process.exit(0);
+    } catch (error) {
+      console.error('Desktop server shutdown failed:', error);
+      process.exit(1);
+    }
+  };
+  process.on('message', message => { if (message?.type === 'shutdown') void stopDesktopServer(); });
+  process.once('disconnect', () => { void stopDesktopServer(); });
+  if (!process.connected) void stopDesktopServer();
+}

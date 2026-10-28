@@ -16,6 +16,57 @@ Open `http://localhost:3001`. Without `DEFAULT_ADMIN_PASSWORD`, the first browse
 
 The `manafolio-data` volume contains the SQLite database, automatic backups, TLS material, scan models, and catalogs. To configure optional variables in Compose, uncomment the `environment:` header and the desired entries below it; [`.env.example`](../.env.example) documents available settings. Builds use local source, not an assumed published image or binary. After updating your checkout, run `docker compose up -d --build` again. Existing installations must follow the [migration instructions](#migrate-an-existing-installation) first.
 
+## Windows installer
+
+Tagged releases also build `Manafolio-Setup-windows-x64.exe` for **64-bit Windows 10 or later**. Download it from [GitHub Releases](https://github.com/batman-2099/manafolio/releases), run Setup, and open **Manafolio** from the Start Menu. Setup installs for the current user without requesting administrator privileges, defaults to `%LOCALAPPDATA%\Programs\Manafolio`, and offers an optional desktop shortcut. Node, Electron, Chromium, and application dependencies are included; the server-only `.zip` remains available.
+
+Windows packages include ONNX Runtime's required Microsoft Visual C++ DLLs beside its native addon, so they do not rely on a separately installed Visual C++ Redistributable or require an elevation prompt to install it. These private runtime DLLs are serviced through Manafolio package updates. If an older installer fails loading `onnxruntime_binding.node` with “The specified module could not be found,” install the corrected package over the existing app; do not delete the data directory. Installing the [Microsoft x64 Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe) is also a workaround for older packages.
+
+Manafolio opens in its own sandboxed window and starts the bundled server without a console. Closing the window or choosing **Quit** asks for confirmation, then waits for active server requests and database writes before exiting. Finish imports and saves first. Setup and uninstall refuse to overwrite a running installed app/server; quit it and wait for shutdown before proceeding. Stop any older console-launched server too, since a port conflict is reported rather than connecting to another process.
+
+Persistent files live separately in `%LOCALAPPDATA%\Manafolio`: `manafolio.db`, backups, artwork, TLS material, and `models/`. Optional configuration goes in that directory's `.env`, using [`.env.example`](../.env.example) as a reference. Environment variables take precedence; `DB_PATH` and `CV_MODEL_DIR` override the defaults, and relative paths resolve from the data directory. The private Chromium profile lives in `desktop/`; server/startup diagnostics go to `desktop.log` (current launch, capped at 4 MiB). Startup errors offer **Show log**.
+
+The app uses native file dialogs, clipboard shortcuts, Back/Forward, reload, zoom, printing, and text prompts with Cancel/Escape. Camera access requires permission. External links open in your browser; sign-in redirects stay in the app session, although some identity providers reject embedded browsers. Browser sessions are not shared with Edge or Chrome.
+
+Before updating, quit Manafolio and back up the entire data directory, then run the new installer. **Settings → Apps → Installed apps → Manafolio → Uninstall** removes the program and shortcuts but deliberately retains collection data, configuration, and the desktop profile. Existing server-archive/Docker data is **not imported automatically**; follow the [offline migration procedure](#migrate-an-existing-installation). If an existing collection unexpectedly shows owner setup, stop and check paths.
+
+The installer is **unsigned**; Windows SmartScreen may warn about an unknown publisher. Only run a download from a source you trust; do not disable SmartScreen globally. The server retains normal LAN access, so protect access until first-owner setup is complete and use HTTPS remotely. Native scanning/OCR and ChatGPT/Codex still require the supported Unix runtime; use Docker for those features on Windows. Camera permission alone does not install those prerequisites.
+
+## Linux AppImage
+
+Tagged releases also build `Manafolio-Server-linux-x64.AppImage` for x86-64 Linux. Download it from [GitHub Releases](https://github.com/batman-2099/manafolio/releases), then run:
+
+```bash
+chmod +x Manafolio-Server-linux-x64.AppImage
+./Manafolio-Server-linux-x64.AppImage
+```
+
+The image opens Manafolio in its own desktop window and runs its bundled server in the background. No Terminal or browser is needed after launch. Closing the window or choosing **Quit** asks for confirmation, then stops the server; finish imports and saves first. Stop the previous browser-based AppImage server before launching this version. Node, Electron, Chromium, and application dependencies are included; the existing server-only `.tar.gz` remains available.
+
+The x86-64 image targets Ubuntu 22.04 or newer compatible desktop distributions with GTK 3, NSS, ALSA, and GBM runtime libraries. Chromium's sandbox requires unprivileged user namespaces; run as a normal user and **do not use `--no-sandbox` or run as root**. If a distro's AppArmor policy blocks user namespaces, configure a narrowly scoped policy for the installed app rather than disabling sandbox protections globally. If FUSE is unavailable, use `./Manafolio-Server-linux-x64.AppImage --appimage-extract-and-run`. Wayland and X11 are supported; if your compositor has rendering problems, launch with `--ozone-platform=x11` on an X11/XWayland session.
+
+By default, persistent files live in `~/.local/share/manafolio/` (`$XDG_DATA_HOME/manafolio/` when set): `manafolio.db`, backups, artwork, TLS material, and `models/` for scan models/catalogs. Optional configuration goes in that directory's `.env`; use [`.env.example`](../.env.example) as a reference. Environment variables take precedence over `.env`; `DB_PATH` and `CV_MODEL_DIR` can override the defaults. Relative configuration paths resolve from this data directory. The private Chromium profile lives in `desktop/`; sign in again when switching from the old browser UI. Current-launch server diagnostics go to `desktop.log` (capped at 4 MiB), and startup errors offer **Show log**.
+
+Imports/exports use native file dialogs; Edit/View provide clipboard shortcuts, Back/Forward, reload, zoom, and printing. Text prompts support Enter, Cancel, and Escape. Camera access requires an explicit grant and is restricted to the local app; microphones and unrelated permissions are denied. External links open in your browser, while SSO redirects remain in the app session (some providers may reject embedded browsers). The app does not share Safari/Chrome/Firefox sessions.
+
+Stop the server and back up this entire directory before updating; replace only the AppImage, not its data directory. Existing archive/Docker installations are **not imported automatically**: follow the [offline migration procedure](#migrate-an-existing-installation) and point configuration at the intended data before starting. An unexpected owner-creation screen means stop and check paths.
+
+The server retains its normal network behavior, including LAN access. Protect access until owner setup is complete and use HTTPS for remote access. Scanning still requires native Tesseract with English data and downloaded models/catalogs; these are not bundled. See [Card scanning](#card-scanning).
+
+## macOS DMG
+
+Tagged releases also build `Manafolio-Server-macos-arm64.dmg` for **Apple Silicon Macs running macOS 14.4 or later**. Download it from [GitHub Releases](https://github.com/batman-2099/manafolio/releases), open the disk image, drag **Manafolio.app** into **Applications**, and eject the image. The existing macOS `.tar.gz` server archive remains available.
+
+Open **Manafolio** from Applications. The app starts its bundled server in the background and displays Manafolio inside a native WebKit window; no Terminal or browser is required. Closing the window or pressing **Command+Q** asks for confirmation, then stops the server. Finish saves/imports before quitting. Stop an older Terminal-launched server before opening the new app; a port conflict is reported instead of silently connecting to another process.
+
+File imports and exports use macOS Open/Save dialogs. The Edit menu supports clipboard shortcuts; View offers Back, Forward, Reload, zoom, and Print. Camera access requires permission. External links open in your default browser; HTTP(S) sign-in redirects remain in the app's web session, although identity providers may disallow embedded browsers. The app has its own persistent WebKit session, separate from Safari/Chrome; sign in again after switching from the old browser launcher.
+
+The bundle is ad-hoc signed, **not Developer ID signed or notarized**. Gatekeeper may block a downloaded copy. Only if you trust the release, use macOS **System Settings → Privacy & Security → Open Anyway** after the first launch attempt. Do not disable Gatekeeper globally. Intel Macs are not supported by this artifact.
+
+Persistent files live in `~/Library/Application Support/Manafolio/`: `manafolio.db`, backups, artwork, TLS material, and `models/` for downloaded scan assets. Put optional configuration in that directory's `.env`, using [`.env.example`](../.env.example) as a reference. Environment variables take precedence; `DB_PATH` and `CV_MODEL_DIR` override the defaults. Relative configuration paths resolve from this data directory. Startup/server output goes to `desktop.log` there, replaced on each launch; startup failures offer **Show log**.
+
+Before updating, stop the server and back up the entire data directory, then replace the app in Applications. Existing archive/Docker data is **not imported automatically**; follow the [offline migration procedure](#migrate-an-existing-installation). The normal LAN access and first-owner setup rules still apply: protect access until setup is complete and use HTTPS for remote access. The DMG does not bundle native Tesseract or scan models/catalogs; packaging does not remove the existing [scanning prerequisites](#card-scanning).
+
 ## Migrate an existing installation
 
 Manafolio uses its own database, deployment, browser, and backup names. Startup does not rename previous database files or migrate deployment volumes, browser state, or backup formats. Follow the offline procedure before starting the new service. **Do not start the new service against an empty replacement volume.**

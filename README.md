@@ -44,6 +44,12 @@ The `manafolio-data` volume holds the database, backups, TLS material, scan mode
 
 **Existing installation?** Read the [offline migration procedure](docs/INSTALLATION.md#migrate-an-existing-installation) before starting a renamed or moved deployment. Back up the stopped data directory first; very old `sub_location_1` schemas take a destructive migration path. An unexpected owner-creation screen means you should stop and check the volume mount and `DB_PATH`, not initialize a replacement collection.
 
+**Windows:** releases also build an x64 [installer](docs/INSTALLATION.md#windows-installer) with its own app window, background server, and Start Menu shortcut—no terminal or browser needed.
+
+**Linux without Docker:** releases also build an x86-64 [AppImage](docs/INSTALLATION.md#linux-appimage) with its own desktop window and background server. Persistent data stays outside the image so it survives updates.
+
+**macOS:** releases also build an Apple Silicon [DMG](docs/INSTALLATION.md#macos-dmg) with a native app window and background server—no Terminal or browser needed.
+
 See the [installation guide](docs/INSTALLATION.md) for updates, configuration, HTTPS/reverse proxies, phone access, and scanning assets. Available environment variables are documented in [`.env.example`](.env.example).
 
 ## Screenshots

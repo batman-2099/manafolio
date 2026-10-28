@@ -42,8 +42,23 @@ process.on('unhandledRejection', fatal);
 
 try {
   const appBackend = path.join(path.dirname(process.execPath), 'app', 'backend');
-  process.chdir(appBackend); // dotenv reads ./.env, sqlite writes are cwd-relative
   const req = createRequire(path.join(appBackend, 'launch-anchor.js'));
+  if (process.env.APPIMAGE || process.env.MANAFOLIO_MAC_APP === '1' || process.env.MANAFOLIO_LINUX_APP === '1' || process.env.MANAFOLIO_WINDOWS_APP === '1') {
+    const fs = require('node:fs');
+    const home = require('node:os').homedir();
+    const dataDir = process.env.MANAFOLIO_MAC_APP === '1'
+      ? path.join(home, 'Library', 'Application Support', 'Manafolio')
+      : process.env.MANAFOLIO_WINDOWS_APP === '1'
+        ? path.join(process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local'), 'Manafolio')
+        : path.join(process.env.XDG_DATA_HOME || path.join(home, '.local', 'share'), 'manafolio');
+    fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+    process.chdir(dataDir);
+    req('dotenv').config();
+    process.env.DB_PATH ||= path.join(dataDir, 'manafolio.db');
+    process.env.CV_MODEL_DIR ||= path.join(dataDir, 'models');
+  } else {
+    process.chdir(appBackend); // Preserve archive configuration and relative paths.
+  }
   req(path.join(appBackend, 'src', 'server.js'));
 } catch (err) {
   fatal(err);

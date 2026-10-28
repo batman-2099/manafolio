@@ -42,7 +42,7 @@ jobs:
             target: windows-x64
             exe: manafolio-server.exe
             archive: zip
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             target: linux-x64
             exe: manafolio-server
             archive: tar
@@ -59,7 +59,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ runner.os == 'macOS' && '20' || '22' }}
 
       - name: Build frontend
         working-directory: frontend
@@ -71,6 +71,20 @@ jobs:
       - name: Install backend deps (prod)
         working-directory: backend
         run: npm ci --omit=dev
+
+      - name: Prepare Linux desktop runtime
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-0 libnss3 libasound2 libgbm1 xvfb
+          # The published sqlite3 prebuild requires newer glibc than Ubuntu 22.04.
+          npm rebuild sqlite3 --build-from-source --prefix backend
+
+      - name: Prepare desktop runtime
+        if: runner.os != 'macOS'
+        run: |
+          npm ci --prefix desktop/electron
+          node desktop/electron/node_modules/electron/install.js
 
       - name: Build SEA blob
         run: |
@@ -103,6 +117,24 @@ jobs:
           cp -r shared               "$ROOT/app/shared"
           cp -r frontend/dist        "$ROOT/app/frontend/dist"
           cp    .env.example         "$ROOT/app/backend/.env.example"
+
+      - name: Bundle Windows native runtime dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'Visual C++ redistributable source was not found' }
+          $crt = Get-ChildItem "$vs\VC\Redist\MSVC\*\x64\Microsoft.VC*.CRT" -Directory | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $crt) { throw 'x64 Visual C++ CRT directory was not found' }
+          # Node loads addons with LOAD_WITH_ALTERED_SEARCH_PATH: put their CRT
+          # dependencies beside the addon, not only beside the server executable.
+          $destination = 'build/manafolio-server/app/backend/node_modules/onnxruntime-node/bin/napi-v6/win32/x64'
+          foreach ($name in @('msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_atomic_wait.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+            $source = Join-Path $crt.FullName $name
+            Copy-Item -LiteralPath $source -Destination $destination
+            Write-Host "$name $((Get-Item $source).VersionInfo.FileVersion)"
+          }
 
       # Boot the assembled tree for real. A packaged binary that cannot start is
       # invisible to every other test in this repo — they all run from source,
@@ -175,6 +207,164 @@ jobs:
             tar czf "$NAME.tar.gz" -C build/manafolio-server .
             echo "ASSET=$NAME.tar.gz" >> "$GITHUB_ENV"
           fi
+
+      - name: Build Linux AppImage
+        if: runner.os == 'Linux'
+        run: |
+          APPDIR=build/Manafolio.AppDir
+          cp -r build/manafolio-server "$APPDIR"
+          cp frontend/public/logo.svg "$APPDIR/manafolio.svg"
+          cp -r desktop/electron/node_modules/electron/dist "$APPDIR/desktop"
+          mkdir -p "$APPDIR/desktop/resources/app"
+          cp desktop/electron/package.json desktop/electron/main.cjs "$APPDIR/desktop/resources/app/"
+          cat > "$APPDIR/AppRun" <<'EOF'
+          #!/bin/sh
+          exec "$(dirname "$(readlink -f "$0")")/desktop/electron" "$@"
+          EOF
+          chmod +x "$APPDIR/AppRun"
+          cat > "$APPDIR/manafolio.desktop" <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Manafolio
+          Comment=Magic collection, storage, and decks
+          Exec=AppRun
+          Icon=manafolio
+          Terminal=false
+          Categories=Game;
+          EOF
+          curl -fL https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage -o build/appimagetool
+          chmod +x build/appimagetool
+          ARCH=x86_64 build/appimagetool --appimage-extract-and-run "$APPDIR" build/Manafolio-Server-linux-x64.AppImage
+
+      - name: Smoke test Linux AppImage
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a node backend/scripts/smoke-linux.js ./build/Manafolio-Server-linux-x64.AppImage ./build/linux-desktop-smoke
+
+      - uses: actions/upload-artifact@v4
+        if: always() && runner.os == 'Linux'
+        with:
+          name: manafolio-linux-desktop-smoke
+          path: build/linux-desktop-smoke/*.png
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: manafolio-server-linux-x64-appimage
+          path: build/Manafolio-Server-linux-x64.AppImage
+
+      - name: Attach AppImage to release
+        if: github.ref_type == 'tag' && runner.os == 'Linux'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/Manafolio-Server-linux-x64.AppImage
+
+      - name: Build Windows desktop installer
+        if: runner.os == 'Windows'
+        run: |
+          cp -r build/manafolio-server build/Manafolio-windows
+          cp -r desktop/electron/node_modules/electron/dist build/Manafolio-windows/desktop
+          mv build/Manafolio-windows/desktop/electron.exe build/Manafolio-windows/desktop/Manafolio.exe
+          mkdir -p build/Manafolio-windows/desktop/resources/app
+          cp desktop/electron/package.json desktop/electron/main.cjs build/Manafolio-windows/desktop/resources/app/
+          node -e "require('./backend/node_modules/sharp')('frontend/public/logo.svg').resize(256,256).png().toBuffer().then(png => { const header = Buffer.alloc(22); header.writeUInt16LE(1,2); header.writeUInt16LE(1,4); header.writeUInt16LE(1,10); header.writeUInt16LE(32,12); header.writeUInt32LE(png.length,14); header.writeUInt32LE(22,18); require('fs').writeFileSync('build/Manafolio-windows/manafolio.ico',Buffer.concat([header,png])); })"
+          VERSION=$(node -p "require('./backend/package.json').version")
+          MSYS_NO_PATHCONV=1 "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" "/DAppVersion=$VERSION" desktop/windows/installer.iss
+
+      - name: Smoke test Windows installer
+        if: runner.os == 'Windows'
+        run: node backend/scripts/smoke-windows.js ./build/Manafolio-Setup-windows-x64.exe ./build/windows-desktop-smoke
+
+      - uses: actions/upload-artifact@v4
+        if: always() && runner.os == 'Windows'
+        with:
+          name: manafolio-windows-desktop-smoke
+          path: |
+            build/windows-desktop-smoke/**/*.png
+            build/windows-desktop-smoke/*.log
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: manafolio-windows-x64-installer
+          path: build/Manafolio-Setup-windows-x64.exe
+
+      - name: Attach Windows installer to release
+        if: github.ref_type == 'tag' && runner.os == 'Windows'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/Manafolio-Setup-windows-x64.exe
+
+      - name: Build macOS DMG
+        if: runner.os == 'macOS'
+        run: |
+          APP=build/dmg/Manafolio.app
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          swiftc -target arm64-apple-macos14.4 backend/macos/Manafolio.swift -o "$APP/Contents/MacOS/Manafolio"
+          cp -R build/manafolio-server "$APP/Contents/Resources/server"
+          cat > "$APP/Contents/Info.plist" <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleExecutable</key><string>Manafolio</string>
+            <key>CFBundleName</key><string>Manafolio</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleIconFile</key><string>manafolio.icns</string>
+            <key>LSMinimumSystemVersion</key><string>14.4</string>
+            <key>NSHighResolutionCapable</key><true/>
+            <key>NSCameraUsageDescription</key><string>Manafolio uses your camera to scan Magic cards when you start scanning.</string>
+            <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
+          </dict></plist>
+          EOF
+          VERSION=$(node -p "require('./backend/package.json').version")
+          plutil -replace CFBundleIdentifier -string app.manafolio.server "$APP/Contents/Info.plist"
+          plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
+          plutil -replace CFBundleVersion -string "$VERSION" "$APP/Contents/Info.plist"
+          plutil -lint "$APP/Contents/Info.plist"
+          mkdir -p build/manafolio.iconset
+          node -e "require('./backend/node_modules/sharp')('frontend/public/logo.svg').resize(1024, 1024).png().toFile('build/icon.png').catch(e => { console.error(e); process.exit(1); })"
+          for SIZE in 16 32 128 256 512; do
+            sips -z "$SIZE" "$SIZE" build/icon.png --out "build/manafolio.iconset/icon_${SIZE}x${SIZE}.png" >/dev/null
+            DOUBLE=$((SIZE * 2))
+            sips -z "$DOUBLE" "$DOUBLE" build/icon.png --out "build/manafolio.iconset/icon_${SIZE}x${SIZE}@2x.png" >/dev/null
+          done
+          iconutil -c icns build/manafolio.iconset -o "$APP/Contents/Resources/manafolio.icns"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict "$APP"
+          ln -s /Applications build/dmg/Applications
+          hdiutil create -volname Manafolio -srcfolder build/dmg -format UDZO build/Manafolio-Server-macos-arm64.dmg
+
+      - name: Smoke test mounted macOS DMG
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p build/dmg-mounted
+          hdiutil attach build/Manafolio-Server-macos-arm64.dmg -readonly -nobrowse -mountpoint "$PWD/build/dmg-mounted"
+          trap 'hdiutil detach "$PWD/build/dmg-mounted"' EXIT
+          node backend/scripts/smoke-package.js "$PWD/build/dmg-mounted/Manafolio.app/Contents/Resources/server/manafolio-server" --mac-app
+          cp -R build/dmg-mounted/Manafolio.app build/mac-wrapper-smoke.app
+          swiftc -D SMOKE_TEST -target arm64-apple-macos14.4 backend/macos/Manafolio.swift -o build/mac-wrapper-smoke.app/Contents/MacOS/Manafolio
+          codesign --force --deep --sign - build/mac-wrapper-smoke.app
+          node backend/scripts/smoke-macos.js "$PWD/build/mac-wrapper-smoke.app" "$PWD/build/mac-wrapper-smoke-data"
+
+      - uses: actions/upload-artifact@v4
+        if: always() && runner.os == 'macOS'
+        with:
+          name: manafolio-macos-wrapper-smoke
+          path: |
+            build/mac-wrapper-smoke-data/Library/Application Support/Manafolio/wrapper.png
+            build/mac-wrapper-smoke-data/Library/Application Support/Manafolio/desktop.log
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: manafolio-server-macos-arm64-dmg
+          path: build/Manafolio-Server-macos-arm64.dmg
+
+      - name: Attach DMG to release
+        if: github.ref_type == 'tag' && runner.os == 'macOS'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/Manafolio-Server-macos-arm64.dmg
 
       - uses: actions/upload-artifact@v4
         with:

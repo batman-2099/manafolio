@@ -58,6 +58,7 @@ Paths below are relative to the repository root.
 | `backend/src/psaApi.js` | Certification lookup |
 | `backend/src/cardArt.js`, `backup.js` | Artwork overrides and server-level SQLite snapshots |
 | `backend/scripts/` | Model fetching, catalog tooling, and scan-gate measurements |
+| `desktop/electron/`, `desktop/windows/installer.iss` | Shared sandboxed Linux/Windows desktop shell and per-user Windows installer; release packaging keeps server and user data separate |
 | `backend/test/`, `backend/test/e2e/` | Backend unit and HTTP integration runners |
 | `frontend/src/main.jsx`, `App.jsx` | Initialization, translations, authentication state, fetch wrapper, tab-based navigation |
 | `frontend/src/components/` | Collection, storage, deck, scanner, settings, administration, and shared views |
