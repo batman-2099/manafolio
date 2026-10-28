@@ -12,7 +12,7 @@
 
 Manafolio is a self-hosted, multi-user collection, storage, and deck manager for **Magic: The Gathering**. Track exact printings, find the box holding a copy, and prepare decks for play without mixing physical ownership with Arena inventory.
 
-Built with React, Express, and SQLite, it runs as one Docker service or from source and works in desktop and phone browsers. No hosted Manafolio account or AI subscription is required.
+Built with React, Express, and SQLite, it runs as a desktop app on Linux, macOS, and Windows, as one Docker service, or from source. The web interface also works in desktop and phone browsers. No hosted Manafolio account or AI subscription is required.
 
 ## Features
 
@@ -30,6 +30,22 @@ Built with React, Express, and SQLite, it runs as one Docker service or from sou
 
 ## Install
 
+### Desktop apps
+
+Download the package for your platform from [GitHub Releases](https://github.com/batman-2099/manafolio/releases). Each desktop app includes its own window and bundled server; no separate Node.js installation or browser is needed.
+
+| Platform | Download | Install and launch |
+| --- | --- | --- |
+| **Linux x86-64** — Ubuntu 22.04 or compatible newer desktop distributions | `Manafolio-Server-linux-x64.AppImage` | Make it executable with `chmod +x Manafolio-Server-linux-x64.AppImage`, then open it. See [Linux requirements and FUSE troubleshooting](docs/INSTALLATION.md#linux-appimage). |
+| **macOS 14.4+ on Apple Silicon** | `Manafolio-Server-macos-arm64.dmg` | Open the DMG, drag **Manafolio.app** to **Applications**, then launch it. Intel Macs are not supported by this package. See [macOS installation](docs/INSTALLATION.md#macos-dmg). |
+| **Windows 10+ x64** | `Manafolio-Setup-windows-x64.exe` | Run Setup, then open **Manafolio** from the Start Menu. Installs for the current user without administrator privileges; a desktop shortcut is optional. See [Windows installation](docs/INSTALLATION.md#windows-installer). |
+
+**Security notices:** the Windows installer is unsigned, and the macOS app is not Developer ID signed or notarized, so SmartScreen or Gatekeeper may warn. Download only from a trusted source and follow the platform-specific instructions above; do not disable system protections globally. On Linux, run as a normal user with Chromium's sandbox enabled.
+
+**Your data stays separate from the app.** Quit Manafolio and back up its data directory before updating; finish imports and saves before quitting. Existing Docker or server-archive data is **not imported automatically**—follow the [migration guide](docs/INSTALLATION.md#migrate-an-existing-installation). Scan models/catalogs and native OCR prerequisites are not bundled; see [scanning setup](docs/INSTALLATION.md#card-scanning). On Windows, use Docker for native scanning/OCR and ChatGPT/Codex.
+
+### Docker
+
 For a **new installation**, install Docker with Compose, then run:
 
 ```bash
@@ -43,12 +59,6 @@ Open **http://localhost:3001**. Without `DEFAULT_ADMIN_PASSWORD`, the first brow
 The `manafolio-data` volume holds the database, backups, TLS material, scan models, and catalogs. Keep protected backups outside that volume. Use **HTTPS for remote access and phone scanning**.
 
 **Existing installation?** Read the [offline migration procedure](docs/INSTALLATION.md#migrate-an-existing-installation) before starting a renamed or moved deployment. Back up the stopped data directory first; very old `sub_location_1` schemas take a destructive migration path. An unexpected owner-creation screen means you should stop and check the volume mount and `DB_PATH`, not initialize a replacement collection.
-
-**Windows:** releases also build an x64 [installer](docs/INSTALLATION.md#windows-installer) with its own app window, background server, and Start Menu shortcut—no terminal or browser needed.
-
-**Linux without Docker:** releases also build an x86-64 [AppImage](docs/INSTALLATION.md#linux-appimage) with its own desktop window and background server. Persistent data stays outside the image so it survives updates.
-
-**macOS:** releases also build an Apple Silicon [DMG](docs/INSTALLATION.md#macos-dmg) with a native app window and background server—no Terminal or browser needed.
 
 See the [installation guide](docs/INSTALLATION.md) for updates, configuration, HTTPS/reverse proxies, phone access, and scanning assets. Available environment variables are documented in [`.env.example`](.env.example).
 
