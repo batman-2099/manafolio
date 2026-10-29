@@ -585,7 +585,6 @@ function App() {
           <SetupWizard user={user} onUpdateUser={handleUpdateUser} onClose={() => setShowSetup(false)} />
         </Suspense>
       )}
-      {/* Premium Header */}
       <header className="app-header">
         <div className="logo-section">
           <h1 className="logo-text">Manafolio</h1>
@@ -595,9 +594,8 @@ function App() {
           <span className="app-version">v{import.meta.env.VITE_APP_VERSION}</span>
         </div>
 
-        {/* Navigation Tabs (Nested inside header for unified layout) */}
-        <nav ref={navRef} className="nav-tabs" style={{ margin: 0 }}>
-          <button 
+        <nav ref={navRef} className="nav-tabs">
+          <button type="button"
             className={`nav-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
             aria-current={activeTab === 'dashboard' ? 'page' : undefined}
             onClick={() => goTab('dashboard')}
@@ -605,7 +603,7 @@ function App() {
             <LayoutDashboard size={18} />
             <span>{t('nav.dashboard')}</span>
           </button>
-          <button
+          <button type="button"
             className={`nav-tab ${activeTab === 'add-cards' ? 'active' : ''}`}
             aria-current={activeTab === 'add-cards' ? 'page' : undefined}
             onClick={() => goTab('add-cards')}
@@ -613,7 +611,7 @@ function App() {
             <Plus size={18} />
             <span>{t('nav.addCards')}</span>
           </button>
-          <button
+          <button type="button"
             className={`nav-tab ${activeTab === 'collection' ? 'active' : ''}`}
             aria-current={activeTab === 'collection' ? 'page' : undefined}
             onClick={() => goTab('collection')}
@@ -621,7 +619,7 @@ function App() {
             <Database size={18} />
             <span>{t('nav.collection')}</span>
           </button>
-          <button
+          <button type="button"
             className={`nav-tab ${activeTab === 'storage' ? 'active' : ''}`}
             aria-current={activeTab === 'storage' ? 'page' : undefined}
             onClick={() => {
@@ -646,7 +644,7 @@ function App() {
             <span>{t('nav.more')}</span>
           </button>
           <div id="nav-secondary" className={`nav-secondary ${moreOpen ? 'is-open' : ''}`}>
-            <button
+            <button type="button"
               className={`nav-tab ${activeTab === 'deckbuilder' ? 'active' : ''}`}
               aria-current={activeTab === 'deckbuilder' ? 'page' : undefined}
               onClick={() => {
@@ -657,12 +655,12 @@ function App() {
               <Swords size={18} />
               <span>{t('nav.deckBuilder')}</span>
             </button>
-            <button className={`nav-tab ${activeTab === 'trades' ? 'active' : ''}`}
+            <button type="button" className={`nav-tab ${activeTab === 'trades' ? 'active' : ''}`}
               aria-current={activeTab === 'trades' ? 'page' : undefined} onClick={() => goTab('trades')}>
               <ArrowRightLeft size={18} aria-hidden="true" /><span>{t('trade.title')}</span>
             </button>
 
-            <button
+            <button type="button"
               className={`nav-tab ${activeTab === 'howto' ? 'active' : ''}`}
               aria-current={activeTab === 'howto' ? 'page' : undefined}
               onClick={() => goTab('howto')}
@@ -671,7 +669,7 @@ function App() {
               <span style={{ whiteSpace: 'nowrap' }}>{t('nav.howto')}</span>
             </button>
 
-            <button
+            <button type="button"
               className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
               aria-current={activeTab === 'settings' ? 'page' : undefined}
               onClick={() => goTab('settings')}
@@ -680,7 +678,7 @@ function App() {
               <span>{t('nav.settings')}</span>
             </button>
             {user.role === 'admin' && (
-              <button
+              <button type="button"
                 className={`nav-tab ${activeTab === 'admin' ? 'active' : ''}`}
                 aria-current={activeTab === 'admin' ? 'page' : undefined}
                 onClick={() => goTab('admin')}
@@ -692,16 +690,15 @@ function App() {
           </div>
         </nav>
 
-        <div className="header-account" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div className="header-greeting" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+        <div className="header-account">
+          <div className="header-greeting">
             <span>{t('header.greeting')} <strong style={{ color: 'var(--text-strong)' }}>{user.username}</strong> ({t(`role.${user.role}`)})</span>
           </div>
-          <button
+          <button type="button"
             onClick={handleLogout}
             className="btn btn-secondary btn-icon-only"
             title={t('header.logOut')}
             aria-label={t('header.logOut')}
-            style={{ padding: '0.4rem 0.5rem', borderRadius: 'var(--radius-sm)' }}
           >
             <LogOut size={14} />
           </button>
@@ -709,7 +706,7 @@ function App() {
       </header>
 
       {/* Main Content Area */}
-      <main id="main-content" ref={mainRef} tabIndex={-1} style={{ flex: 1, marginTop: '1rem' }}>
+      <main id="main-content" ref={mainRef} tabIndex={-1}>
         {user.role === 'admin' && setupProbe === 'loading' && <p role="status">{t('common.loading')}</p>}
         {serverUnavailable && snapshotUserId === user.id && <section className="glass-panel" role="status" style={{ padding: '1rem', marginBottom: '1rem' }}>
           <p>{t('offline.serverUnavailable')}</p>

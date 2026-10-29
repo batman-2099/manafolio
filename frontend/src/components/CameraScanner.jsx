@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import './CatalogueWorkbench.css';
 import { Camera, RefreshCw, AlertTriangle, X, Zap, ZapOff, Settings, ScanLine, ListFilter, Layers, Search } from 'lucide-react';
 import { getCardDisplayName } from '../utils/langHelper';
 import { priceText } from '../utils/formatPrice';
@@ -77,7 +78,7 @@ function LangFallbackNote({ card, style, priceCheck = false }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: '0.3rem', justifyContent: 'center',
-      fontSize: '0.65rem', lineHeight: 1.25, color: '#ffc107', marginTop: '0.25rem',
+      fontSize: 'var(--text-sm)', lineHeight: 1.25, color: 'var(--accent-yellow)', marginTop: '0.25rem',
       ...style,
     }}>
       <AlertTriangle size={11} style={{ flexShrink: 0 }} />
@@ -716,11 +717,11 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
   // can never disagree about why nothing is happening.
   const AUTO_BADGE = {
     scanning: { key: 'scan.autoScanning', color: 'var(--accent-red)' },
-    waiting: { key: 'scan.autoWaiting', color: '#fbbf24' },
-    lift: { key: 'scan.autoLiftCard', color: '#fbbf24' },
-    nocard: { key: 'scan.autoNoCard', color: 'rgba(255,255,255,0.55)' },
-    closer: { key: 'scan.autoCloser', color: '#fbbf24' },
-    hold: { key: 'scan.autoHoldStill', color: '#fbbf24' },
+    waiting: { key: 'scan.autoWaiting', color: 'var(--accent-yellow)' },
+    lift: { key: 'scan.autoLiftCard', color: 'var(--accent-yellow)' },
+    nocard: { key: 'scan.autoNoCard', color: 'var(--text-muted)' },
+    closer: { key: 'scan.autoCloser', color: 'var(--accent-yellow)' },
+    hold: { key: 'scan.autoHoldStill', color: 'var(--accent-yellow)' },
     ready: { key: 'scan.autoReady', color: 'var(--accent-green)' },
   };
 
@@ -1821,6 +1822,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
   return (
     <div className="scanner-container">
       <div className="scanner-capture">
+      <div className="scanner-camera-stage">
 
 
 
@@ -1833,7 +1835,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
           {cameraErrorKey ? (
             <div style={{ textAlign: 'center', padding: '2rem' }}>
               <AlertTriangle size={48} style={{ color: 'var(--accent-yellow)', marginBottom: '1rem' }} />
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
                 {t(cameraErrorKey, { origin: window.location.origin, port: window.location.port || '80' })}
               </p>
               <button type="button" className="btn btn-primary" onClick={startCamera}>
@@ -1843,8 +1845,8 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
           ) : (
             <div style={{ textAlign: 'center', padding: '2rem' }}>
               <Camera size={48} style={{ color: 'var(--accent-red)', marginBottom: '1rem', opacity: 0.8 }} />
-              <p style={{ fontSize: '0.95rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>{t('scan.readyTitle')}</p>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>{t('scan.readyHint')}</p>
+              <p style={{ fontSize: 'var(--text-md)', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>{t('scan.readyTitle')}</p>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>{t('scan.readyHint')}</p>
               <button type="button" className="btn btn-primary" onClick={startCamera}>
                 {t('scan.activateCamera')}
               </button>
@@ -1879,7 +1881,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+                  boxShadow: 'none'
                 }}
                 onClick={(e) => { e.stopPropagation(); toggleTorch(); }}
               >
@@ -1891,9 +1893,9 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 scanner is waiting on them (no card / hold still) or on itself
                 (scanning / lift the card), because those need opposite reactions. */}
             {autoScan && (autoState || verificationFrame) && (
-              <div style={{ position: 'absolute', top: '1rem', left: '1rem', zIndex: 20, display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.6rem', borderRadius: 999, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.6))' }}>
+              <div style={{ position: 'absolute', top: '1rem', left: '1rem', zIndex: 20, display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.6rem', borderRadius: 999, background: 'var(--media-background)', backdropFilter: 'none', filter: 'none' }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: autoState?.color || 'var(--accent-red)', flexShrink: 0 }} />
-                <span role="status" style={{ fontSize: '0.68rem', fontWeight: 700, color: '#fff' }}>{verificationFrame ? t('scan.verifying', { frame: verificationFrame, total: 2 }) : autoState.label}</span>
+                <span role="status" style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--media-foreground)' }}>{verificationFrame ? t('scan.verifying', { frame: verificationFrame, total: 2 }) : autoState.label}</span>
               </div>
             )}
 
@@ -1906,8 +1908,11 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             <div className="camera-overlay">
               <style>{`
                 @keyframes border-flash-error {
-                  0%, 100% { border-color: rgba(255, 255, 255, 0.4); box-shadow: none; }
-                  30%, 70% { border-color: var(--accent-red); box-shadow: 0 0 25px var(--accent-red-glow); }
+                  0%, 100% { border-color: var(--media-foreground); }
+                  30%, 70% { border-color: var(--accent-red); }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                  .scan-card-guide { animation: none !important; }
                 }
               `}</style>
               <div
@@ -1939,6 +1944,8 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                     worth seeing before pressing the shutter rather than after. */}
                 {showDetectOutline && detectQuad?.detected && detectQuad.quad && (
                   <svg
+                    role="img"
+                    aria-label={t('scan.showDetectOutline')}
                     viewBox="0 0 100 100"
                     preserveAspectRatio="none"
                     style={{
@@ -1953,8 +1960,8 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   >
                     <polygon
                       points={detectQuad.quad.map(p => `${p.x * 100},${p.y * 100}`).join(' ')}
-                      fill="rgba(74,222,128,0.15)"
-                      stroke="rgb(74,222,128)"
+                      fill="none"
+                      stroke="var(--accent-green)"
                       strokeWidth="2"
                       vectorEffect="non-scaling-stroke"
                     />
@@ -1965,7 +1972,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 <button
                   type="button"
                   onClick={resetGuide}
-                  style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto', zIndex: 10, fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-strong)', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 999, padding: '0.25rem 0.7rem', cursor: 'pointer' }}
+                  style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto', zIndex: 10, fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--media-foreground)', background: 'var(--media-background)', border: '1px solid var(--border-glass)', borderRadius: 999, padding: '0.25rem 0.7rem', cursor: 'pointer' }}
                 >
                   {t('scan.resetBox')}
                 </button>
@@ -1990,7 +1997,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                     type="number"
                     step="any"
                     className="input-control"
-                    style={{ width: '100%', minWidth: 0, minHeight: 44, fontSize: '1rem' }}
+                    style={{ width: '100%', minWidth: 0, minHeight: 44, fontSize: 'var(--text-md)' }}
                     value={guideInput?.id === control.id ? guideInput.value : control.value}
                     onChange={event => {
                       setGuideInput({ id: control.id, value: event.target.value });
@@ -2020,12 +2027,12 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
 
           {/* Advanced scan settings; auto-queue and the set filter stay on the main page. */}
           {showScanSettings && (
-          <div className="glass-panel" style={{ width: '100%', padding: '1rem', background: 'rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem', order: 2, position: 'relative' }}>
+          <div className="glass-panel" style={{ width: '100%', padding: '1rem', background: 'var(--surface-2)', display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem', order: 2, position: 'relative' }}>
             {/* Card art is language-specific, so the language picks which catalog
                 the scan is matched against AND how each added copy is recorded. */}
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: 1, minWidth: 0 }}>
-                <label htmlFor="scan-language" style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                <label htmlFor="scan-language" style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-muted)' }}>
                   {t('scan.cardLanguage')}
                 </label>
                 <select
@@ -2037,7 +2044,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                     setScanLang(code);
                     setLanguage(langName(code));
                   }}
-                  style={{ fontSize: '0.8rem' }}
+                  style={{ fontSize: 'var(--text-sm)' }}
                 >
                   {/* Keep languages without their own catalog available for
                       artwork matching, but make the limitation visible. */}
@@ -2052,7 +2059,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             </div>
             {!!scanBuiltLangs.length && !scanBuiltLangs.includes(langName(scanLang)) && (
               <p style={{
-                margin: '0.4rem 0 0', fontSize: '0.72rem', lineHeight: 1.4,
+                margin: '0.4rem 0 0', fontSize: 'var(--text-sm)', lineHeight: 1.4,
                 color: 'var(--text-muted)',
               }}>
                 {t('scan.langNoCatalogMtg', { lang: langName(scanLang) })}
@@ -2064,8 +2071,8 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 crop is visible BEFORE the shutter rather than inferred from a
                 wrong answer afterwards. Off is offered because it costs a small
                 request roughly every 650ms. */}
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.showDetectOutline')}</span>
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'var(--surface-2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.showDetectOutline')}</span>
               <input
                 type="checkbox"
                 checked={showDetectOutline}
@@ -2077,10 +2084,10 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             {/* Diagnostics: the hashed crop and the ranked candidates behind the
                 last scan. Off by default — it is for debugging a wrong match, not
                 for watching correct ones. */}
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'var(--surface-2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>
               <span style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.debugPanel')}</span>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t('scan.debugPanelHint')}</span>
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.debugPanel')}</span>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('scan.debugPanelHint')}</span>
               </span>
               <input
                 type="checkbox"
@@ -2098,15 +2105,15 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 the point: each gate shows its current reading next to its
                 threshold, so a card that will not trigger says why. */}
             {autoScan && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--surface-2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.autoTuning')}</span>
-                  <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.autoTuning')}</span>
+                  <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
                     {detectStats?.engine || '—'}{detectStats?.ms != null ? ` · ${detectStats.ms}ms` : ''}{detectStats?.runMs != null ? ` (run ${detectStats.runMs})` : ''}{detectStats?.armed === false ? ' · held' : ''}
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)' }}>
                   <label htmlFor="scan-fill" style={{ color: 'var(--text-muted)' }}>{t('scan.autoFillGate')}</label>
                   <span style={{ fontWeight: 700, color: detectStats && !detectStats.none && detectStats.fill >= minFill ? 'var(--accent-green)' : 'var(--accent-red)' }}>
                     {detectStats && !detectStats.none ? detectStats.fill.toFixed(2) : '—'} / {minFill.toFixed(2)}
@@ -2119,7 +2126,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   style={{ width: '100%', accentColor: 'var(--accent-red)' }}
                 />
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)' }}>
                   <label htmlFor="scan-steady" style={{ color: 'var(--text-muted)' }}>{t('scan.autoSteadyGate')}</label>
                   <span style={{ fontWeight: 700, color: detectStats && detectStats.steady >= minSteady ? 'var(--accent-green)' : 'var(--accent-red)' }}>
                     {detectStats ? detectStats.steady : '—'} / {minSteady}
@@ -2132,7 +2139,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   style={{ width: '100%', accentColor: 'var(--accent-red)' }}
                 />
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
                   <span>{t('scan.autoDrift')}: {detectStats?.drift != null ? detectStats.drift.toFixed(3) : '—'} / {STEADY_DRIFT}</span>
                   <span>{t('scan.autoCorners')}: {detectStats?.corners != null ? detectStats.corners.toFixed(3) : '—'}</span>
                 </div>
@@ -2140,10 +2147,10 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             )}
 
             {/* Presets do not change CollectorVision or the two-frame safety checks. */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'var(--surface-2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label htmlFor="scan-detail" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.detail')}</label>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-red)' }}>{t(`scan.preset.${profile.key}`)}</span>
+                <label htmlFor="scan-detail" style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.detail')}</label>
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--accent-red)' }}>{t(`scan.preset.${profile.key}`)}</span>
               </div>
               <input
                 id="scan-detail"
@@ -2155,24 +2162,24 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 onChange={(e) => { const v = parseInt(e.target.value, 10); setScanDetail(v); if (!priceCheck) localStorage.setItem('scan_detail', String(v)); }}
                 style={{ width: '100%', accentColor: 'var(--accent-red)' }}
               />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
                 <span>{t('scan.detailQuick')}</span>
                 <span>{t('scan.detailSlow')}</span>
               </div>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
                 {t('scan.presetHint', { width: profile.uploadW, seconds: profile.countdown, rectified: RECTIFIED_SIZE })}
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'var(--surface-2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label htmlFor="scan-zoom" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.zoom')}</label>
+                <label htmlFor="scan-zoom" style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.zoom')}</label>
                 {zoomCaps && <button
                   type="button"
                   className="btn btn-secondary"
                   disabled={zoomAdjusting || zoom === zoomCaps.initial}
                   onClick={() => changeZoom(zoomCaps.initial)}
-                  style={{ fontSize: '0.6rem', padding: '0.15rem 0.4rem' }}
+                  style={{ fontSize: 'var(--text-sm)', padding: '0.15rem 0.4rem' }}
                 >{t('scan.resetZoom')}</button>}
               </div>
               {zoomCaps ? <>
@@ -2187,21 +2194,21 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   onChange={(e) => changeZoom(Number(e.target.value))}
                   style={{ width: '100%', accentColor: 'var(--accent-red)' }}
                 />
-                <output htmlFor="scan-zoom" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{zoom}×</output>
-              </> : <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t('scan.zoomUnsupported')}</span>}
+                <output htmlFor="scan-zoom" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{zoom}×</output>
+              </> : <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('scan.zoomUnsupported')}</span>}
             </div>
 
             {/* Manual exposure: only rendered when the camera track supports it
                 (Android Chrome back cams). Auto-exposure stays default until you
                 move this. */}
             {exposureCaps && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', background: 'var(--surface-2)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label htmlFor="scan-exposure" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.exposure')}</label>
+                  <label htmlFor="scan-exposure" style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>{t('scan.exposure')}</label>
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    style={{ fontSize: '0.6rem', padding: '0.15rem 0.4rem' }}
+                    style={{ fontSize: 'var(--text-sm)', padding: '0.15rem 0.4rem' }}
                     onClick={() => {
                       const track = stream?.getVideoTracks?.()[0];
                       if (track) updateAdvancedConstraints(track, { exposureMode: 'continuous', exposureCompensation: null })
@@ -2223,7 +2230,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   onChange={(e) => changeExposure(parseFloat(e.target.value))}
                   style={{ width: '100%', accentColor: 'var(--accent-red)' }}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
                   <span>{t('scan.darker')}</span>
                   <span>{t('scan.brighter')}</span>
                 </div>
@@ -2237,9 +2244,9 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
               card, and it was eating a screenful on every correct scan too. Also
               needs an actual crop/candidate, so no empty dashed box. */}
           {showDebug && cameraActive && (debugHashImg || debugCandidates.length > 0) && (
-            <div className="glass-panel" style={{ width: '100%', padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.3)', border: '1px dashed var(--border-glass-hover)', display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.25rem' }}>
+            <div className="glass-panel" style={{ width: '100%', padding: '0.75rem 1rem', background: 'var(--surface-2)', border: '1px dashed var(--border-glass-hover)', display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.25rem' }}>
               {debugTimings.length > 0 && (
-                <div aria-label={t('scan.timings')} style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                <div aria-label={t('scan.timings')} style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
                   <strong>{t('scan.timings')}</strong>
                   {debugTimings.map(timing => (
                     <div key={timing.frame}>
@@ -2257,27 +2264,27 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
               )}
               {/* Hash-match diagnostics: what was cropped + the ranked candidates. */}
               {(debugHashImg || debugCandidates.length > 0) && (
-                <div style={{ display: 'flex', gap: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', marginTop: '0.25rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', background: 'var(--surface-2)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', marginTop: '0.25rem' }}>
                   {debugHashImg && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t('scan.hashedCrop')}</span>
-                      <img src={debugHashImg} style={{ width: '52px', maxHeight: '80px', objectFit: 'contain', background: '#111', borderRadius: '3px', border: '1px solid var(--border-glass-hover)' }} alt="Hashed crop" />
+                      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('scan.hashedCrop')}</span>
+                      <img src={debugHashImg} style={{ width: '52px', maxHeight: '80px', objectFit: 'contain', background: 'var(--media-background)', borderRadius: '3px', border: '1px solid var(--border-glass-hover)' }} alt="Hashed crop" />
                     </div>
                   )}
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                     {debugScoped !== null && (
-                      <span style={{ fontSize: '0.65rem', fontWeight: 700, color: debugScoped ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                      <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: debugScoped ? 'var(--accent-green)' : 'var(--accent-red)' }}>
                         {debugScoped ? t('scan.debugScoped', { sets: debugScoped }) : t('scan.debugGlobal')}
                       </span>
                     )}
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t('scan.debugTopMatchesSimilarity')}</span>
+                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('scan.debugTopMatchesSimilarity')}</span>
                     {debugCandidates.length === 0 ? (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t('scan.noCandidates')}</span>
+                      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('scan.noCandidates')}</span>
                     ) : debugCandidates.slice(0, 3).map((cd, i) => {
                       const pass = cd.score >= SCAN_MATCH_MIN_SCORE;
                       const label = cd.score != null ? cd.score.toFixed(2) : '?';
                       return (
-                        <div key={i} style={{ fontSize: '0.7rem', color: i === 0 ? '#fff' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div key={i} style={{ fontSize: 'var(--text-sm)', color: i === 0 ? 'var(--text-strong)' : 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           <span style={{ color: pass ? 'var(--accent-green)' : 'var(--accent-red)', fontWeight: 700 }}>{label}</span>
                           {' '}{cd.card ? getCardDisplayName(cd.card.name, cd.card.printed_name) : cd.name} <span style={{ color: 'var(--text-muted)' }}>({cd.set} #{cd.number})</span>
                         </div>
@@ -2317,9 +2324,9 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
               title={t('scan.scanningHint')}
             >
               <ScanLine size={15} />
-              <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{t(autoScan ? 'scan.scanningOn' : 'scan.scanningOff')}</span>
-              <span style={{ width: 28, height: 15, borderRadius: 999, background: autoScan ? '#fff' : 'rgba(255,255,255,0.22)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
-                <span style={{ position: 'absolute', top: 2, left: autoScan ? 15 : 2, width: 11, height: 11, borderRadius: '50%', background: autoScan ? 'var(--accent-red)' : '#fff', transition: 'left 0.2s' }} />
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{t(autoScan ? 'scan.scanningOn' : 'scan.scanningOff')}</span>
+              <span style={{ width: 28, height: 15, borderRadius: 999, background: autoScan ? 'var(--text-strong)' : 'var(--text-muted)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                <span style={{ position: 'absolute', top: 2, left: autoScan ? 15 : 2, width: 11, height: 11, borderRadius: '50%', background: autoScan ? 'var(--accent-red)' : 'var(--text-strong)', transition: 'left 0.2s' }} />
               </span>
             </button>
             <button
@@ -2340,13 +2347,15 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
         <input id="price-check-search" type="text" className="form-input"
           value={manualSearchText} onChange={e => setManualSearchText(e.target.value)}
           placeholder={t('scan.manualSearchPlaceholder')} disabled={manualSearching}
-          style={{ fontSize: '1rem', minHeight: 44 }} />
+          style={{ fontSize: 'var(--text-md)', minHeight: 44 }} />
         <button type="submit" className="btn btn-secondary" disabled={manualSearching || !manualSearchText.trim()}>
           {manualSearching ? <RefreshCw size={16} className="spin" aria-hidden="true" /> : <Search size={16} aria-hidden="true" />}
           {t(manualSearching ? 'common.loading' : 'search.submit')}
         </button>
         {scanStatus && !loading && <button type="button" className="btn btn-secondary" onClick={closeDrawer}>{t('scan.rescan')}</button>}
       </form>}
+      </div>
+      <div className="scanner-setup">
       {!priceCheck && <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
         <button
           type="button"
@@ -2366,22 +2375,22 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             <span style={{ position: 'absolute', top: 3, left: autoAdd ? 19 : 3, width: 14, height: 14, borderRadius: '50%', background: autoAdd ? 'var(--accent-green)' : 'var(--bg-primary)' }} />
           </span>
         </button>
-        <p id="scan-auto-queue-hint" style={{ fontSize: '0.9375rem', lineHeight: 1.5, color: 'var(--text-secondary)', margin: 0 }}>
+        <p id="scan-auto-queue-hint" style={{ fontSize: 'var(--text-md)', lineHeight: 1.5, color: 'var(--text-secondary)', margin: 0 }}>
           {t('scan.autoAddHint')}
         </p>
       </div>}
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.4rem', '--set-name-font-size': '1rem' }}>
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.4rem', '--set-name-font-size': 'var(--text-md)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                <label htmlFor="scan-set-filter" style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                <label htmlFor="scan-set-filter" style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-muted)' }}>
                   {t('scan.filterBySet')}
                 </label>
                 {scanSetCodes.length > 0 && (
-                  <button type="button" className="btn btn-secondary" style={{ fontSize: '0.6rem', padding: '0.2rem 0.5rem' }} onClick={() => { persistSets([]); setSetInput(''); }}>
+                  <button type="button" className="btn btn-secondary" style={{ fontSize: 'var(--text-sm)', padding: '0.2rem 0.5rem' }} onClick={() => { persistSets([]); setSetInput(''); }}>
                     {t('bulk.clear')}
                   </button>
                 )}
               </div>
-              <p style={{ fontSize: scanSetCodes.length ? '0.7rem' : '1rem', fontWeight: scanSetCodes.length ? 400 : 600, lineHeight: 1.5, color: scanSetCodes.length ? 'var(--accent-green)' : 'var(--accent-blue)', margin: 0 }}>
+              <p style={{ fontSize: 'var(--text-md)', fontWeight: scanSetCodes.length ? 400 : 600, lineHeight: 1.5, color: scanSetCodes.length ? 'var(--accent-green)' : 'var(--accent-blue)', margin: 0 }}>
                 {scanSetCodes.length
                   ? t('scan.setsFiltered', { count: selectedSetCount, codes: scanSetCodes.length })
                   : t('scan.setsAllHint')}
@@ -2392,13 +2401,13 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 value={setInput}
                 onChange={(e) => setSetInput(e.target.value)}
                 placeholder={t(scanGame === 'mtg' ? 'scan.setSearchMtg' : 'scan.setSearch')}
-                style={{ padding: '0.35rem 0.5rem', fontSize: '1rem', background: 'rgba(255,255,255,0.06)', border: `1px solid ${scanSetCodes.length ? 'var(--accent-green)' : 'var(--border-glass)'}`, borderRadius: 'var(--radius-sm)', color: 'var(--text-strong)' }}
+                style={{ padding: '0.35rem 0.5rem', fontSize: 'var(--text-md)', background: 'var(--surface-2)', border: `1px solid ${scanSetCodes.length ? 'var(--accent-green)' : 'var(--border-glass)'}`, borderRadius: 'var(--radius-sm)', color: 'var(--text-strong)' }}
               />
               {/* Scoping to a set the catalog does not hold is worse than not
                   scoping at all: cvScan fails open and scans everything, so the
                   filter appears to work and silently did nothing. */}
               {scanSets?.local && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.68rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={onlyBuiltSets}
@@ -2409,7 +2418,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 </label>
               )}
               {scanSets?.published && (
-                <p style={{ fontSize: '0.66rem', color: 'var(--text-muted)', margin: 0 }}>{t('scan.publishedCatalogNote')}</p>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', margin: 0 }}>{t('scan.publishedCatalogNote')}</p>
               )}
               {/* Shared with the catalog build picker and the first-run wizard:
                   one implementation of "which sets?", three things done with the answer. */}
@@ -2425,12 +2434,13 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 onlyWithCounts={onlyBuiltSets && !!scanSets?.local}
               />
             </div>
+      </div>
 
       {/* Scan Status Log */}
       {scanStatus && scanMatches.length === 0 && (
         <div role="status" className="glass-panel" style={{ width: '100%', padding: '1rem', borderLeft: '3px solid var(--accent-red)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {loading && <div className="spinner" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }}></div>}
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-strong)', fontWeight: 500 }}>{scanStatus}</span>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-strong)', fontWeight: 500 }}>{scanStatus}</span>
         </div>
       )}
 
@@ -2439,12 +2449,12 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
         <Modal onClose={cancelAutoAdd} aria-labelledby="scan-countdown-title" style={{ padding: '1rem' }}>
           <div className="glass-panel animate-fade-in scan-confirm-modal" style={{ maxWidth: '420px', width: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: '1.25rem', alignItems: 'center', textAlign: 'center', border: '1px solid var(--accent-red)' }}>
             <div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.15em', fontWeight: 800 }}>{t(autoAddEditing ? 'scan.adjustAndAdd' : 'scan.exactMatch')}</span>
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', fontWeight: 800 }}>{t(autoAddEditing ? 'scan.adjustAndAdd' : 'scan.exactMatch')}</span>
               {/* The name AS PRINTED when the provider gave one, so a Japanese
                   scan reads as the Japanese card it is. Falls back to English. */}
-              <h3 id="scan-countdown-title" style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-strong)', margin: '0.25rem 0 0.35rem 0' }}>{getCardDisplayName(autoAddTargetCard.name, autoAddTargetCard.printed_name)}</h3>
-              <p style={{ color: 'var(--text-primary)', fontSize: '1rem', fontWeight: 700, margin: 0 }}>#{autoAddTargetCard.number}</p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0 }}>{autoAddTargetCard.set_name}</p>
+              <h3 id="scan-countdown-title" style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: 'var(--text-strong)', margin: '0.25rem 0 0.35rem 0' }}>{getCardDisplayName(autoAddTargetCard.name, autoAddTargetCard.printed_name)}</h3>
+              <p style={{ color: 'var(--text-primary)', fontSize: 'var(--text-md)', fontWeight: 700, margin: 0 }}>#{autoAddTargetCard.number}</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', margin: 0 }}>{autoAddTargetCard.set_name}</p>
               <LangFallbackNote card={autoAddTargetCard} />
             </div>
 
@@ -2459,7 +2469,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
               style={{ position: 'relative', width: '115px', aspectRatio: 0.718, margin: '0.5rem 0', cursor: autoAddEditing ? 'default' : 'pointer' }}
               aria-label={t('scan.tapToChange')}
             >
-              <img src={autoAddTargetCard.image_url} alt={getCardDisplayName(autoAddTargetCard.name, autoAddTargetCard.printed_name)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', boxShadow: 'var(--shadow-glow)' }} />
+              <img src={autoAddTargetCard.image_url} alt={getCardDisplayName(autoAddTargetCard.name, autoAddTargetCard.printed_name)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', boxShadow: 'none' }} />
               {!autoAddEditing && (
                 <div style={{
                   position: 'absolute',
@@ -2469,14 +2479,14 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   height: '32px',
                   borderRadius: '50%',
                   backgroundColor: 'var(--accent-red)',
-                  border: '2px solid #fff',
+                  border: '2px solid var(--media-foreground)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'var(--text-strong)',
                   fontWeight: 900,
-                  fontSize: '1rem',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.5)'
+                  fontSize: 'var(--text-md)',
+                  boxShadow: 'none'
                 }}>
                   {autoAddCountdown}
                 </div>
@@ -2511,7 +2521,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                       setAutoAddEditing(false);
                       autoAddCard(card, 1, overrides);
                     }}
-                    style={{ flex: 1.5, fontSize: '0.75rem', padding: '0.45rem 0' }}
+                    style={{ flex: 1.5, fontSize: 'var(--text-sm)', padding: '0.45rem 0' }}
                   >
                     {t('scan.queueCard')}
                   </button>
@@ -2519,7 +2529,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                     type="button"
                     className="btn btn-secondary"
                     onClick={cancelAutoAdd}
-                    style={{ flex: 1, fontSize: '0.75rem', padding: '0.45rem 0' }}
+                    style={{ flex: 1, fontSize: 'var(--text-sm)', padding: '0.45rem 0' }}
                   >
                     {t('common.cancel')}
                   </button>
@@ -2527,8 +2537,8 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
               </div>
             ) : (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t('scan.autoAddingIn', { seconds: autoAddCountdown })}</span>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t('scan.tapToChange')}</span>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{t('scan.autoAddingIn', { seconds: autoAddCountdown })}</span>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('scan.tapToChange')}</span>
                 <div style={{ display: 'flex', gap: '0.5rem', width: '100%', marginTop: '0.5rem' }}>
                   <button
                     type="button"
@@ -2540,7 +2550,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                       setAutoAddAlternatives([]);
                       autoAddCard(card);
                     }}
-                    style={{ flex: 1.5, fontSize: '0.75rem', padding: '0.45rem 0' }}
+                    style={{ flex: 1.5, fontSize: 'var(--text-sm)', padding: '0.45rem 0' }}
                   >
                     {t('scan.addNow')}
                   </button>
@@ -2548,7 +2558,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                     type="button"
                     className="btn btn-secondary"
                     onClick={cancelAutoAdd}
-                    style={{ flex: 1, fontSize: '0.75rem', padding: '0.45rem 0' }}
+                    style={{ flex: 1, fontSize: 'var(--text-sm)', padding: '0.45rem 0' }}
                   >
                     {t('common.cancel')}
                   </button>
@@ -2559,7 +2569,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             {/* Keep alternative matches reachable before staging the draft. */}
             {!autoAddEditing && autoAddAlternatives.length > 0 && (
               <div style={{ width: '100%', borderTop: '1px solid var(--border-glass)', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', fontWeight: 700 }}>
                   {t('scan.notThisOne')}
                 </span>
                 <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
@@ -2583,7 +2593,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                         alt={getCardDisplayName(alt.name, alt.printed_name)}
                         style={{ width: '100%', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--border-glass-hover)' }}
                       />
-                      <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         #{alt.number}
                       </div>
                     </button>
@@ -2604,7 +2614,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                     setScanMatches(all);
                     setShowAllMatches(true);
                   }}
-                  style={{ alignSelf: 'center', fontSize: '0.7rem', padding: '0.3rem 0.7rem' }}
+                  style={{ alignSelf: 'center', fontSize: 'var(--text-sm)', padding: '0.3rem 0.7rem' }}
                 >
                   {t('scan.seeAllMatches', { n: autoAddAlternatives.length + 1 })}
                 </button>
@@ -2619,14 +2629,14 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
         <Modal onClose={discardRepeat} aria-labelledby="scan-duplicate-title" style={{ padding: '1rem' }}>
           <div className="glass-panel animate-fade-in scan-confirm-modal" style={{ maxWidth: '420px', width: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: '1.25rem', alignItems: 'center', textAlign: 'center', border: '1px solid var(--accent-yellow)' }}>
             <div>
-              <h3 id="scan-duplicate-title" style={{ fontSize: '0.75rem', color: 'var(--accent-yellow)', textTransform: 'uppercase', letterSpacing: '0.15em', fontWeight: 800 }}>{t('scan.sameCardAgain')}</h3>
-              <h3 style={{ fontSize: '1.25rem', color: 'var(--text-strong)', margin: '0.25rem 0 0.5rem 0' }}>{getCardDisplayName(dupConfirmCard.name, dupConfirmCard.printed_name)}</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0 }}>{dupConfirmCard.set_name} • #{dupConfirmCard.number}</p>
+              <h3 id="scan-duplicate-title" style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-yellow)', fontWeight: 800 }}>{t('scan.sameCardAgain')}</h3>
+              <h3 style={{ fontSize: 'var(--text-lg)', color: 'var(--text-strong)', margin: '0.25rem 0 0.5rem 0' }}>{getCardDisplayName(dupConfirmCard.name, dupConfirmCard.printed_name)}</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', margin: 0 }}>{dupConfirmCard.set_name} • #{dupConfirmCard.number}</p>
             </div>
 
-            <img src={dupConfirmCard.image_url} alt={getCardDisplayName(dupConfirmCard.name, dupConfirmCard.printed_name)} style={{ width: '110px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '6px', boxShadow: 'var(--shadow-glow)' }} />
+            <img src={dupConfirmCard.image_url} alt={getCardDisplayName(dupConfirmCard.name, dupConfirmCard.printed_name)} style={{ width: '110px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '6px', boxShadow: 'none' }} />
 
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', margin: 0 }}>
               {t('scan.repeatHint')}
             </p>
 
@@ -2636,14 +2646,14 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 type="button"
                 className="btn btn-secondary"
                 onClick={() => setDupQty(q => Math.max(1, q - 1))}
-                style={{ width: '36px', padding: '0.35rem 0', fontSize: '1rem', fontWeight: 800 }}
+                style={{ width: '36px', padding: '0.35rem 0', fontSize: 'var(--text-md)', fontWeight: 800 }}
               >−</button>
-              <span style={{ minWidth: '2.5rem', fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-strong)' }}>{dupQty}</span>
+              <span style={{ minWidth: '2.5rem', fontSize: 'var(--text-xl)', fontWeight: 900, color: 'var(--text-strong)' }}>{dupQty}</span>
               <button
                 type="button"
                 className="btn btn-secondary"
                 onClick={() => setDupQty(q => Math.min(99, q + 1))}
-                style={{ width: '36px', padding: '0.35rem 0', fontSize: '1rem', fontWeight: 800 }}
+                style={{ width: '36px', padding: '0.35rem 0', fontSize: 'var(--text-md)', fontWeight: 800 }}
               >+</button>
             </div>
 
@@ -2659,7 +2669,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   setDupConfirmCard(null);
                   autoAddCard(card, qty);
                 }}
-                style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0' }}
+                style={{ width: '100%', fontSize: 'var(--text-sm)', padding: '0.55rem 0' }}
               >
                 {t('scan.queueMore', { count: dupQty })}
               </button>
@@ -2667,7 +2677,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 type="button"
                 className="btn btn-secondary"
                 onClick={discardRepeat}
-                style={{ width: '100%', fontSize: '0.8rem', padding: '0.45rem 0' }}
+                style={{ width: '100%', fontSize: 'var(--text-sm)', padding: '0.45rem 0' }}
               >
                 {t('scan.discardRepeat')}
               </button>
@@ -2680,7 +2690,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   setAutoScan(false);
                   showToast(t('scan.secondPhoto'), 'status');
                 }}
-                style={{ width: '100%', fontSize: '0.8rem', padding: '0.45rem 0' }}
+                style={{ width: '100%', fontSize: 'var(--text-sm)', padding: '0.45rem 0' }}
               >
                 {t('scan.finishRepeat')}
               </button>
@@ -2694,8 +2704,8 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
         <Modal onClose={closeDrawer} aria-label={t('scan.identifiedTitle')} style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.85)',
-          backdropFilter: 'blur(5px)',
+          backgroundColor: 'var(--overlay-background)',
+          backdropFilter: 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -2704,7 +2714,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
         }}>
           <div className="glass-panel scan-suggestions-modal">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
-              <h3 style={{ fontSize: '1.1rem', color: 'var(--text-strong)', margin: 0 }}>{t('scan.identifiedTitle')}</h3>
+              <h3 style={{ fontSize: 'var(--text-lg)', color: 'var(--text-strong)', margin: 0 }}>{t('scan.identifiedTitle')}</h3>
               <button 
                 className="btn btn-secondary btn-icon-only" 
                 onClick={closeDrawer}
@@ -2718,17 +2728,17 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', margin: 0 }}>
                 {t(priceCheck ? 'priceCheck.selectCorrect' : 'scan.selectCorrect')}
               </p>
               {draftBusy && <p role="status">{t('common.loading')}…</p>}
               {draftError && <p role="alert">{draftError}</p>}
               {scanStatus && (
-                <p role="status" style={{ color: 'var(--text-strong)', fontSize: '0.85rem', margin: 0, padding: '0.75rem', borderLeft: '3px solid var(--accent-yellow)' }}>
+                <p role="status" style={{ color: 'var(--text-strong)', fontSize: 'var(--text-sm)', margin: 0, padding: '0.75rem', borderLeft: '3px solid var(--accent-yellow)' }}>
                   {scanStatus}
                 </p>
               )}
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', margin: 0, overflowWrap: 'anywhere' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-md)', margin: 0, overflowWrap: 'anywhere' }}>
                 {t('scan.nameRead')}{' '}
                 <strong style={{ color: 'var(--text-strong)' }}>
                   {scanName?.text
@@ -2749,7 +2759,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                     value={manualSearchText}
                     disabled={draftBusy}
                     onChange={(e) => setManualSearchText(e.target.value)}
-                    style={{ width: '100%', padding: '0.4rem 2rem 0.4rem 0.6rem', fontSize: '1rem' }}
+                    style={{ width: '100%', padding: '0.4rem 2rem 0.4rem 0.6rem', fontSize: 'var(--text-md)' }}
                   />
                   {manualSearchText && (
                     <button
@@ -2777,7 +2787,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   type="submit"
                   className="btn btn-secondary btn-sm"
                   disabled={draftBusy || manualSearching || !manualSearchText.trim()}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.75rem', fontSize: 'var(--text-sm)' }}
                 >
                   {manualSearching ? <RefreshCw size={14} className="spin" /> : <Search size={14} />}
                   <span>{t('search.submit') || 'Search'}</span>
@@ -2800,11 +2810,11 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                       the two lines that say WHICH printing this is were the smallest
                       text in the modal. */}
                   <div className="tcg-card-info" style={{ textAlign: 'center', marginTop: '0.5rem' }}>
-                    <div className="tcg-card-name" style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-strong)', lineHeight: 1.2 }}>{getCardDisplayName(card.name, card.printed_name)}</div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>#{card.number}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{card.set_name}</div>
+                    <div className="tcg-card-name" style={{ fontSize: 'var(--text-md)', fontWeight: 800, color: 'var(--text-strong)', lineHeight: 1.2 }}>{getCardDisplayName(card.name, card.printed_name)}</div>
+                    <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>#{card.number}</div>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{card.set_name}</div>
                     <LangFallbackNote card={card} priceCheck={priceCheck} />
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-yellow)', marginTop: '0.2rem' }}>{priceCheck && !(card.price_trend > 0) ? t('priceCheck.unavailable') : priceText(card.price_trend, card.price_currency)}</div>
+                    <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--accent-yellow)', marginTop: '0.2rem' }}>{priceCheck && !(card.price_trend > 0) ? t('priceCheck.unavailable') : priceText(card.price_trend, card.price_currency)}</div>
                   </div>
                 </button>
               ))}
@@ -2901,13 +2911,13 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
         <div className="glass-panel scan-confirm-modal" style={{ maxWidth: '420px', width: '100%', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
             <div style={{ minWidth: 0 }}>
-              <h2 id="price-check-result-title" style={{ margin: 0, fontSize: '1.25rem', overflowWrap: 'anywhere' }}>{getCardDisplayName(selectedCard.name, selectedCard.printed_name)}</h2>
+              <h2 id="price-check-result-title" style={{ margin: 0, fontSize: 'var(--text-lg)', overflowWrap: 'anywhere' }}>{getCardDisplayName(selectedCard.name, selectedCard.printed_name)}</h2>
               <p style={{ margin: '0.5rem 0 0', color: 'var(--text-secondary)' }}>{selectedCard.set_name} · #{selectedCard.number} · {selectedCard.language || langName(scanLang)}</p>
             </div>
             <button type="button" className="btn btn-secondary btn-icon-only" onClick={closeDrawer} aria-label={t('common.close')}><X size={18} /></button>
           </div>
           {selectedCard.image_url && <img src={selectedCard.image_url} alt={getCardDisplayName(selectedCard.name, selectedCard.printed_name)} style={{ width: '100%', maxWidth: 220, aspectRatio: '5 / 7', objectFit: 'contain', alignSelf: 'center', borderRadius: 'var(--radius-sm)' }} />}
-          <LangFallbackNote card={selectedCard} priceCheck style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }} />
+          <LangFallbackNote card={selectedCard} priceCheck style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }} />
           <div aria-live="polite">
             <p style={{ margin: '0 0 0.5rem', color: 'var(--text-secondary)' }}>{t('priceCheck.estimate')}</p>
             <dl style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', margin: 0 }}>
@@ -2946,11 +2956,11 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   is boilerplate. So they get the size, and the set name (which the
                   number already implies) drops to the small line. */}
               <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                <h3 id="scan-drawer-title" style={{ color: 'var(--text-muted)', fontSize: '0.7rem', margin: 0, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800 }}>{t(editingDraftId ? 'common.edit' : 'scan.addScannedTitle')}</h3>
-                <p style={{ color: 'var(--text-strong)', fontSize: '1.25rem', fontWeight: 800, margin: '0.1rem 0 0 0', lineHeight: 1.2, wordBreak: 'break-word' }}>
+                <h3 id="scan-drawer-title" style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', margin: 0, fontWeight: 800 }}>{t(editingDraftId ? 'common.edit' : 'scan.addScannedTitle')}</h3>
+                <p style={{ color: 'var(--text-strong)', fontSize: 'var(--text-lg)', fontWeight: 800, margin: '0.1rem 0 0 0', lineHeight: 1.2, wordBreak: 'break-word' }}>
                   {getCardDisplayName(selectedCard.name, selectedCard.printed_name)} <span style={{ color: 'var(--text-primary)' }}>#{selectedCard.number}</span>
                 </p>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, wordBreak: 'break-word' }}>{selectedCard.set_name}</p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', margin: 0, wordBreak: 'break-word' }}>{selectedCard.set_name}</p>
                 <LangFallbackNote card={selectedCard} style={{ justifyContent: 'flex-start' }} />
               </div>
               <button type="button" className="btn btn-secondary btn-icon-only" onClick={closeDrawer} disabled={draftBusy || findingPrintings} aria-label={t('common.close')} style={{ borderRadius: '50%', flexShrink: 0 }}>
@@ -2972,11 +2982,11 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                     className="quick-add-preview-img"
                   />
                   <div className="quick-add-preview-info">
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TCG Market ({printing})</div>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-yellow)', margin: '0.1rem 0' }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>TCG Market ({printing})</div>
+                    <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: 'var(--accent-yellow)', margin: '0.1rem 0' }}>
                       {priceText(resolveCardPrice(selectedCard, printing), selectedCard.price_currency)}
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                       Rarity: <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{selectedCard.rarity || 'Common'}</span>
                     </div>
                   </div>

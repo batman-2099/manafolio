@@ -1,0 +1,16 @@
+/* Hallmark · genre: modern-minimal · theme: Manafolio brand · shape: app screen · redesign: full · copy: verbatim · contrast: rendered controls checked across eight dashboard palettes; not a WCAG certification · v2.0.0 */
+/* Critique: shared accessibility foundations only; existing components retain their own layout. */
+html, body { overflow-x: clip; }
+html { scrollbar-color: var(--text-muted) var(--bg-primary); }
+body { font-size: var(--text-md); -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-red); color: var(--text-on-accent); }
+:is(h1, h2, h3, h4, h5) { font-family: var(--font-main); overflow-wrap: break-word; min-width: 0; text-wrap: balance; }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+[hidden] { display: none !important; }
+button, input, select, textarea { font-family: var(--font-main); }
+button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
+input, select, textarea { accent-color: var(--accent-red); }
+input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

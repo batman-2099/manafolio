@@ -18,7 +18,7 @@ function SelectAll({ ids, done, setChecked, label }) {
       onClick={() => setChecked(ids, !all)}
       style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem', flexShrink: 0 }}
     >
-      <span aria-hidden="true" style={{ width: '16px', height: '16px', borderRadius: '4px', border: all || some ? 'none' : '2px solid var(--text-muted)', background: all ? 'var(--accent-green)' : some ? 'var(--accent-blue)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: all ? '#000' : '#fff' }}>
+      <span aria-hidden="true" style={{ width: '16px', height: '16px', borderRadius: '4px', border: all || some ? 'none' : '2px solid var(--text-muted)', background: all ? 'var(--accent-green)' : some ? 'var(--accent-blue)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: all ? 'var(--bg-primary)' : 'var(--text-strong)' }}>
         {all ? <Check size={11} strokeWidth={3} /> : some ? <Minus size={11} strokeWidth={3} /> : null}
       </span>
       {label ?? t('wizard.selectAll')}
@@ -182,7 +182,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
             style={{
               textAlign: 'left', width: '100%', minWidth: 0, cursor: 'pointer',
               display: 'flex', flexDirection: kind === 'checkin' ? 'column' : 'row', alignItems: kind === 'checkin' ? 'stretch' : 'center', gap: '0.75rem', padding: '0.65rem 0.75rem',
-              background: isDone ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)',
+              background: isDone ? 'var(--surface-3)' : 'var(--surface-2)',
               border: isDone ? '1px solid var(--accent-green)' : '1px solid var(--border-glass)',
               borderRadius: 'var(--radius-sm)', transition: 'background 0.15s, border-color 0.15s'
             }}
@@ -194,7 +194,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
               background: isDone ? 'var(--accent-green)' : 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
-              {isDone && <Check size={14} color="#000" strokeWidth={3} />}
+              {isDone && <Check size={14} color="var(--bg-primary)" strokeWidth={3} />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: 'var(--text-strong)', fontSize: '0.9rem', fontWeight: 600, textDecoration: isDone ? 'line-through' : 'none', overflowWrap: 'anywhere', whiteSpace: kind === 'checkin' ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -205,7 +205,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
               </div>
             </div>
             {pull.take > 1 && (
-              <span className="badge" style={{ flexShrink: 0, background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)', fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
+              <span className="badge" style={{ flexShrink: 0, background: 'var(--surface-3)', color: 'var(--text-secondary)', fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
                 ×{pull.take}
               </span>
             )}
@@ -223,7 +223,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
     const undoneIds = page.pulls.filter(p => !done.has(p.entry_id)).map(p => p.entry_id);
     const doneIds = page.pulls.filter(p => done.has(p.entry_id)).map(p => p.entry_id);
     return (
-      <div style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', padding: '0.85rem', marginBottom: '0.6rem', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', padding: '0.85rem', marginBottom: '0.6rem', overflow: 'hidden' }}>
         <CompartmentView
           compartment={grid.compartment}
           cards={grid.cards}
@@ -253,7 +253,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
         <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-glass)', flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
             <div>
-              <h2 id={titleId} style={{ fontSize: '1.35rem', color: 'var(--text-strong)', fontWeight: 800, margin: '0 0 0.25rem 0' }}>{t(`wizard.${kind}.title`)}</h2>
+              <h2 id={titleId} style={{ fontSize: '1.35rem', color: 'var(--text-strong)', fontWeight: 700, margin: '0 0 0.25rem 0' }}>{t(`wizard.${kind}.title`)}</h2>
               <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.85rem' }}>{t(`wizard.${kind}.subtitle`)}</p>
             </div>
             <button className="btn btn-secondary btn-icon-only" onClick={cancel} disabled={busy} aria-label={t('common.cancel')}>
@@ -267,7 +267,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
                 <span role="status" aria-live="polite" aria-atomic="true" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t(`wizard.${kind}.progress`, { done: doneCount, total: totalPulls })}</span>
                 <SelectAll ids={allEntryIds} done={done} setChecked={setChecked} label={t('wizard.selectAll')} />
               </div>
-              <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: '6px', background: 'var(--surface-3)', borderRadius: '3px', overflow: 'hidden' }}>
                 <div style={{ width: `${pct}%`, height: '100%', background: allComplete ? 'var(--accent-green)' : 'var(--accent-blue)', transition: 'width 0.3s ease' }} />
               </div>
             </div>
@@ -294,7 +294,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
           )}
 
           {missing.length > 0 && (
-            <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 'var(--radius-md)', padding: '0.85rem 1rem' }}>
+            <div style={{ background: 'var(--surface-2)', border: '1px solid var(--text-negative)', borderRadius: 'var(--radius-md)', padding: '0.85rem 1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-red)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.4rem' }}>
                 <AlertTriangle size={16} /> {t('wizard.notEnoughCopies')}
               </div>
@@ -316,7 +316,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <button type="button" aria-expanded={!collapsed} aria-controls={panelId} onClick={toggleExpand}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1, minWidth: 0, textAlign: 'left', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0, background: complete ? 'var(--accent-green)' : container.unassigned ? 'rgba(148,163,184,0.15)' : 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: complete ? '#000' : container.unassigned ? 'var(--text-muted)' : 'var(--accent-blue)' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: 'var(--radius-sm)', flexShrink: 0, background: complete ? 'var(--accent-green)' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: complete ? 'var(--bg-primary)' : container.unassigned ? 'var(--text-muted)' : 'var(--accent-blue)' }}>
                     {complete ? <Check size={16} strokeWidth={3} /> : container.unassigned ? <Package size={16} /> : <MapPin size={16} />}
                   </div>
                   <div style={{ minWidth: 0, flex: 1 }}>

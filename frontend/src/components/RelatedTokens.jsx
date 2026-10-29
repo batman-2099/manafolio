@@ -58,7 +58,7 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
 
   return (
     <section className={compact ? 'related-tokens-compact' : undefined} aria-labelledby={headingId} style={{ minWidth: 0, borderTop: '1px solid var(--border-glass)', paddingTop: '1rem' }}>
-      <h3 id={headingId} style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>{title ?? t('relatedTokens.title')}</h3>
+      <h3 id={headingId} style={{ fontSize: 'var(--text-md)', marginBottom: '0.5rem' }}>{title ?? t('relatedTokens.title')}</h3>
       {status === 'loading' && <p role="status">{t('relatedTokens.loading')}</p>}
       {status === 'error' && (
         <div>
@@ -71,15 +71,15 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
       ) : (
         <ul className={compact ? 'related-token-list' : 'card-grid'} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {result.tokens.map(token => (
-            <li key={token.id} className={compact ? 'related-token-item' : undefined} style={compact ? { minWidth: 0, overflowWrap: 'anywhere' } : { display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 0, background: 'var(--surface-1)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '0.5rem', overflowWrap: 'anywhere' }}>
+            <li key={token.id} className={compact ? 'related-token-item' : undefined} style={compact ? { minWidth: 0, overflowWrap: 'anywhere' } : { display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', minWidth: 0, overflowWrap: 'anywhere' }}>
               <button type="button" className={compact ? 'related-token-art ci-image-wrap' : 'ci-image-wrap'} aria-label={`${t('deck.previewArt')}: ${token.name}`} aria-haspopup="dialog" onClick={() => setPreviewToken({ ...token, id: token.matched_card_id || token.id })}>
                 <CardImage card={{ ...token, id: token.matched_card_id || token.id }} game="mtg" loading="lazy" style={{ width: '100%', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
                 <span>{t('deck.previewArt')}</span>
               </button>
               <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{token.name}</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>{token.name}</span>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                   {t(inventoryType === 'arena'
                     ? token.owned ? 'relatedTokens.ownedArena' : 'relatedTokens.notOwnedArena'
                     : token.owned ? 'relatedTokens.owned' : 'relatedTokens.notOwned')}
@@ -87,7 +87,7 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
                 </span>
               </div>
               {token.owned && inventoryType === 'collection' && (
-                <ul style={{ listStyle: 'none', margin: '0.25rem 0 0', padding: 0, color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                <ul style={{ listStyle: 'none', margin: '0.25rem 0 0', padding: 0, color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
                   {token.locations.map((location, index) => {
                     const slot = getSlotNumber(location);
                     return (
@@ -101,7 +101,7 @@ export default function RelatedTokens({ cardIds = [], title, inventoryType = 'co
                   })}
                 </ul>
               )}
-              <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              <p style={{ marginTop: '0.5rem', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                 {t('relatedTokens.createdBy')}
                 {[...new Set(token.source_cards.map(source => source.name))].map(name => (
                   <span key={name} style={{ display: 'block' }}>{name}</span>

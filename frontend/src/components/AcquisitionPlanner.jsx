@@ -50,7 +50,7 @@ export default function AcquisitionPlanner({ decks, onClose }) {
           <input type="checkbox" checked={selected.includes(deck.id)} onChange={event => {
             reset(); setSelected(event.target.checked ? [...selected, deck.id] : selected.filter(id => id !== deck.id));
           }} />
-          <span>{deck.name} — {t('deck.physical')}</span>
+          <span>{deck.name}: {t('deck.physical')}</span>
         </label>)}</div>
         <label htmlFor="acquisition-preference">{t('planner.preference')}</label>
         <select id="acquisition-preference" className="input-control" value={preference} onChange={event => {

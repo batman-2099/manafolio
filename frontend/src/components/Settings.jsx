@@ -494,7 +494,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
   };
 
   return (
-    <div ref={revealRef} className="settings-page" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div ref={revealRef} className="settings-page">
       <header className="page-heading">
         <div>
           <h2 className="page-title">{t('settings.title')}</h2>
@@ -524,7 +524,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
       </nav>
       <div className="settings-grid">
         {/* Sharing Panel */}
-        <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="view-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Share2 size={20} aria-hidden="true" />
             <h3 id="settings-sharing" tabIndex={-1} className="section-heading">{t('settings.sharingTitle')}</h3>
@@ -532,8 +532,8 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
             <div>
-              <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: '0.95rem' }}>{t('settings.shareLibrary')}</div>
-              <div id="settings-share-hint" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>{t('settings.shareLibraryHint')}</div>
+              <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: 'var(--text-md)' }}>{t('settings.shareLibrary')}</div>
+              <div id="settings-share-hint" style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>{t('settings.shareLibraryHint')}</div>
             </div>
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '44px', minHeight: '44px', cursor: 'pointer' }}>
               <input
@@ -605,7 +605,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 </div>
               </div>
 
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
                 {/* The three query strings go in as placeholders rather than as
                     <code> elements: that keeps the sentence one translatable unit
                     and stops a translator from accidentally localising a URL. */}
@@ -619,8 +619,8 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
                 <div>
-                  <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: '0.95rem' }}>{t('settings.showLocations')}</div>
-                  <div id="settings-share-locations-hint" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>{t('settings.showLocationsHint')}</div>
+                  <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: 'var(--text-md)' }}>{t('settings.showLocations')}</div>
+                  <div id="settings-share-locations-hint" style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>{t('settings.showLocationsHint')}</div>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '44px', minHeight: '44px', cursor: 'pointer' }}>
                   <input
@@ -653,7 +653,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                         <input readOnly className="input-control" aria-label={loc.name}
                           value={`${origin}/share/${user?.share_token}?container=${loc.id}${themeQuery}`}
                           onClick={event => event.target.select()} style={{ flex: 1, minWidth: 0 }} />
-                        <span style={{ maxWidth: '35%', fontSize: '0.8rem', overflowWrap: 'anywhere' }}>{loc.name}</span>
+                        <span style={{ maxWidth: '35%', fontSize: 'var(--text-md)', overflowWrap: 'anywhere' }}>{loc.name}</span>
                         <button
                           className="btn btn-secondary"
                           onClick={() => copyToClipboard(`${origin}/share/${user?.share_token}?container=${loc.id}${themeQuery}`, `container-${loc.id}`, 'container')}
@@ -673,7 +673,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                   className="btn btn-secondary"
                   onClick={handleRegenerateToken}
                   disabled={shareLoading}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: 'var(--text-md)', padding: '0.4rem 0.8rem' }}
                 >
                   <RefreshCw size={12} className={shareLoading ? 'spin-animation' : ''} />
                   <span>{t('settings.regenerateLink')}</span>
@@ -683,7 +683,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
           )}
 
           {!shareEnabled && (
-            <div style={{ display: 'flex', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9375rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: 'var(--text-md)' }}>
               <ShieldAlert size={16} style={{ color: 'var(--accent-red)', flexShrink: 0 }} />
               <span>{t('settings.privateNotice')}</span>
             </div>
@@ -691,7 +691,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
         </div>
 
         {/* Change Password Panel */}
-        <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="view-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <KeyRound size={20} aria-hidden="true" />
             <h3 id="settings-security" tabIndex={-1} className="section-heading">{t('settings.securityTitle')}</h3>
@@ -768,7 +768,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
           </form>
         </div>
 
-        <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="view-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <KeyRound size={20} aria-hidden="true" />
             <h3 id="settings-keys" tabIndex={-1} className="section-heading">{t('settings.keysTitle')}</h3>
@@ -792,7 +792,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                     className="input-control"
                     value={accessKey}
                     onClick={(e) => e.target.select()}
-                    style={{ fontFamily: 'monospace', paddingRight: '3.5rem', minHeight: '44px', width: '100%' }}
+                    style={{ fontFamily: 'var(--font-main)', paddingRight: '3.5rem', minHeight: '44px', width: '100%' }}
                   />
                   <button
                     type="button"
@@ -805,12 +805,12 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                   </button>
                 </div>
               ) : (
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t('settings.accessNone')}</div>
+                <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-muted)' }}>{t('settings.accessNone')}</div>
               )}
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem', lineHeight: 1.45 }}>
+              <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-muted)', marginTop: '0.35rem', lineHeight: 1.45 }}>
                 {t('settings.accessIntro')} {t('settings.accessNetWorth')}
               </div>
-              <pre style={{ margin: '0.4rem 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontFamily: 'monospace', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+              <pre style={{ margin: '0.4rem 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontFamily: 'var(--font-main)', fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
                 {`curl -H "Authorization: Bearer <key>" ${origin}/api/stats/networth`}
               </pre>
             </div>
@@ -821,7 +821,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 className="btn btn-secondary"
                 disabled={accessKeyLoading}
                 onClick={() => handleAccessKey('create')}
-                style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                style={{ padding: '0.5rem 1rem', fontSize: 'var(--text-md)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               >
                 {accessKeyLoading && <span className="spinner" aria-hidden="true" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }} />}
                 {t(accessKey ? 'settings.accessRotate' : 'settings.accessCreate')}
@@ -832,7 +832,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                   className="btn btn-secondary"
                   disabled={accessKeyLoading}
                   onClick={() => handleAccessKey('revoke')}
-                  style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}
+                  style={{ padding: '0.5rem 1rem', fontSize: 'var(--text-md)' }}
                 >
                   {t('settings.accessRevoke')}
                 </button>
@@ -844,12 +844,12 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
         {user && <CodexSettings key={user.id} />}
 
         {user?.role === 'admin' && (
-          <section className="view-section" aria-labelledby="settings-bulk-title" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <section className="view-section" aria-labelledby="settings-bulk-title">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Database size={20} aria-hidden="true" />
               <h3 id="settings-bulk-title" tabIndex={-1} className="section-heading">{t('settings.bulkTitle')}</h3>
             </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>{t('settings.bulkHint')}</p>
+            <p style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', margin: 0 }}>{t('settings.bulkHint')}</p>
             <form onSubmit={(e) => { e.preventDefault(); handleBulkAction('save'); }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label htmlFor="settings-bulk-time">{t('settings.bulkTime')}</label>
@@ -865,7 +865,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                   aria-describedby="settings-bulk-utc"
                   style={{ maxWidth: '15rem' }}
                 />
-                <p id="settings-bulk-utc" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.4rem 0 0' }}>{t('settings.bulkUtcHint')}</p>
+                <p id="settings-bulk-utc" style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', margin: '0.4rem 0 0' }}>{t('settings.bulkUtcHint')}</p>
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <button type="submit" className="btn btn-primary" disabled={!!bulkBusy || !bulkTime}>
@@ -878,10 +878,10 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 </button>
               </div>
             </form>
-            <p id="settings-bulk-force" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>{t('settings.bulkForceHint')}</p>
+            <p id="settings-bulk-force" style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', margin: 0 }}>{t('settings.bulkForceHint')}</p>
             {bulkBusy === 'loading' && <p role="status" style={{ color: 'var(--text-secondary)', margin: 0 }}>{t('common.loading')}</p>}
             {bulkNotice && (
-              <p role={bulkNotice.error ? 'alert' : 'status'} style={{ fontSize: '0.85rem', color: bulkNotice.error ? 'var(--accent-red)' : 'var(--text-strong)', margin: 0 }}>
+              <p role={bulkNotice.error ? 'alert' : 'status'} style={{ fontSize: 'var(--text-md)', color: bulkNotice.error ? 'var(--accent-red)' : 'var(--text-strong)', margin: 0 }}>
                 {bulkNotice.message || t(bulkNotice.key, bulkNotice.values)}
               </p>
             )}
@@ -889,13 +889,13 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
         )}
 
         {/* Collection Backup & Data Options Panel */}
-        <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="view-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Database size={20} aria-hidden="true" />
             <h3 id="settings-backup" tabIndex={-1} className="section-heading">{t('settings.backupTitle')}</h3>
           </div>
 
-          <div style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
             {t('settings.backupHint')}
           </div>
 
@@ -905,7 +905,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
               onClick={() => handleExport('backup')}
               disabled={!!exporting}
               className="btn btn-primary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-md)' }}
             >
               <Download size={14} />
               <span>{t('settings.exportBackup')}</span>
@@ -915,7 +915,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
               onClick={() => handleExport('csv')}
               disabled={!!exporting}
               className="btn btn-secondary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-md)' }}
             >
               <Download size={14} />
               <span>{t('settings.exportCsv')}</span>
@@ -925,7 +925,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
               onClick={() => handleExport('json')}
               disabled={!!exporting}
               className="btn btn-secondary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-md)' }}
             >
               <Download size={14} />
               <span>{t('settings.exportJson')}</span>
@@ -937,7 +937,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
               onClick={() => importInputRef.current?.click()}
               disabled={importBusy}
               className="btn btn-primary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-md)' }}
             >
               <Upload size={14} aria-hidden="true" />
               <span>{t('settings.importBackup')}</span>
@@ -958,7 +958,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
 
         <OfflineSettings key={user?.id} user={user} />
         {/* Preferences Panel */}
-        <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="view-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <SlidersHorizontal size={20} aria-hidden="true" />
             <h3 id="settings-preferences" tabIndex={-1} className="section-heading">{t('prefs.title')}</h3>
@@ -983,16 +983,16 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                     <option key={code} value={code}>{localeName(code)}</option>
                   ))}
                 </select>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>
+                <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>
                   {t('prefs.languageHint')}
                 </div>
               </>
             ) : (
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
                 {t('prefs.languageOnlyEnglish')}
               </div>
             )}
-            {repoUrl && <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', marginTop: '0.5rem' }}>
+            {repoUrl && <div className="settings-translation" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-md)', marginTop: '0.5rem' }}>
               <Languages size={13} style={{ color: 'var(--accent-yellow)', flexShrink: 0 }} />
               <span style={{ color: 'var(--text-secondary)' }}>
                 {t('prefs.translateCta')}{' '}
@@ -1019,7 +1019,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 </label>
               ))}
             </div>
-            <p id="settings-theme-hint" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+            <p id="settings-theme-hint" style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
               {t('prefs.themeHint')}
             </p>
           </fieldset>
@@ -1041,7 +1041,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 <option key={c.code} value={c.code}>{c.label}</option>
               ))}
             </select>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>
+            <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>
               {t('prefs.currencyHint')}
             </div>
           </div>
@@ -1063,7 +1063,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>{t('prefs.defaultViewsHint')}</div>
+            <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>{t('prefs.defaultViewsHint')}</div>
           </div>
 
           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1082,12 +1082,12 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 <option key={scale} value={scale}>{Math.round(scale * 100)}%</option>
               ))}
             </select>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>{t('prefs.defaultCardScaleHint')}</div>
+            <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>{t('prefs.defaultCardScaleHint')}</div>
           </div>
         </div>
 
         {/* About / version */}
-        <div className="view-section" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="view-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Info size={20} aria-hidden="true" />
             <h3 id="settings-about" tabIndex={-1} className="section-heading">{t('settings.aboutTitle')}</h3>
@@ -1095,7 +1095,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
-              <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div style={{ fontWeight: 700, color: 'var(--text-strong)', fontSize: 'var(--text-md)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <span ref={versionTextRef}>{shownVersion ? `Manafolio v${shownVersion}` : t('settings.versionUnknown')}</span>
                 <button
                   type="button"
@@ -1105,12 +1105,12 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                     const text = `Manafolio app v${shownVersion || 'unknown'} | server v${versionInfo?.version || (backendReachable ? 'unknown' : 'unreachable')} | ${navigator.platform || 'unknown'} | ${navigator.userAgent}`;
                     copyToClipboard(text, 'version');
                   }}
-                  style={{ padding: '0.15rem 0.45rem', fontSize: '0.7rem' }}
+                  style={{ padding: '0.15rem 0.45rem', fontSize: 'var(--text-md)' }}
                 >
                   <Clipboard size={12} /> {t('settings.copy')}
                 </button>
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
                 {isDemo
                   ? t('settings.updateDemo')
                   : !backendReachable
@@ -1124,7 +1124,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                         : t('settings.updateOnDemand')}
               </div>
               {versionSkew && (
-                <div style={{ fontSize: '0.75rem', color: 'var(--accent-yellow)', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: 'var(--text-md)', color: 'var(--accent-yellow)', marginTop: '0.25rem' }}>
                   {t('settings.versionSkew', { version: versionSkew })}
                 </div>
               )}
@@ -1155,7 +1155,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
               prefilled, never submitted, so nothing is posted without the user
               reading it and pressing the button on GitHub. */}
           <div>
-            <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-strong)', marginBottom: '0.5rem' }}>
+            <div style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text-strong)', marginBottom: '0.5rem' }}>
               {t('settings.getInvolvedTitle')}
             </div>
             {repoUrl ? <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -1178,12 +1178,12 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 <Github size={16} /> {t('settings.source')}
               </a>
             </div> : <p>{t('settings.supportUnavailable')}</p>}
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem', lineHeight: 1.4 }}>
+            <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', marginTop: '0.5rem', lineHeight: 1.4 }}>
               {t('settings.reportNote')}
             </div>
           </div>
 
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+          <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
             {t('settings.updateChecksNote')}{' '}
             {repoUrl && <a href={`${repoUrl}/releases`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-yellow)' }}>
               {t('settings.source')}

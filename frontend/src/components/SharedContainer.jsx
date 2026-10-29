@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
 import Logo from './Logo';
 import { isBinderType, binderSpread } from '../utils/cardOptions';
 import CompartmentView from './CompartmentView';
 import { useT } from '../utils/i18n';
+import './LocationManager.css';
 
 // A single shared container, drawn with the same CompartmentView the owner sees:
 // a binder gets its pocket spread, a box its coverflow. Read-only — no callbacks
@@ -91,20 +92,20 @@ function SharedContainer({ shareToken, containerId }) {
   const prevIndex = binder ? (spread <= 1 ? 0 : (spread - 1) * 2 - 1) : pageIndex - 1;
 
   return (
-    <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+    <main className="shared-container-workbench">
+      <header className="shared-container-heading">
         <Logo style={{ width: '34px', height: '34px', flexShrink: 0 }} />
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-strong)' }}>{location.name}</h1>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{t('shared.sharedBy')} {owner}</span>
+          <h1>{location.name}</h1>
+          <span>{t('shared.sharedBy')} {owner}</span>
         </div>
-      </div>
+      </header>
 
       {compartments.length === 0 ? (
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t('loc.noCompartments')}</p>
       ) : (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', background: 'rgba(0,0,0,0.1)', padding: '0.4rem', borderRadius: 'var(--radius-sm)' }}>
+          <div className="shared-container-navigation">
             <button
               type="button"
               className="btn btn-secondary"
@@ -112,7 +113,7 @@ function SharedContainer({ shareToken, containerId }) {
               onClick={() => setPageIndex(Math.max(0, prevIndex))}
               style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
             >
-              {t('loc.prev')}
+              <ChevronLeft size={16} aria-hidden="true" /> {t('loc.prev')}
             </button>
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               {(binder ? (right || left) : activeRow)?.display_label}
@@ -124,7 +125,7 @@ function SharedContainer({ shareToken, containerId }) {
               onClick={() => setPageIndex(nextIndex)}
               style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
             >
-              {t('loc.next')}
+              {t('loc.next')} <ChevronRight size={16} aria-hidden="true" />
             </button>
           </div>
 

@@ -38,9 +38,9 @@ export default function CardEntryFields({
     <div className="form-group quick-add-full-width" style={groupStyle}>
       <label htmlFor={`${fieldId}-quantity`}>{t('card.quantity')}</label>
       <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'stretch', width: '100%', boxSizing: 'border-box' }}>
-        <button type="button" className="btn btn-secondary" disabled={disabled} onClick={() => stepQty(-1)} aria-label={t('card.quantityDown')} style={{ width: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 800, flexShrink: 0 }}>&minus;</button>
+        <button type="button" className="btn btn-secondary" disabled={disabled} onClick={() => stepQty(-1)} aria-label={t('card.quantityDown')} style={{ width: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-lg)', fontWeight: 800, flexShrink: 0 }}>&minus;</button>
         <input id={`${fieldId}-quantity`} type="number" className="input-control" disabled={disabled} min="1" max={quantityMax} step="1" value={quantity} onChange={(e) => onQuantity(e.target.value)} required style={{ flex: 1, minWidth: 0, textAlign: 'center', fontWeight: 700, height: '44px' }} />
-        <button type="button" className="btn btn-secondary" disabled={disabled} onClick={() => stepQty(1)} aria-label={t('card.quantityUp')} style={{ width: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 800, flexShrink: 0 }}>+</button>
+        <button type="button" className="btn btn-secondary" disabled={disabled} onClick={() => stepQty(1)} aria-label={t('card.quantityUp')} style={{ width: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-lg)', fontWeight: 800, flexShrink: 0 }}>+</button>
       </div>
     </div>
   ) : (

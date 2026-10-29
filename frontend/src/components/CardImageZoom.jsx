@@ -46,8 +46,7 @@ export default function CardImageZoom({ card, onClose }) {
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.92)',
-        backdropFilter: 'blur(12px)',
+        backgroundColor: 'var(--overlay-background)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -67,10 +66,10 @@ export default function CardImageZoom({ card, onClose }) {
           position: 'absolute',
           top: 'max(1rem, env(safe-area-inset-top, 0px))',
           right: '1rem',
-          borderRadius: '50%',
+          borderRadius: 'var(--radius-sm)',
           zIndex: 10,
-          background: 'rgba(0,0,0,0.6)',
-          color: '#fff'
+          background: 'var(--media-background)',
+          color: 'var(--media-foreground)'
         }}
       >
         <X size={20} />
@@ -85,10 +84,6 @@ export default function CardImageZoom({ card, onClose }) {
           maxHeight: '88vh',
           maxWidth: '88vw',
           objectFit: 'contain',
-          /* No border-radius: the card art already has its own rounded
-             corners, so a CSS radius here clips them. drop-shadow follows
-             the image's own shape instead of a rounded box. */
-          filter: 'drop-shadow(0 20px 60px rgba(0,0,0,0.8))'
         }}
       />
     </dialog>

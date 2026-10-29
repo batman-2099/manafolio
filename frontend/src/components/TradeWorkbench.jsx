@@ -101,7 +101,14 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
     return <li className="scan-review-card" key={`${card.entry_id || card.id}-${index}`}>
       <CardImage card={card} loading="lazy" />
       <strong className="scan-review-details">{identity(card)}</strong>
-      {side === 'giving' && <p>{card.location_name || t('trade.unassigned')} · {card.compartment_label || card.compartment_idx || '—'} · #{card.entry_id} · {card.printing} · {card.condition}{card.grader !== 'Raw' ? ` · ${card.grader} ${card.grade || ''} ${card.cert_number || ''}` : ''}</p>}
+      {side === 'giving' && <p className="trade-metadata">
+        <span>{card.location_name || t('trade.unassigned')}</span>
+        <span>{card.compartment_label || card.compartment_idx || t('offline.unknown')}</span>
+        <span>#{card.entry_id}</span>
+        <span>{card.printing}</span>
+        <span>{card.condition}</span>
+        {card.grader !== 'Raw' && <span>{`${card.grader} ${card.grade || ''} ${card.cert_number || ''}`}</span>}
+      </p>}
       {side === 'giving' && staleIds.has(card.entry_id) && <p className="trade-error" role="alert">{t('trade.staleEntry')}</p>}
       <div className="trade-fields">
         <label>{t('card.quantity')}<input className="input-control" type="number" required step="1" min="1" max={maxQuantity} form="trade-review-form" value={card.quantity}
@@ -118,16 +125,18 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
       </div>
     </li>;
   });
-  return <section className="trade-workbench glass-panel" aria-labelledby="trade-title">
+  return <section className="trade-workbench" aria-labelledby="trade-title">
+    <header className="trade-heading">
     <h2 id="trade-title" ref={heading} tabIndex={-1}>{t('trade.title')}</h2>
     <p>{t('trade.intro')}</p>
+    </header>
     {error && <p role="alert" className="trade-error">{error} {uncertain && t('trade.retry')}</p>}
     {success && <p role="status">{t('trade.success', success)}</p>}
     {review ? <>
       <h3>{t('trade.review')}</h3>
       <p>{t('trade.estimates')}</p>
       <div className="trade-columns">{['giving', 'receiving'].map(side => <section key={side}>
-        <h3>{t(`trade.${side}`)} — {total(review[side])}</h3>
+        <h3 className="trade-subtotal"><span>{t(`trade.${side}`)}</span><span>{total(review[side])}</span></h3>
         <ul className="trade-list">{review[side].map((card, index) => <li key={index} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
           <CardImage card={card} loading="lazy" style={{ width: '72px', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: '4px', flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>
@@ -157,7 +166,17 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
             {entriesError && <p role="alert" className="trade-error">{t('trade.entriesError')} {entriesError.message}</p>}
             {giving.length >= MAX_ROWS && <p id="trade-giving-limit" role="status">{t('trade.rowLimit', { max: MAX_ROWS })}</p>}
             {loading && <p role="status">{t('common.loading')}</p>}
-              <ul ref={givingResults} className="scan-review-list trade-results">{pageEntries.map((card, index) => <li className="scan-review-card" key={card.entry_id}><CardImage card={card} loading="lazy" /><strong>{identity(card)}</strong><p>{card.quantity} × {card.printing} · {card.condition} · {card.location_name || t('trade.unassigned')} · #{card.entry_id}</p><button className="btn btn-secondary" disabled={giving.length >= MAX_ROWS} aria-describedby={giving.length >= MAX_ROWS ? 'trade-giving-limit' : undefined} onClick={event => { if (giving.length >= MAX_ROWS) return; if (event.detail === 0) focusAfterGiving.current = index; setSuccess(null); setGiving([...giving, { ...card, available: card.quantity, quantity: 1 }]); }}>{t('trade.add')}</button></li>)}</ul>
+              <ul ref={givingResults} className="scan-review-list trade-results">{pageEntries.map((card, index) => <li className="scan-review-card" key={card.entry_id}>
+                <CardImage card={card} loading="lazy" />
+                <strong>{identity(card)}</strong>
+                <p className="trade-metadata">
+                  <span>{card.quantity} × {card.printing}</span>
+                  <span>{card.condition}</span>
+                  <span>{card.location_name || t('trade.unassigned')}</span>
+                  <span>#{card.entry_id}</span>
+                </p>
+                <button className="btn btn-secondary" disabled={giving.length >= MAX_ROWS} aria-describedby={giving.length >= MAX_ROWS ? 'trade-giving-limit' : undefined} onClick={event => { if (giving.length >= MAX_ROWS) return; if (event.detail === 0) focusAfterGiving.current = index; setSuccess(null); setGiving([...giving, { ...card, available: card.quantity, quantity: 1 }]); }}>{t('trade.add')}</button>
+              </li>)}</ul>
               {pageCount > 1 && <nav className="trade-pagination" aria-label={t('trade.pagination')}>
                 <button className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>{t('collection.previousPage')}</button>
                 <span role="status">{t('collection.pageCount', { page: currentPage, count: pageCount })}<br />{t('collection.pageRange', { start: (currentPage - 1) * PAGE_SIZE + 1, end: Math.min(currentPage * PAGE_SIZE, matching.length), count: matching.length })}</span>

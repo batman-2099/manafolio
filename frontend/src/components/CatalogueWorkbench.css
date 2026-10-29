@@ -1,0 +1,107 @@
+/* Hallmark · redesign: full · scope: app · artwork-first collection workbench */
+/* Hallmark · waive 28b · CameraScanner displays a live getUserMedia stream with explicit ready/error states · The collection workbench uses a live camera, not prerecorded footage; a poster would misrepresent readiness. */
+.add-cards-workbench,
+.slab-workbench {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+.add-cards-navigation .sub-nav-tabs { margin: 0; justify-content: flex-start; }
+.catalogue-heading { margin-bottom: var(--space-4); }
+.collection-tool-shelf,
+.search-results-toolbar,
+.shared-catalogue-toolbar {
+  padding-block: var(--space-4);
+  margin-bottom: var(--space-4);
+  border-block: 1px solid var(--border-glass);
+}
+.collection-tool-shelf > *,
+.search-workspace > *,
+.search-intake > *,
+.scanner-capture > *,
+.slab-workbench > * { min-width: 0; }
+.search-workspace {
+  display: grid;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+.search-query-form { display: grid; gap: var(--space-4); }
+.search-intake {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  padding-block: var(--space-4);
+  border-block: 1px solid var(--border-glass);
+}
+.search-intake .search-destination { margin: 0; }
+.search-intake .search-destination select { max-width: none; }
+.search-intake .search-import-actions { margin: 0; }
+.search-intake p { font-size: var(--text-sm); }
+.completion-toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-4);
+  align-items: end;
+  padding-block: var(--space-4);
+  margin-block: var(--space-4);
+  border-block: 1px solid var(--border-glass);
+}
+.completion-toolbar .form-group { margin: 0; min-width: 0; }
+.set-completion-workbench .card-grid > li { padding-bottom: var(--space-4); }
+.scanner-container .scanner-capture {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  max-width: none;
+  gap: var(--space-6);
+}
+.scanner-camera-stage,
+.scanner-setup { display: grid; gap: var(--space-4); min-width: 0; }
+.scanner-setup {
+  padding-block: var(--space-4);
+  border-block: 1px solid var(--border-glass);
+}
+.scanner-camera-stage .camera-preview-wrapper { max-width: none; }
+.scanner-container .scan-review {
+  padding: var(--space-6) 0 0;
+  border: 0;
+  border-top: 1px solid var(--border-glass);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.scanner-container .scan-review-list { margin-top: var(--space-6); }
+.card-inspector.catalogue-inspector { max-width: 980px; }
+.catalogue-inspector .ci-identity {
+  width: 100%;
+  min-width: 0;
+  padding-inline-end: var(--space-8);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-glass);
+}
+.catalogue-inspector .ci-info-col { min-width: 0; }
+.slab-query,
+.slab-certificate { padding-bottom: var(--space-6); border-bottom: 1px solid var(--border-glass); }
+.slab-printings { min-width: 0; }
+.shared-collection .shared-summary {
+  margin-block: var(--space-4);
+  padding-block: var(--space-4);
+  border-block: 1px solid var(--border-glass);
+}
+@media (min-width: 760px) {
+  .search-workspace { grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 1fr); }
+  .search-intake { padding: 0 0 0 var(--space-6); border: 0; border-left: 1px solid var(--border-glass); }
+  .card-inspector.catalogue-inspector { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: var(--space-6); align-items: start; }
+  .catalogue-inspector .ci-identity { grid-column: 1 / -1; }
+  .slab-workbench { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .slab-printings { grid-column: 1 / -1; }
+}
+@media (min-width: 1040px) {
+  .scanner-container .scanner-capture { grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 1fr); }
+  .scanner-setup { padding: 0 0 0 var(--space-6); border: 0; border-left: 1px solid var(--border-glass); }
+  .scanner-capture > :not(.scanner-camera-stage, .scanner-setup) { grid-column: 1 / -1; }
+}
+@media (min-width: 1200px) {
+  .collection-tool-shelf { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--space-6); }
+  .collection-tool-shelf .collection-actions { max-width: 24rem; }
+}

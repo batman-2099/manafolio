@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import './CatalogueWorkbench.css';
 import { Award, Search, Plus } from 'lucide-react';
 import CardImage from './CardImage';
 import { useT } from '../utils/i18n';
@@ -98,13 +99,13 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
   const c = result?.cert;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div className="glass-panel">
+    <div className="slab-workbench">
+      <div className="slab-query">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
           <Award size={20} style={{ color: 'var(--accent-yellow)' }} />
-          <h2 style={{ fontSize: '1.15rem', margin: 0, color: 'var(--text-strong)' }}>{t('slab.title')}</h2>
+          <h2 style={{ fontSize: 'var(--text-lg)', margin: 0, color: 'var(--text-strong)' }}>{t('slab.title')}</h2>
         </div>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5, marginBottom: '1rem' }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', lineHeight: 1.5, marginBottom: '1rem' }}>
           {t('slab.blurb')}
         </p>
         <form onSubmit={lookup} style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
@@ -122,29 +123,29 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
           </button>
         </form>
         {error && (
-          <div style={{ marginTop: '0.85rem', fontSize: '0.8rem', color: 'var(--accent-red, #ff4747)', lineHeight: 1.45 }}>
+          <div style={{ marginTop: '0.85rem', fontSize: 'var(--text-sm)', color: 'var(--accent-red)', lineHeight: 1.45 }}>
             {error}
           </div>
         )}
       </div>
 
       {c && (
-        <div className="glass-panel">
+        <div className="slab-certificate">
           {/* What the grader says, before any guess about which printing it is. This
               is the part that is certain, so it is shown separately from the
               candidates below, which are not. */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-yellow)' }}>
+            <span style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: 'var(--accent-yellow)' }}>
               {c.grader}{c.grade != null ? ` ${c.grade}` : ''}
             </span>
-            <span style={{ fontSize: '0.95rem', color: 'var(--text-strong)', fontWeight: 600 }}>{c.subject}</span>
+            <span style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)', fontWeight: 600 }}>{c.subject}</span>
             {c.grade == null && c.grade_label && (
               // 'AUTHENTIC' is a real PSA label: genuine, encapsulated, ungraded.
               // Showing the words is the only way to say that without implying a 0.
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({c.grade_label})</span>
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>({c.grade_label})</span>
             )}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem 1rem', fontSize: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem 1rem', fontSize: 'var(--text-sm)' }}>
             {[
               [t('slab.fieldCert'), c.cert_number],
               [t('slab.fieldYear'), c.year],
@@ -163,9 +164,9 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
       )}
 
       {c && (
-        <div className="glass-panel">
-          <h3 style={{ fontSize: '0.95rem', margin: '0 0 0.35rem', color: 'var(--text-strong)' }}>{t('slab.pickPrinting')}</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', lineHeight: 1.45, marginBottom: '1rem' }}>
+        <div className="slab-printings">
+          <h3 style={{ fontSize: 'var(--text-md)', margin: '0 0 0.35rem', color: 'var(--text-strong)' }}>{t('slab.pickPrinting')}</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', lineHeight: 1.45, marginBottom: '1rem' }}>
             {t('slab.pickPrintingHint')}
           </p>
           {result.candidates?.length ? (
@@ -173,15 +174,15 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
               {result.candidates.map((card) => (
                 <div key={card.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <CardImage card={card} alt={displayName(card)} style={{ width: '100%', borderRadius: 'var(--radius-sm)' }} loading="lazy" />
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-strong)', fontWeight: 600, lineHeight: 1.3 }}>{displayName(card)}</div>
-                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-strong)', fontWeight: 600, lineHeight: 1.3 }}>{displayName(card)}</div>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', lineHeight: 1.3 }}>
                     {card.set_name} &middot; #{card.number}
                   </div>
                   {/* The raw price, labelled as such. It is the only price any
                       provider here publishes, and a slab is worth a multiple of it —
                       so it is shown as context for identifying the printing, not as
                       what the slab is worth. */}
-                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
                     {t('slab.rawPrice', { price: priceText(card.price_trend, card.price_currency) })}
                   </div>
                   <button
@@ -189,7 +190,7 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
                     className="btn btn-primary"
                     disabled={adding === card.id}
                     onClick={() => addCandidate(card)}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', fontSize: '0.72rem', padding: '0.4rem' }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', fontSize: 'var(--text-sm)', padding: '0.4rem' }}
                   >
                     <Plus size={13} /> {adding === card.id ? t('slab.adding') : t('slab.thisOne')}
                   </button>
@@ -201,7 +202,7 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
             // cards and tickets this app does not track, and a Japan-exclusive
             // printing may not be cached yet. The cert facts above still stand, so
             // say what happened rather than showing an empty grid.
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', lineHeight: 1.5 }}>
               {result.game ? t('slab.noCandidates') : t('slab.unsupportedGame')}
             </div>
           )}

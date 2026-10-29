@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Lock } from 'lucide-react';
+import { Lock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getPrintingBadgeStyle, getPrintingBadgeLabel, getFoilOverlayClass } from '../utils/cardPrinting';
 import { getCardRarityBorder, getRarityBadgeLabel, getRarityBadgeStyle } from '../utils/cardRarity';
 import { priceText } from '../utils/formatPrice';
@@ -10,8 +10,9 @@ import { displayName } from '../utils/languages';
 import { useLongPress } from '../utils/useLongPress';
 import CardImage from './CardImage';
 import { useT } from '../utils/i18n';
+import './LocationManager.css';
 
-const infoChipStyle = { fontSize: '0.6rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' };
+const infoChipStyle = { fontSize: '0.875rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px', background: 'var(--surface-2)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' };
 
 function pocketColumns(capacity) {
   return Math.max(1, Math.round(Math.sqrt(capacity || 1)));
@@ -99,9 +100,9 @@ function categoryForField(card, field, setsList = []) {
 function dividerFieldsOf(arr) {
   if (!Array.isArray(arr) || arr.length === 0) return [];
   const chosen = arr.filter(r => r && r.divider === true);
-  if (chosen.length > 0) return chosen.map(r => ({ field: r.by, color: r.dividerColor || '#6b7280' }));
+  if (chosen.length > 0) return chosen.map(r => ({ field: r.by, color: r.dividerColor || 'var(--surface-3)' }));
   if (arr.some(r => r && r.divider === false)) return [];
-  return [{ field: arr[0].by, color: '#6b7280' }];
+  return [{ field: arr[0].by, color: 'var(--surface-3)' }];
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -115,11 +116,11 @@ export function getSortCategories(card, sortOrder, setsList = []) {
     try { dividerFields = dividerFieldsOf(JSON.parse(sortOrder)); }
     catch (e) { dividerFields = []; }
   } else if (typeof sortOrder === 'string') {
-    if (sortOrder.startsWith('name')) dividerFields = [{ field: 'name', color: '#6b7280' }];
-    else if (sortOrder.startsWith('set')) dividerFields = [{ field: 'set', color: '#6b7280' }];
-    else if (sortOrder.startsWith('type')) dividerFields = [{ field: 'type', color: '#6b7280' }];
-    else if (sortOrder.startsWith('price')) dividerFields = [{ field: 'price', color: '#6b7280' }];
-    else if (sortOrder.startsWith('language')) dividerFields = [{ field: 'language', color: '#6b7280' }];
+    if (sortOrder.startsWith('name')) dividerFields = [{ field: 'name', color: 'var(--surface-3)' }];
+    else if (sortOrder.startsWith('set')) dividerFields = [{ field: 'set', color: 'var(--surface-3)' }];
+    else if (sortOrder.startsWith('type')) dividerFields = [{ field: 'type', color: 'var(--surface-3)' }];
+    else if (sortOrder.startsWith('price')) dividerFields = [{ field: 'price', color: 'var(--surface-3)' }];
+    else if (sortOrder.startsWith('language')) dividerFields = [{ field: 'language', color: 'var(--surface-3)' }];
   }
 
   return dividerFields.map(df => ({
@@ -197,7 +198,7 @@ function PrintingBadge({ printing }) {
       position: 'absolute', top: '-4px', right: '-4px',
       fontSize: '0.55rem', fontWeight: 'bold',
       padding: '0.1rem 0.3rem', borderRadius: '4px',
-      zIndex: 20, boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
+      zIndex: 20, boxShadow: 'none',
       ...getPrintingBadgeStyle(printing)
     }}>
       {getPrintingBadgeLabel(printing)}
@@ -216,10 +217,10 @@ export function FocusedCardInfo({ card, slotNumber, moveSelect = null }) {
 
   return (
     <div className="focused-card-info-panel" style={{ marginTop: '0.5rem', minHeight: '96px', height: 'auto', overflow: 'visible' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.7rem', borderRadius: 'var(--radius-sm)', width: '100%' }}>
+      <div className="storage-focused-card-info">
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
           <div style={{ minWidth: 0 }}>
-            <strong style={{ fontSize: '0.85rem' }}>
+            <strong>
               #{slotNumber || 1} | {isEmpty ? t('compartment.emptySlot') : isDivider ? (card.label || t('compartment.divider')) : isGhost ? t('compartment.recommendedSpot') : displayName(card)}
             </strong>
             {!isEmpty && !isDivider && !isGhost && card.last_verified_at !== undefined && (
@@ -227,7 +228,7 @@ export function FocusedCardInfo({ card, slotNumber, moveSelect = null }) {
                 {t('stocktake.lastVerified', { date: card.last_verified_at ? new Date(card.last_verified_at).toLocaleDateString(locale) : t('stocktake.never') })}
               </div>
             )}
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 'var(--space-1)' }}>
               {isEmpty ? t('compartment.emptySlotHint') : isDivider ? t('compartment.dividerHint') : isGhost ? t('compartment.ghostHint') : `${card.set_name || ''} ${card.number ? `• #${card.number}` : ''}`}
             </div>
           </div>
@@ -237,12 +238,12 @@ export function FocusedCardInfo({ card, slotNumber, moveSelect = null }) {
         {!isEmpty && !isDivider && !isGhost && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
             {card.rarity && (
-              <span style={{ fontSize: '0.6rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.03em', ...getRarityBadgeStyle(card.rarity) }}>
+              <span style={{ fontSize: '0.875rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', ...getRarityBadgeStyle(card.rarity) }}>
                 {getRarityBadgeLabel(card.rarity)}
               </span>
             )}
             {card.printing && card.printing !== 'Normal' && (
-              <span style={{ fontSize: '0.6rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', ...getPrintingBadgeStyle(card.printing) }}>
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', ...getPrintingBadgeStyle(card.printing) }}>
                 {getPrintingBadgeLabel(card.printing)}
               </span>
             )}
@@ -528,7 +529,7 @@ export default function CompartmentView({
     }
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', height: '100%' }}>
+      <div className="storage-compartment" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', height: '100%' }}>
         {(compartment.capacity_count ?? compartment.count) > compartment.capacity && (
           <span className="storage-capacity-warning">{t('loc.overLimit', { used: (compartment.capacity_count ?? compartment.count).toLocaleString(locale), capacity: compartment.capacity.toLocaleString(locale) })}</span>
         )}
@@ -666,9 +667,9 @@ export default function CompartmentView({
                     ...getCardRarityBorder(card.rarity),
                     ...(isTarget ? {
                       border: '2.5px solid var(--accent-green)',
-                      boxShadow: '0 0 15px rgba(34,197,94,0.4), inset 0 0 20px rgba(34,197,94,0.3)'
+                      boxShadow: 'none'
                     } : {}),
-                    ...(card.entry_id === currentActiveId ? { border: '2.5px solid var(--accent-yellow)', boxShadow: '0 0 10px rgba(250,204,21,0.5)' } : {}),
+                    ...(card.entry_id === currentActiveId ? { border: '2.5px solid var(--accent-yellow)', boxShadow: 'none' } : {}),
                     ...(isSelected(card.entry_id) ? selectedOutline : {}),
                     ...(placementMode && pickedEntryId === card.entry_id ? selectedOutline : {}),
                     ...(isGrey(card.entry_id) ? { opacity: 0.3, filter: 'grayscale(1) brightness(0.5)' } : {})
@@ -694,19 +695,19 @@ export default function CompartmentView({
                   {getFoilOverlayClass(card.printing) && <div className={getFoilOverlayClass(card.printing)} style={{ borderRadius: '4px' }} />}
                   <PrintingBadge printing={card.printing} />
                   {allowStacking && card.quantity > 1 && (
-                    <span title={t('compartment.stackedHere', { count: card.quantity })} style={{ position: 'absolute', bottom: '3px', left: '3px', zIndex: 24, fontSize: '0.6rem', fontWeight: 900, padding: '1px 4px', borderRadius: '4px', background: 'rgba(0,0,0,0.75)', border: '1px solid var(--border-glass-hover)', color: 'var(--text-strong)' }}>
+                    <span title={t('compartment.stackedHere', { count: card.quantity })} style={{ position: 'absolute', bottom: '3px', left: '3px', zIndex: 24, fontSize: '0.6rem', fontWeight: 900, padding: '1px 4px', borderRadius: '4px', background: 'var(--media-background)', border: '1px solid var(--border-glass-hover)', color: 'var(--media-foreground)' }}>
                       &times;{card.quantity}
                     </span>
                   )}
                   {(pullMode ? pulledSet.has(card.entry_id) : card.in_deck_qty > 0) && (
-                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.62)', borderRadius: '4px', zIndex: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                      <span style={{ fontSize: '0.5rem', fontWeight: 900, letterSpacing: '0.04em', color: 'var(--text-strong)', background: 'var(--accent-red)', padding: '2px 5px', borderRadius: '4px', transform: 'rotate(-8deg)', textTransform: 'uppercase' }}>
+                    <div style={{ position: 'absolute', inset: 0, background: 'color-mix(in srgb, var(--media-background) 62%, transparent)', borderRadius: '4px', zIndex: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-strong)', background: 'var(--surface-3)', padding: '2px 5px', borderRadius: '4px' }}>
                         {pullMode ? 'Pulled' : (card.in_deck_qty < card.quantity ? `${card.in_deck_qty}/${card.quantity} Out` : t('loc.inPlay'))}
                       </span>
                     </div>
                   )}
                   {selectMode && (
-                    <div style={{ position: 'absolute', top: '3px', left: '3px', zIndex: 25, width: '18px', height: '18px', borderRadius: '50%', background: isSelected(card.entry_id) ? 'var(--accent-red)' : 'rgba(0,0,0,0.6)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.65rem', fontWeight: 900 }}>{isSelected(card.entry_id) ? '✓' : ''}</div>
+                    <div style={{ position: 'absolute', top: '3px', left: '3px', zIndex: 25, width: '18px', height: '18px', borderRadius: '50%', background: isSelected(card.entry_id) ? 'var(--accent-red)' : 'var(--media-background)', border: '2px solid var(--media-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.65rem', fontWeight: 900 }}>{isSelected(card.entry_id) ? '✓' : ''}</div>
                   )}
                   {newDividers.length > 0 && (
                     <div style={{ position: 'absolute', top: 0, left: 0, transform: 'translateY(-100%)', display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '2px', zIndex: 20 }}>
@@ -717,7 +718,7 @@ export default function CompartmentView({
                   )}
 
                   {isTarget && (
-                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'var(--accent-green)', color: '#000', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1rem', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>✓</div>
+                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'var(--surface-3)', color: 'var(--accent-green)', border: '2px solid var(--accent-green)', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1rem' }}>✓</div>
                   )}
                 </DroppablePocket>
               ) : (
@@ -731,8 +732,8 @@ export default function CompartmentView({
                   disabled={!placementMode || !pickedEntryId}
                   onClick={placementMode && pickedEntryId ? () => onPlaceSlot(compartment.id, pos, null) : undefined}
                   style={{
-                    ...(isTarget ? { borderColor: 'var(--accent-green)', background: 'rgba(34,197,94,0.1)' } : {}),
-                    ...(placementMode && pickedEntryId ? { cursor: 'pointer', borderColor: 'var(--accent-red)', background: 'rgba(255,71,71,0.08)' } : {})
+                    ...(isTarget ? { borderColor: 'var(--accent-green)', background: 'var(--surface-2)' } : {}),
+                    ...(placementMode && pickedEntryId ? { cursor: 'pointer', borderColor: 'var(--accent-red)', background: 'var(--surface-2)' } : {})
                   }}
                 >
                   <span className="slot-number">{pos}</span>
@@ -866,7 +867,7 @@ export default function CompartmentView({
     const IMG_WINDOW = 8;
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%', overflow: 'hidden' }}>
+      <div className="storage-compartment" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%', overflow: 'hidden' }}>
         {renderedCards.length === 0 ? (
           <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.8rem' }}>
             {t('compartment.emptyRow')}
@@ -893,7 +894,7 @@ export default function CompartmentView({
               disabled={activeCardIndex <= 0}
               onClick={() => setCoverflowActiveIndex(prev => Math.max(0, prev - 1))}
             >
-              &larr;
+              <ChevronLeft size={20} aria-hidden="true" />
             </button>
 
             <div className="box-coverflow-track">
@@ -922,7 +923,7 @@ export default function CompartmentView({
                 
                 const highlightStyle = isTarget ? { 
                   border: '2px solid var(--accent-green)', 
-                  boxShadow: '0 0 20px rgba(34,197,94,0.6)' 
+                  boxShadow: 'none'
                 } : {};
 
                 if (card.__empty) {
@@ -937,8 +938,8 @@ export default function CompartmentView({
                         setCoverflowActiveIndex(i);
                       }}
                     >
-                      <div style={{ width: '100%', height: '100%', background: 'rgba(0,0,0,0.3)', border: '2px dashed rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: '5px' }}>
-                        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', fontWeight: 'bold' }}>Slot {card.__slotNumber}</span>
+                      <div style={{ width: '100%', height: '100%', background: 'var(--surface-2)', border: '2px dashed var(--border-glass)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: '5px' }}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 'bold' }}>Slot {card.__slotNumber}</span>
                         {isTarget && (
                           <div style={{ color: 'var(--accent-green)', fontWeight: 'bold', fontSize: '1rem', marginTop: '0.5rem' }}>{t('compartment.pull')}</div>
                         )}
@@ -955,7 +956,7 @@ export default function CompartmentView({
                       style={{ transform, zIndex, opacity, filter: 'none', background: card.color || 'var(--accent-red)', border: `1px solid ${card.color || 'var(--accent-red)'}`, display: 'flex', flexDirection: 'column', overflow: 'visible' }}
                       onClick={() => setCoverflowActiveIndex(i)}
                     >
-                      <div style={{ position: 'absolute', top: '-18px', left: '10px', background: card.color || 'var(--accent-red)', color: 'var(--text-strong)', padding: '2px 12px', borderRadius: '6px 6px 0 0', fontSize: '0.7rem', fontWeight: 'bold', boxShadow: '0 -2px 5px rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>
+                      <div style={{ position: 'absolute', top: '-18px', left: '10px', background: card.color || 'var(--accent-red)', color: 'var(--text-strong)', padding: '2px 12px', borderRadius: '6px 6px 0 0', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                         {card.label}
                       </div>
                       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '0.5rem', color: 'var(--text-strong)' }}>
@@ -1013,18 +1014,18 @@ export default function CompartmentView({
                     {getFoilOverlayClass(card.printing) && <div className={getFoilOverlayClass(card.printing)} style={{ borderRadius: '4.5px' }} />}
                     <PrintingBadge printing={card.printing} />
                     {(pullMode ? pulledSet.has(card.entry_id) : card.in_deck_qty > 0) && (
-                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.62)', borderRadius: '5px', zIndex: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.04em', color: 'var(--text-strong)', background: 'var(--accent-red)', padding: '3px 8px', borderRadius: '4px', transform: 'rotate(-8deg)', textTransform: 'uppercase' }}>
+                      <div style={{ position: 'absolute', inset: 0, background: 'color-mix(in srgb, var(--media-background) 62%, transparent)', borderRadius: '5px', zIndex: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-strong)', background: 'var(--surface-3)', padding: '3px 8px', borderRadius: '4px' }}>
                           {pullMode ? 'Pulled' : (card.in_deck_qty < card.quantity ? `${card.in_deck_qty}/${card.quantity} Out` : t('loc.inPlay'))}
                         </span>
                       </div>
                     )}
                     {selectMode && (
-                      <div style={{ position: 'absolute', top: '4px', left: '4px', zIndex: 25, width: '20px', height: '20px', borderRadius: '50%', background: isSelected(card.entry_id) ? 'var(--accent-red)' : 'rgba(0,0,0,0.6)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.7rem', fontWeight: 900 }}>{isSelected(card.entry_id) ? '✓' : ''}</div>
+                      <div style={{ position: 'absolute', top: '4px', left: '4px', zIndex: 25, width: '20px', height: '20px', borderRadius: '50%', background: isSelected(card.entry_id) ? 'var(--accent-red)' : 'var(--media-background)', border: '2px solid var(--media-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.7rem', fontWeight: 900 }}>{isSelected(card.entry_id) ? '✓' : ''}</div>
                     )}
                     
                     {isTarget && (
-                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'var(--accent-green)', color: '#000', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.5rem', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>✓</div>
+                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'var(--surface-3)', color: 'var(--accent-green)', border: '2px solid var(--accent-green)', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.5rem' }}>✓</div>
                     )}
                   </button>
                 );
@@ -1038,7 +1039,7 @@ export default function CompartmentView({
               disabled={activeCardIndex >= renderedCards.length - 1}
               onClick={() => setCoverflowActiveIndex(prev => Math.min(renderedCards.length - 1, prev + 1))}
             >
-              &rarr;
+              <ChevronRight size={20} aria-hidden="true" />
             </button>
           </div>
 

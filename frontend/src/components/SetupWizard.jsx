@@ -9,6 +9,7 @@ import { containerTypeKey } from '../utils/cardOptions';
 import { LOCALES, localeName, useT } from '../utils/i18n';
 import Modal from './Modal';
 import { useBackGuard } from '../utils/useBackGuard';
+import './AccountForms.css';
 
 // First-run setup.
 //
@@ -41,10 +42,10 @@ const STEPS = ['language', 'scanning', 'storage', 'tour'];
 function Heading({ icon, title, sub }) {
   return (
     <div>
-      <h3 id="setup-step-title" tabIndex={-1} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '1.05rem' }}>
+      <h3 id="setup-step-title" tabIndex={-1} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: 'var(--text-lg)' }}>
         {icon} {title}
       </h3>
-      {sub && <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.55, margin: '0.4rem 0 0' }}>{sub}</p>}
+      {sub && <p style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', lineHeight: 1.55, margin: '0.4rem 0 0' }}>{sub}</p>}
     </div>
   );
 }
@@ -275,17 +276,17 @@ export default function SetupWizard({ user, onClose }) {
     return key ? t(`container.type.${key}`) : type;
   };
 
-  const label = { fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-strong)' };
-  const body = { fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.55, margin: 0 };
+  const label = { fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text-strong)' };
+  const body = { fontSize: 'var(--text-md)', color: 'var(--text-secondary)', lineHeight: 1.55, margin: 0 };
   const input = {
-    width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.78rem',
-    background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-glass)',
+    width: '100%', padding: 'var(--space-3)', minHeight: '44px', fontSize: 'var(--text-md)',
+    background: 'var(--surface-1)', border: '1px solid var(--control-border)',
     borderRadius: 'var(--radius-sm)', color: 'var(--text-strong)',
   };
   const row = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem',
-    padding: '0.5rem 0.7rem', borderRadius: 'var(--radius-sm)',
-    border: '1px solid var(--border-glass)', background: 'var(--surface-1)',
+    paddingBlock: 'var(--space-3)', flexWrap: 'wrap',
+    borderBottom: '1px solid var(--border-glass)',
   };
 
 
@@ -294,7 +295,7 @@ export default function SetupWizard({ user, onClose }) {
       <div style={{ flexShrink: 0, marginTop: '0.15rem', color: 'var(--text-muted)' }}>{icon}</div>
       <div>
         <div style={label}>{title}</div>
-        <p style={{ ...body, fontSize: '0.76rem' }}>{children}</p>
+        <p style={{ ...body, fontSize: 'var(--text-md)' }}>{children}</p>
       </div>
     </div>
   );
@@ -307,9 +308,9 @@ export default function SetupWizard({ user, onClose }) {
     return (
       <div style={{ marginTop: '0.4rem' }}>
         <div style={{ height: 6, borderRadius: 3, background: 'var(--surface-3)', overflow: 'hidden' }}>
-          <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent-red)', transition: 'width 0.3s' }} />
+          <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent-red)' }} />
         </div>
-        <div style={{ ...body, fontSize: '0.72rem', marginTop: '0.25rem' }}>
+        <div style={{ ...body, fontSize: 'var(--text-md)', marginTop: '0.25rem' }}>
           {t(dl.phase === 'done' ? 'setup.scan.installing' : 'setup.scan.downloading', {
             name: dl.name, done: mb(dl.done), total: mb(dl.total), pct,
           })}
@@ -322,13 +323,13 @@ export default function SetupWizard({ user, onClose }) {
   // bar just vanishes and the row still reads "Not installed" with no reason why.
   const failed = engine?.last?.phase === 'error' ? engine.last : null;
   const Failure = ({ what }) => (failed?.what === what ? (
-    <p style={{ fontSize: '0.72rem', color: '#f87171', margin: '0.35rem 0 0' }}>
+    <p style={{ fontSize: 'var(--text-md)', color: 'var(--text-negative)', margin: '0.35rem 0 0' }}>
       {t('setup.scan.failed', { message: failed.message })}
     </p>
   ) : null);
 
   const Status = ({ present }) => (
-    <span style={{ fontSize: '0.74rem', color: present ? 'var(--accent-green)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+    <span style={{ fontSize: 'var(--text-md)', color: present ? 'var(--accent-green)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
       {present ? <><Check size={13} /> {t('setup.scan.installed')}</> : t('setup.scan.notInstalled')}
     </span>
   );
@@ -356,7 +357,7 @@ export default function SetupWizard({ user, onClose }) {
               <option key={code} value={code}>{localeName(code)}</option>
             ))}
           </select>
-          <p style={{ ...body, fontSize: '0.74rem', marginTop: '0.35rem' }}>{t('prefs.languageHint')}</p>
+          <p style={{ ...body, fontSize: 'var(--text-md)', marginTop: '0.35rem' }}>{t('prefs.languageHint')}</p>
         </div>
       )}
       <p style={body}>{t('setup.language.body')}</p>
@@ -392,7 +393,7 @@ export default function SetupWizard({ user, onClose }) {
           </div>
           <Status present={modelsReady} />
         </div>
-        <p style={{ ...body, fontSize: '0.75rem', margin: '0.25rem 0 0.4rem' }}>
+        <p style={{ ...body, fontSize: 'var(--text-md)', margin: '0.25rem 0 0.4rem' }}>
           {t('setup.scan.recogniserBody', { license: engine?.license?.spdx || 'AGPL-3.0' })}
         </p>
         {!modelsReady && (
@@ -408,7 +409,7 @@ export default function SetupWizard({ user, onClose }) {
 
       <div>
         <div style={label}>{t('setup.scan.catalog')}</div>
-        <p style={{ ...body, fontSize: '0.75rem', margin: '0.25rem 0 0.5rem' }}>
+        <p style={{ ...body, fontSize: 'var(--text-md)', margin: '0.25rem 0 0.5rem' }}>
           {t('setup.scan.catalogBody')}
         </p>
         {modelsStatus === 'ready' && !(engine?.catalogs || []).some(c => c.game === 'mtg') && <p style={body}>{t('setup.scan.noCatalogDownloads')}</p>}
@@ -417,7 +418,7 @@ export default function SetupWizard({ user, onClose }) {
           {(modelsStatus === 'ready' ? engine?.catalogs || [] : []).filter(c => c.game === 'mtg').map(c => (
             <div key={c.name}>
               <div style={row}>
-                <span style={{ fontSize: '0.76rem', color: 'var(--text-strong)' }}>
+                <span style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)' }}>
                   {gameLabel(c.game)}
                   <span style={{ color: 'var(--text-secondary)' }}>
                     {' · '}{t('setup.scan.catalogMeta', { size: mb(c.bytes), snapshot: c.snapshot })}
@@ -439,11 +440,11 @@ export default function SetupWizard({ user, onClose }) {
           ))}
         </div>
         {modelsStatus === 'ready' && !modelsReady && (
-          <p style={{ fontSize: '0.72rem', color: 'var(--accent-yellow)', margin: '0.4rem 0 0' }}>
+          <p style={{ fontSize: 'var(--text-md)', color: 'var(--accent-yellow)', margin: '0.4rem 0 0' }}>
             {t('setup.scan.needModels')}
           </p>
         )}
-        <p style={{ ...body, fontSize: '0.74rem', marginTop: '0.5rem' }}>
+        <p style={{ ...body, fontSize: 'var(--text-md)', marginTop: '0.5rem' }}>
           {t('setup.scan.buildHint')}
           {localCatalogs.length > 0 && ` ${t('setup.scan.buildHintBuilt')}`}
         </p>
@@ -467,7 +468,7 @@ export default function SetupWizard({ user, onClose }) {
             <button className="btn btn-secondary btn-sm" onClick={() => loadLocations()}>{t('common.retry')}</button>
           </div>
         )}
-        {locationsStatus === 'ready' && locations.length === 0 && <p style={{ ...body, fontSize: '0.76rem' }}>{t('setup.storage.none')}</p>}
+        {locationsStatus === 'ready' && locations.length === 0 && <p style={{ ...body, fontSize: 'var(--text-md)' }}>{t('setup.storage.none')}</p>}
         {locations.map(l => (
           <div key={l.id} style={row}>
             {editingId === l.id ? (
@@ -488,8 +489,8 @@ export default function SetupWizard({ user, onClose }) {
             ) : (
               <>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-strong)', fontWeight: 600 }}>{l.name}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                  <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)', fontWeight: 600 }}>{l.name}</div>
+                  <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
                     {t('setup.storage.meta', {
                       type: typeName(l.type),
                       compartments: t('setup.storage.compartments', { count: l.compartment_count }),
@@ -535,7 +536,7 @@ export default function SetupWizard({ user, onClose }) {
           </div>
           <button className="btn btn-secondary btn-sm" onClick={addLocation} disabled={!newName.trim()}>{t('setup.storage.add')}</button>
         </div>
-        <p style={{ ...body, fontSize: '0.74rem', marginTop: '0.35rem' }}>
+        <p style={{ ...body, fontSize: 'var(--text-md)', marginTop: '0.35rem' }}>
           {t('setup.storage.addHint')}
         </p>
       </div>
@@ -572,36 +573,27 @@ export default function SetupWizard({ user, onClose }) {
   const last = step === STEPS.length - 1;
 
   return (
-    <Modal onClose={close} aria-labelledby="setup-step-title" style={{
-      position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '1rem', background: 'rgba(0,0,0,0.72)',
-      backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
-    }}>
-      <div className="dialog-panel-spacing" style={{
-        width: '100%', maxWidth: 580, maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-        background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)',
-        borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-glow)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+    <Modal onClose={close} aria-labelledby="setup-step-title" className="setup-overlay">
+      <div className="dialog-panel-spacing setup-dialog">
+        <div className="setup-progress">
+          <div className="setup-stages">
             {STEPS.map((s, i) => (
-              <div key={s} aria-current={i === step ? 'step' : undefined} title={t(`setup.step.${s}`)} style={{
-                width: i === step ? 20 : 8, height: 8, borderRadius: 4,
-                background: i === step ? 'var(--accent-red)' : i < step ? 'var(--accent-green)' : 'var(--surface-3)',
-                transition: 'width 0.15s',
-              }} />
+              <div key={s} aria-current={i === step ? 'step' : undefined} title={t(`setup.step.${s}`)} className="setup-stage">
+                <span aria-hidden="true">{i + 1}</span>
+                {t(`setup.step.${s}`)}
+              </div>
             ))}
-            <span aria-live="polite" aria-atomic="true" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
+            <span aria-live="polite" aria-atomic="true" className="setup-stage-status">
               {t(`setup.step.${STEPS[step]}`)} · {t('setup.stepCount', { step: step + 1, total: STEPS.length })}
             </span>
           </div>
           <button type="button" onClick={close} disabled={finishing || storagePending} aria-label={t('common.close')}
-            className="btn btn-icon-only" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+            className="btn btn-icon-only setup-close">
             <X size={18} />
           </button>
         </div>
 
-        <fieldset disabled={finishing} ref={contentRef} style={{ border: 0, margin: 0, padding: 0, flex: 1, minHeight: 0, minWidth: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', paddingRight: '0.25rem' }}>
+        <fieldset disabled={finishing} ref={contentRef} className="setup-content">
           {content}
           {actionError && <p role="alert" style={{ ...body, color: 'var(--accent-red)' }}>{actionError}</p>}
         </fieldset>
@@ -613,7 +605,7 @@ export default function SetupWizard({ user, onClose }) {
           </div>
         )}
         {(finishing || storagePending) && <p role="status" style={body}>{t('common.loading')}</p>}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderTop: '1px solid var(--border-glass)', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
+        <div className="setup-actions">
           <button className="btn btn-secondary btn-sm" disabled={finishing || storagePending} onClick={finish}>{t('setup.skip')}</button>
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             {step > 0 && (

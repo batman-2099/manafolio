@@ -171,7 +171,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
     ...option,
     searchText: option.label,
     label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-      {setSymbols[option.value.replace(/^mtg-/, '')] && <img src={setSymbols[option.value.replace(/^mtg-/, '')]} alt="" width="20" height="20" loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+      {setSymbols[option.value.replace(/^mtg-/, '')] && <img src={setSymbols[option.value.replace(/^mtg-/, '')]} alt="" width="20" height="20" loading="lazy" style={{ objectFit: 'contain', background: 'var(--symbol-background)', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
       {option.label}
     </span>,
   })), [inventory, sets, excludedSets, locale, setSymbols]);
@@ -303,13 +303,13 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   };
 
   return (
-    <section aria-labelledby="ai-deck-title" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', minWidth: 0 }}>
+    <section className="ai-deck-builder" aria-labelledby="ai-deck-title">
       <div style={rowStyle}>
         <button type="button" className="btn btn-secondary" onClick={onClose} aria-label={t('common.back')}><ArrowLeft size={18} /></button>
         <h2 id="ai-deck-title" style={{ margin: 0 }}><Sparkles size={20} /> {t(sourceDeck ? 'aiDeck.improve' : 'aiDeck.title')}</h2>
       </div>
       {sourceDeck && <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.improveHint', { name: sourceDeck.name })}</p>}
-      <section>
+      <section className="ai-deck-connection">
         <span role="status" style={{ color: account?.connected ? 'var(--accent-green)' : 'var(--text-secondary)' }}>
           {account?.connected ? t('aiDeck.aiConnected') : account === null && !accountError ? t('common.loading') : t('aiDeck.disconnected')}
         </span>
@@ -354,7 +354,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
               </section>}
             </div>
             <div className="form-group" style={{ marginTop: '1rem', minWidth: 0, overflowWrap: 'anywhere' }}>
-              <label htmlFor="ai-power-level">{t('aiDeck.powerLevel')}: {powerLevel} — {powerLevelName}</label>
+              <label htmlFor="ai-power-level">{t('aiDeck.powerLevel')}: {powerLevel}: {powerLevelName}</label>
               <input
                 id="ai-power-level"
                 name="power_level"
@@ -364,7 +364,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
                 max="5"
                 step="1"
                 value={powerLevel}
-                aria-valuetext={`${powerLevel} — ${powerLevelName}`}
+                aria-valuetext={`${powerLevel}: ${powerLevelName}`}
                 aria-describedby="ai-power-description ai-power-pace ai-power-hint"
                 onChange={event => { clearDraft(); setPowerLevel(Number(event.target.value)); }}
                 style={{ display: 'block', width: '100%', minHeight: 44, margin: 0, accentColor: 'var(--accent-green)' }}
@@ -457,7 +457,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
               <p id="ai-checked-out-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.includeCheckedOutHint')}</p>
             )}
           </div>
-          <section>
+          <section className="ai-deck-guidance">
             <h3>{t('aiDeck.eligibilityDetails')}</h3>
             <div className="deck-details-content">
             <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.inventoryHint')}</p>
@@ -469,7 +469,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
           </section>
         </fieldset>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1.25rem', alignItems: 'start' }}>
+      <div className="ai-deck-results">
       <form id="ai-conversation-form" onSubmit={generate} style={{ minWidth: 0 }}>
         <fieldset disabled={!!busy} style={fieldsetStyle}>
           <section className="glass-panel" aria-labelledby="ai-conversation-title" style={{ minWidth: 0 }}>
@@ -542,8 +542,8 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
                   <div key={id} style={{ position: 'relative', borderRadius: '6px', overflow: 'hidden', border: card.quantity > (owned?.available_qty || 0) ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', background: 'var(--surface-1)', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                     <button type="button" disabled={!owned} aria-label={`${t('deck.previewArt')}: ${owned?.name || id}`} onClick={() => onPreview(owned)} style={{ position: 'relative', width: '100%', aspectRatio: 0.718, padding: 0, border: 0, background: 'none', cursor: 'pointer' }}>
                       <CardImage card={owned || { id, name: id }} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      {String(draft.commander_card_id) === id && <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '4px', fontSize: '0.75rem', fontWeight: 800 }}>{t('deck.commander')}</span>}
-                      <span style={{ position: 'absolute', top: '4px', right: '4px', background: 'var(--bg-primary)', color: 'var(--accent-yellow)', fontSize: '0.75rem', fontWeight: 800, padding: '1px 6px', borderRadius: '10px', border: '1px solid var(--accent-yellow)' }}>x{card.quantity}</span>
+                      {String(draft.commander_card_id) === id && <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '4px', fontSize: '0.75rem', fontWeight: 700 }}>{t('deck.commander')}</span>}
+                      <span style={{ position: 'absolute', top: '4px', right: '4px', background: 'var(--bg-primary)', color: 'var(--accent-yellow)', fontSize: '0.75rem', fontWeight: 700, padding: '1px 6px', borderRadius: '10px', border: '1px solid var(--accent-yellow)' }}>x{card.quantity}</span>
                     </button>
                     <div title={owned ? printingLabel(owned) : id} style={{ padding: '4px', fontSize: '0.7rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{owned?.name || id}</div>
                     {owned && <p style={{ padding: '0 4px', color: 'var(--text-secondary)', fontSize: '0.65rem' }}>{t('aiDeck.cardCounts', { available: owned.available_qty, locked: owned.locked_qty })}</p>}

@@ -1,10 +1,30 @@
+/* Hallmark · scope: app · redesign: full · instance workbench */
+.admin-page { display: flex; flex-direction: column; gap: var(--space-6); }
+.admin-heading { padding-bottom: var(--space-6); border-bottom: 1px solid var(--border-glass); }
+.admin-user-count { display: flex; align-items: center; gap: var(--space-2); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.admin-grid-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: var(--space-8); align-items: start; }
+.admin-grid-layout > .glass-panel { min-width: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: none; }
+.admin-grid-layout > .glass-panel:nth-child(n + 3) { grid-column: 1 / -1; padding-top: var(--space-6); border-top: 1px solid var(--border-glass); }
+.admin-grid-layout h3 { font-family: var(--font-main); }
+.admin-grid-layout .form-group { max-width: 40rem; }
+.admin-grid-layout :is(p, form) { line-height: 1.6; }
+.admin-page p { max-width: 50ch; }
+.admin-page .admin-grid-layout p { max-width: 50ch; }
+.admin-role { font-weight: 600; color: var(--text-secondary); }
+.admin-page .collection-table { font-size: var(--text-md); }
+
 .admin-user-actions {
   display: flex;
-  gap: 0.35rem;
+  gap: var(--space-2);
 }
 
 .admin-user-action-label {
   display: none;
+}
+
+@media (max-width: 900px) {
+  .admin-grid-layout { grid-template-columns: minmax(0, 1fr); }
+  .admin-grid-layout > .glass-panel + .glass-panel { padding-top: var(--space-6); border-top: 1px solid var(--border-glass); }
 }
 
 @media (max-width: 600px) {
@@ -42,7 +62,7 @@
     content: attr(data-label);
     display: block;
     color: var(--text-secondary);
-    font-size: 0.75rem;
+    font-size: var(--text-md);
     font-weight: 400;
     margin-bottom: 0.25rem;
   }

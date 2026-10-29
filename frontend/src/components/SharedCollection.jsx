@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import './CatalogueWorkbench.css';
 import { ResponsiveContainer, Cell, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import { Search, Trophy, Compass, Library, ShieldAlert, Sparkles, X, MapPin, SlidersHorizontal } from 'lucide-react';
 import Logo from './Logo';
@@ -18,14 +19,14 @@ import themes from '../../../shared/themes.json';
 const PAGE_SIZE = 60;
 
 const COLORS = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#ec4899', '#14b8a6', '#f43f5e', '#a855f7', '#6366f1'
+  'var(--chart-series-1)', 'var(--chart-series-2)', 'var(--chart-series-3)', 'var(--chart-series-4)', 'var(--chart-series-5)',
+  'var(--chart-series-6)', 'var(--chart-series-7)', 'var(--chart-series-8)', 'var(--chart-series-9)', 'var(--chart-series-10)'
 ];
 
 const TYPE_COLORS = {
-  'Colorless': '#cbd5e1',
-  'White': '#fef08a', 'Blue': '#3b82f6', 'Black': '#334155', 'Red': '#ef4444',
-  'Green': '#10b981', 'Land': '#d97706'
+  'Colorless': 'var(--chart-colorless)',
+  'White': 'var(--chart-white)', 'Blue': 'var(--chart-series-1)', 'Black': 'var(--chart-archive)', 'Red': 'var(--chart-series-4)',
+  'Green': 'var(--chart-series-2)', 'Land': 'var(--chart-series-3)'
 };
 
 function typeColor(name, i) {
@@ -165,7 +166,7 @@ function SharedCollection({ shareToken }) {
       <button type="button" className="btn btn-secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} style={{ minHeight: '44px' }}>
         {t('collection.previousPage')}
       </button>
-      <span role="status" style={{ fontSize: '0.875rem', textAlign: 'center' }}>
+      <span role="status" style={{ fontSize: 'var(--text-sm)', textAlign: 'center' }}>
         {t('collection.pageCount', { page: currentPage, count: pageCount })}
         <br />
         {t('collection.pageRange', { start: (currentPage - 1) * PAGE_SIZE + 1, end: Math.min(currentPage * PAGE_SIZE, processedCollection.length), count: processedCollection.length })}
@@ -210,7 +211,7 @@ function SharedCollection({ shareToken }) {
           <div style={{ height: '100%', minWidth: Math.max(300, chartData.length * 85) }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} role="img" aria-labelledby={titleId} accessibilityLayer={false} margin={{ top: 10, right: 15, left: 0, bottom: 5 }}>
-                <XAxis dataKey="name" stroke="var(--text-secondary)" tickLine={false} interval={0} style={{ fontSize: '0.8rem' }} />
+                <XAxis dataKey="name" stroke="var(--text-secondary)" tickLine={false} interval={0} style={{ fontSize: 'var(--text-sm)' }} />
                 <YAxis allowDecimals={false} domain={[0, 'auto']} stroke="var(--text-secondary)" width={45} />
                 <Bar dataKey="value" maxBarSize={48} radius={[4, 4, 0, 0]}>
                   {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
@@ -233,7 +234,7 @@ function SharedCollection({ shareToken }) {
           <h1 className="logo-text">Manafolio</h1>
           <div className="logo-icon"><Logo /></div>
         </div>
-        {owner && <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+        {owner && <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
           <Sparkles size={14} aria-hidden="true" style={{ color: 'var(--accent-yellow)' }} />
           <span>{t('shared.sharedBy')} <strong>{owner}</strong></span>
         </div>}
@@ -262,11 +263,29 @@ function SharedCollection({ shareToken }) {
 
       {/* Title block */}
       <div style={{ marginBottom: '1rem' }}>
-        <h2 style={{ fontSize: '1.25rem', color: 'var(--text-strong)' }}>{t('shared.ownerTitle', { owner, list: listTitle })}</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{listBlurb}</p>
+        <h2 style={{ fontSize: 'var(--text-lg)', color: 'var(--text-strong)' }}>{t('shared.ownerTitle', { owner, list: listTitle })}</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>{listBlurb}</p>
       </div>
+      {/* Overview stats */}
+      <section className="shared-summary" aria-label={t('shared.summary')}>
+        <div>
+          <div className="metric-header"><span>{valueLabel}</span><Trophy size={18} aria-hidden="true" style={{ color: 'var(--accent-yellow)' }} /></div>
+          <div className="shared-summary-value">{mixedCurrencies ? t('common.mixedCurrencies') : `${currencySymbol(sourceCurrency)}${summary.totalValue.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</div>
+          <div className="metric-footer">{t('shared.valueFooter')}</div>
+        </div>
+        <div>
+          <div className="metric-header"><span>{qtyLabel}</span><Library size={18} aria-hidden="true" /></div>
+          <div className="shared-summary-value">{summary.totalCards}</div>
+          <div className="metric-footer">{t('shared.qtyFooter')}</div>
+        </div>
+        <div>
+          <div className="metric-header"><span>{t('shared.uniqueCards')}</span><Compass size={18} aria-hidden="true" /></div>
+          <div className="shared-summary-value">{summary.uniqueCards}</div>
+          <div className="metric-footer">{t('shared.uniqueFooter')}</div>
+        </div>
+      </section>
       {/* Filters + Sort */}
-      <div className="glass-panel" style={{ marginBottom: '1.5rem' }}>
+      <div className="shared-catalogue-toolbar">
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div className="form-group" style={{ marginBottom: 0, flex: '1 1 220px' }}>
             <label htmlFor="shared-search">{t('shared.search')}</label>
@@ -317,7 +336,7 @@ function SharedCollection({ shareToken }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-glass)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <input type="checkbox" id="stackCardsSharedOpt" checked={stackCards} onChange={(e) => setStackCards(e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
-                <label htmlFor="stackCardsSharedOpt" style={{ cursor: 'pointer', margin: 0, fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)' }}>
+                <label htmlFor="stackCardsSharedOpt" style={{ cursor: 'pointer', margin: 0, fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-strong)' }}>
                   {t('shared.stackDuplicates')}
                 </label>
               </div>
@@ -325,13 +344,13 @@ function SharedCollection({ shareToken }) {
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <input type="checkbox" id="stackByConditionSharedOpt" checked={stackByCondition} onChange={(e) => setStackByCondition(e.target.checked)} style={{ width: '14px', height: '14px', cursor: 'pointer' }} />
-                    <label htmlFor="stackByConditionSharedOpt" style={{ cursor: 'pointer', margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    <label htmlFor="stackByConditionSharedOpt" style={{ cursor: 'pointer', margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                       {t('shared.separateByCondition')}
                     </label>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <input type="checkbox" id="stackByPrintingSharedOpt" checked={stackByPrinting} onChange={(e) => setStackByPrinting(e.target.checked)} style={{ width: '14px', height: '14px', cursor: 'pointer' }} />
-                    <label htmlFor="stackByPrintingSharedOpt" style={{ cursor: 'pointer', margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    <label htmlFor="stackByPrintingSharedOpt" style={{ cursor: 'pointer', margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
                       {t('shared.separateByPrinting')}
                     </label>
                   </div>
@@ -341,24 +360,6 @@ function SharedCollection({ shareToken }) {
           </div>
       </div>
 
-      {/* Overview stats */}
-      <section className="shared-summary" aria-label={t('shared.summary')}>
-        <div>
-          <div className="metric-header"><span>{valueLabel}</span><Trophy size={18} aria-hidden="true" style={{ color: 'var(--accent-yellow)' }} /></div>
-          <div className="shared-summary-value">{mixedCurrencies ? t('common.mixedCurrencies') : `${currencySymbol(sourceCurrency)}${summary.totalValue.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</div>
-          <div className="metric-footer">{t('shared.valueFooter')}</div>
-        </div>
-        <div>
-          <div className="metric-header"><span>{qtyLabel}</span><Library size={18} aria-hidden="true" /></div>
-          <div className="shared-summary-value">{summary.totalCards}</div>
-          <div className="metric-footer">{t('shared.qtyFooter')}</div>
-        </div>
-        <div>
-          <div className="metric-header"><span>{t('shared.uniqueCards')}</span><Compass size={18} aria-hidden="true" /></div>
-          <div className="shared-summary-value">{summary.uniqueCards}</div>
-          <div className="metric-footer">{t('shared.uniqueFooter')}</div>
-        </div>
-      </section>
 
 
 
@@ -420,7 +421,7 @@ function SharedCollection({ shareToken }) {
                 <div style={{ height: '100%', minWidth: Math.max(300, sets.length * 110) }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={sets} role="img" aria-labelledby="shared-set-title" accessibilityLayer={false} margin={{ left: 0, right: 15, top: 10, bottom: 5 }}>
-                    <XAxis dataKey="name" stroke="var(--text-secondary)" interval={0} tickLine={false} style={{ fontSize: '0.8rem' }} />
+                    <XAxis dataKey="name" stroke="var(--text-secondary)" interval={0} tickLine={false} style={{ fontSize: 'var(--text-sm)' }} />
                     <YAxis type="number" domain={[0, 'auto']} stroke="var(--text-secondary)" tickFormatter={(v) => priceText(v, sourceCurrency)} />
                     <Tooltip contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }} itemStyle={{ color: 'var(--text-strong)' }} labelStyle={{ color: 'var(--text-strong)' }} formatter={(v) => [priceText(v, sourceCurrency), t('dash.value')]} />
                     <Bar dataKey="value" fill="var(--accent-red)" maxBarSize={48} radius={[4, 4, 0, 0]} />
@@ -445,12 +446,12 @@ function SharedCollection({ shareToken }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.25rem' }}>
             {topValuable.map((card) => (
               <button type="button" key={card.entry_id} onClick={() => setActiveCard(card)} className="dashboard-card-clickable shared-valuable-row" aria-haspopup="dialog" aria-label={`${t('shared.cardDetails')} ${displayName(card)}`}>
-                <CardImage card={card} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }} />
+                <CardImage card={card} style={{ width: '48px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '5px', boxShadow: 'none' }} />
                 <span style={{ flex: 1, overflow: 'hidden' }}>
-                  <span style={{ display: 'block', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName(card)}</span>
+                  <span style={{ display: 'block', fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--text-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName(card)}</span>
                   <span className="tcg-card-meta">{card.set_name} • {card.rarity}</span>
                 </span>
-                <span style={{ fontWeight: 800, color: 'var(--accent-yellow)', fontSize: '0.9rem' }}>{priceText(card.price_trend, card.price_currency)}</span>
+                <span style={{ fontWeight: 800, color: 'var(--accent-yellow)', fontSize: 'var(--text-sm)' }}>{priceText(card.price_trend, card.price_currency)}</span>
               </button>
             ))}
             {topValuable.length === 0 && <div className="chart-empty">{t('shared.noCards')}</div>}
@@ -469,41 +470,41 @@ function SharedCollection({ shareToken }) {
             </button>
             <div style={{ flex: '1 1 240px', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
               <button type="button" className="ci-image-wrap" aria-label={t('deck.previewArt')} aria-haspopup="dialog" onClick={() => setZoomCard(activeCard)}>
-                <CardImage card={activeCard} style={{ width: '100%', maxWidth: '260px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: 'var(--radius-md)', boxShadow: '0 8px 24px rgba(0,0,0,0.5), 0 0 15px rgba(255,255,255,0.05)' }} />
+                <CardImage card={activeCard} style={{ width: '100%', maxWidth: '260px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: 'var(--radius-md)', boxShadow: 'none' }} />
               </button>
             </div>
             <div style={{ flex: '1 1 300px', minWidth: 0, overflowWrap: 'anywhere', display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center' }}>
               <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(234,179,8,0.1)', color: 'var(--accent-yellow)', border: '1px solid rgba(234,179,8,0.2)', display: 'inline-block', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: 'var(--surface-2)', color: 'var(--accent-yellow)', border: '1px solid var(--border-glass)', display: 'inline-block', marginBottom: '0.5rem' }}>
                   {activeCard.rarity || t('shared.rarityCommon')}
                 </span>
-                <h3 id="shared-card-title" style={{ fontSize: '1.5rem', color: 'var(--text-strong)', lineHeight: 1.2 }}>{displayName(activeCard)}</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{activeCard.set_name} • {t('shared.cardNumber', { number: activeCard.number })}</p>
+                <h3 id="shared-card-title" style={{ fontSize: 'var(--text-xl)', color: 'var(--text-strong)', lineHeight: 1.2 }}>{displayName(activeCard)}</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>{activeCard.set_name} • {t('shared.cardNumber', { number: activeCard.number })}</p>
               </div>
               <div style={{ borderTop: '1px solid var(--border-glass)', paddingTop: '1rem', display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
                 <div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t('shared.estMarketPrice')}</div>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-yellow)' }}>{priceText(activeCard.price_trend, activeCard.price_currency)}</div>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('shared.estMarketPrice')}</div>
+                  <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: 'var(--accent-yellow)' }}>{priceText(activeCard.price_trend, activeCard.price_currency)}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t('shared.quantity')}</div>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-strong)' }}>x{activeCard.quantity}</div>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('shared.quantity')}</div>
+                  <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: 'var(--text-strong)' }}>x{activeCard.quantity}</div>
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(255,255,255,0.01)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}><strong>{t('shared.cardDetails')}</strong></div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.8rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--surface-2)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}><strong>{t('shared.cardDetails')}</strong></div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
                   <span style={{ color: 'var(--text-muted)' }}>{t(activeCard.game === 'mtg' || activeCard.supertype === 'MTG' ? 'inspector.specGame' : 'inspector.specSupertype')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.game === 'mtg' || activeCard.supertype === 'MTG' ? 'Magic: The Gathering' : activeCard.supertype}</span>
                   {activeCard.types.length > 0 && (<><span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{t('shared.specTypes')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.types.join(', ')}</span></>)}
                   {activeCard.subtypes.length > 0 && (<><span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{t('shared.specSubtypes')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.subtypes.join(', ')}</span></>)}
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: 'var(--text-sm)', marginTop: '0.25rem' }}>
                   <span style={{ color: 'var(--text-muted)' }}>{t('inspector.specCondition')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.condition ?? t('shared.mixed')}</span>
                   <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.printing ?? t('shared.mixed')}</span>
                   <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{t('inspector.specLanguage')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.language ?? t('shared.mixed')}</span>
                 </div>
                 {shareLocations && (activeCard.location || (activeCard.members?.length > 1 && activeCard.location === null)) && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-sm)', marginTop: '0.25rem' }}>
                     <MapPin size={13} style={{ color: 'var(--accent-red)' }} />
                     <span style={{ color: 'var(--text-muted)' }}>{t('inspector.locationLabel')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.location ?? t('shared.mixed')}</span>
                   </div>
@@ -511,9 +512,12 @@ function SharedCollection({ shareToken }) {
                 {activeCard.members?.length > 1 && <section aria-labelledby="shared-copies-title">
                   <h4 id="shared-copies-title">{t('shared.copyBreakdown')}</h4>
                   <ul>
-                    {activeCard.members.map((member, index) => <li key={index}>
-                      {t('shared.quantity')}: {member.quantity || 1} · {t('card.printing')}: {member.printing} · {t('card.condition')}: {member.condition} · {t('card.language')}: {member.language}
-                      {shareLocations && member.location && <> · {t('inspector.locationLabel')} {member.location}</>}
+                    {activeCard.members.map((member, index) => <li key={index} style={{ display: 'grid', gap: 'var(--space-1)', paddingBlock: 'var(--space-2)' }}>
+                      <span>{t('shared.quantity')}: {member.quantity || 1}</span>
+                      <span>{t('card.printing')}: {member.printing}</span>
+                      <span>{t('card.condition')}: {member.condition}</span>
+                      <span>{t('card.language')}: {member.language}</span>
+                      {shareLocations && member.location && <span>{t('inspector.locationLabel')} {member.location}</span>}
                     </li>)}
                   </ul>
                 </section>}

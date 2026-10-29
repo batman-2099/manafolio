@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { User, Lock, ArrowRight, Eye, EyeOff, Shield, ShieldAlert } from 'lucide-react';
 import { useT } from '../utils/i18n';
 import Logo from './Logo';
+import './AccountForms.css';
 
 // Must match OWNER_USERNAME in backend/src/routes/auth.js — the bootstrap route
 // ignores whatever username is posted and always creates `admin`.
@@ -135,33 +136,27 @@ function Login({ onLoginSuccess, pendingContainer }) {
   };
 
   return (
-    <main style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100dvh',
-      boxSizing: 'border-box',
-      padding: 'calc(1rem + env(safe-area-inset-top, 0px)) 1rem calc(1rem + env(safe-area-inset-bottom, 0px)) 1rem'
-    }}>
-      <div className="login-form" style={{ maxWidth: '420px', width: '100%' }}>
-        <header style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+    <main className="login-page">
+      <div className="login-form">
+        <header className="login-heading">
+          <div className="login-brand">
             <div style={{ width: '48px', height: '48px', flexShrink: 0 }}><Logo /></div>
-            <span style={{ fontSize: '1.25rem', fontWeight: 700 }} translate="no">Manafolio</span>
+            <span style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }} translate="no">Manafolio</span>
             <span className="app-version">v{import.meta.env.VITE_APP_VERSION}</span>
           </div>
-          <h1 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem' }}>
+          <h1 style={{ fontSize: 'var(--text-xl)', margin: '0 0 0.5rem' }}>
             {t(configStatus !== 'ready' ? 'login.configTitle' : setupRequired ? 'login.setupSubmit' : isRegister ? 'login.register' : 'login.signIn')}
           </h1>
           {configStatus === 'ready' && <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
             {t(setupRequired ? 'login.setupTagline' : isRegister ? 'login.taglineRegister' : 'login.taglineLogin')}
           </p>}
         </header>
+        <div className="login-fields">
 
         {configStatus === 'ready' && setupRequired && (
           <div style={{
             marginBottom: '1.5rem',
-            fontSize: '0.9375rem',
+            fontSize: 'var(--text-md)',
             color: 'var(--text-secondary)',
             lineHeight: 1.5
           }}>
@@ -174,7 +169,7 @@ function Login({ onLoginSuccess, pendingContainer }) {
             padding: '0.75rem 1rem',
             border: '1px solid var(--accent-red)',
             color: 'var(--accent-red)',
-            fontSize: '0.875rem',
+            fontSize: 'var(--text-md)',
             marginBottom: '1.5rem',
             borderRadius: 'var(--radius-sm)'
           }}>
@@ -210,7 +205,7 @@ function Login({ onLoginSuccess, pendingContainer }) {
                 padding: '0.75rem 1rem',
                 width: '100%',
                 boxSizing: 'border-box',
-                fontSize: '0.95rem',
+                fontSize: 'var(--text-md)',
                 fontWeight: 600,
                 borderRadius: 'var(--radius-sm)',
                 textDecoration: 'none',
@@ -223,7 +218,7 @@ function Login({ onLoginSuccess, pendingContainer }) {
 
             <div style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0 0.25rem 0', gap: '0.75rem' }}>
               <div style={{ flex: 1, height: '1px', background: 'var(--border-glass)' }} />
-              <span style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)' }}>
+              <span style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
                 {t('login.orDivider')}
               </span>
               <div style={{ flex: 1, height: '1px', background: 'var(--border-glass)' }} />
@@ -323,7 +318,7 @@ function Login({ onLoginSuccess, pendingContainer }) {
                 <Lock size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               </div>
               {passwordMismatch && (
-                <p id="login-confirm-error" role="alert" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-red)', fontSize: '0.875rem', margin: '0.5rem 0 0' }}>
+                <p id="login-confirm-error" role="alert" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-red)', fontSize: 'var(--text-md)', margin: '0.5rem 0 0' }}>
                   <ShieldAlert size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
                   {t('login.errPasswordMismatch')}
                 </p>
@@ -340,7 +335,7 @@ function Login({ onLoginSuccess, pendingContainer }) {
               alignItems: 'center',
               justifyContent: 'center',
               gap: '0.5rem',
-              fontSize: '1rem',
+              fontSize: 'var(--text-md)',
               fontWeight: 700
             }}
             disabled={loading}
@@ -353,7 +348,7 @@ function Login({ onLoginSuccess, pendingContainer }) {
         </form>
 
         {registrationEnabled && !setupRequired && (
-          <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+          <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
             {t(isRegister ? 'login.haveAccount' : 'login.noAccount')}{' '}
             <button
               onClick={() => {
@@ -378,6 +373,7 @@ function Login({ onLoginSuccess, pendingContainer }) {
           </div>
         )}
         </>}
+        </div>
       </div>
     </main>
   );

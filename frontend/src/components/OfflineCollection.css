@@ -1,5 +1,6 @@
+/* Hallmark · scope: app · redesign: full · offline inventory ledger */
 .offline-collection {
-  width: min(100%, 1120px);
+  width: min(100%, 1360px);
   margin-inline: auto;
   padding: var(--space-4);
   color: var(--text-primary);
@@ -14,11 +15,11 @@
   gap: var(--space-4);
 }
 
-.offline-collection h1 { font-size: 1.75rem; }
-.offline-collection h2 { font-size: 1.125rem; }
+.offline-collection h1 { font-size: var(--text-2xl); }
+.offline-collection h2 { font-size: var(--text-lg); }
 .offline-collection p, .offline-settings p { margin-block: var(--space-2); }
 .offline-summary, .offline-settings { display: grid; gap: var(--space-3); }
-.offline-summary { margin-block: var(--space-6); }
+.offline-summary { margin-block: var(--space-6); padding-block: var(--space-4); border-block: 1px solid var(--border-glass); background: none; border-radius: 0; }
 .offline-readonly { line-height: 1.6; }
 .offline-settings { min-width: 0; overflow-wrap: anywhere; }
 .offline-settings > p { max-width: 70ch; }
@@ -44,30 +45,34 @@
   outline-offset: 3px;
 }
 
-.offline-filters { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.offline-workbench { display: grid; grid-template-columns: 16rem minmax(0, 1fr); gap: var(--space-8); align-items: start; }
+.offline-results { min-width: 0; }
+.offline-filters { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); position: sticky; top: var(--space-4); padding-right: var(--space-6); border-right: 1px solid var(--border-glass); }
 .offline-filters label { display: grid; gap: var(--space-2); min-width: 0; font-weight: 600; }
-.offline-filters .input-control { width: 100%; min-width: 0; min-height: 44px; font-size: 1rem; }
+.offline-filters .input-control { width: 100%; min-width: 0; min-height: 44px; font-size: var(--text-md); }
 .offline-filters select { color: var(--text-primary); background-color: var(--bg-secondary); }
-.offline-search span { font-size: 0.875rem; color: var(--text-secondary); font-weight: 400; }
+.offline-search span { font-size: var(--text-md); color: var(--text-secondary); font-weight: 400; }
 .offline-rows { list-style: none; padding: 0; margin-block: var(--space-4); }
 .offline-row { padding-block: var(--space-4); border-bottom: 1px solid var(--border-glass-hover); }
 .offline-row:first-child { border-top: 1px solid var(--border-glass-hover); }
 .offline-card-name h2 { margin: 0; color: var(--text-strong); }
-.offline-card-name p { font-size: 0.9375rem; color: var(--text-secondary); }
+.offline-card-name p { font-size: var(--text-md); color: var(--text-secondary); }
 .offline-card-details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin-block: var(--space-4); }
-.offline-card-details dt { font-size: 0.875rem; color: var(--text-secondary); }
+.offline-card-details dt { font-size: var(--text-md); color: var(--text-secondary); }
 .offline-card-details dd { margin: 0; font-variant-numeric: tabular-nums; }
-.offline-card-storage { font-size: 0.9375rem; }
+.offline-card-storage { font-size: var(--text-md); }
 .offline-pagination { justify-content: space-between; margin-block: var(--space-6); font-variant-numeric: tabular-nums; }
 .offline-empty { margin-block: var(--space-6); }
 
 @media (min-width: 600px) {
   .offline-collection { padding: var(--space-8); }
-  .offline-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .offline-search { grid-column: 1 / -1; }
   .offline-card-details { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
-
-@media (min-width: 900px) {
-  .offline-filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .offline-workbench { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
+  .offline-filters { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 0; padding: 0; }
+  .offline-search { grid-column: 1 / -1; }
+}
+@media (max-width: 380px) {
+  .offline-filters { grid-template-columns: minmax(0, 1fr); }
 }

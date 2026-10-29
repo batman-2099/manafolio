@@ -3,6 +3,7 @@ import { Database, Play, Square, RefreshCw, Check, AlertTriangle, Cpu, Download,
 import SetTree from './SetTree';
 import { useT } from '../utils/i18n';
 import { toggleSetCodes } from '../utils/setSelection';
+import './AccountForms.css';
 
 // Scan catalogs.
 //
@@ -18,22 +19,13 @@ import { toggleSetCodes } from '../utils/setSelection';
 const GAME_LABEL = { mtg: 'Magic: The Gathering' };
 const POLL_MS = 1000;
 
-// The house style, so this panel reads as part of Admin rather than its own app.
-//
-// It had grown a private type scale (0.6rem to 0.85rem, six sizes), pill badges
-// nothing else uses, and hand-rolled inputs beside the shared .input-control —
-// which is what "formatted differently from the rest of the menus" was. Everything
-// below is lifted from the neighbouring admin panels: 1.1rem section head with an
-// accent-red icon over a rule, 0.95rem sub-heads, 0.8rem body, the shared control
-// classes, and .collection-table for anything that is a list of rows.
-const H3 = { color: 'var(--text-strong)', fontSize: '1.1rem', margin: 0, borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' };
-const H4 = { margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-strong)', display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' };
-const SUB = { background: 'rgba(255, 71, 71, 0.03)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' };
-const INNER = { background: 'rgba(0, 0, 0, 0.18)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '0.75rem 0.9rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' };
-const HINT = { color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, lineHeight: 1.45 };
-const NOTE = { color: 'var(--text-muted)', fontSize: '0.75rem', margin: 0, lineHeight: 1.4 };
+const H3 = { color: 'var(--text-strong)', fontSize: 'var(--text-lg)', margin: 0, borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' };
+const H4 = { margin: 0, fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-strong)', display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' };
+const INNER = { borderTop: '1px solid var(--border-glass)', paddingBlock: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' };
+const HINT = { color: 'var(--text-secondary)', fontSize: 'var(--text-md)', margin: 0, lineHeight: 1.45 };
+const NOTE = { color: 'var(--text-muted)', fontSize: 'var(--text-md)', margin: 0, lineHeight: 1.4 };
 const ROW = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' };
-const BTN = { display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, height: '34px' };
+const BTN = { display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0, minHeight: '44px' };
 
 function pct(a, b) {
   if (!b) return null;
@@ -42,8 +34,8 @@ function pct(a, b) {
 
 function Bar({ value, tone = 'var(--accent-green)' }) {
   return (
-    <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
-      <div style={{ width: `${Math.max(0, Math.min(100, value))}%`, height: '100%', background: tone, transition: 'width 0.3s' }} />
+    <div style={{ height: 6, borderRadius: 3, background: 'var(--surface-3)', overflow: 'hidden' }}>
+      <div style={{ width: `${Math.max(0, Math.min(100, value))}%`, height: '100%', background: tone }} />
     </div>
   );
 }
@@ -60,12 +52,12 @@ const num = (n) => Number(n || 0).toLocaleString();
 // thing on screen. That is backwards, and it is why installs sat unable to scan.
 function Step({ n, icon, title, status, tone, children }) {
   return (
-    <div style={SUB}>
-      <div style={ROW}>
+    <div className="catalog-step">
+      <div className="catalog-step-heading">
         <h4 style={H4}>{icon} {n}. {title}</h4>
-        {status && <span style={{ fontSize: '0.8rem', fontWeight: 600, color: tone || 'var(--text-secondary)' }}>{status}</span>}
+        {status && <span style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: tone || 'var(--text-secondary)' }}>{status}</span>}
       </div>
-      {children}
+      <div className="catalog-step-content">{children}</div>
     </div>
   );
 }
@@ -95,7 +87,7 @@ function EngineCard({ engine, onDownload, busy }) {
           <p style={NOTE}>
             {t('catalog.engineLicense', { spdx: engine.license?.spdx || '' })}{' '}
             {(engine.license?.urls || []).map((u, i) => (
-              <a key={u} href={u} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue, #60a5fa)' }}>
+              <a key={u} href={u} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)' }}>
                 {i === 0 ? 'cornelius' : 'milo'}
               </a>
             )).reduce((acc, el) => acc.length ? [...acc, ', ', el] : [el], [])}
@@ -128,7 +120,7 @@ function ReadyMadeCard({ engine, onDownload, busy, enginePresent }) {
       icon={<Download size={16} style={{ color: 'var(--accent-red)' }} />}
       title={t('catalog.readyMadeTitle')}
       status={have ? t('catalog.nInstalled', { count: have }) : t('catalog.fastestWay')}
-      tone={have ? 'var(--accent-green)' : 'var(--accent-blue, #60a5fa)'}
+      tone={have ? 'var(--accent-green)' : 'var(--accent-blue)'}
     >
       <p style={HINT}>
         {t('catalog.readyMadeDesc')}
@@ -248,7 +240,8 @@ function BuildPicker({ game, lang, disabled, onBuild, showToast, label }) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={t('catalog.searchMtgPlaceholder')}
-        style={{ padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
+        aria-label={t('catalog.searchMtgPlaceholder')}
+        style={{ padding: '0.5rem 0.75rem', fontSize: 'var(--text-md)' }}
       />
       {loading
         ? <p style={HINT}>{t('catalog.loadingSets')}</p>
@@ -427,11 +420,11 @@ export default function CatalogPanel({ showToast }) {
     return (
       <details key={`${c.game}|${c.lang}`} style={INNER}>
         <summary style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-strong)' }}>
+          <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--text-strong)' }}>
             {GAME_LABEL[c.game] || c.game}
             <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}> · {c.lang}</span>
           </span>
-          <span style={{ fontSize: '0.8rem', color: c.built ? 'var(--accent-green)' : 'var(--text-secondary)' }}>
+          <span style={{ fontSize: 'var(--text-md)', color: c.built ? 'var(--accent-green)' : 'var(--text-secondary)' }}>
             {c.built ? t('catalog.nIndexed', { count: num(indexed) }) : c.published ? t('catalog.readyMadeInUse') : t('catalog.notBuilt')}
           </span>
           {warn && <AlertTriangle size={14} color="var(--accent-yellow)" />}
@@ -468,7 +461,7 @@ export default function CatalogPanel({ showToast }) {
               {busy ? t('catalog.btnBuilding') : c.built ? t('catalog.updateEverythingBuilt') : t('catalog.buildWholeGame')}
             </button>
             {!c.built && (
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: 'var(--text-md)', color: 'var(--text-muted)' }}>
                 {t('catalog.wholeGameHint')}
               </span>
             )}
@@ -534,17 +527,14 @@ export default function CatalogPanel({ showToast }) {
           single slot on the server, so only one of them can ever be running. */}
       {engine?.progress && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          <div style={{ ...ROW, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          <div style={{ ...ROW, fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
             <span>{engine.progress.phase === 'error' ? engine.progress.message : t('catalog.downloadingWithName', { name: engine.progress.name })}</span>
             <span>{mb(engine.progress.done)} / {mb(engine.progress.total)}</span>
           </div>
-          <Bar value={pct(engine.progress.done, engine.progress.total) ?? 0} tone="var(--accent-blue, #60a5fa)" />
+          <Bar value={pct(engine.progress.done, engine.progress.total) ?? 0} tone="var(--accent-blue)" />
         </div>
       )}
 
-      {/* Same <Step> as 1 and 2 — head, status on the right, one bordered box. It
-          was a bare h4 with the note inline, which put the third step in a different
-          visual class from the two above it. */}
       <Step
         n="3"
         icon={<Database size={16} style={{ color: 'var(--accent-red)' }} />}
@@ -560,7 +550,7 @@ export default function CatalogPanel({ showToast }) {
             fetch it before it can show anything. A local catalog is keyed by
             card_cache ids, so the same step is a primary-key read. */}
         <div style={{ ...INNER, flexDirection: 'row', alignItems: 'flex-start', gap: '0.5rem' }}>
-          <Zap size={15} style={{ color: 'var(--accent-blue, #60a5fa)', flexShrink: 0, marginTop: '0.1rem' }} />
+          <Zap size={15} style={{ color: 'var(--accent-blue)', flexShrink: 0, marginTop: '0.1rem' }} />
           <p style={{ ...HINT, flex: 1 }}>
             <strong style={{ color: 'var(--text-strong)' }}>{t('catalog.speedTitle')}</strong>{' '}
             {t('catalog.speedDesc')}
@@ -570,7 +560,7 @@ export default function CatalogPanel({ showToast }) {
         {running && (
           <div style={INNER}>
             <div style={ROW}>
-              <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-strong)' }}>
+              <span style={{ fontWeight: 700, fontSize: 'var(--text-md)', color: 'var(--text-strong)' }}>
                 {GAME_LABEL[running.game] || running.game} · {running.lang}
               </span>
               <button type="button" className="btn btn-secondary btn-sm" onClick={stop} disabled={running.cancelled}
@@ -578,7 +568,7 @@ export default function CatalogPanel({ showToast }) {
                 <Square size={14} /> {running.cancelled ? t('catalog.stopping') : t('common.stop')}
               </button>
             </div>
-            <div style={{ ...ROW, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            <div style={{ ...ROW, fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
               <span>{phaseLabel}{running.message ? ` · ${running.message}` : ''}</span>
               <span>{running.done}/{running.total || '?'}</span>
             </div>

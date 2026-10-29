@@ -36,8 +36,8 @@ export default function SetCodeField({ id, label, value, onChange, lang = 'en', 
       onFocus={() => setOpen(true)} onChange={event => { onChange(event.target.value); setOpen(true); }} />
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
       {knownSets.filter(set => value.toLowerCase().split(/[\s,]+/).includes(set.code.toLowerCase())).map(set => (
-        <span key={set.code} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem' }}>
-          {set.symbol_url && <img src={set.symbol_url} alt="" width="20" height="20" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px' }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+        <span key={set.code} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: 'var(--text-sm)' }}>
+          {set.symbol_url && <img src={set.symbol_url} alt="" width="20" height="20" style={{ objectFit: 'contain', background: 'var(--symbol-background)', borderRadius: '3px', padding: '2px' }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
           {set.name} ({set.code.toUpperCase()})
         </span>
       ))}
@@ -51,7 +51,7 @@ export default function SetCodeField({ id, label, value, onChange, lang = 'en', 
           <button key={set.code} type="button" className="btn btn-secondary"
             style={{ display: 'flex', width: '100%', justifyContent: 'flex-start', gap: '0.5rem', textAlign: 'left' }}
             onClick={() => { onChange(value.replace(/[^\s,]*$/, set.code)); input.current?.focus(); setOpen(false); }}>
-            {set.symbol_url && <img src={set.symbol_url} alt="" width="24" height="24" loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px' }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+            {set.symbol_url && <img src={set.symbol_url} alt="" width="24" height="24" loading="lazy" style={{ objectFit: 'contain', background: 'var(--symbol-background)', borderRadius: '3px', padding: '2px' }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
             {set.name} ({set.code.toUpperCase()})
           </button>
         ))}

@@ -53,9 +53,9 @@ export default function SetTree({
   });
 
   return (
-    <div style={{ maxHeight, overflowY: 'auto', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', background: 'rgba(0,0,0,0.25)' }}>
+    <div style={{ maxHeight, overflowY: 'auto', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)' }}>
       {visible.length === 0 ? (
-        <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0, padding: '0.6rem' }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', margin: 0, padding: '0.6rem' }}>
           {emptyLabel || t('scan.noSetMatches')}
         </p>
       ) : visible.map((s) => {
@@ -65,7 +65,7 @@ export default function SetTree({
         const kidsOn = kids.filter(c => has(c.code)).length;
         const isExpanded = expanded.has(code);
         return (
-          <div key={s.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <div key={s.id} style={{ borderBottom: '1px solid var(--border-glass)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.35rem 0.5rem' }}>
               {kids.length > 0 ? (
                 <button
@@ -89,19 +89,19 @@ export default function SetTree({
                   onChange={() => onToggleFamily(s)}
                   style={{ accentColor: 'var(--accent-green)', flexShrink: 0 }}
                 />
-                {s.symbol_url && <img src={s.symbol_url} alt="" width="20" height="20" loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
-                <span style={{ fontSize: 'var(--set-name-font-size, 0.75rem)', color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
-                <code style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>{code}</code>
+                {s.symbol_url && <img src={s.symbol_url} alt="" width="20" height="20" loading="lazy" style={{ objectFit: 'contain', background: 'var(--symbol-background)', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+                <span style={{ fontSize: 'var(--set-name-font-size, var(--text-md))', color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                <code style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>{code}</code>
               </label>
               {kids.length > 0 && (
-                <span style={{ fontSize: '0.62rem', color: on && kidsOn ? 'var(--accent-green)' : 'var(--text-muted)', flexShrink: 0 }}>
+                <span style={{ fontSize: 'var(--text-sm)', color: on && kidsOn ? 'var(--accent-green)' : 'var(--text-muted)', flexShrink: 0 }}>
                   {on ? `${kidsOn}/${kids.length}` : `+${kids.length}`}
                 </span>
               )}
               {/* What the scanner actually holds for this family. A set with nothing
                   embedded cannot be scanned no matter how confidently it is listed. */}
               {showCounts && (
-                <span style={{ fontSize: '0.62rem', flexShrink: 0, color: familyEmbedded(s) ? 'var(--accent-green)' : 'var(--accent-yellow)' }}>
+                <span style={{ fontSize: 'var(--text-sm)', flexShrink: 0, color: familyEmbedded(s) ? 'var(--accent-green)' : 'var(--accent-yellow)' }}>
                   {familyEmbedded(s)
                     ? t('scan.setIndexedCount', { count: familyEmbedded(s) })
                     : t('scan.setNotBuilt')}
@@ -116,10 +116,10 @@ export default function SetTree({
                   onChange={() => onToggleCode(c.code)}
                   style={{ accentColor: 'var(--accent-green)', flexShrink: 0 }}
                 />
-                {c.symbol_url && <img src={c.symbol_url} alt="" width="20" height="20" loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
-                <span style={{ fontSize: 'var(--set-name-font-size, 0.72rem)', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-                <code style={{ fontSize: '0.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>{c.code}</code>
-                <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginLeft: 'auto', flexShrink: 0, textTransform: 'capitalize' }}>{c.type}</span>
+                {c.symbol_url && <img src={c.symbol_url} alt="" width="20" height="20" loading="lazy" style={{ objectFit: 'contain', background: 'var(--symbol-background)', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+                <span style={{ fontSize: 'var(--set-name-font-size, var(--text-md))', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                <code style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', textTransform: 'uppercase', flexShrink: 0 }}>{c.code}</code>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginLeft: 'auto', flexShrink: 0, textTransform: 'capitalize' }}>{c.type}</span>
               </label>
             ))}
           </div>

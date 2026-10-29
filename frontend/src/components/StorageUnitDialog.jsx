@@ -3,6 +3,7 @@ import Modal from './Modal';
 import { useT } from '../utils/i18n';
 import { useBackGuard } from '../utils/useBackGuard';
 import storageUnitTypes from '../../../shared/storageUnitTypes.json';
+import './LocationManager.css';
 
 export function StorageUnitSelect({ units, value, onChange, disabled = false }) {
   const { t } = useT();
@@ -48,7 +49,7 @@ export default function StorageUnitDialog({ draft, units, onClose, onSaved, onDe
     } finally { setBusy(false); }
   };
   return <Modal onClose={close} aria-labelledby="storage-unit-dialog-title">
-    <form className="glass-panel dialog-panel-spacing" onSubmit={submit} style={{ width: '440px', maxWidth: '100%', maxHeight: '90dvh', overflowY: 'auto', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1rem', background: 'var(--bg-secondary)' }}>
+    <form className="glass-panel dialog-panel-spacing storage-unit-dialog" onSubmit={submit} style={{ width: '440px', maxWidth: '100%', maxHeight: '90dvh', overflowY: 'auto', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 'var(--space-4)', background: 'var(--bg-secondary)' }}>
       <h3 id="storage-unit-dialog-title" style={{ margin: 0 }}>{title}</h3>
       {draft.mode === 'edit' && <button type="button" className="btn btn-secondary" disabled={busy} onClick={onChooseCover}>{t('storageUnit.chooseCover')}</button>}
       {deleting ? <p style={{ overflowWrap: 'anywhere' }}>{t('storageUnit.deleteHint', { name: draft.name })}</p> : moving ? <>
@@ -65,7 +66,7 @@ export default function StorageUnitDialog({ draft, units, onClose, onSaved, onDe
         </label>
       </>}
       {error && <p role="alert">{error}</p>}
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.5rem' }}>
+      <div className="storage-dialog-actions">
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={close}>{t('common.cancel')}</button>
         <button type="submit" className="btn btn-primary" disabled={busy || (!moving && !deleting && !name.trim())} aria-busy={busy}>{busy ? t('common.loading') : deleting ? t('storageUnit.delete') : moving ? t('storageUnit.move') : t('common.save')}</button>
       </div>

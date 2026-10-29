@@ -93,7 +93,7 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
             position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 101,
             minWidth: '100%', maxHeight: '260px', overflowY: 'auto',
             background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)',
-            borderRadius: 'var(--radius-sm)', padding: '0.35rem', boxShadow: 'var(--shadow-glow)'
+            borderRadius: 'var(--radius-sm)', padding: '0.35rem', boxShadow: 'var(--shadow-overlay)'
           }}
         >
           {searchable && <div style={{ position: 'sticky', top: '-0.35rem', background: 'var(--bg-secondary)', paddingBlock: '0.35rem', zIndex: 1 }}>
@@ -106,14 +106,14 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
               value={query}
               onChange={event => setQuery(event.target.value)}
               onKeyDown={event => { if (event.key === 'Enter') event.preventDefault(); }}
-              style={{ width: '100%', minWidth: 0, minHeight: 44, fontSize: '1rem' }}
+              style={{ width: '100%', minWidth: 0, minHeight: 44, fontSize: 'var(--text-md)' }}
             />
           </div>}
           {(value.length > 0 || excludedValue?.length > 0) && (
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ width: '100%', fontSize: '0.72rem', padding: '0.3rem', marginBottom: '0.3rem' }}
+              style={{ width: '100%', fontSize: 'var(--text-sm)', padding: '0.3rem', marginBottom: '0.3rem' }}
               onClick={() => excludedValue ? onChange([], []) : onChange([])}
             >
               {t('bulk.clear')}
@@ -137,7 +137,7 @@ export default function MultiSelectDropdown({ label, options, value, onChange, a
           ) : (
             <label
               key={opt.value}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minHeight: singleSelect ? 44 : undefined, padding: '0.35rem 0.4rem', borderRadius: '5px', cursor: 'pointer', fontSize: singleSelect ? '1rem' : '0.82rem' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minHeight: 44, padding: '0.35rem 0.4rem', borderRadius: '5px', cursor: 'pointer', fontSize: 'var(--text-md)' }}
             >
               <input
                 type={singleSelect ? 'radio' : 'checkbox'}

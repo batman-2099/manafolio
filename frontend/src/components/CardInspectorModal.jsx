@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useId } from 'react';
+import './CatalogueWorkbench.css';
 import { X, MapPin, Trash2, Star, Maximize2, ExternalLink, Search, Copy, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getCardDisplayName } from '../utils/langHelper';
 import { translatedName, setCode, isEnglish } from '../utils/languages';
@@ -19,12 +20,9 @@ import Modal from './Modal';
 import { isMtgToken, pairedCardName, reverseFace } from '../utils/tokenFaces';
 import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
 
-// MTG color identity pip colors (WUBRG), approximating the printed mana colors.
+// MTG color identity pips share the application's mana palette.
 const MTG_COLOR_BG = {
-  White: '#f8f6d8', Blue: '#0e68ab', Black: '#2b2422', Red: '#d3202a', Green: '#00733e'
-};
-const MTG_COLOR_FG = {
-  White: '#3a3520', Blue: '#fff', Black: '#fff', Red: '#fff', Green: '#fff'
+  White: 'var(--mana-white)', Blue: 'var(--mana-blue)', Black: 'var(--mana-black)', Red: 'var(--mana-red)', Green: 'var(--mana-green)'
 };
 
 // Shared card detail popup used by Dashboard, CollectionList and LocationManager.
@@ -451,14 +449,14 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
     }} style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.75)',
-      backdropFilter: 'blur(8px)',
+      backgroundColor: 'var(--overlay-background)',
+      backdropFilter: 'none',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 999
     }} onClick={(event) => { if (event.target === event.currentTarget) handleClose(); }}>
-      <fieldset disabled={writing} aria-busy={writing} className={`glass-panel card-inspector ${mode === 'edit' ? 'mode-edit' : ''}`} style={{ minWidth: 0, margin: 0 }} onClickCapture={(event) => { if (writingRef.current) { event.preventDefault(); event.stopPropagation(); } }} onKeyDownCapture={(event) => { if (writingRef.current && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); event.stopPropagation(); } }} onClick={(e) => e.stopPropagation()}>
+      <fieldset disabled={writing} aria-busy={writing} className={`glass-panel card-inspector catalogue-inspector ${mode === 'edit' ? 'mode-edit' : ''}`} style={{ minWidth: 0, margin: 0 }} onClickCapture={(event) => { if (writingRef.current) { event.preventDefault(); event.stopPropagation(); } }} onKeyDownCapture={(event) => { if (writingRef.current && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); event.stopPropagation(); } }} onClick={(e) => e.stopPropagation()}>
         <button ref={closeRef} type="button" aria-label={t('common.close')} className="btn btn-secondary btn-icon-only" onClick={handleClose} style={{
           position: 'absolute',
           top: '1rem',
@@ -468,6 +466,76 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
         }}>
           <X size={16} />
         </button>
+          <div className="ci-identity">
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+              {activeCard.list_type === 'wishlist' && (
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 800, padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: 'var(--surface-2)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)' }}>
+                  {t('inspector.wishlistItem')}
+                </span>
+              )}
+              {activeCard.list_type === 'arena' && (
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 800, padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: 'var(--surface-2)', color: 'var(--text-primary)', border: '1px solid var(--border-glass)' }}>
+                  {t('inspector.arenaItem')}
+                </span>
+              )}
+              {activeCard.list_type === 'graveyard' && (
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 800, padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border-glass)' }}>
+                  {t('inspector.graveyardItem')}
+                </span>
+              )}
+              {activeCard.list_type === 'arena' && (
+                <button type="button" className="btn btn-secondary" style={{ color: 'var(--accent-green)', padding: '0.2rem 0.5rem', fontSize: 'var(--text-sm)' }} onClick={() => handleQuickToggle('list_type', 'collection')} title={t('bulk.moveToCollection')}>
+                  {t('inspector.obtained')}
+                </button>
+              )}
+              {activeCard.is_trade === 1 && (
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 800, padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: 'var(--surface-2)', color: 'var(--accent-green)', border: '1px solid var(--border-glass)' }}>
+                  {t('inspector.forTrade')}
+                </span>
+              )}
+            </div>
+
+            <h3 id={titleId} className="section-heading" style={{ fontSize: 'var(--text-xl)', color: 'var(--text-strong)', fontWeight: 700, lineHeight: 1.2, marginBottom: '0.25rem' }}>
+              {pairedCardName(activeCard)}
+            </h3>
+            {/* Show the English name alongside a localized printing when available. */}
+            {translatedName(activeCard) && (
+              <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', fontWeight: 500, marginBottom: '0.25rem' }}>
+                {translatedName(activeCard)}
+              </p>
+            )}
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-md)', fontWeight: 500 }}>
+              {setSymbols[setCode(activeCard)] && <img key={setCode(activeCard)} src={setSymbols[setCode(activeCard)]} alt="" width="20" height="20" style={{ objectFit: 'contain', background: 'var(--symbol-background)', borderRadius: '3px', padding: '2px', verticalAlign: 'middle', marginRight: '0.35rem' }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+              {activeCard.set_name}
+              {/* Set code alongside the native set name: it reads the same in every
+                  language, so it is the part you can search or quote. The collector
+                  number is already spelled out just after, so only the code here. */}
+              {!isEnglish(language) && setCode(activeCard) && (
+                <span style={{ fontFamily: 'var(--font-main)', color: 'var(--text-muted)' }}> ({setCode(activeCard)})</span>
+              )}
+              {(activeCard.number || activeCard.collector_number || activeCard.card_number) ? ` • #${activeCard.number || activeCard.collector_number || activeCard.card_number}` : ''}{activeCard.rarity ? ` • ${activeCard.rarity}` : ''} • {t(activeCard.list_type === 'graveyard' ? 'inspector.archived' : 'inspector.owned', { count: activeCard.quantity ?? 1 })}
+            </p>
+
+            {/* MTG color pips and type line. */}
+            {(activeCard.supertype === 'MTG' || activeCard.game === 'mtg') && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                {(Array.isArray(activeCard.types) ? activeCard.types : []).map(color => (
+                  <span key={color} className={`mtg-color-pip mtg-color-${color.toLowerCase()}`} style={{
+                    fontSize: 'var(--text-sm)', fontWeight: 800,
+                    padding: '0.15rem 0.45rem', borderRadius: '999px',
+                    background: MTG_COLOR_BG[color] || 'var(--surface-2)',
+                    color: MTG_COLOR_BG[color] ? 'var(--media-background)' : 'var(--text-primary)', border: '1px solid var(--border-glass)'
+                  }}>{color}</span>
+                ))}
+                {(!activeCard.types || activeCard.types.length === 0) && (
+                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 800, padding: '0.15rem 0.45rem', borderRadius: '999px', background: 'var(--surface-2)', color: 'var(--text-primary)' }}>{t('inspector.colorless')}</span>
+                )}
+                {Array.isArray(activeCard.subtypes) && activeCard.subtypes.length > 0 && (
+                  <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{activeCard.subtypes.join(' ')}</span>
+                )}
+              </div>
+            )}
+          </div>
 
         {/* Left side: Main Card Image Focus */}
         <div className="ci-image-col" style={{ flex: '1 1 260px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -500,17 +568,17 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
               position: 'absolute',
               bottom: '0.6rem',
               right: '0.6rem',
-              background: 'rgba(0,0,0,0.65)',
+              background: 'var(--media-background)',
               padding: '0.25rem 0.5rem',
               borderRadius: 'var(--radius-sm)',
-              color: '#fff',
-              fontSize: '0.875rem',
+              color: 'var(--media-foreground)',
+              fontSize: 'var(--text-sm)',
               fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
               gap: '0.3rem',
               pointerEvents: 'none',
-              border: '1px solid rgba(255,255,255,0.15)'
+              border: '1px solid var(--border-glass)'
             }}>
               <Maximize2 size={12} />
               <span>{t('inspector.fullScreen')}</span>
@@ -549,97 +617,27 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
           {!writing && localizing && <p role="status">{t('common.loading')}</p>}
           {mutationError && <p role="alert" style={{ color: 'var(--accent-red)' }}>{mutationError}</p>}
           {!writing && status && <p role="status">{status}</p>}
-          <div>
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-              {activeCard.list_type === 'wishlist' && (
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(6, 182, 212, 0.15)', color: '#06b6d4', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
-                  {t('inspector.wishlistItem')}
-                </span>
-              )}
-              {activeCard.list_type === 'arena' && (
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(249, 115, 22, 0.15)', color: '#f97316', border: '1px solid rgba(249, 115, 22, 0.3)' }}>
-                  {t('inspector.arenaItem')}
-                </span>
-              )}
-              {activeCard.list_type === 'graveyard' && (
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(148, 163, 184, 0.15)', color: 'var(--text-secondary)', border: '1px solid var(--border-glass)' }}>
-                  {t('inspector.graveyardItem')}
-                </span>
-              )}
-              {activeCard.list_type === 'arena' && (
-                <button type="button" className="btn btn-secondary" style={{ color: 'var(--accent-green)', padding: '0.2rem 0.5rem', fontSize: '0.8rem' }} onClick={() => handleQuickToggle('list_type', 'collection')} title={t('bulk.moveToCollection')}>
-                  {t('inspector.obtained')}
-                </button>
-              )}
-              {activeCard.is_trade === 1 && (
-                <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.2rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(74, 222, 128, 0.15)', color: 'var(--accent-green)', border: '1px solid rgba(74, 222, 128, 0.3)' }}>
-                  {t('inspector.forTrade')}
-                </span>
-              )}
-            </div>
-
-            <h3 id={titleId} className="section-heading" style={{ fontSize: '1.5rem', color: 'var(--text-strong)', fontWeight: 700, lineHeight: 1.2, marginBottom: '0.25rem' }}>
-              {pairedCardName(activeCard)}
-            </h3>
-            {/* Show the English name alongside a localized printing when available. */}
-            {translatedName(activeCard) && (
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500, marginBottom: '0.25rem' }}>
-                {translatedName(activeCard)}
-              </p>
-            )}
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', fontWeight: 500 }}>
-              {setSymbols[setCode(activeCard)] && <img key={setCode(activeCard)} src={setSymbols[setCode(activeCard)]} alt="" width="20" height="20" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', verticalAlign: 'middle', marginRight: '0.35rem' }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
-              {activeCard.set_name}
-              {/* Set code alongside the native set name: it reads the same in every
-                  language, so it is the part you can search or quote. The collector
-                  number is already spelled out just after, so only the code here. */}
-              {!isEnglish(language) && setCode(activeCard) && (
-                <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}> ({setCode(activeCard)})</span>
-              )}
-              {(activeCard.number || activeCard.collector_number || activeCard.card_number) ? ` • #${activeCard.number || activeCard.collector_number || activeCard.card_number}` : ''}{activeCard.rarity ? ` • ${activeCard.rarity}` : ''} • {t(activeCard.list_type === 'graveyard' ? 'inspector.archived' : 'inspector.owned', { count: activeCard.quantity ?? 1 })}
-            </p>
-
-            {/* MTG color pips and type line. */}
-            {(activeCard.supertype === 'MTG' || activeCard.game === 'mtg') && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-                {(Array.isArray(activeCard.types) ? activeCard.types : []).map(color => (
-                  <span key={color} className={`mtg-color-pip mtg-color-${color.toLowerCase()}`} style={{
-                    fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em',
-                    padding: '0.15rem 0.45rem', borderRadius: '999px',
-                    background: MTG_COLOR_BG[color] || 'rgba(255,255,255,0.1)',
-                    color: MTG_COLOR_FG[color] || '#fff', border: '1px solid rgba(0,0,0,0.2)'
-                  }}>{color}</span>
-                ))}
-                {(!activeCard.types || activeCard.types.length === 0) && (
-                  <span style={{ fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.15rem 0.45rem', borderRadius: '999px', background: 'rgba(180,180,180,0.25)', color: '#eee' }}>{t('inspector.colorless')}</span>
-                )}
-                {Array.isArray(activeCard.subtypes) && activeCard.subtypes.length > 0 && (
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{activeCard.subtypes.join(' ')}</span>
-                )}
-              </div>
-            )}
-          </div>
 
           {mode === 'edit' ? (
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {(card.list_type || 'collection') !== 'collection' && card.list_type !== 'graveyard' ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(74,222,128,0.1)', padding: '0.6rem 0.9rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(74,222,128,0.2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--surface-2)', padding: '0.6rem 0.9rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                   <input type="checkbox" checked={listType === 'collection'} onChange={(e) => setListType(e.target.checked ? 'collection' : card.list_type)} id="markOwned" style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
-                  <label htmlFor="markOwned" style={{ cursor: 'pointer', margin: 0, fontWeight: 700, color: 'var(--accent-green)', fontSize: '0.85rem' }}>
+                  <label htmlFor="markOwned" style={{ cursor: 'pointer', margin: 0, fontWeight: 700, color: 'var(--accent-green)', fontSize: 'var(--text-sm)' }}>
                     {t('inspector.markObtained')}
                   </label>
                 </div>
               ) : listType === 'collection' ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.6rem 0.9rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--surface-2)', padding: '0.6rem 0.9rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                   <input type="checkbox" checked={isTrade === 1} onChange={(e) => setIsTrade(e.target.checked ? 1 : 0)} id="isTrade" style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
-                  <label htmlFor="isTrade" style={{ cursor: 'pointer', margin: 0, fontWeight: 700, color: 'var(--text-strong)', fontSize: '0.85rem' }}>
+                  <label htmlFor="isTrade" style={{ cursor: 'pointer', margin: 0, fontWeight: 700, color: 'var(--text-strong)', fontSize: 'var(--text-sm)' }}>
                     {t('inspector.listedInTrade')}
                   </label>
                 </div>
               ) : null}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: missing ? 'rgba(255,71,71,0.1)' : 'rgba(255,255,255,0.02)', padding: '0.6rem 0.9rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: missing ? 'var(--surface-3)' : 'var(--surface-2)', padding: '0.6rem 0.9rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                 <input type="checkbox" checked={missing} onChange={(e) => setMissing(e.target.checked)} id="isMissing" style={{ width: '16px', height: '16px', cursor: 'pointer' }} />
-                <label htmlFor="isMissing" style={{ cursor: 'pointer', margin: 0, fontWeight: 700, color: missing ? 'var(--accent-red)' : 'var(--text-strong)', fontSize: '0.85rem' }}>
+                <label htmlFor="isMissing" style={{ cursor: 'pointer', margin: 0, fontWeight: 700, color: missing ? 'var(--accent-red)' : 'var(--text-strong)', fontSize: 'var(--text-sm)' }}>
                   {t('inspector.markMissing')}
                 </label>
               </div>
@@ -669,7 +667,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                     placeholder={formatPrice(displayPrice)}
                   />
                 </div>
-                <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '0.3rem', lineHeight: 1.4 }}>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: '0.3rem', lineHeight: 1.4 }}>
                   {t('inspector.copyValueHint')}
                 </div>
               </div>
@@ -701,7 +699,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={t('inspector.notesPlaceholder')}
                   rows={3}
-                  style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                  style={{ resize: 'vertical', fontFamily: 'var(--font-main)' }}
                 />
               </div>
 
@@ -713,7 +711,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
           ) : (
             <>
               {/* Specifications Details Grid */}
-              <div className="view-section" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem 1rem', fontSize: '0.875rem', overflowWrap: 'anywhere', marginTop: 0, paddingTop: '0.75rem' }}>
+              <div className="view-section" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem 1rem', fontSize: 'var(--text-sm)', overflowWrap: 'anywhere', marginTop: 0, paddingTop: '0.75rem' }}>
                 {/* A slab reports its grade where a raw card reports its condition:
                     they answer the same question, and showing 'Near Mint' for a
                     PSA 9 states an opinion the grader already overruled. */}
@@ -745,7 +743,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                   style={{
                     display: 'flex', alignItems: 'center', gap: '0.5rem',
                     padding: '0.75rem 0', marginTop: 0,
-                    fontSize: '0.875rem', cursor: onViewStorage ? 'pointer' : 'default'
+                    fontSize: 'var(--text-sm)', cursor: onViewStorage ? 'pointer' : 'default'
                   }}
                   title={onViewStorage ? t('inspector.viewInStorage') : undefined}
                 >
@@ -779,13 +777,13 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                   disabled={writing}
                   onAdd={handleAddToDeck}
                   placeholder={t('inspector.addToDeck')}
-                  style={{ fontSize: '0.875rem', padding: '0.5rem', width: '100%' }}
+                  style={{ fontSize: 'var(--text-sm)', padding: '0.5rem', width: '100%' }}
                 />
                 </div>
               )}
 
               {activeCard.notes && (
-                <div className="view-section" style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 0, paddingTop: '0.75rem' }}>
+                <div className="view-section" style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 0, paddingTop: '0.75rem' }}>
                   {activeCard.notes}
                 </div>
               )}
@@ -797,7 +795,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                     className="btn btn-secondary"
                     onClick={handleCreateCommanderDeck}
                     disabled={creatingCommanderDeck}
-                    style={{ fontSize: '0.875rem' }}
+                    style={{ fontSize: 'var(--text-sm)' }}
                   >
                     {creatingCommanderDeck ? t('common.loading') : t('inspector.createCommanderDeck')}
                   </button>
@@ -827,7 +825,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
               {activeCard.list_type !== 'collection' && activeCard.list_type !== 'arena' && activeCard.list_type !== 'graveyard' && (
                 <button 
                   className="btn btn-secondary" 
-                  style={{ backgroundColor: 'rgba(74,222,128,0.2)', color: 'var(--accent-green)', border: '1px solid rgba(74,222,128,0.3)', padding: '0 0.75rem', fontSize: '0.8rem' }} 
+                  style={{ backgroundColor: 'var(--surface-2)', color: 'var(--accent-green)', border: '1px solid var(--border-glass)', padding: '0 0.75rem', fontSize: 'var(--text-sm)' }}
                   onClick={() => handleQuickToggle('list_type', 'collection')}
                   title={t('bulk.moveToCollection')}
                 >
@@ -838,13 +836,13 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                 <button
                   type="button"
                   className={`btn ${favorite === 1 ? 'btn-primary' : 'btn-secondary'} btn-icon-only`}
-                  style={{ borderRadius: 'var(--radius-sm)', padding: '0.6rem', ...(favorite === 1 ? { backgroundColor: 'rgba(250,204,21,0.2)', color: '#facc15', border: '1px solid rgba(250,204,21,0.3)' } : {}) }}
+                  style={{ borderRadius: 'var(--radius-sm)', padding: '0.6rem', ...(favorite === 1 ? { backgroundColor: 'var(--surface-2)', color: 'var(--accent-yellow)', border: '1px solid var(--border-glass)' } : {}) }}
                   onClick={() => handleQuickToggle('favorite', favorite === 1 ? 0 : 1)}
                   title={t(favorite === 1 ? 'inspector.unfavorite' : 'inspector.favorite')}
                   aria-label={t(favorite === 1 ? 'inspector.unfavorite' : 'inspector.favorite')}
                   aria-pressed={favorite === 1}
                 >
-                  <Star size={16} fill={favorite === 1 ? '#facc15' : 'none'} />
+                  <Star size={16} fill={favorite === 1 ? 'var(--accent-yellow)' : 'none'} />
                 </button>
 
                 <button
@@ -863,13 +861,13 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
               {/* Price Panel */}
               <div style={{ borderTop: '1px solid var(--border-glass)', borderBottom: '1px solid var(--border-glass)', padding: '0.75rem 0', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                 <div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>{t('inspector.marketPrice')}</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent-yellow)', marginTop: '0.15rem' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', fontWeight: 700 }}>{t('inspector.marketPrice')}</div>
+                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--accent-yellow)', marginTop: '0.15rem' }}>
                     {priceText(displayPrice, activeCard.price_currency)}
                   </div>
                   {/* Provider prices retain their reported currency. */}
                   {priceSource(activeCard) && (
-                    <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
                       {t('inspector.priceVia', { source: priceSource(activeCard).name, currency: priceSource(activeCard).currency })}
                     </div>
                   )}
@@ -880,11 +878,11 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                       is the raw price and says so. Inventing a grade multiplier
                       would be worse than either: confidently wrong. */}
                   {activeCard.market_value > 0 ? (
-                    <div style={{ fontSize: '0.62rem', color: 'var(--accent-yellow)', marginTop: '0.1rem', lineHeight: 1.35 }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-yellow)', marginTop: '0.1rem', lineHeight: 1.35 }}>
                       {t('inspector.valueFromYou')}
                     </div>
                   ) : activeCard.grader && activeCard.grader !== 'Raw' && (
-                    <div style={{ fontSize: '0.62rem', color: 'var(--accent-yellow)', marginTop: '0.1rem', lineHeight: 1.35 }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-yellow)', marginTop: '0.1rem', lineHeight: 1.35 }}>
                       {t('inspector.priceRawOnly')}
                     </div>
                   )}
@@ -895,14 +893,14 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                       condition multiplier, which would be a made-up number wearing
                       the same styling as a real one. */}
                   {!(activeCard.market_value > 0) && condition && condition !== 'Near Mint' && (
-                    <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: '0.1rem', lineHeight: 1.35 }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: '0.1rem', lineHeight: 1.35 }}>
                       {t('inspector.priceNearMintOnly', { condition })}
                     </div>
                   )}
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>{t('inspector.purchaseValue')}</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-strong)', marginTop: '0.15rem' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', fontWeight: 700 }}>{t('inspector.purchaseValue')}</div>
+                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--text-strong)', marginTop: '0.15rem' }}>
                     {priceText(activeCard.purchase_price)}
                   </div>
                 </div>
@@ -920,7 +918,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                   <a
                     href={tcgplayerUrl(activeCard)} target="_blank" rel="noopener noreferrer"
                     className="btn btn-secondary"
-                    style={{ flex: 1, minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.75rem' }}
+                    style={{ flex: 1, minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: 'var(--text-sm)' }}
                   >
                     <ExternalLink size={13} /> {t('inspector.viewOnTcgplayer')}
                   </a>
@@ -929,7 +927,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                   <a
                     href={cardmarketUrl(activeCard)} target="_blank" rel="noopener noreferrer"
                     className="btn btn-secondary"
-                    style={{ flex: 1, minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.75rem' }}
+                    style={{ flex: 1, minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: 'var(--text-sm)' }}
                   >
                     <ExternalLink size={13} /> Cardmarket
                   </a>
@@ -940,14 +938,14 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                   <a
                     href={searchUrl(activeCard)} target="_blank" rel="noopener noreferrer"
                     className="btn btn-secondary"
-                    style={{ flex: 1, minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.75rem' }}
+                    style={{ flex: 1, minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: 'var(--text-sm)' }}
                   >
                     <Search size={13} /> {t('inspector.searchTcgplayer')}
                   </a>
                 )}
               </div>
               {noLinkReason(activeCard) && (
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                   {noLinkReason(activeCard)}
                 </div>
               )}

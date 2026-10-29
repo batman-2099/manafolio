@@ -41,7 +41,7 @@ export default function ReverseTokenField({ card, value, onChange, disabled = fa
 
   return <div className="form-group quick-add-full-width" style={{ minWidth: 0 }} onKeyDown={event => { if (event.key === 'Enter' && event.target.tagName === 'INPUT') { event.preventDefault(); search(); } }}>
     <label htmlFor={`${id}-search`}>{t('token.reverse')}</label>
-    <p id={`${id}-hint`} style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{t('token.pairHint')}</p>
+    <p id={`${id}-hint`} style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>{t('token.pairHint')}</p>
     <div className="card-entry-fields-row-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.75rem' }}>
       <SetCodeField id={`${id}-set`} label={t('collection.fSet')} value={setCode} onChange={setSetCode} disabled={disabled} />
       <label style={{ minWidth: 0 }}>{t('search.cardNumber')}<input className="input-control" style={{ width: '100%', minWidth: 0 }} value={number} disabled={disabled} onChange={event => setNumber(event.target.value)} /></label>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import './CatalogueWorkbench.css';
 import { useT } from '../utils/i18n';
 import CardImageZoom from './CardImageZoom';
 import CardImage from './CardImage';
@@ -53,7 +54,7 @@ export default function SetCompletion() {
       value: set.id,
       searchText: `${set.name} ${set.id}`,
       label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
-        {set.symbol_url && <img src={set.symbol_url} alt="" width={20} height={20} loading="lazy" style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
+        {set.symbol_url && <img src={set.symbol_url} alt="" width={20} height={20} loading="lazy" style={{ objectFit: 'contain', background: 'var(--symbol-background)', borderRadius: '3px', padding: '2px', flexShrink: 0 }} onError={event => { event.currentTarget.style.display = 'none'; }} />}
         <span>{set.name} ({set.id.replace(/^mtg-/, '').toUpperCase()})</span>
       </span>,
     })), [sets, locale]);
@@ -98,10 +99,10 @@ export default function SetCompletion() {
     }
   };
 
-  return <section aria-labelledby="completion-title">
+  return <section className="set-completion-workbench" aria-labelledby="completion-title">
     <h2 id="completion-title">{t('completion.title')}</h2>
     <p style={{ color: 'var(--text-secondary)', maxWidth: '75ch' }}>{t('completion.rules')}</p>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '1rem', marginBlock: '1rem' }}>
+    <div className="completion-toolbar">
       <div className="form-group">
         <label>{t('completion.set')}</label>
         <MultiSelectDropdown label={t('completion.set')} allLabel={t('completion.choose')} options={setOptions} value={code ? [code] : []}
@@ -155,7 +156,7 @@ export default function SetCompletion() {
             <button type="button" className="btn btn-secondary" disabled={!!wishlistAction?.pending} aria-busy={wishlistAction?.key === actionKey && !!wishlistAction.pending} onClick={() => addToWishlist(printing, finish)} style={{ minHeight: '44px', width: '100%', whiteSpace: 'normal' }}>
               {t(wishlistAction?.key === actionKey && wishlistAction.pending ? 'search.adding' : 'search.addToWishlist')}
             </button>
-            {wishlistAction?.key === actionKey && !wishlistAction.pending && <p role={wishlistAction.error ? 'alert' : 'status'} style={{ margin: 0, fontSize: '0.875rem', color: wishlistAction.error ? 'var(--text-negative)' : 'var(--text-positive)' }}>
+            {wishlistAction?.key === actionKey && !wishlistAction.pending && <p role={wishlistAction.error ? 'alert' : 'status'} style={{ margin: 0, fontSize: 'var(--text-sm)', color: wishlistAction.error ? 'var(--text-negative)' : 'var(--text-positive)' }}>
               {wishlistAction.error || t('search.addedToWishlist', { name: printing.name })}
             </p>}
           </li>;
