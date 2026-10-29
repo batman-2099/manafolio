@@ -755,6 +755,10 @@ button.collection-card-trigger {
   color: var(--text-strong);
   letter-spacing: 0;
   text-transform: none;
+  background: var(--logo-wordmark-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 

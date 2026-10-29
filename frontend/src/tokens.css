@@ -2,6 +2,7 @@
 /* Critique: retained the palette and card artwork; replaced ornamental chrome with a compact collection workbench. */
 :root {
   --font-brand: 'Cinzel', Georgia, serif;
+  --logo-wordmark-gradient: linear-gradient(180deg, #d8efff 10%, #89c6f2 42%, #3478b8 52%, #79b9ed 90%);
   --font-display: var(--font-main);
   --font-body: var(--font-main);
   --text-xs: 0.75rem;
