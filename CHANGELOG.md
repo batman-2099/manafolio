@@ -2,6 +2,12 @@
 
 Release history starts with Manafolio 2.0.
 
+## 2.4.4 — 2026-10-29
+
+- Fix release verification on GitHub's Linux runners by installing Electron's sandbox helper with the required ownership and permissions, without disabling sandboxing.
+- Use Node.js 22 for browser verification to meet Electron's supported runtime requirements.
+- Includes the application improvements listed under 2.4.3; that release's installer and image builds were blocked by CI verification.
+
 ## 2.4.3 — 2026-10-29
 
 - Removed destructive production test-card seeding and reject unsupported legacy storage schemas without dropping their tables.

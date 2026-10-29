@@ -22,7 +22,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install backend dependencies
         run: npm ci
@@ -52,6 +52,9 @@ jobs:
       - name: Frontend browser regressions
         run: |
           npm ci --prefix desktop/electron
+          node desktop/electron/node_modules/electron/install.js
+          sudo chown root:root desktop/electron/node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 desktop/electron/node_modules/electron/dist/chrome-sandbox
           xvfb-run -a npm run test:browser --prefix frontend
 
   # One leg per architecture, each on a runner of that architecture. QEMU
