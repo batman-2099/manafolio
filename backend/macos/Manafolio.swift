@@ -71,6 +71,9 @@ final class Manafolio: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
             receive(Data("\nlog limit reached\n".utf8))
             let logSize = try log?.offset()
             guard logSize == 4 * 1024 * 1024 else { fail("Desktop log exceeded its 4 MiB limit"); return }
+            try log?.truncate(atOffset: 0)
+            try log?.seek(toOffset: 0)
+            logBytes = 0
             #endif
             let child = Process()
             child.executableURL = Bundle.main.resourceURL!.appendingPathComponent("server/manafolio-server")
@@ -89,7 +92,8 @@ final class Manafolio: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
                 DispatchQueue.main.async { self?.receive(data) }
             }
             child.terminationHandler = { [weak self] child in
-                DispatchQueue.main.async {
+                // Deferred app termination runs a modal loop, not the main dispatch queue.
+                RunLoop.main.perform(inModes: [.default, .modalPanel]) {
                     guard let self = self else { return }
                     if self.stopping {
                         if child.terminationStatus != 0 && !self.failed {
@@ -103,6 +107,7 @@ final class Manafolio: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
                         self.fail("The local server stopped. Check desktop.log for details, then quit and reopen Manafolio.")
                     }
                 }
+                CFRunLoopWakeUp(CFRunLoopGetMain())
             }
             server = child
             deadline = Date().addingTimeInterval(90)
@@ -196,7 +201,7 @@ final class Manafolio: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
     }
 
     private func waitForShutdown() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+        let timer = Timer(timeInterval: 30, repeats: false) { [weak self] _ in
             guard let self = self, let server = self.server, server.isRunning else { return }
             let alert = NSAlert()
             alert.messageText = "Manafolio is still saving"
@@ -211,6 +216,8 @@ final class Manafolio: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
                 } else { self.waitForShutdown() }
             }
         }
+        RunLoop.main.add(timer, forMode: .default)
+        RunLoop.main.add(timer, forMode: .modalPanel)
     }
 
     private func isLocal(_ url: URL?) -> Bool {
