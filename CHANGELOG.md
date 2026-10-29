@@ -17,6 +17,7 @@ Release history starts with Manafolio 2.0.
 - Add a keyboard-accessible Expand control to Container Settings on desktop; keep mobile sizing and scrollable settings unchanged.
 - Show saved sort-rule dividers and their colors in the container's Detail list view under Storage order, preserving card order and the separate Tokens section.
 - Redesign the application as a collection-focused workbench: compact navigation, consistent account-theme controls, artwork-led collection and storage views, a dashboard summary rail, clearer deck and AI setup layouts, and indexed account/help screens. Preserve inventory, scanning, checkout, sharing, and editing workflows; retain visible deck description/notes and AI guidance.
+- Align rarity badges and card values on the same baseline in Collection gallery tiles, keeping set information and condition details on separate rows.
 
 ## 2.4.2 — 2026-10-28
 

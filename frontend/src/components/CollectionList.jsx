@@ -845,10 +845,12 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                   <span className="tcg-card-name">{pairedCardName(item)}</span>
                   <span className="tcg-card-meta">
                     <span>{item.set_name} • #{item.number}</span>
-                    <span className="tcg-card-price">{priceText(item.price_trend, item.price_currency)}</span>
+                  </span>
+                  <span className="tcg-card-meta" style={{ alignItems: 'baseline', flexWrap: 'nowrap' }}>
+                    <span className="collection-card-tag" style={getRarityBadgeStyle(item.rarity)}>{getRarityBadgeLabel(item.rarity)}</span>
+                    <span className="tcg-card-price" style={{ whiteSpace: 'nowrap' }}>{priceText(item.price_trend, item.price_currency)}</span>
                   </span>
                   <span style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
-                    <span className="collection-card-tag" style={getRarityBadgeStyle(item.rarity)}>{getRarityBadgeLabel(item.rarity)}</span>
                     <span>
                       {item.grader && item.grader !== 'Raw'
                         ? `${item.grader}${item.grade != null ? ` ${item.grade}` : ''}`
