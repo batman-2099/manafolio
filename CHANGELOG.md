@@ -2,6 +2,12 @@
 
 Release history starts with Manafolio 2.0.
 
+## 2.4.5 — 2026-10-29
+
+- Fix macOS app quit hanging after its server stops: deliver process-exit callbacks and the slow-shutdown warning through AppKit's modal termination run loop. Preserve graceful shutdown and explicit consent before forced termination.
+- Reset the macOS smoke test's log after checking the size limit so startup diagnostics and the server readiness marker remain available to its shutdown checks.
+- Includes the 2.4.3 application improvements and 2.4.4 CI fixes; restores macOS installer publication after its native quit regression.
+
 ## 2.4.4 — 2026-10-29
 
 - Fix release verification on GitHub's Linux runners by installing Electron's sandbox helper with the required ownership and permissions, without disabling sandboxing.
