@@ -58,7 +58,7 @@ export default function OfflineCollection() {
         <p>{t('offline.noSnapshotHint')}</p>
         <a href="/">{t('offline.returnOnline')}</a>
       </section>}
-      {snapshot && <>
+      {snapshot && <div className="offline-workbench">
         <section className="offline-filters" aria-label={t('offline.filters')}>
           <label className="offline-search">{t('offline.search')}
             <input className="input-control" type="search" value={filters.query} onChange={event => update('query', event.target.value)} aria-describedby="offline-search-hint" />
@@ -89,6 +89,7 @@ export default function OfflineCollection() {
             </select>
           </label>
         </section>
+        <div className="offline-results">
         <p role="status" aria-live="polite">{t('offline.results', { count: filtered.length, start: filtered.length ? start + 1 : 0, end: Math.min(start + PAGE_SIZE, filtered.length) })}</p>
         {!filtered.length ? <div className="view-section offline-empty"><p>{t(cards.length ? 'offline.noResults' : 'offline.emptySnapshot')}</p></div> : <ul className="offline-rows" aria-label={t('offline.resultsLabel')}>
           {filtered.slice(start, start + PAGE_SIZE).map(card => <li key={card.entry_id} className="offline-row">
@@ -113,7 +114,8 @@ export default function OfflineCollection() {
           <span>{t('offline.page', { current: currentPage, total: pages })}</span>
           <button type="button" className="btn btn-secondary" disabled={currentPage === pages} onClick={() => setPage(currentPage + 1)}>{t('offline.next')}</button>
         </nav>
-      </>}
+        </div>
+      </div>}
     </main>
   );
 }

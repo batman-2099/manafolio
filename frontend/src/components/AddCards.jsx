@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import './CatalogueWorkbench.css';
 import { Camera, Search, Award, BookOpen } from 'lucide-react';
 import CameraScanner from './CameraScanner';
 import CardSearch from './CardSearch';
@@ -22,8 +23,8 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, navigationGuardRef, i
     return (
       <div className="glass-panel" style={{ maxWidth: '520px', margin: '2rem auto', padding: '2rem', textAlign: 'center' }}>
         <Camera size={40} style={{ color: 'var(--accent-yellow)', marginBottom: '1rem' }} />
-        <h2 style={{ fontSize: '1.2rem', color: 'var(--text-strong)', marginBottom: '0.75rem' }}>{t('demo.unavailableTitle')}</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+        <h2 style={{ fontSize: 'var(--text-lg)', color: 'var(--text-strong)', marginBottom: '0.75rem' }}>{t('demo.unavailableTitle')}</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', lineHeight: 1.5 }}>
           {t('demo.unavailableBody')}
         </p>
       </div>
@@ -31,9 +32,9 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, navigationGuardRef, i
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', gap: '1rem', position: 'relative' }}>
-        <div className="sub-nav-tabs" role="group" aria-label={t('addCards.mode')} style={{ width: '100%', maxWidth: '520px', margin: 0 }}>
+    <div className="add-cards-workbench">
+      <div className="add-cards-navigation">
+        <div className="sub-nav-tabs" role="group" aria-label={t('addCards.mode')}>
           <button
             className={`sub-nav-tab ${mode === 'search' ? 'active' : ''}`}
             aria-pressed={mode === 'search'}

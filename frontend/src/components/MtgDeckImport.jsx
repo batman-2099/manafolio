@@ -3,6 +3,7 @@ import { BookOpen, List, Plus, Search } from 'lucide-react';
 import { useT } from '../utils/i18n';
 import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
 import { reverseFace } from '../utils/tokenFaces';
+import './DeckBuilder.css';
 
 export default function MtgDeckImport({ onAddSuccess, showToast, onChoose, navigationGuardRef }) {
   const { t } = useT();
@@ -140,12 +141,12 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose, navig
   };
 
   return (
-    <div className="glass-panel" style={{ maxWidth: '720px', margin: '0 auto' }}>
+    <div className="glass-panel mtg-deck-import">
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
         <BookOpen size={20} style={{ color: 'var(--accent-yellow)' }} />
-        <h2 style={{ fontSize: '1.15rem', margin: 0, color: 'var(--text-strong)' }}>{t('mtgDeck.title')}</h2>
+        <h2 style={{ fontSize: 'var(--text-lg)', margin: 0, color: 'var(--text-strong)' }}>{t('mtgDeck.title')}</h2>
       </div>
-      <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', lineHeight: 1.5, marginBottom: '1rem' }}>{t(onChoose ? 'mtgDeck.chooseHint' : 'mtgDeck.hint')}</p>
+      <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-md)', lineHeight: 1.5, marginBottom: 'var(--space-4)' }}>{t(onChoose ? 'mtgDeck.chooseHint' : 'mtgDeck.hint')}</p>
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
         <input
           type="search"
@@ -171,14 +172,14 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose, navig
           {decks.map(deck => {
             const detail = details?.fileName === deck.fileName ? details : null;
             return (
-              <div key={deck.fileName} style={{ padding: '0.75rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)' }}>
+              <div key={deck.fileName} className="mtg-deck-import-result">
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
                   <div>
                     <div style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{deck.name}</div>
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.2rem' }}>{[deck.type, deck.code, deck.releaseDate].filter(Boolean).join(' · ')}</div>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                    <button type="button" className="btn btn-primary" disabled={!!adding || detailsLoading === deck.fileName} onClick={() => showDetails(deck)} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
+                    <button type="button" className="btn btn-secondary" disabled={!!adding || detailsLoading === deck.fileName} onClick={() => showDetails(deck)} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
                       <List size={15} /> {detailsLoading === deck.fileName ? t('common.loading') : detail ? t('mtgDeck.hideDetails') : t('mtgDeck.details')}
                     </button>
                     <button type="button" className="btn btn-primary" disabled={!!adding} onClick={event => onChoose ? onChoose(deck) : addDeck(deck, event.currentTarget)} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
@@ -215,7 +216,7 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose, navig
                   </div>
                 )}
                 {detail && (
-                  <div style={{ display: 'grid', gap: '0.75rem', marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid var(--border-glass)' }}>
+                  <div className="mtg-deck-import-detail">
                     {[
                       ['creatures', t('mtgDeck.creatures')],
                       ['spells', t('mtgDeck.spells')],

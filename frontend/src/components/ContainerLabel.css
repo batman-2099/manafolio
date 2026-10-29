@@ -1,15 +1,23 @@
-.container-label-preview {
-  width: min(36rem, calc(100vw - 2rem));
-  max-height: 90dvh;
-  overflow-y: auto;
-  padding: 1.25rem;
+/* Hallmark · scope: app · redesign: full · surface: absolute */
+/* Hallmark · waive 7b · exact black ink on white paper for QR labels · printed container label contrast is deliberate and required for scanning. */
+:root {
+  --label-paper: #fff;
+  --label-ink: #000;
 }
 
-.container-label-tools h2 { margin-top: 0; }
+.container-label-preview {
+  width: 36rem;
+  max-width: 100%;
+  max-height: 90dvh;
+  overflow-y: auto;
+  padding: var(--space-6);
+}
+
+.container-label-tools h2 { margin-top: 0; text-wrap: balance; }
 .container-label-tools p { color: var(--text-secondary); }
 .container-label-destination { overflow-wrap: anywhere; }
 .container-label-destination a { color: var(--text-strong); text-decoration: underline; }
-.container-label-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.75rem; }
+.container-label-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border-glass); }
 .container-label-actions button { min-height: 44px; }
 
 .container-label-paper {
@@ -17,16 +25,16 @@
   width: 70mm;
   max-width: 100%;
   min-height: 70mm;
-  margin: 1rem auto;
+  margin: var(--space-6) auto;
   padding: 4mm;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2mm;
-  background: #fff;
-  color: #000;
+  background: var(--label-paper);
+  color: var(--label-ink);
   text-align: center;
-  border: 1px solid #000;
+  border: 1px solid var(--label-ink);
   break-inside: avoid;
 }
 .container-label-paper strong { font-size: 16pt; line-height: 1.2; overflow-wrap: anywhere; max-width: 100%; }
@@ -34,7 +42,7 @@
 .container-label-paper span { font-size: 10pt; }
 
 @media print {
-  body:has(.container-label-dialog) { background: #fff !important; margin: 0 !important; }
+  body:has(.container-label-dialog) { background: var(--label-paper) !important; margin: 0 !important; }
   body:has(.container-label-dialog) > :not(.container-label-dialog) { display: none !important; }
   .container-label-dialog::backdrop { background: transparent; }
   .container-label-dialog {
@@ -46,7 +54,7 @@
     margin: 0 !important;
     padding: 0 !important;
     border: 0 !important;
-    background: #fff !important;
+    background: var(--label-paper) !important;
     backdrop-filter: none !important;
   }
   .container-label-preview {
@@ -56,7 +64,7 @@
     padding: 0 !important;
     border: 0 !important;
     box-shadow: none !important;
-    background: #fff !important;
+    background: var(--label-paper) !important;
     transition: none !important;
   }
   .container-label-tools { display: none !important; }

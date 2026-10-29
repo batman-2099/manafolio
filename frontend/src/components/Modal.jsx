@@ -21,7 +21,7 @@ export default function Modal({ onClose, returnFocus, children, className = '', 
       ref={dialogRef}
       tabIndex={-1}
       className={`modal-overlay ${className}`}
-      style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', ...style }}
+      style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--overlay-background)', ...style }}
       onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}
       onClick={event => { if (event.target === event.currentTarget) onClose(); }}
     >

@@ -62,48 +62,31 @@ export default function PriceHistoryChart({
   if (!cardId) return null;
 
   const up = (pctChange ?? 0) >= 0;
-  const trendColor = up ? '#22c55e' : '#ef4444';
+  const trendColor = up ? 'var(--text-positive)' : 'var(--text-negative)';
   const rangeName = RANGE_KEYS.includes(range) ? t(`priceHistory.range.${range}.name`) : '';
 
   return (
-    <div style={{
-      width: '100%',
-      background: 'rgba(0,0,0,0.15)',
-      padding: '0.75rem',
-      borderRadius: 'var(--radius-sm)',
-      border: '1px solid var(--border-glass)'
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px', gap: '0.5rem' }}>
-        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+    <div style={{ width: '100%' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--space-2)', gap: 'var(--space-2)' }}>
+        <span style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
           {t('priceHistory.title')} ({rangeName})
         </span>
         {pctChange !== null && (
-          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: trendColor }}>
+          <span style={{ fontSize: '0.875rem', fontWeight: 600, color: trendColor }}>
             {up ? '▲' : '▼'} {up ? '+' : ''}{priceText(Math.abs(absChange), currency)} ({up ? '+' : '−'}{Math.abs(pctChange).toFixed(1)}%)
           </span>
         )}
       </div>
 
       {/* Range selector */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+      <div className="sub-nav-tabs" style={{ marginBottom: 'var(--space-2)' }}>
         {RANGE_KEYS.map(key => (
           <button
             type="button"
             key={key}
             onClick={() => setRange(key)}
             aria-pressed={range === key}
-            style={{
-              flex: 1,
-              padding: '3px 0',
-              fontSize: '0.62rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border-glass)',
-              background: range === key ? 'var(--accent-yellow)' : 'transparent',
-              color: range === key ? '#000' : 'var(--text-secondary)',
-              transition: 'background 0.15s, color 0.15s',
-            }}
+            className={`sub-nav-tab ${range === key ? 'active' : ''}`}
           >
             {t(`priceHistory.range.${key}.label`)}
           </button>
@@ -126,7 +109,7 @@ export default function PriceHistoryChart({
           market data pulled per request; everything else is what Manafolio has
           watched happen since it was installed. */}
       {!loading && !insufficientHistory && (coverage.marketCount > 0 || coverage.recordedCount > 0) && (
-        <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginBottom: '6px', lineHeight: 1.35 }}>
+        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-2)', lineHeight: 1.5 }}>
           {coverage.marketCount > 0
             ? t('priceHistory.sourceCardmarket')
             : t('priceHistory.sourceRecorded', { count: coverage.spanDays || 0 })}
@@ -136,40 +119,34 @@ export default function PriceHistoryChart({
         </div>
       )}
 
-      <div style={{ width: '100%', height: '100px' }} aria-busy={loading}>
+      <div style={{ width: '100%', height: '160px' }} aria-busy={loading}>
         {!result ? null : insufficientHistory ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '1rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
             {t('priceHistory.insufficient')}
           </div>
         ) : (!chartData || chartData.length === 0) ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '1rem', color: 'var(--text-secondary)' }}>
             {t('priceHistory.noData')}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="priceGlow" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--accent-yellow)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="var(--accent-yellow)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-glass)" vertical={false} />
               <XAxis dataKey="ts" type="number" scale="time" domain={['dataMin', 'dataMax']} hide />
               <YAxis
                 domain={['auto', 'auto']}
                 stroke="var(--text-secondary)"
-                style={{ fontSize: '0.6rem' }}
-                width={48}
+                style={{ fontSize: '0.875rem' }}
+                width={64}
                 tickFormatter={(v) => priceText(v, currency)}
               />
               <Tooltip
-                contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', borderRadius: '8px', fontSize: '0.75rem' }}
+                contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem' }}
                 labelStyle={{ color: 'var(--text-secondary)' }}
                 formatter={(val) => [priceText(val, currency), t('priceHistory.market')]}
                 labelFormatter={(label) => (label ? new Date(label).toLocaleDateString(locale) : '')}
               />
-              <Area type="monotone" dataKey="price" stroke="var(--accent-yellow)" strokeWidth={1.75} fillOpacity={1} fill="url(#priceGlow)" />
+              <Area type="monotone" dataKey="price" stroke="var(--accent-yellow)" strokeWidth={1.75} fillOpacity={0.08} fill="var(--accent-yellow)" />
             </AreaChart>
           </ResponsiveContainer>
         )}

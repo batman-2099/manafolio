@@ -1,10 +1,9 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useT } from '../utils/i18n';
-import { useScrollReveal } from '../utils/useScrollReveal';
 
-const cellStyle = { padding: '0.65rem', borderBottom: '1px solid var(--border-glass)', textAlign: 'left' };
-const tableStyle = { width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' };
-const noteStyle = { color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.5, margin: '0.75rem 0' };
+const cellStyle = { padding: 'var(--space-3)', borderBottom: '1px solid var(--border-glass)', textAlign: 'left' };
+const tableStyle = { width: '100%', borderCollapse: 'collapse', fontSize: '0.9375rem', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' };
+const noteStyle = { color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: 1.5, margin: 'var(--space-3) 0' };
 
 export function ChartDataTable({ titleId, title, category, rows, series, format, categoryKey = 'name', formatCategory = value => value }) {
   const { t, locale } = useT();
@@ -24,14 +23,13 @@ export function ChartDataTable({ titleId, title, category, rows, series, format,
 
 export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
   const { t, locale } = useT();
-  const revealRef = useScrollReveal();
   const isArchive = inventory === 'graveyard';
   const number = (value) => value.toLocaleString(locale);
   const distributionSeries = isArchive ? [
-    { key: 'owned', label: t('dash.archivedCopies'), color: '#a78bfa' },
+    { key: 'owned', label: t('dash.archivedCopies'), color: 'var(--chart-series-5)' },
   ] : [
-    { key: 'owned', label: t('dash.ownedCopies'), color: '#60a5fa' },
-    { key: 'decks', label: t('dash.savedDeckSlots'), color: '#fbbf24' },
+    { key: 'owned', label: t('dash.ownedCopies'), color: 'var(--chart-series-1)' },
+    { key: 'decks', label: t('dash.savedDeckSlots'), color: 'var(--chart-series-3)' },
   ];
   const charts = [
     {
@@ -39,10 +37,10 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
       rows: analytics?.growth?.map(row => ({ ...row, name: new Date(`${row.month}-01T00:00:00Z`).toLocaleDateString(locale, { month: 'short', year: '2-digit', timeZone: 'UTC' }) })),
       category: t('dash.month'), empty: t(isArchive ? 'dash.noArchiveGrowth' : 'dash.noGrowth'), stacked: true,
       series: isArchive ? [
-        { key: 'graveyard', label: t('dash.archivedCopies'), color: '#a78bfa' },
+        { key: 'graveyard', label: t('dash.archivedCopies'), color: 'var(--chart-series-5)' },
       ] : [
-        { key: 'physical', label: t('dash.physical'), color: '#60a5fa' },
-        { key: 'arena', label: t('dash.arena'), color: '#fbbf24' },
+        { key: 'physical', label: t('dash.physical'), color: 'var(--chart-series-1)' },
+        { key: 'arena', label: t('dash.arena'), color: 'var(--chart-series-3)' },
       ],
     },
     {
@@ -84,7 +82,7 @@ export default function DashboardAnalytics({ analytics, inventory = 'all' }) {
   }
 
   return (
-    <div ref={revealRef} className="dashboard-analytics-grid">
+    <div className="dashboard-analytics-grid">
       {charts.map(chart => (
         <section key={chart.key} className="dashboard-subsection view-section" aria-labelledby={`analytics-${chart.key}`}>
           <h3 id={`analytics-${chart.key}`} className="section-heading">{chart.title}</h3>

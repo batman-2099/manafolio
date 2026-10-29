@@ -6,6 +6,7 @@ import CardImageZoom from './CardImageZoom';
 import { useT } from '../utils/i18n';
 import { displayName } from '../utils/languages';
 import { useBackGuard } from '../utils/useBackGuard';
+import './LocationManager.css';
 
 export default function StocktakeDialog({ location, onClose, onApplied }) {
   const { t, locale } = useT();
@@ -80,10 +81,10 @@ export default function StocktakeDialog({ location, onClose, onApplied }) {
   return <Modal onClose={close} aria-labelledby="stocktake-title">
     <section ref={panel} className="glass-panel dialog-panel-spacing stocktake-panel">
       <div className="stocktake-heading">
-        <h2 id="stocktake-title">{t('stocktake.title')} — {location.name}</h2>
+        <h2 id="stocktake-title">{t('stocktake.title')}: {location.name}</h2>
         <button type="button" className="btn btn-secondary" disabled={!!pending} onClick={close}>{t('common.close')}</button>
       </div>
-      <p>{t('stocktake.hint')}</p>
+      <p className="stocktake-hint">{t('stocktake.hint')}</p>
       {loading && <p role="status">{t('common.loading')}</p>}
       {error && <div role="alert" className="read-state">
         <p>{t(error.message)}</p>

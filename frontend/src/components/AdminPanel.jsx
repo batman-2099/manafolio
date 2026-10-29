@@ -369,7 +369,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="admin-page">
       {showWizard && (
         <SetupWizard 
           user={user} 
@@ -379,33 +379,32 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
         />
       )}
       {/* Header Info */}
-      <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="page-heading admin-heading">
         <div>
-          <h2 style={{ fontSize: '1.25rem', color: 'var(--text-strong)' }}>{t('admin.title')}</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{t('admin.subtitle')}</p>
+          <h2 className="page-title">{t('admin.title')}</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-md)' }}>{t('admin.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button 
             type="button" 
             className="btn btn-secondary btn-sm" 
             onClick={() => setShowWizard(true)}
-            style={{ padding: '0.5rem 1rem', height: '34px', fontSize: '0.8rem', border: '1px solid var(--border-glass)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
           >
             <Sparkles size={14} style={{ color: 'var(--accent-yellow)' }} />
             {t('admin.runSetupWizard')}
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', height: '34px' }}>
+          <div className="admin-user-count">
             <Users size={16} style={{ color: 'var(--accent-red)' }} />
-            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('admin.totalUsers', { count: users.length })}</span>
+            <span style={{ fontSize: 'var(--text-md)', fontWeight: 600 }}>{t('admin.totalUsers', { count: users.length })}</span>
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1.5rem' }} className="admin-grid-layout">
+      <div className="admin-grid-layout">
         {/* Registration Panel */}
         <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <h3 style={{ color: 'var(--text-strong)', fontSize: '1.1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <h3 style={{ color: 'var(--text-strong)', fontSize: 'var(--text-lg)', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <UserPlus size={18} style={{ color: 'var(--accent-red)' }} />
             {t('admin.registerTitle')}
           </h3>
@@ -463,7 +462,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
         {/* Instance Settings Panel */}
         <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <h3 style={{ color: 'var(--text-strong)', fontSize: '1.1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <h3 style={{ color: 'var(--text-strong)', fontSize: 'var(--text-lg)', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Globe size={18} style={{ color: 'var(--accent-red)' }} />
             {t('admin.instanceTitle')}
           </h3>
@@ -475,7 +474,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
             </div>
           )}
           <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ background: 'rgba(255, 71, 71, 0.03)', border: '1px solid var(--border-glass)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+            <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               {t('admin.instanceHint', { envVar: 'PUBLIC_BASE_URL' })}
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -508,7 +507,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                 <option value={30}>{t('admin.priceRefreshMonthly')}</option>
                 <option value={0}>{t('admin.priceRefreshOff')}</option>
               </select>
-              <p style={{ margin: '0.4rem 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+              <p style={{ margin: '0.4rem 0 0', fontSize: 'var(--text-md)', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
                 {t('admin.priceRefreshHint')}
               </p>
             </div>
@@ -528,7 +527,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
         {/* Database Backup Panel */}
         <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <h3 style={{ color: 'var(--text-strong)', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ color: 'var(--text-strong)', fontSize: 'var(--text-lg)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <HardDriveDownload size={18} style={{ color: 'var(--accent-red)' }} />
               {t('admin.backupTitle')}
             </h3>
@@ -537,13 +536,12 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
               className="btn btn-primary btn-sm"
               onClick={handleBackup}
               disabled={backupLoading}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', height: '34px' }}
             >
               {backupLoading ? <span className="spinner" aria-hidden="true" style={{ width: '14px', height: '14px', margin: 0, borderWidth: '2px' }} /> : <HardDriveDownload size={14} aria-hidden="true" />}
               {t('admin.backUpNow')}
             </button>
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0, lineHeight: 1.4 }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-md)', margin: 0, lineHeight: 1.4 }}>
             {t('admin.backupHint', { keep: 10, dbFile: 'manafolio.db' })}
           </p>
 
@@ -555,7 +553,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
             </div>
           )}
           {backups.length === 0 && backupsStatus === 'loaded' && (
-            <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+            <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 'var(--text-md)' }}>
               {t('admin.noBackups')}
             </div>
           )}
@@ -573,9 +571,9 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                 <tbody>
                   {backups.map(b => (
                     <tr key={b.file}>
-                      <td style={{ fontWeight: 600, color: 'var(--text-strong)', fontFamily: 'monospace', fontSize: '0.78rem' }}>{b.file}</td>
-                      <td className="hide-mobile" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{new Date(b.created_at).toLocaleString(locale)}</td>
-                      <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{formatBytes(b.size)}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--text-strong)', fontFamily: 'var(--font-main)', fontSize: 'var(--text-md)' }}>{b.file}</td>
+                      <td className="hide-mobile" style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>{new Date(b.created_at).toLocaleString(locale)}</td>
+                      <td style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>{formatBytes(b.size)}</td>
                       <td>
                         <button
                           type="button"
@@ -600,7 +598,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
         {/* User Maintenance Table */}
         <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <h3 style={{ color: 'var(--text-strong)', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 style={{ color: 'var(--text-strong)', fontSize: 'var(--text-lg)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Shield size={18} style={{ color: 'var(--accent-yellow)' }} />
               {t('admin.manageUsers')}
             </h3>
@@ -612,7 +610,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                 aria-label={t('admin.filterUsers')}
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
-                style={{ width: '100%', paddingLeft: '2rem', paddingVertical: '0.35rem', fontSize: '0.85rem' }}
+                style={{ width: '100%', paddingLeft: '2rem', paddingVertical: '0.35rem', fontSize: 'var(--text-md)' }}
               />
               <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             </div>
@@ -648,22 +646,11 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
                     <tr key={user.id}>
                       <td style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{user.username}</td>
                       <td>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: '12px',
-                          backgroundColor: user.role === 'admin' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                          color: user.role === 'admin' ? 'var(--accent-red)' : 'var(--accent-blue)',
-                          border: user.role === 'admin' ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(59,130,246,0.2)'
-                        }}>
+                        <span className="admin-role">
                           {t(user.role === 'admin' ? 'admin.roleAdmin' : 'admin.roleMember')}
                         </span>
                       </td>
-                      <td className="hide-mobile" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      <td className="hide-mobile" style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
                         {new Date(user.created_at).toLocaleDateString(locale)}
                       </td>
                       <td data-label={t('sets.colCards')} style={{ fontWeight: 600 }}>{t('admin.userCards', { count: user.total_cards })}</td>
@@ -719,8 +706,7 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
         <Modal onClose={closePassword} aria-labelledby="admin-reset-title" style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(4px)',
+          backgroundColor: 'var(--overlay-background)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -728,8 +714,8 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
         }}>
           <div className="glass-panel dialog-panel-spacing" style={{ maxWidth: '380px', width: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div>
-              <h3 id="admin-reset-title" style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('admin.resetPassword')}</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{t('admin.resetPasswordFor')} <strong>{targetUser.username}</strong></p>
+              <h3 id="admin-reset-title" style={{ color: 'var(--text-strong)', fontSize: 'var(--text-lg)' }}>{t('admin.resetPassword')}</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-md)' }}>{t('admin.resetPasswordFor')} <strong>{targetUser.username}</strong></p>
             </div>
             <form noValidate onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>

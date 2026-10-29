@@ -62,7 +62,7 @@ Paths below are relative to the repository root.
 | `backend/test/`, `backend/test/e2e/` | Backend unit and HTTP integration runners |
 | `frontend/src/main.jsx`, `App.jsx` | Initialization, translations, authentication state, fetch wrapper, tab-based navigation |
 | `frontend/src/components/` | Collection, storage, deck, scanner, settings, administration, and shared views |
-| `frontend/src/index.css`, `arcane.css` | Base/component/theme styles and the default dark Arcane Blue overrides |
+| `frontend/src/index.css`, `arcane.css`, `tokens.css`, `base.css` | Shared component styles, account palettes, semantic/type tokens, and accessible base rules; `design.md` records the retained-brand workbench system |
 | `frontend/src/utils/`, `locales/` | Display/domain helpers, scanner worker, translations, and frontend unit tests |
 | `frontend/src/demo/` | Fixture-backed demonstration build, separate from a server installation |
 | `shared/` | Shared card geometry and domain tables used by client and server |

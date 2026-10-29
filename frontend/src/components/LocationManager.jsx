@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay, MouseSensor, useSensor, useSensors, useDraggable, useDroppable, pointerWithin } from '@dnd-kit/core';
-import { Plus, Minus, Trash2, X, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, Edit3, Download, Search, SlidersHorizontal, Layers, Check, ClipboardCheck } from 'lucide-react';
+import { Plus, Minus, Trash2, X, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Edit3, Download, Search, SlidersHorizontal, Layers, Check, ClipboardCheck } from 'lucide-react';
 import { sortCardsByOrder, COLOR_ORDER, colorCategory } from '../utils/cardSort';
 import { priceText } from '../utils/formatPrice';
 import { getFoilOverlayClass, getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
@@ -22,6 +22,7 @@ import { prepareStorageImage } from '../utils/prepareImage';
 import StocktakeDialog from './StocktakeDialog';
 import ContainerLabel from './ContainerLabel';
 import { isMtgToken, reverseFace } from '../utils/tokenFaces';
+import './LocationManager.css';
 
 async function checkStorageResponse(response, fallback) {
   if (!response.ok) {
@@ -31,7 +32,7 @@ async function checkStorageResponse(response, fallback) {
 }
 
 function GalleryCover({ cover }) {
-  return <div style={{ aspectRatio: '1.4', overflow: 'hidden', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+  return <div className="storage-gallery-cover">
     {cover
       ? <CardImage card={cover} src={cover.image_url.replace(/^(https:\/\/cards\.scryfall\.io\/)(?:small|normal|large|png)\/([^?]+)(.*)$/, (_, host, path, query) => `${host}art_crop/${path.replace(/\.png$/, '.jpg')}${query}`)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       : <Layers size={56} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />}
@@ -1555,7 +1556,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const coverDialog = coverLocation && (
         <Modal onClose={closeCover} aria-labelledby="container-cover-title">
         <div className="dialog-panel-spacing" style={{ width: 'min(700px, 90vw)', maxHeight: '80vh', overflowY: 'auto', background: 'var(--bg-secondary)', color: 'var(--text-strong)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)' }}>
-          <h3 id="container-cover-title">{t(coverLocation.isUnit ? 'storageUnit.chooseCover' : 'loc.chooseCover')} — {coverLocation.name}</h3>
+          <h3 id="container-cover-title">{t(coverLocation.isUnit ? 'storageUnit.chooseCover' : 'loc.chooseCover')}: {coverLocation.name}</h3>
           {coverLocation.isUnit && <p>{t('storageUnit.coverHint')}</p>}
           {coverLocation.isUnit && <div style={{ marginBlock: '1rem' }}>
             {coverLocation.cover_image && <div style={{ maxWidth: '280px', marginBottom: '0.75rem' }}>
@@ -1602,7 +1603,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             
             {filingQueue[filingIndex] && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem' }}>
-                <CardImage card={filingQueue[filingIndex].entry} style={{ width: 'min(120px, 26vh)', borderRadius: '5px', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }} />
+                <CardImage card={filingQueue[filingIndex].entry} style={{ width: 'min(120px, 26vh)', borderRadius: '5px' }} />
                 
                 <div style={{ textAlign: 'center' }}>
                   <strong style={{ fontSize: '1rem', display: 'block' }}>{displayName(filingQueue[filingIndex].entry)}</strong>
@@ -1613,7 +1614,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   const rec = filingQueue[filingIndex].recommended;
                   if (!rec) {
                     return (
-                      <div style={{ background: 'rgba(255, 71, 71, 0.15)', border: '1px solid #ff4747', borderRadius: 'var(--radius-sm)', padding: '0.75rem', width: '100%', textAlign: 'center' }}>
+                      <div style={{ background: 'var(--surface-2)', border: '1px solid var(--accent-red)', borderRadius: 'var(--radius-sm)', padding: '0.75rem', width: '100%', textAlign: 'center' }}>
                         <strong style={{ fontSize: 'max(0.9rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-strong)' }}>
                           {t('loc.noEligibleCompartment')}
                         </strong>
@@ -1625,15 +1626,15 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   }
                   return (
                     <div 
-                      style={{ background: 'rgba(255, 193, 7, 0.15)', border: '1px solid #ffc107', borderRadius: 'var(--radius-sm)', padding: '0.75rem', width: '100%', textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 193, 7, 0.25)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 193, 7, 0.15)'; }}
+                      style={{ background: 'var(--surface-2)', border: '1px solid var(--accent-yellow)', borderRadius: 'var(--radius-sm)', padding: '0.75rem', width: '100%', textAlign: 'center', cursor: 'pointer' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-3)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--surface-2)'; }}
                       onClick={() => locateRecommendedSpot(rec)}
                       title={t('loc.snapToSlot')}
                     >
-                      <div style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', color: '#ffc107', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold', marginBottom: '0.25rem' }}>{t('loc.clickToLocate')}</div>
+                      <div style={{ fontSize: 'max(0.7rem, var(--unsorted-text-min, 0rem))', color: 'var(--accent-yellow)', fontWeight: 'bold', marginBottom: '0.25rem' }}>{t('loc.clickToLocate')}</div>
                       <strong style={{ fontSize: 'max(0.9rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-strong)', display: 'block' }}>{rec.label}</strong>
-                      <strong style={{ fontSize: '1.2rem', color: '#ffc107', display: 'block', marginTop: '0.25rem' }}>{t('loc.slotNumber', { n: Math.floor(rec.position / 1000) })}</strong>
+                      <strong style={{ fontSize: '1.2rem', color: 'var(--accent-yellow)', display: 'block', marginTop: '0.25rem' }}>{t('loc.slotNumber', { n: Math.floor(rec.position / 1000) })}</strong>
                       {rec.after ? (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '0.4rem' }}>
                           <CardImage card={rec.after} style={{ width: '26px', borderRadius: '3px' }} />
@@ -1670,7 +1671,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           </div>
   );
   if (showGallery) return (
-    <section>
+    <section className="storage-gallery">
       <header className="page-heading" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <h2 className="page-title">{t('nav.storage')}</h2>
         <div className="storage-create-actions">
@@ -1682,7 +1683,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         </button>
         </div>
       </header>
-      <nav className="view-toolbar" aria-label={t('storageUnit.title')}>
+      <nav className="view-toolbar storage-gallery-nav" aria-label={t('storageUnit.title')}>
         <select ref={unitNavigationSelect} className="select-control storage-unit-mobile-nav" aria-label={t('storageUnit.title')} value={unitFilter} onChange={event => { setUnitFilter(event.target.value); setGallerySearch(''); }}>
           <option value="all">{t('storageUnit.all')}</option>
           <option value="none">{t('storageUnit.none')}</option>
@@ -1698,10 +1699,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       {unitsFeedback}
       {unitFilter === 'units' && !unitsLoading && !unitsError && <>
         {!storageUnits.length && <div className="read-state"><p>{t('storageUnit.empty')}</p><p>{t('storageUnit.helper')}</p></div>}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: '1.25rem', marginBottom: '1rem' }}>
-          {storageUnits.map(unit => <button key={unit.id} type="button" className="glass-panel" onClick={() => { setUnitFilter(String(unit.id)); setGallerySearch(''); }} style={{ padding: 0, overflow: 'hidden', textAlign: 'left', color: 'var(--text-strong)', cursor: 'pointer', overflowWrap: 'anywhere' }}>
+        <div className="storage-gallery-grid">
+          {storageUnits.map(unit => <button key={unit.id} type="button" className="glass-panel storage-gallery-card storage-unit-card" onClick={() => { setUnitFilter(String(unit.id)); setGallerySearch(''); }}>
             <GalleryCover cover={unit.cover} />
-            <div style={{ padding: '0.75rem 1rem' }}>
+            <div className="storage-gallery-card-info">
               <strong>{unit.name}</strong><p style={{ marginBottom: 0, color: 'var(--text-secondary)' }}>{unit.type} · {t('storageUnit.count', { count: unit.container_count })}</p>
             </div>
           </button>)}
@@ -1713,7 +1714,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         <button type="button" className="btn btn-secondary" onClick={() => setUnitDraft({ ...selectedUnit, mode: 'delete' })}>{t('storageUnit.delete')}</button>
       </div>}
       {unitFilter !== 'units' && <>
-      <div className="view-toolbar">
+      <div className="view-toolbar storage-gallery-filters">
         {inventorySelector}
         <input className="input-control" aria-label={t('shared.search')} placeholder={t('loc.searchPlaceholder')} value={gallerySearch} onChange={e => setGallerySearch(e.target.value)} style={{ flex: '1 1 200px' }} />
         {gallerySearch && <button type="button" className="btn btn-secondary" onClick={() => setGallerySearch('')}>{t('loc.clearSearch')}</button>}
@@ -1740,12 +1741,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           )}
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: '1.25rem' }}>
+      <div className="storage-gallery-grid">
         {galleryLocations.map(location => (
-          <div key={location.id} className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
-          <button onClick={() => setActiveLocationId(location.id)} style={{ width: '100%', padding: 0, border: 0, background: 'transparent', textAlign: 'left', color: 'var(--text-strong)', cursor: 'pointer' }}>
+          <div key={location.id} className="glass-panel storage-gallery-card">
+          <button className="storage-gallery-open" onClick={() => setActiveLocationId(location.id)}>
             <GalleryCover cover={location.cover} />
-            <div style={{ padding: '0.75rem 1rem', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', columnGap: '0.75rem' }}>
+            <div className="storage-gallery-card-info">
               <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflowWrap: 'anywhere' }}>{!!location.locked && <Lock size={14} />}{location.name}</strong>
               <span style={{ gridColumn: 1, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{location.type}</span>
               {location.storage_unit_name && <span style={{ gridColumn: 1, color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>{location.storage_unit_name}</span>}
@@ -1755,8 +1756,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     <span key={symbol} title={t(`dash.color.${name}`)} style={{ display: 'inline-flex' }}>
                       <svg role="img" aria-label={t(`dash.color.${name}`)} focusable="false" width="20" height="20" viewBox={`${x === null ? 0 : x - 50} 0 100 100`}>
                         {symbol === 'C' ? <>
-                          <circle cx="50" cy="50" r="50" fill="#CAC5C0" />
-                          <path fill="#0D0F0F" fillRule="evenodd" d="M50 10 90 50 50 90 10 50Z M50 30 30 50 50 70 70 50Z" />
+                          <circle cx="50" cy="50" r="50" fill="var(--mana-colorless-paper)" />
+                          <path fill="var(--mana-colorless-ink)" fillRule="evenodd" d="M50 10 90 50 50 90 10 50Z M50 30 30 50 50 70 70 50Z" />
                         </> : <image href={`${import.meta.env.BASE_URL}mana.svg`} x="-945" y="-210.002" width="1045" height="730.002" />}
                       </svg>
                     </span>
@@ -1764,7 +1765,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 </span>
               )}
               <span className="storage-card-quantity" style={{ gridColumn: 2, gridRow: '1 / 4', alignSelf: 'center', textAlign: 'right', minWidth: '3.75rem' }}>
-                <strong style={{ display: 'block', fontSize: '2rem', fontWeight: 800, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{location.total_cards || 0}</strong>
+                <strong>{location.total_cards || 0}</strong>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', lineHeight: 1.3 }}>{t('collection.cardUnit', { count: location.total_cards || 0 })}</span>
               </span>
               {location.total_cards > location.total_capacity && (
@@ -1840,7 +1841,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           <img
             src={draggingCard.image_url}
             alt={displayName(draggingCard)}
-            style={{ width: '90px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '4px', boxShadow: '0 8px 20px rgba(0,0,0,0.6)', cursor: 'grabbing' }}
+            style={{ width: '90px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: '4px', boxShadow: 'none', cursor: 'grabbing' }}
           />
         </DragOverlay>
       )}
@@ -1987,7 +1988,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               </div>
             )}
 
-            <div style={{ background: 'var(--bg-tertiary, rgba(255,255,255,0.04))', borderRadius: 'var(--radius-sm)', padding: '0.4rem 0.55rem', fontSize: '0.72rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ background: 'var(--bg-tertiary, var(--surface-1))', borderRadius: 'var(--radius-sm)', padding: '0.4rem 0.55rem', fontSize: '0.72rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               {/* Label only — the count sits in the value beside it, so this is
                   not loc.cardsCurrentlyStored, whose sentence carries a {count}
                   this row has nowhere to put. */}
@@ -1998,7 +1999,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               <span className="storage-capacity-warning">{t('loc.overLimit', { used: selectedLoc.total_cards.toLocaleString(locale), capacity: selectedLoc.total_capacity.toLocaleString(locale) })}</span>
             )}
 
-            <div style={{ background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #d97706', padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
+            <div style={{ background: 'var(--surface-2)', border: '1px solid var(--accent-yellow)', padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
               <strong>{t('loc.reorganizeWarningTitle')}</strong>
               <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1.1rem' }}>
                 <li>{t('loc.ruleNoteResort', { containerType: isBinderType ? t('loc.binderLower') : t('loc.boxLower') })}</li>
@@ -2028,11 +2029,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       {/* Selected location detail. During mobile filing the binder stays visible
           (the recommended slot blinks in it); the compact filing bar is pinned
           at the bottom of the screen. */}
-      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto' }}>
+      <div className="storage-workspace-main">
         {locationsFeedback}
         {unitsFeedback}
-        <div className="view-toolbar storage-workspace-toolbar" style={{ justifyContent: 'space-between' }}>
-          <div className="storage-workspace-identity" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', minWidth: 0 }}>
+        <div className="view-toolbar storage-workspace-toolbar">
+          <div className="storage-workspace-identity">
             <button className="btn btn-secondary" disabled={storage.bulkPending} onClick={returnToGallery} title={t('nav.storage')} aria-label={t('nav.storage')}><LayoutGrid size={16} /></button>
             {inventorySelector}
             <select
@@ -2041,10 +2042,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               value={activeLocationId || ''}
               disabled={storage.bulkPending}
               onChange={(e) => setActiveLocationId(parseInt(e.target.value, 10))}
-              style={{ fontSize: '1rem', fontWeight: 'bold', padding: '0.3rem', width: 'auto', minWidth: '150px', maxWidth: '100%' }}
+              style={{ fontSize: '1rem', fontWeight: 'bold', maxWidth: '100%' }}
             >
               <option value="" disabled>{t('loc.selectContainer')}</option>
-              {locations.slice().sort((a, b) => a.name.localeCompare(b.name)).map(loc => <option key={loc.id} value={loc.id}>{loc.locked ? '🔒 ' : ''}{loc.storage_unit_name && `${loc.storage_unit_name} · `}{loc.name} ({loc.type})</option>)}
+              {locations.slice().sort((a, b) => a.name.localeCompare(b.name)).map(loc => <option key={loc.id} value={loc.id}>{loc.locked ? `${t('compartment.locked')}: ` : ''}{loc.storage_unit_name && `${loc.storage_unit_name} · `}{loc.name} ({loc.type})</option>)}
             </select>
             {selectedLoc && (
               <div className="storage-container-summary">
@@ -2059,10 +2060,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               </div>
             )}
             {selectedLoc && !!selectedLoc.locked && (
-              <button type="button" onClick={handleToggleContainerLock} title={t('loc.lockedBadgeHint')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.62rem', fontWeight: 800, padding: '0.15rem 0.45rem', borderRadius: '999px', cursor: 'pointer', background: 'rgba(255,193,7,0.15)', border: '1px solid var(--accent-yellow)', color: 'var(--accent-yellow)' }}>
+              <button type="button" onClick={handleToggleContainerLock} title={t('loc.lockedBadgeHint')} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.62rem', fontWeight: 800, padding: '0.15rem 0.45rem', borderRadius: '999px', cursor: 'pointer', background: 'var(--surface-2)', border: '1px solid var(--accent-yellow)', color: 'var(--accent-yellow)' }}>
                 <Lock size={11} /> Locked
               </button>
             )}
+          </div>
+          <div className="storage-workspace-controls">
             {containerViewMode === 'layout' && isBinderType && compartments.length > 0 && (
               <div className="storage-page-nav" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                 <button
@@ -2076,7 +2079,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   })}
                   style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
                 >
-                  {t('loc.prev')}
+                  <ChevronLeft size={16} aria-hidden="true" /> {t('loc.prev')}
                 </button>
                 <select
                   className="select-control"
@@ -2112,16 +2115,15 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   })}
                   style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
                 >
-                  {t('loc.next')}
+                  {t('loc.next')} <ChevronRight size={16} aria-hidden="true" />
                 </button>
               </div>
             )}
-          </div>
           
-            <div className="storage-workspace-actions" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+            <div className="storage-workspace-actions">
             {selectedLoc && <>
             {!filingMode && !moveMode && (
-              <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ display: 'flex', background: 'var(--surface-2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                 <button
                   type="button"
                   className={`btn btn-icon-only ${containerViewMode === 'layout' ? 'btn-primary' : 'btn-secondary'}`}
@@ -2143,7 +2145,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               </div>
             )}
             {containerViewMode === 'list' && !filingMode && !moveMode && (
-              <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ display: 'flex', background: 'var(--surface-2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                 <button
                   type="button"
                   className="btn btn-icon-only btn-secondary"
@@ -2299,10 +2301,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               )}
             </div>
             </div>
+          </div>
         </div>
 
         {storage.selectMode && (
-          <fieldset disabled={storage.bulkPending} aria-busy={storage.bulkPending} className="glass-panel" style={{ minWidth: 0, margin: 0, padding: '0.6rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', background: 'rgba(255,71,71,0.08)' }}>
+          <fieldset disabled={storage.bulkPending} aria-busy={storage.bulkPending} className="glass-panel" style={{ minWidth: 0, margin: 0, padding: '0.6rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', background: 'var(--surface-2)' }}>
             <span style={{ fontWeight: 800, color: 'var(--text-strong)', fontSize: '0.8rem' }}>{storage.selectedIds.size} selected</span>
             <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set(selectableContainerCards.map(c => c.entry_id)))}>Select all ({selectableContainerCards.length})</button>
             <button className="btn btn-secondary" style={{ fontSize: '0.875rem', padding: '0.25rem 0.5rem' }} onClick={() => storage.setSelectedIds(new Set())}>{t('bulk.clear')}</button>
@@ -2378,17 +2381,17 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         ) : (
           <>
             {!!selectedLoc.locked && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'rgba(255,193,7,0.12)', border: '1px solid var(--accent-yellow)', padding: '0.55rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--surface-2)', border: '1px solid var(--accent-yellow)', padding: '0.55rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
                 <Lock size={16} color="var(--accent-yellow)" style={{ flexShrink: 0 }} />
                 <span style={{ flex: 1 }}>{t('loc.lockedBanner')}</span>
                 <button type="button" className="btn btn-secondary" onClick={handleToggleContainerLock} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.68rem', padding: '0.25rem 0.6rem', flexShrink: 0, borderColor: 'var(--accent-yellow)', color: 'var(--accent-yellow)' }}>
-                  <Lock size={13} /> Unlock
+                  <Lock size={13} /> {t('loc.unlockContainer')}
                 </button>
               </div>
             )}
 
             {isBinderType && !isCustom && !binderTipDismissed && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', background: 'rgba(255, 170, 0, 0.1)', border: '1px solid #d97706', padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', background: 'var(--surface-2)', border: '1px solid var(--accent-yellow)', padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>
                 <span style={{ flex: 1 }}>
                   {t('loc.binderTip')}
                 </span>
@@ -2399,7 +2402,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             )}
 
             {moveMode && (
-              <div style={{ background: 'rgba(255,71,71,0.1)', border: '1px solid var(--accent-red)', padding: '0.5rem 0.7rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)' }}>
+              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--accent-red)', padding: '0.5rem 0.7rem', borderRadius: 'var(--radius-sm)', fontSize: '0.72rem', color: 'var(--text-primary)' }}>
                 {pickedEntryId
                   ? t(isBinderType ? 'loc.arrangeStepPocket' : 'loc.arrangeStepSlot')
                   : 'Tap a card here or in Unsorted to pick it up.'}
@@ -2497,12 +2500,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       type="button"
                       disabled={storage.bulkPending}
                       onClick={() => storage.selectMode ? storage.toggleSelect(card.entry_id) : setInspectorCard(card)}
-                      style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', padding: '0.25rem', border: selected ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', background: selected ? 'rgba(255,71,71,0.12)' : 'rgba(255,255,255,0.03)', cursor: 'pointer' }}
+                      style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', padding: '0.25rem', border: selected ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', background: selected ? 'var(--surface-2)' : 'var(--surface-1)', cursor: 'pointer' }}
                     >
                       <CardImage card={card} style={{ width: '100%', borderRadius: '3px' }} />
                       {reverseImage && <CardImage card={reverseImage} style={{ width: '100%', borderRadius: '3px', marginTop: '0.5rem' }} />}
                       {card.quantity > 1 && (
-                        <span style={{ position: 'absolute', top: '0.35rem', right: '0.35rem', padding: '0.25rem 0.5rem', borderRadius: '999px', background: 'rgba(0,0,0,0.85)', color: 'white', fontSize: '1rem', fontWeight: 800 }}>
+                        <span style={{ position: 'absolute', top: '0.35rem', right: '0.35rem', padding: '0.25rem 0.5rem', borderRadius: '999px', background: 'var(--media-background)', color: 'var(--media-foreground)', fontSize: '1rem', fontWeight: 800 }}>
                           ×{card.quantity}
                         </span>
                       )}
@@ -2518,12 +2521,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         </span>
                       )}
                       {card.in_deck_qty > 0 && (
-                        <span title={`${t('loc.inPlay')}: ${card.deck_names}`} style={{ position: 'absolute', right: '0.35rem', bottom: '1.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.45rem', borderRadius: '999px', background: 'rgba(0,0,0,0.85)', border: '2px solid var(--accent-red)', color: 'white', fontSize: '0.85rem', fontWeight: 800 }}>
+                        <span title={`${t('loc.inPlay')}: ${card.deck_names}`} style={{ position: 'absolute', right: '0.35rem', bottom: '1.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.45rem', borderRadius: '999px', background: 'var(--media-background)', border: '2px solid var(--accent-red)', color: 'var(--media-foreground)', fontSize: '0.85rem', fontWeight: 800 }}>
                           <Layers size={14} /> {card.in_deck_qty < card.quantity ? `${card.in_deck_qty}/${card.quantity} Out` : t('loc.inPlay')}
                         </span>
                       )}
                       {card.missing ? (
-                        <span style={{ position: 'absolute', left: '0.35rem', bottom: '1.35rem', padding: '0.25rem 0.45rem', borderRadius: '999px', background: 'var(--accent-red)', color: 'white', fontSize: '0.85rem', fontWeight: 800 }}>
+                        <span style={{ position: 'absolute', left: '0.35rem', bottom: '1.35rem', padding: '0.25rem 0.45rem', borderRadius: '999px', background: 'var(--accent-red)', color: 'var(--media-foreground)', fontSize: '0.85rem', fontWeight: 800 }}>
                           {t('inspector.missing')}
                         </span>
                       ) : null}
@@ -2653,10 +2656,10 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div key={activeComp.id} className="row-flash" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'rgba(0,0,0,0.1)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap' }}>
+                    <div key={activeComp.id} className="row-flash" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', background: 'var(--surface-2)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <button className="btn btn-secondary btn-icon-only" aria-label={t('loc.prev')} disabled={activeCompIdx <= 0} onClick={() => setActiveCompartmentId(compartments[activeCompIdx - 1]?.id)} style={{ width: '24px', height: '24px', padding: 0 }}>
-                          &larr;
+                          <ChevronLeft size={18} aria-hidden="true" />
                         </button>
                         <select
                           className="select-control"
@@ -2675,7 +2678,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                           <option value="__add_new__" disabled={!!selectedLoc.locked}>+ {t('loc.addRow')}</option>
                         </select>
                         <button className="btn btn-secondary btn-icon-only" aria-label={t('common.next')} disabled={activeCompIdx >= compartments.length - 1} onClick={() => setActiveCompartmentId(compartments[activeCompIdx + 1]?.id)} style={{ width: '24px', height: '24px', padding: 0 }}>
-                          &rarr;
+                          <ChevronRight size={18} aria-hidden="true" />
                         </button>
                       </div>
                       {(activeComp.capacity_count ?? activeComp.count) > activeComp.capacity && (
@@ -2771,7 +2774,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   <MousePointerClick size={12} />
                   {t(unsortedSelectMode ? 'bulk.done' : 'collection.select')}
                 </button>
-                <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+                <div style={{ display: 'flex', background: 'var(--surface-2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                   <button
                     type="button"
                     className={`btn btn-icon-only ${unsortedViewMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`}
@@ -2795,7 +2798,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             </div>
 
             {unsortedSelectMode && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: 'rgba(0,0,0,0.25)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', marginTop: '0.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: 'var(--surface-2)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', marginTop: '0.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', fontWeight: 700, color: 'var(--text-strong)' }}>{t('bulk.selectedCount', { count: unsortedSelectedIds.size })}</span>
                   <div style={{ display: 'flex', gap: '0.3rem' }}>
@@ -2940,26 +2943,26 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       style={unsortedViewMode === 'grid' ? {
                         display: 'flex',
                         flexDirection: 'column',
-                        background: isHighlighted ? 'rgba(255, 71, 71, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                        background: isHighlighted ? 'var(--surface-2)' : 'var(--surface-1)',
                         border: isHighlighted ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)',
                         borderRadius: 'var(--radius-sm)',
                         padding: '0.35rem',
                         position: 'relative',
                         cursor: 'pointer',
                         userSelect: 'none',
-                        transition: 'all 0.15s ease-in-out'
+                        transition: 'background-color 150ms ease-out, border-color 150ms ease-out'
                       } : {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem',
                         fontSize: 'max(0.72rem, var(--unsorted-text-min, 0rem))',
                         padding: '0.4rem',
-                        background: isHighlighted ? 'rgba(255,71,71,0.18)' : 'rgba(255, 255, 255, 0.02)',
+                        background: isHighlighted ? 'var(--surface-2)' : 'var(--surface-1)',
                         border: isHighlighted ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)',
                         borderRadius: 'var(--radius-sm)',
                         cursor: 'pointer',
                         userSelect: 'none',
-                        transition: 'all 0.15s ease-in-out'
+                        transition: 'background-color 150ms ease-out, border-color 150ms ease-out'
                       }}
                     >
                       {unsortedViewMode === 'grid' ? (
@@ -2980,7 +2983,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         
                         {/* Selected / Picked checkmark badge */}
                         {isHighlighted && (
-                          <div style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 20, width: '20px', height: '20px', borderRadius: '50%', background: 'var(--accent-red)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', fontWeight: 900 }}>
+                          <div style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 20, width: '20px', height: '20px', borderRadius: '50%', background: 'var(--accent-red)', border: '2px solid var(--media-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', fontWeight: 900 }}>
                             ✓
                           </div>
                         )}
@@ -2995,8 +2998,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                           padding: '1px 3px',
                           borderRadius: '2px',
                           zIndex: 10,
-                          textTransform: 'uppercase',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.5)',
+                          boxShadow: 'none',
                           ...getRarityBadgeStyle(card.rarity)
                         }}>
                           {getRarityBadgeLabel(card.rarity)}
@@ -3013,8 +3015,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                             padding: '1px 3px',
                             borderRadius: '2px',
                             zIndex: 10,
-                            border: '1px solid rgba(255,255,255,0.2)',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.5)',
+                            border: '1px solid var(--border-glass)',
+                            boxShadow: 'none',
                             ...getPrintingBadgeStyle(card.printing)
                           }}>
                             {printingBadgeLabel}
@@ -3050,7 +3052,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         <CardImage card={card} loading="lazy" decoding="async" style={{ width: '100%', aspectRatio: 0.718, objectFit: 'cover', display: 'block' }} />
                         {foilClass && <div className={foilClass} style={{ borderRadius: '4px' }} />}
                         {isHighlighted && (
-                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(255, 71, 71, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontWeight: 900, fontSize: 'max(0.8rem, var(--unsorted-text-min, 0rem))' }}>
+                          <div style={{ position: 'absolute', inset: 0, background: 'color-mix(in srgb, var(--accent-red) 40%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontWeight: 900, fontSize: 'max(0.8rem, var(--unsorted-text-min, 0rem))' }}>
                             ✓
                           </div>
                         )}
@@ -3063,7 +3065,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         <div style={{ fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', display: 'flex', gap: '0.4rem', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <span>{card.set_name || 'Unset'} {card.number ? `#${card.number}` : ''}</span>
                           {card.condition && (
-                            <span style={{ padding: '1px 3px', borderRadius: '2px', background: 'rgba(0,0,0,0.4)', fontSize: 'max(0.55rem, var(--unsorted-text-min, 0rem))', fontWeight: 700 }}>
+                            <span style={{ padding: '1px 3px', borderRadius: '2px', background: 'var(--surface-2)', fontSize: 'max(0.55rem, var(--unsorted-text-min, 0rem))', fontWeight: 700 }}>
                               {card.condition}
                             </span>
                           )}
@@ -3099,9 +3101,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
           container and the guide share one screen. */}
       {isStacked && filingMode && filingQueue[filingIndex] && (
         <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))', zIndex: 90, padding: '0 0.6rem' }}>
-          <div className="glass-panel" style={{ padding: '0.7rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'var(--bg-secondary)', boxShadow: '0 -6px 20px rgba(0,0,0,0.5)' }}>
+          <div className="glass-panel" style={{ padding: '0.7rem 0.8rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'var(--bg-secondary)', boxShadow: 'none' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700, whiteSpace: 'nowrap' }}>
                 {t('loc.filing')} {filingIndex + 1} / {filingQueue.length}
               </span>
               {filingBarCollapsed && (
@@ -3121,7 +3123,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
             {!filingBarCollapsed && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <CardImage card={filingQueue[filingIndex].entry} style={{ width: '48px', borderRadius: '4px', boxShadow: '0 2px 8px rgba(0,0,0,0.5)', flexShrink: 0 }} />
+              <CardImage card={filingQueue[filingIndex].entry} style={{ width: '48px', borderRadius: '4px', boxShadow: 'none', flexShrink: 0 }} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: '0.95rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {filingQueue[filingIndex].entry.name}
@@ -3138,11 +3140,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                 <div
                   onClick={() => locateRecommendedSpot(currentRecSpot)}
                   title={t('loc.tapToSnap')}
-                  style={{ background: 'rgba(255,193,7,0.14)', border: '1px solid #ffc107', borderRadius: 'var(--radius-sm)', padding: '0.5rem 0.6rem', cursor: 'pointer' }}
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--accent-yellow)', borderRadius: 'var(--radius-sm)', padding: '0.5rem 0.6rem', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '0.6rem', color: '#ffc107', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>{t('loc.tapToLocate')}</span>
-                    <strong style={{ fontSize: '0.95rem', color: '#ffc107', whiteSpace: 'nowrap' }}>Slot {Math.floor(currentRecSpot.position / 1000)}</strong>
+                    <span style={{ fontSize: '0.6rem', color: 'var(--accent-yellow)', fontWeight: 700 }}>{t('loc.tapToLocate')}</span>
+                    <strong style={{ fontSize: '0.95rem', color: 'var(--accent-yellow)', whiteSpace: 'nowrap' }}>Slot {Math.floor(currentRecSpot.position / 1000)}</strong>
                   </div>
                   {!filingBarCollapsed && (<>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-strong)', fontWeight: 600, marginTop: '0.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

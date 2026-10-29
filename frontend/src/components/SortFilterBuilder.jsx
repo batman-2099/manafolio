@@ -14,16 +14,13 @@ function SortableItem({ id, children }) {
     transition,
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
-    background: 'rgba(255, 255, 255, 0.05)',
-    padding: '0.5rem',
-    borderRadius: '4px',
-    marginBottom: '4px',
-    border: '1px solid rgba(255, 255, 255, 0.1)'
+    gap: 'var(--space-2)',
+    paddingBlock: 'var(--space-2)',
+    borderBottom: '1px solid var(--border-glass)'
   };
   return (
     <div ref={setNodeRef} style={style}>
-      <button type="button" className="sort-drag-handle" {...attributes} {...listeners} aria-label={t('sort.reorder')} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', touchAction: 'none', background: 'transparent', border: 0, padding: 0 }}>
+      <button type="button" className="sort-drag-handle" {...attributes} {...listeners} aria-label={t('sort.reorder')} style={{ cursor: 'grab', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', background: 'transparent', border: 0, padding: 0, minWidth: 44, minHeight: 44 }}>
         <GripVertical size={16} color="var(--text-muted)" />
       </button>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -96,8 +93,8 @@ export function SortBuilder({ value, onChange }) {
 
   return (
     <div className="sort-filter-builder" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <strong style={{ fontSize: '0.75rem' }}>{t('sort.title')}</strong>
-      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t('sort.hint')}</span>
+      <strong style={{ fontSize: 'var(--text-sm)' }}>{t('sort.title')}</strong>
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('sort.hint')}</span>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
           {items.map((item, idx) => (
@@ -130,7 +127,7 @@ export function SortBuilder({ value, onChange }) {
               })()}
               <label
                 title={t('sort.dividerHint')}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', whiteSpace: 'nowrap', cursor: 'pointer' }}
               >
                 <input
                   type="checkbox"
@@ -146,7 +143,7 @@ export function SortBuilder({ value, onChange }) {
                   value={item.dividerColor || '#6b7280'}
                   onChange={(e) => updateDividerColor(item.id, e.target.value)}
                   title={t('sort.dividerColor')}
-                  style={{ width: '24px', height: '24px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                  style={{ width: '44px', height: '44px', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
                 />
               )}
               <button
@@ -162,7 +159,7 @@ export function SortBuilder({ value, onChange }) {
           ))}
         </SortableContext>
       </DndContext>
-      <button type="button" className="btn btn-secondary" style={{ alignSelf: 'flex-start', padding: '0.3rem 0.6rem', fontSize: '0.7rem' }} onClick={addCriteria}>
+      <button type="button" className="btn btn-secondary" style={{ alignSelf: 'flex-start', padding: '0.3rem 0.6rem', fontSize: 'var(--text-sm)' }} onClick={addCriteria}>
         <Plus size={14} style={{ marginRight: '4px' }} /> {t('sort.addRule')}
       </button>
     </div>
@@ -229,14 +226,14 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
 
   return (
     <div className="sort-filter-builder" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', borderTop: '1px solid var(--border-glass)', paddingTop: '1rem' }}>
-      <strong style={{ fontSize: '0.75rem' }}>{t('filter.title')}</strong>
-      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{t('filter.hint')}</span>
+      <strong style={{ fontSize: 'var(--text-sm)' }}>{t('filter.title')}</strong>
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('filter.hint')}</span>
       {rules.some(rule => rule.operator !== 'exists' && !String(rule.value ?? '').trim()) && (
         <p role="status" style={{ margin: 0, color: 'var(--text-secondary)' }}>{t('filter.valueRequired')}</p>
       )}
 
       {rules.length === 0 && (
-        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>
           {t('filter.noRules')}
         </div>
       )}
@@ -247,7 +244,7 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
         const options = optionsFor(rule.field);
         
         return (
-          <div key={rule.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap', background: 'rgba(0,0,0,0.1)', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
+          <div key={rule.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap', paddingBlock: 'var(--space-2)', borderBottom: '1px solid var(--border-glass)' }}>
             <select
               className="select-control"
               aria-label={t('filter.action')}
@@ -324,7 +321,7 @@ export function FilterBuilder({ value, onChange, setsList = [], fieldOptions = {
           </div>
         );
       })}
-      <button type="button" className="btn btn-secondary" style={{ alignSelf: 'flex-start', padding: '0.3rem 0.6rem', fontSize: '0.7rem' }} onClick={addRule}>
+      <button type="button" className="btn btn-secondary" style={{ alignSelf: 'flex-start', padding: '0.3rem 0.6rem', fontSize: 'var(--text-sm)' }} onClick={addRule}>
         <Plus size={14} style={{ marginRight: '4px' }} /> {t('filter.addRule')}
       </button>
     </div>

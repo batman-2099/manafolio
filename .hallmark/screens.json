@@ -1,0 +1,23 @@
+{
+  "scope": "app",
+  "genre": "modern-minimal",
+  "routes": [
+    {"route":"/","state":"dashboard","file":"frontend/src/components/Dashboard.jsx"},
+    {"route":"/","state":"add-cards","file":"frontend/src/components/AddCards.jsx"},
+    {"route":"/","state":"collection","file":"frontend/src/components/CollectionList.jsx"},
+    {"route":"/","state":"storage","file":"frontend/src/components/LocationManager.jsx"},
+    {"route":"/","state":"deckbuilder","file":"frontend/src/components/DeckBuilder.jsx"},
+    {"route":"/","state":"trades","file":"frontend/src/components/TradeWorkbench.jsx"},
+    {"route":"/","state":"howto","file":"frontend/src/components/HowTo.jsx"},
+    {"route":"/","state":"settings","file":"frontend/src/components/Settings.jsx"},
+    {"route":"/","state":"admin","file":"frontend/src/components/AdminPanel.jsx"},
+    {"route":"/","state":"unauthenticated","file":"frontend/src/components/Login.jsx"},
+    {"route":"/","state":"setup dialog","file":"frontend/src/components/SetupWizard.jsx"},
+    {"route":"/share/:token","file":"frontend/src/components/SharedCollection.jsx"},
+    {"route":"/share/:token?container=:id","file":"frontend/src/components/SharedContainer.jsx"},
+    {"route":"/share/deck/:token","file":"frontend/src/components/SharedDeck.jsx"},
+    {"route":"/offline.html","file":"frontend/src/components/OfflineCollection.jsx"}
+  ],
+  "preserved": "Tab state remains in App; no routes or navigation behavior added or removed.",
+  "baseline": "before/127.0.0.1-5177-*.png captures original setup overlay. Original unobstructed primary screens were inspected via browser screenshots before source edits. before/dashboard-home-* are transitional captures, not original baseline."
+}

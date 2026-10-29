@@ -250,10 +250,10 @@ export default function CodexSettings() {
   };
 
   return (
-    <section className="glass-panel ai-settings" aria-labelledby="codex-settings-title">
-      <div style={{ ...rowStyle, borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem' }}>
-        <Sparkles size={20} style={{ color: 'var(--accent-yellow)' }} aria-hidden="true" />
-        <h3 id="codex-settings-title" tabIndex={-1} style={{ color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('codexSettings.title')}</h3>
+    <section className="view-section ai-settings" aria-labelledby="codex-settings-title">
+      <div style={rowStyle}>
+        <Sparkles size={20} aria-hidden="true" />
+        <h3 id="codex-settings-title" tabIndex={-1} className="section-heading">{t('codexSettings.title')}</h3>
       </div>
       <div className="form-group">
         <label htmlFor="ai-provider">{t('codexSettings.provider')}</label>
@@ -303,7 +303,7 @@ export default function CodexSettings() {
         <div style={{ overflowWrap: 'anywhere' }}>
           <p>{t('aiDeck.loginInstructions')}</p>
           <a href={/^https:\/\//i.test(login.verificationUrl) ? login.verificationUrl : undefined} target="_blank" rel="noopener noreferrer">{login.verificationUrl}</a>
-          <p>{t('aiDeck.userCode')}: <code style={{ fontSize: '1.3rem', userSelect: 'all' }}>{login.userCode}</code></p>
+          <p>{t('aiDeck.userCode')}: <code style={{ fontSize: 'var(--text-lg)', userSelect: 'all' }}>{login.userCode}</code></p>
           <p role="status">{t('aiDeck.waiting')}</p>
           <button type="button" className="btn btn-secondary" disabled={accountBusy} onClick={() => handleAccount(true)}>{t('common.cancel')}</button>
         </div>

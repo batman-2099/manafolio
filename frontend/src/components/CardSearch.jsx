@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import './CatalogueWorkbench.css';
 import { Search, Plus, X, ShieldAlert, Check, MousePointerClick, Zap, Undo2, Maximize2, Download } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { priceText } from '../utils/formatPrice';
@@ -55,7 +56,7 @@ function ImportLog({ entries }) {
   if (!entries.length) return null;
   return (
     <div style={{ minWidth: 0 }}>
-      <strong style={{ color: 'var(--text-strong)', fontSize: '0.85rem' }}>{t('importLog.title')}</strong>
+      <strong style={{ color: 'var(--text-strong)', fontSize: 'var(--text-sm)' }}>{t('importLog.title')}</strong>
       <div
         ref={container}
         role="log"
@@ -67,7 +68,7 @@ function ImportLog({ entries }) {
           const node = event.currentTarget;
           follow.current = node.scrollHeight - node.scrollTop - node.clientHeight < 24;
         }}
-        style={{ maxHeight: 'min(200px, 30dvh)', overflowY: 'auto', overflowWrap: 'anywhere', padding: '0.6rem', marginTop: '0.4rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', fontSize: '0.78rem' }}
+        style={{ maxHeight: 'min(200px, 30dvh)', overflowY: 'auto', overflowWrap: 'anywhere', padding: '0.6rem', marginTop: '0.4rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', fontSize: 'var(--text-sm)' }}
       >
         {entries.map(entry => (
           <div key={entry.id} role={entry.stage === 'failed' ? 'alert' : undefined} style={{ padding: '0.2rem 0', color: entry.stage === 'failed' ? 'var(--accent-red)' : 'var(--text-secondary)' }}>
@@ -77,7 +78,7 @@ function ImportLog({ entries }) {
           </div>
         ))}
       </div>
-      <p style={{ margin: '0.4rem 0 0', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{t('importLog.disconnect')}</p>
+      <p style={{ margin: '0.4rem 0 0', color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>{t('importLog.disconnect')}</p>
     </div>
   );
 }
@@ -947,11 +948,12 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
         onClickCapture={event => { if (bulkPending.current) event.stopPropagation(); }}
         onPointerDownCapture={event => { if (bulkPending.current) event.stopPropagation(); }}>
       {/* Search Header Panel */}
-      <div className="glass-panel" style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
-          <h2 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--text-strong)' }}>{t('search.title', { game: gameLabel(game) })}</h2>
+      <div className="search-workspace">
+        <div className="search-query">
+        <div className="catalogue-heading">
+          <h2 style={{ fontSize: 'var(--text-lg)', margin: 0, color: 'var(--text-strong)' }}>{t('search.title', { game: gameLabel(game) })}</h2>
         </div>
-        <form ref={searchFormRef} onSubmit={handleSearch} style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+        <form ref={searchFormRef} onSubmit={handleSearch} className="search-query-form">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <label className="control-label" htmlFor="search-card-name">{t('search.cardName')}</label>
@@ -1035,6 +1037,8 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
             {loading ? t('common.loading') : ''}
           </span>
         </form>
+        </div>
+        <div className="search-intake">
         <div className="search-destination">
           <label className="control-label" htmlFor="search-destination">{t('search.destination')}</label>
           <select id="search-destination" className="select-control" aria-describedby="search-destination-hint" value={addToArena ? 'arena' : 'collection'} onChange={event => setAddToArena(event.target.value === 'arena')}>
@@ -1071,17 +1075,18 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
             <input ref={csvImportInput} type="file" accept=".csv,text/csv" onChange={event => handleImportFile(event, 'internal')} style={{ display: 'none' }} />
           </div>
         </section>
+        </div>
       </div>
 
       {/* Rapid add: type a number, press Enter, next. */}
       {rapidMode && (
-        <div className="glass-panel" style={{ marginBottom: '1.5rem', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', borderLeft: '4px solid var(--accent-yellow)' }}>
+        <div className="search-rapid" style={{ marginBottom: 'var(--space-6)', paddingBlock: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderBlock: '1px solid var(--border-glass)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <Zap size={18} style={{ color: 'var(--accent-yellow)' }} />
-            <strong style={{ color: 'var(--text-strong)', fontSize: '0.95rem' }}>
+            <strong style={{ color: 'var(--text-strong)', fontSize: 'var(--text-md)' }}>
               {setCodeQuery ? t('search.rapidToSet', { set: setCodeQuery.toUpperCase() }) : t('search.rapid')}
             </strong>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
               {t(setCodeQuery ? 'search.rapidReady' : 'search.rapidNeedsSet')}
             </span>
           </div>
@@ -1103,7 +1108,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
               disabled={!setCodeQuery}
               onChange={(e) => setRapidNumber(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRapidAdd(); } }}
-              style={{ width: '100%', fontSize: '1.1rem', fontWeight: 700 }}
+              style={{ width: '100%', fontSize: 'var(--text-lg)', fontWeight: 700 }}
             />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
@@ -1131,22 +1136,22 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               title={t('search.copiesPerEnter')}
-              style={{ width: '80px', fontSize: '0.75rem' }}
+              style={{ width: '80px', fontSize: 'var(--text-sm)' }}
             />
             </div>
-            {rapidBusy && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('search.adding')}</span>}
+            {rapidBusy && <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('search.adding')}</span>}
           </div>
 
           {rapidLog.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-muted)' }}>
                 {t('search.addedThisSession', { count: rapidLog.length })}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.75rem', maxHeight: '55vh', overflowY: 'auto' }}>
               {rapidLog.map(entry => (
                 <div key={entry.entryId} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 0, background: 'var(--surface-2)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                   <CardImage card={entry.card} alt={displayName(entry.card)} style={{ width: '100%', aspectRatio: '0.718', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
-                  <span title={`#${entry.card.number} ${displayName(entry.card)}`} style={{ fontSize: '0.8rem', color: 'var(--text-strong)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span title={`#${entry.card.number} ${displayName(entry.card)}`} style={{ fontSize: 'var(--text-sm)', color: 'var(--text-strong)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     #{entry.card.number} {displayName(entry.card)}{entry.qty > 1 ? ` ×${entry.qty}` : ''}
                   </span>
                   <button
@@ -1155,7 +1160,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                     aria-pressed={entry.printing === 'Holofoil'}
                     disabled={entry.busy}
                     onClick={() => toggleRapidFoil(entry)}
-                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', minHeight: '44px', justifyContent: 'center' }}
+                    style={{ fontSize: 'var(--text-sm)', padding: '0.35rem 0.5rem', minHeight: '44px', justifyContent: 'center' }}
                   >
                     {t('search.foil')}
                   </button>
@@ -1163,7 +1168,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                     type="button"
                     className="btn btn-secondary"
                     disabled={entry.busy}
-                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem', marginTop: 'auto', justifyContent: 'center' }}
+                    style={{ fontSize: 'var(--text-sm)', padding: '0.35rem 0.5rem', marginTop: 'auto', justifyContent: 'center' }}
                     onClick={() => undoRapidAdd(entry)}
                   >
                     <Undo2 size={12} /> {t('search.undo')}
@@ -1177,16 +1182,16 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
       )}
 
       {searchError && (
-        <div role="alert" className="glass-panel" style={{ borderLeft: '4px solid var(--accent-red)', background: 'rgba(239, 68, 68, 0.08)', padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-red)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+        <div role="alert" className="glass-panel" style={{ borderLeft: '4px solid var(--accent-red)', background: 'var(--surface-2)', padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--accent-red)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
             <ShieldAlert size={18} />
             {t(`searchErr.${searchError.kind}.title`)}
           </h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
             {t(`searchErr.${searchError.kind}.body`)}
           </p>
-          {searchError.message && <p style={{ fontSize: '0.85rem', margin: 0 }}>{searchError.message}</p>}
-          {searchError.page > 1 && <p style={{ fontSize: '0.85rem', margin: 0 }}>{t('searchErr.moreRetained')}</p>}
+          {searchError.message && <p style={{ fontSize: 'var(--text-sm)', margin: 0 }}>{searchError.message}</p>}
+          {searchError.page > 1 && <p style={{ fontSize: 'var(--text-sm)', margin: 0 }}>{t('searchErr.moreRetained')}</p>}
           <button type="button" className="btn btn-secondary" style={{ alignSelf: 'flex-start' }}
             disabled={loading || loadingMore || rapidBusy}
             onClick={() => searchError.rapid ? handleRapidAdd(searchError.rapid) : runSearch(searchError.page, searchError.size, submittedSearch.current)}>
@@ -1197,7 +1202,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
 
       {/* Filters and Sorting Panel */}
       {!loading && cards.length > 0 && (
-        <div className="glass-panel" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
+        <div className="search-results-toolbar">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <label className="control-label" htmlFor="search-filter-type">{t('search.filterType')}</label>
@@ -1232,7 +1237,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
             </div>
           </div>
           <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
               {t('search.showingMatches', { shown: filteredAndSortedCards.length, count: total != null ? total : cards.length })}
               {total != null && cards.length < total ? ` ${t('search.loadedSuffix', { loaded: cards.length })}` : ''}
             </span>
@@ -1241,7 +1246,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
               type="button"
               className={`btn ${selectMode ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
-              style={{ fontSize: '0.8rem', padding: '0.4rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+              style={{ fontSize: 'var(--text-sm)', padding: '0.4rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
               title={t('collection.selectHint')}
             >
               <MousePointerClick size={14} />
@@ -1254,9 +1259,9 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
       {/* Bulk add bar — sticky single row, matching the collection's bulk bar. */}
       {selectMode && (
         <form onSubmit={handleBulkAdd} className="glass-panel" style={{ marginBottom: '1rem', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', position: 'sticky', top: '0.5rem', zIndex: 30 }}>
-          <span style={{ fontWeight: 800, color: 'var(--text-strong)', fontSize: '0.85rem' }}>{t('bulk.selected', { count: selectedIds.size })}</span>
-          <button type="button" className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={() => setSelectedIds(new Set(filteredAndSortedCards.map(c => c.id)))}>{t('bulk.selectAll', { count: filteredAndSortedCards.length })}</button>
-          <button type="button" className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={clearSelection}>{t('bulk.clear')}</button>
+          <span style={{ fontWeight: 800, color: 'var(--text-strong)', fontSize: 'var(--text-sm)' }}>{t('bulk.selected', { count: selectedIds.size })}</span>
+          <button type="button" className="btn btn-secondary" style={{ fontSize: 'var(--text-sm)', padding: '0.3rem 0.6rem' }} onClick={() => setSelectedIds(new Set(filteredAndSortedCards.map(c => c.id)))}>{t('bulk.selectAll', { count: filteredAndSortedCards.length })}</button>
+          <button type="button" className="btn btn-secondary" style={{ fontSize: 'var(--text-sm)', padding: '0.3rem 0.6rem' }} onClick={clearSelection}>{t('bulk.clear')}</button>
           <div style={{ width: '1px', height: '22px', background: 'var(--border-glass)' }} />
           <div className="form-group" style={{ margin: 0 }}>
             <label className="control-label" htmlFor="search-bulk-condition">{t('card.condition')}</label>
@@ -1282,18 +1287,18 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             title={t('search.copiesEachSelected')}
-            style={{ fontSize: '0.72rem', width: '70px', padding: '0.3rem 0.4rem' }}
+            style={{ fontSize: 'var(--text-sm)', width: '70px', padding: '0.3rem 0.4rem' }}
           />
           </div>
           <button
             className="btn btn-primary"
-            style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+            style={{ fontSize: 'var(--text-sm)', padding: '0.3rem 0.6rem' }}
             disabled={bulkAdding || selectedIds.size === 0}
             type="submit"
           >
             {bulkAdding ? t('search.adding') : t('search.addN', { count: selectedIds.size })}
           </button>
-          <button type="button" className="btn btn-secondary" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', marginLeft: 'auto' }} onClick={exitSelectMode}>{t('bulk.done')}</button>
+          <button type="button" className="btn btn-secondary" style={{ fontSize: 'var(--text-sm)', padding: '0.3rem 0.6rem', marginLeft: 'auto' }} onClick={exitSelectMode}>{t('bulk.done')}</button>
           {bulkErrors.length > 0 && <div role="alert" style={{ flexBasis: '100%', color: 'var(--accent-red)' }}>
             <p>{t('search.bulkRetry')}</p>
             <ul>{bulkErrors.map(failure => <li key={failure.card_id}>
@@ -1329,20 +1334,20 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                 <div className="tcg-card-inner" style={isSelected ? { outline: '3px solid var(--accent-red)', outlineOffset: '2px' } : undefined}>
                   {/* Same check bubble the collection uses for selection. */}
                   {selectMode && (
-                    <div style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 20, width: '22px', height: '22px', borderRadius: '50%', background: isSelected ? 'var(--accent-red)' : 'rgba(0,0,0,0.6)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.8rem', fontWeight: 900 }}>{isSelected ? '✓' : ''}</div>
+                    <div style={{ position: 'absolute', top: '6px', right: '6px', zIndex: 20, width: '22px', height: '22px', borderRadius: '50%', background: isSelected ? 'var(--accent-red)' : 'var(--media-background)', border: '2px solid var(--media-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-on-accent)', fontSize: 'var(--text-sm)', fontWeight: 900 }}>{isSelected ? '✓' : ''}</div>
                   )}
                   <CardImage card={card} className="tcg-card-image" loading="lazy" draggable={false} />
                   {/* Already-in-the-binder count, so a set browse doesn't invite
                       re-adding what the user already has. */}
                   {card.owned_qty > 0 && (
-                    <div style={{ position: 'absolute', top: '8px', left: '8px', background: 'var(--accent-green, #22c55e)', color: '#04210f', padding: '2px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', fontWeight: 800 }}>
+                    <div style={{ position: 'absolute', top: '8px', left: '8px', background: 'var(--accent-green)', color: 'var(--text-on-accent)', padding: '2px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: 'var(--text-sm)', fontWeight: 800 }}>
                       <Check size={10} /> {card.owned_qty}
                     </div>
                   )}
                   {!selectMode && (
-                    <div style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(0,0,0,0.85)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-glass-hover)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'var(--media-background)', color: 'var(--media-foreground)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-glass-hover)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Plus size={10} style={{ color: 'var(--accent-red)' }} />
-                      <span style={{ fontSize: '0.65rem', fontWeight: 700 }}>{t('search.quickAdd')}</span>
+                      <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{t('search.quickAdd')}</span>
                     </div>
                   )}
                 </div>
@@ -1353,11 +1358,11 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                       does), otherwise the set code — language-independent, and the
                       only handle you have on a card whose name you can't read. */}
                   {translatedName(card) ? (
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {translatedName(card)}
                     </div>
                   ) : !isEnglish(card.language) && setReference(card) ? (
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', fontFamily: 'var(--font-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {setReference(card)}
                     </div>
                   ) : null}
@@ -1405,8 +1410,8 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
           <div className="quick-add-drawer" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
               <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                <h3 id="search-quick-add-title" style={{ color: 'var(--text-strong)', fontSize: '1.25rem', margin: 0, wordBreak: 'break-word' }}>{t('search.addCardTitle')}</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0.25rem 0 0 0', wordBreak: 'break-word' }}>
+                <h3 id="search-quick-add-title" style={{ color: 'var(--text-strong)', fontSize: 'var(--text-lg)', margin: 0, wordBreak: 'break-word' }}>{t('search.addCardTitle')}</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', margin: '0.25rem 0 0 0', wordBreak: 'break-word' }}>
                   {getCardDisplayName(selectedCard.name, selectedCard.printed_name)}
                   {translatedName(selectedCard) && <span style={{ color: 'var(--text-muted)' }}> ({translatedName(selectedCard)})</span>}
                   {' '}({selectedCard.set_name}
@@ -1414,7 +1419,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                   {!isEnglish(selectedCard.language) && setCode(selectedCard) ? ` / ${setCode(selectedCard)}` : ''}
                   {' • '}#{selectedCard.number})
                 </p>
-                <div role="status" aria-live="polite" style={{ marginTop: '0.5rem', fontSize: '1rem', color: 'var(--text-secondary)' }}>
+                <div role="status" aria-live="polite" style={{ marginTop: '0.5rem', fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
                   {localizing || existingCopies?.scope !== countScope ? t('common.loading') : existingCopies.error ? (
                     <>
                       {t('search.existingCountError')}{' '}
@@ -1428,28 +1433,28 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
               </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: 'rgba(255, 255, 255, 0.02)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: 'var(--surface-2)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
               {/* Tap the art to enlarge, same as the collection inspector. */}
               <button type="button" className="ci-image-wrap" aria-label={t('inspector.zoomHint')} aria-haspopup="dialog"
                 onClick={() => setIsFullScreen(true)}
                 title={t('inspector.zoomHint')}
                 style={{ position: 'relative', flexShrink: 0, cursor: 'pointer', lineHeight: 0 }}
               >
-                <CardImage card={selectedCard} style={{ width: '75px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: 'var(--radius-sm)', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }} />
+                <CardImage card={selectedCard} style={{ width: '75px', aspectRatio: 0.718, objectFit: 'cover', borderRadius: 'var(--radius-sm)', boxShadow: 'none' }} />
                 <div style={{
                   position: 'absolute', bottom: '4px', right: '4px',
-                  background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
-                  padding: '2px 4px', borderRadius: '4px', color: '#fff',
+                  background: 'var(--media-background)', backdropFilter: 'none',
+                  padding: '2px 4px', borderRadius: '4px', color: 'var(--media-foreground)',
                   display: 'flex', alignItems: 'center', pointerEvents: 'none',
-                  border: '1px solid rgba(255,255,255,0.15)'
+                  border: '1px solid var(--border-glass)'
                 }}>
                   <Maximize2 size={11} />
                 </div>
               </button>
               <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t('search.tcgMarketPrice', { printing })}</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-yellow)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{priceText(resolveCardPrice(selectedCard, printing), selectedCard.price_currency)}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{t('search.rarityLabel')} <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{selectedCard.rarity}</span></div>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('search.tcgMarketPrice', { printing })}</div>
+                <div style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: 'var(--accent-yellow)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{priceText(resolveCardPrice(selectedCard, printing), selectedCard.price_currency)}</div>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{t('search.rarityLabel')} <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{selectedCard.rarity}</span></div>
               </div>
             </div>
 
@@ -1495,23 +1500,23 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
         <Modal onClose={closeImportPreview} returnFocus={importTriggerRef.current} aria-labelledby="search-manabox-preview-title" style={{ padding: '1rem' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', minWidth: 0, maxHeight: 'calc(100dvh - 2rem)', overflowY: 'auto', display: 'grid', gap: '1rem' }}>
             <div>
-              <h2 id="search-manabox-preview-title" style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('manaboxPreview.title')}</h2>
-              <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{manaBoxPreview.filename}</p>
+              <h2 id="search-manabox-preview-title" style={{ margin: 0, color: 'var(--text-strong)', fontSize: 'var(--text-lg)' }}>{t('manaboxPreview.title')}</h2>
+              <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', overflowWrap: 'anywhere' }}>{manaBoxPreview.filename}</p>
               <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)' }}>{t('csvPreview.destination', { destination: t(manaBoxPreview.listType === 'arena' ? 'collection.arena' : 'nav.collection') })}</p>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', fontSize: '0.8rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
               {[
                 [t('manaboxPreview.cards'), manaBoxPreview.cards],
                 [t('manaboxPreview.normal'), manaBoxPreview.normal],
                 [t('manaboxPreview.foils'), manaBoxPreview.foils],
               ].map(([label, value]) => (
                 <div key={label} style={{ padding: '0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', textAlign: 'center' }}>
-                  <strong style={{ display: 'block', color: 'var(--text-strong)', fontSize: '1rem' }}>{value}</strong>
+                  <strong style={{ display: 'block', color: 'var(--text-strong)', fontSize: 'var(--text-md)' }}>{value}</strong>
                   <span style={{ color: 'var(--text-muted)' }}>{label}</span>
                 </div>
               ))}
             </div>
-            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{t('manaboxPreview.printings', { count: manaBoxPreview.printings })}</p>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>{t('manaboxPreview.printings', { count: manaBoxPreview.printings })}</p>
             <ImportLog entries={importLog} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
               <button type="button" className="btn btn-secondary" onClick={closeImportPreview} disabled={importingText}>{t('common.cancel')}</button>
@@ -1525,28 +1530,28 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
         <Modal onClose={closeImportPreview} returnFocus={importTriggerRef.current} aria-labelledby="search-csv-preview-title" style={{ padding: '1rem' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '520px', minWidth: 0, maxHeight: 'calc(100dvh - 2rem)', overflowY: 'auto', display: 'grid', gap: '1rem' }}>
             <div>
-              <h2 id="search-csv-preview-title" style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('csvPreview.title')}</h2>
-              <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{csvPreview.filename}</p>
-              <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{t('csvPreview.destination', { destination: t(csvPreview.listType === 'arena' ? 'collection.arena' : 'nav.collection') })}</p>
+              <h2 id="search-csv-preview-title" style={{ margin: 0, color: 'var(--text-strong)', fontSize: 'var(--text-lg)' }}>{t('csvPreview.title')}</h2>
+              <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', overflowWrap: 'anywhere' }}>{csvPreview.filename}</p>
+              <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>{t('csvPreview.destination', { destination: t(csvPreview.listType === 'arena' ? 'collection.arena' : 'nav.collection') })}</p>
             </div>
             {csvPreview.stale && <p role="status" style={{ margin: 0, color: 'var(--text-secondary)' }}>{t('csvPreview.stale')}</p>}
             {csvPreview.previewError && <p role="alert" style={{ margin: 0, color: 'var(--accent-red)' }}>{csvPreview.previewError}</p>}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.8rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
               {[
                 [t('csvPreview.cards'), csvPreview.cards || 0],
                 [t('csvPreview.copies'), csvPreview.quantity || 0],
               ].map(([label, value]) => (
                 <div key={label} style={{ padding: '0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', textAlign: 'center' }}>
-                  <strong style={{ display: 'block', color: 'var(--text-strong)', fontSize: '1rem' }}>{value}</strong>
+                  <strong style={{ display: 'block', color: 'var(--text-strong)', fontSize: 'var(--text-md)' }}>{value}</strong>
                   <span style={{ color: 'var(--text-muted)' }}>{label}</span>
                 </div>
               ))}
             </div>
             <div style={{ display: 'grid', gap: '0.5rem' }}>
-              <strong style={{ color: 'var(--text-strong)', fontSize: '0.85rem' }}>{t('csvMapping.title')}</strong>
+              <strong style={{ color: 'var(--text-strong)', fontSize: 'var(--text-sm)' }}>{t('csvMapping.title')}</strong>
               <div style={{ maxHeight: '190px', overflowY: 'auto', display: 'grid', gap: '0.4rem' }}>
                 {CSV_FIELDS.map(([field, label]) => (
-                  <label key={field} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.4fr)', gap: '0.5rem', alignItems: 'center', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
+                  <label key={field} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.4fr)', gap: '0.5rem', alignItems: 'center', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
                     <span>{t(label)}</span>
                     <select
                       disabled={importingText}
@@ -1564,10 +1569,10 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
             </div>
             {csvPreview.errors.length > 0 && (
               <div role="alert" style={{ display: 'grid', gap: '0.4rem' }}>
-                <strong style={{ color: 'var(--accent-red)', fontSize: '0.85rem' }}>{t('csvPreview.errors')}</strong>
+                <strong style={{ color: 'var(--accent-red)', fontSize: 'var(--text-sm)' }}>{t('csvPreview.errors')}</strong>
                 <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'grid', gap: '0.35rem' }}>
                   {csvPreview.errors.map((error, index) => (
-                    <div key={`${error}-${index}`} style={{ padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-sm)', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>{error}</div>
+                    <div key={`${error}-${index}`} style={{ padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>{error}</div>
                   ))}
                 </div>
               </div>
@@ -1585,16 +1590,16 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
         <Modal onClose={() => setImportSummary(null)} returnFocus={importTriggerRef.current} aria-labelledby="search-import-summary-title" style={{ padding: '1rem' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '520px', minWidth: 0, maxHeight: 'calc(100dvh - 2rem)', overflowY: 'auto', display: 'grid', gap: '1rem' }}>
             <div>
-              <h2 id="search-import-summary-title" style={{ margin: 0, color: 'var(--text-strong)', fontSize: '1.1rem' }}>{t('importSummary.title')}</h2>
-              <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{importSummary.filename}</p>
+              <h2 id="search-import-summary-title" style={{ margin: 0, color: 'var(--text-strong)', fontSize: 'var(--text-lg)' }}>{t('importSummary.title')}</h2>
+              <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', overflowWrap: 'anywhere' }}>{importSummary.filename}</p>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.8rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: 'var(--text-sm)' }}>
               {[
                 [t('importSummary.added'), importSummary.added],
                 [t('importSummary.failed'), importSummary.failed]
               ].map(([label, summary]) => (
                 <div key={label} style={{ padding: '0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', textAlign: 'center' }}>
-                  <strong style={{ display: 'block', color: 'var(--text-strong)', fontSize: '1rem' }}>{summary.cards} {t('importSummary.cards')}</strong>
+                  <strong style={{ display: 'block', color: 'var(--text-strong)', fontSize: 'var(--text-md)' }}>{summary.cards} {t('importSummary.cards')}</strong>
                   <span style={{ color: 'var(--text-muted)' }}>{summary.copies} {t('importSummary.copies')} · {label}</span>
                 </div>
               ))}
@@ -1602,20 +1607,20 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
             <ImportLog entries={importLog} />
             {importSummary.added.items.length > 0 && (
               <div style={{ display: 'grid', gap: '0.4rem' }}>
-                <strong style={{ color: 'var(--accent-green)', fontSize: '0.85rem' }}>{t('importSummary.addedCards')}</strong>
+                <strong style={{ color: 'var(--accent-green)', fontSize: 'var(--text-sm)' }}>{t('importSummary.addedCards')}</strong>
                 <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'grid', gap: '0.35rem' }}>
                   {importSummary.added.items.map((item, index) => (
-                    <div key={`${item.name}-${index}`} style={{ padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-sm)', background: 'rgba(34, 197, 94, 0.1)', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>{item.quantity}× {item.name}</div>
+                    <div key={`${item.name}-${index}`} style={{ padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>{item.quantity}× {item.name}</div>
                   ))}
                 </div>
               </div>
             )}
             {importSummary.failed.items.length > 0 && (
               <div style={{ display: 'grid', gap: '0.4rem' }}>
-                <strong style={{ color: 'var(--accent-red)', fontSize: '0.85rem' }}>{t('importSummary.failedCards')}</strong>
+                <strong style={{ color: 'var(--accent-red)', fontSize: 'var(--text-sm)' }}>{t('importSummary.failedCards')}</strong>
                 <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'grid', gap: '0.35rem' }}>
                   {importSummary.failed.items.map((item, index) => (
-                    <div key={`${item.name}-${index}`} style={{ padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-sm)', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>{item.quantity}× {item.name}</div>
+                    <div key={`${item.name}-${index}`} style={{ padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>{item.quantity}× {item.name}</div>
                   ))}
                 </div>
                 <button type="button" className="btn btn-secondary" onClick={downloadFailedImport}><Download size={16} /> {t('importSummary.downloadFailed')}</button>

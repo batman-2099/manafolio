@@ -61,12 +61,12 @@ const formatCardLocations = (locations) => locations.map(({ take, storage_unit_n
 const locationCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 const DECK_DISTRIBUTION_COLORS = {
-  Creature: '#4ade80', Land: '#c4b5fd', Instant: '#fbbf24', Sorcery: '#60a5fa',
-  Enchantment: '#f87171', Artifact: '#cbd5e1', Planeswalker: '#f0abfc', Battle: '#fb923c',
-  White: '#fef08a', Blue: '#60a5fa', Black: '#a78bfa', Red: '#f87171',
-  Green: '#4ade80', Colorless: '#cbd5e1',
-  'Land (Plains)': '#fef08a', 'Land (Island)': '#60a5fa', 'Land (Swamp)': '#a78bfa',
-  'Land (Mountain)': '#f87171', 'Land (Forest)': '#4ade80', 'Land (Nonbasic)': '#fbbf24',
+  Creature: 'var(--accent-green)', Land: 'var(--chart-series-5)', Instant: 'var(--chart-series-6)', Sorcery: 'var(--accent-blue)',
+  Enchantment: 'var(--text-negative)', Artifact: 'var(--chart-colorless)', Planeswalker: 'var(--chart-series-7)', Battle: 'var(--chart-series-8)',
+  White: 'var(--chart-white)', Blue: 'var(--accent-blue)', Black: 'var(--chart-series-5)', Red: 'var(--text-negative)',
+  Green: 'var(--accent-green)', Colorless: 'var(--chart-colorless)',
+  'Land (Plains)': 'var(--chart-white)', 'Land (Island)': 'var(--accent-blue)', 'Land (Swamp)': 'var(--chart-series-5)',
+  'Land (Mountain)': 'var(--text-negative)', 'Land (Forest)': 'var(--accent-green)', 'Land (Nonbasic)': 'var(--chart-series-6)',
 };
 
 const CARD_GROUP_LABELS = {
@@ -1307,7 +1307,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         ) : (
                           <p style={{ color: 'var(--text-secondary)' }}>{t(activeDeck.cards.length ? 'deck.sourcesEmpty' : 'shared.noCards')}</p>
                         )}
-                        {unavailableCopies > 0 && <p style={{ marginTop: '0.75rem', color: 'var(--accent-yellow)', fontSize: '0.85rem' }}>{t('deck.unavailableCopies', { count: unavailableCopies })}</p>}
+                        {unavailableCopies > 0 && <p style={{ marginTop: '0.75rem', color: 'var(--accent-yellow)', fontSize: 'var(--text-md)' }}>{t('deck.unavailableCopies', { count: unavailableCopies })}</p>}
                       </>
                     )}
                   </section>
@@ -1405,15 +1405,13 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     {sleevedError && <p id="deck-sleeved-error" className="deck-source-error" role="alert">{t('deck.errSleeved')}</p>}
                   </div>
                 </section>
-              </div>
-            </div>
-          <section className="glass-panel" aria-labelledby="deck-description-heading">
+          <section className="deck-overview-section" aria-labelledby="deck-description-heading">
             <h3 id="deck-description-heading" style={{ marginBottom: '0.75rem' }}>{t('deck.description')}</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-md)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
               {activeDeck.description || '—'}
             </p>
           </section>
-          <section className="glass-panel" aria-labelledby="deck-notes-heading">
+          <section className="deck-overview-section" aria-labelledby="deck-notes-heading">
             <h3 id="deck-notes-heading" style={{ marginBottom: '0.75rem' }}>
               <label htmlFor="deck-notes">{t('nav.notes')}</label>
             </h3>
@@ -1430,6 +1428,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               <button className="btn btn-secondary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
             </div>
           </section>
+              </div>
+            </div>
             </div>
               <div className="deck-card-previews">
                 {commanderCard && (
@@ -1502,7 +1502,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           {/* Top Banner Header & Primary Action */}
           <div className="deck-gallery-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h2 style={{ fontSize: '1.4rem', color: 'var(--text-strong)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <h2 style={{ fontSize: 'var(--text-xl)', color: 'var(--text-strong)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
                 <Layers size={22} style={{ color: 'var(--accent-yellow)' }} />
                 {t('deck.vaultTitle')}
               </h2>
@@ -1515,7 +1515,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             <button 
               className="btn btn-primary" 
               onClick={() => setShowCreateModal(true)}
-              style={{ padding: '0.6rem 1.25rem', fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 14px rgba(234, 179, 8, 0.25)' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
             >
               <Plus size={18} /> {t('deck.createDeck')}
             </button>
@@ -1536,14 +1536,14 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   aria-label={t('deck.filterPlaceholder')}
                   value={deckSearchTerm}
                   onChange={e => setDeckSearchTerm(e.target.value)}
-                  style={{ paddingLeft: '2.25rem', width: '100%', fontSize: '0.85rem' }}
+                  style={{ paddingLeft: '2.25rem', width: '100%', fontSize: 'var(--text-md)' }}
                 />
                 {deckSearchTerm && (
                   <button
                     className="btn btn-secondary btn-icon-only"
                     onClick={() => setDeckSearchTerm('')}
                     aria-label={t('deck.clearFilters')}
-                    style={{ position: 'absolute', right: '0.4rem', top: '50%', transform: 'translateY(-50%)', width: '20px', height: '20px', padding: 0, fontSize: '0.7rem' }}
+                    style={{ position: 'absolute', right: '0.4rem', top: '50%', transform: 'translateY(-50%)', width: '20px', height: '20px', padding: 0, fontSize: 'var(--text-sm)' }}
                   >
                     <X size={12} />
                   </button>
@@ -1563,7 +1563,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     aria-label={t('admin.colStatus')}
                     value={deckStatusFilter}
                     onChange={e => setDeckStatusFilter(e.target.value)}
-                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', height: 'auto' }}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: 'var(--text-sm)', height: 'auto' }}
                   >
                     <option value="all">{t('deck.allStatuses')}</option>
                     <option value="ready">{t('deck.statusBattleReady')}</option>
@@ -1581,7 +1581,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     aria-label={t('collection.sortBy')}
                     value={deckSortBy}
                     onChange={e => setDeckSortBy(e.target.value)}
-                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', height: 'auto' }}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: 'var(--text-sm)', height: 'auto' }}
                   >
                     <option value="created_desc">{t('deck.sortNewest')}</option>
                     <option value="created_asc">{t('deck.sortOldest')}</option>
@@ -1590,7 +1590,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   </select>
                 </div>
                 <button type="button" role="switch" aria-checked={showGraveyardDecks} className="btn btn-secondary"
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', height: 'auto', ...(showGraveyardDecks ? { background: 'var(--accent-green)', borderColor: 'var(--accent-green)', color: 'var(--bg-primary)' } : {}) }}
+                  style={{ padding: '0.3rem 0.6rem', fontSize: 'var(--text-sm)', height: 'auto', ...(showGraveyardDecks ? { background: 'var(--accent-green)', borderColor: 'var(--accent-green)', color: 'var(--bg-primary)' } : {}) }}
                   onClick={() => setShowGraveyardDecks(current => !current)}>
                   {t('deck.showGraveyard')}
                   <span aria-hidden="true" style={{ width: 28, height: 16, borderRadius: 999, background: showGraveyardDecks ? 'var(--text-on-accent)' : 'var(--text-muted)', position: 'relative', flexShrink: 0 }}>
@@ -1600,11 +1600,11 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               </div>
 
               {/* View Mode Toggle: Grid vs Table */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'var(--surface-1)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                 <button
                   type="button"
                   className={`btn ${deckSelectionViewMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  style={{ padding: '0.25rem 0.55rem', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '4px' }}
                   onClick={() => setDeckSelectionViewMode('grid')}
                   aria-pressed={deckSelectionViewMode === 'grid'} title={t('deck.gridView')}
                 >
@@ -1613,7 +1613,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 <button
                   type="button"
                   className={`btn ${deckSelectionViewMode === 'table' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  style={{ padding: '0.25rem 0.55rem', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '4px' }}
                   onClick={() => setDeckSelectionViewMode('table')}
                   aria-pressed={deckSelectionViewMode === 'table'} title={t('deck.tableView')}
                 >
@@ -1634,12 +1634,12 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           {decks.length === 0 && (decksLoading || decksError) ? null : filteredDecks.length === 0 ? (
             <div className="glass-panel" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-secondary)' }}>
               <Layers size={36} style={{ color: 'var(--text-muted)', marginBottom: '0.75rem', opacity: 0.5 }} />
-              <h3 style={{ color: 'var(--text-strong)', fontSize: '1.05rem', marginBottom: '0.25rem' }}>{t('deck.noMatches')}</h3>
-              <p style={{ fontSize: '0.85rem' }}>{t('deck.noMatchesHint')}</p>
+              <h3 style={{ color: 'var(--text-strong)', fontSize: 'var(--text-md)', marginBottom: '0.25rem' }}>{t('deck.noMatches')}</h3>
+              <p style={{ fontSize: 'var(--text-md)' }}>{t('deck.noMatchesHint')}</p>
               {(deckSearchTerm || deckStatusFilter !== 'all') && (
                 <button
                   className="btn btn-secondary"
-                  style={{ marginTop: '1rem', fontSize: '0.8rem' }}
+                  style={{ marginTop: '1rem', fontSize: 'var(--text-md)' }}
                   onClick={() => { setDeckSearchTerm(''); setDeckStatusFilter('all'); }}
                 >
                   {t('deck.clearFilters')}
@@ -1648,7 +1648,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             </div>
           ) : deckSelectionViewMode === 'grid' ? (
             /* --- GRID VIEW --- */
-            <div className="deck-overview-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(320px, 100%), 1fr))', gap: '1.25rem' }}>
+            <div className="deck-overview-grid">
               {filteredDecks.map(deck => {
                 const targetSize = deck.target_size || 60;
                 const totalCards = deck.total_cards || 0;
@@ -1660,56 +1660,20 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 return (
                   <div
                     key={deck.id}
-                    className="glass-panel"
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      gap: '1rem',
-                      padding: '1.25rem',
-                      border: deck.checked_out
-                        ? '1px solid rgba(234,179,8,0.5)'
-                        : `1px solid ${accentColor}40`,
-                      position: 'relative',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                      background: 'linear-gradient(145deg, rgba(211,32,42,0.06), rgba(15,23,42,0.65))'
-                    }}
+                    className="glass-panel deck-gallery-card"
                     onClick={() => loadDeckDetails(deck.id)}
                     onMouseEnter={e => {
-                      e.currentTarget.style.transform = 'translateY(-3px)';
-                      e.currentTarget.style.boxShadow = `0 12px 30px ${accentColor}25`;
+                      e.currentTarget.style.backgroundColor = 'var(--surface-2)';
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.transform = 'none';
-                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.backgroundColor = '';
                     }}
                   >
-                    {/* Top Accent Line */}
-                    <div style={{
-                      position: 'absolute', top: 0, left: 0, right: 0, height: '3px',
-                      background: deck.checked_out
-                        ? 'linear-gradient(90deg, #eab308, #f59e0b)'
-                        : `linear-gradient(90deg, ${accentColor}, ${accentColor}cc)`
-                    }} />
+                    <span className="deck-accent-marker" style={{ backgroundColor: accentColor }} aria-hidden="true" />
 
                     {/* In Play Banner */}
                     {deck.checked_out ? (
-                      <div style={{
-                        marginTop: '4px',
-                        background: 'linear-gradient(90deg, rgba(234,179,8,0.9), rgba(245,158,11,0.85))',
-                        padding: '4px 10px',
-                        borderRadius: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '0.65rem',
-                        fontWeight: 800,
-                        color: '#000',
-                        letterSpacing: '0.06em',
-                        textTransform: 'uppercase'
-                      }}>
+                      <div className="deck-in-play">
                         <Gamepad2 size={12} />
                         <span>{t('deck.inPlay')}</span>
                         {deck.checked_out_at && (
@@ -1720,23 +1684,23 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                       </div>
                     ) : null}
 
-                    <div>
+                    <div className="deck-gallery-identity">
                       <div className="deck-overview-card-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            <h3 style={{ color: 'var(--text-strong)', fontSize: '1.15rem', fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>
+                            <h3 style={{ color: 'var(--text-strong)', fontSize: 'var(--text-lg)', fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>
                               {deck.name}
                             </h3>
                             <span style={{
-                              fontSize: '0.6rem',
-                              fontWeight: 800,
-                              textTransform: 'uppercase',
+                              fontSize: 'var(--text-sm)',
+                              fontWeight: 700,
+                              textTransform: 'none',
                               letterSpacing: '0.05em',
                               padding: '0.1rem 0.45rem',
                               borderRadius: '4px',
-                              background: 'rgba(239,68,68,0.15)',
-                              color: '#f87171',
-                              border: '1px solid rgba(239,68,68,0.3)',
+                              background: 'var(--surface-2)',
+                              color: 'var(--text-negative)',
+                              border: '1px solid var(--border-glass)',
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '3px'
@@ -1745,24 +1709,24 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                             </span>
 
                             <span style={{
-                              fontSize: '0.6rem',
+                              fontSize: 'var(--text-sm)',
                               fontWeight: 700,
                               padding: '0.1rem 0.4rem',
                               borderRadius: '4px',
-                              background: deck.inventory_type === 'arena' ? 'rgba(168,85,247,0.12)' : 'rgba(74,222,128,0.12)',
-                              color: deck.inventory_type === 'arena' ? '#c084fc' : '#4ade80',
-                              border: deck.inventory_type === 'arena' ? '1px solid rgba(168,85,247,0.25)' : '1px solid rgba(74,222,128,0.25)'
+                              background: 'var(--surface-2)',
+                              color: deck.inventory_type === 'arena' ? 'var(--accent-purple)' : 'var(--accent-green)',
+                              border: '1px solid var(--border-glass)'
                             }}>
                               {deck.inventory_type === 'graveyard' ? t('collection.graveyard') : deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}
                             </span>
 
                             {deck.format && (
                               <span style={{
-                                fontSize: '0.6rem',
+                                fontSize: 'var(--text-sm)',
                                 fontWeight: 700,
                                 padding: '0.1rem 0.4rem',
                                 borderRadius: '4px',
-                                background: 'rgba(255,255,255,0.06)',
+                                background: 'var(--surface-2)',
                                 color: 'var(--text-secondary)',
                                 border: '1px solid var(--border-glass)'
                               }}>
@@ -1772,13 +1736,13 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
                             {deck.category && (
                               <span style={{
-                                fontSize: '0.6rem',
+                                fontSize: 'var(--text-sm)',
                                 fontWeight: 700,
                                 padding: '0.1rem 0.4rem',
                                 borderRadius: '4px',
-                                background: 'rgba(59, 130, 246, 0.12)',
-                                color: '#60a5fa',
-                                border: '1px solid rgba(59, 130, 246, 0.25)'
+                                background: 'var(--surface-2)',
+                                color: 'var(--accent-blue)',
+                                border: '1px solid var(--border-glass)'
                               }}>
                                 {deck.category}
                               </span>
@@ -1788,42 +1752,42 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
                         {/* Status Badge */}
                         <span style={{
-                          fontSize: '0.7rem',
+                          fontSize: 'var(--text-sm)',
                           fontWeight: 700,
                           padding: '0.2rem 0.5rem',
                           borderRadius: '12px',
-                          backgroundColor: hasMissingCards ? 'color-mix(in srgb, var(--text-negative) 15%, transparent)' : isComplete ? 'rgba(74, 222, 128, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                          color: hasMissingCards ? 'var(--text-negative)' : isComplete ? '#4ade80' : '#60a5fa',
-                          border: hasMissingCards ? '1px solid var(--text-negative)' : isComplete ? '1px solid rgba(74, 222, 128, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
+                          backgroundColor: hasMissingCards ? 'color-mix(in srgb, var(--text-negative) 15%, transparent)' : 'var(--surface-2)',
+                          color: hasMissingCards ? 'var(--text-negative)' : isComplete ? 'var(--accent-green)' : 'var(--accent-blue)',
+                          border: hasMissingCards ? '1px solid var(--text-negative)' : '1px solid var(--border-glass)',
                           whiteSpace: 'nowrap'
                         }}>
                           {t(hasMissingCards ? 'deck.statusMissingCards' : isComplete ? 'deck.statusReady' : 'deck.statusBuilding')}
                         </span>
                       </div>
 
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '0.6rem', minHeight: '34px', lineHeight: '1.4' }}>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-md)', marginTop: '0.6rem', minHeight: '34px', lineHeight: '1.4' }}>
                         {deck.description || 'No description provided.'}
                       </p>
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '0.4rem', fontVariantNumeric: 'tabular-nums' }}>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', marginTop: '0.4rem', fontVariantNumeric: 'tabular-nums' }}>
                         {t('deck.recordSummary', { wins: deck.wins ?? 0, losses: deck.losses ?? 0 })}
                       </p>
                     </div>
 
                     {/* Progress Bar & Details */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: 'rgba(0,0,0,0.2)', padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+                    <div className="deck-gallery-capacity">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm)' }}>
                         <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{t('deck.cardCapacity')}</span>
-                        <span style={{ color: isComplete ? '#4ade80' : 'var(--text-strong)', fontWeight: 700 }}>
+                        <span style={{ color: isComplete ? 'var(--accent-green)' : 'var(--text-strong)', fontWeight: 700 }}>
                           {totalCards} / {targetSize} Cards ({percent}%)
                         </span>
                       </div>
-                      <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ width: '100%', height: '6px', background: 'var(--surface-3)', borderRadius: '3px', overflow: 'hidden' }}>
                         <div style={{
                           height: '100%',
                           width: `${percent}%`,
                           background: isComplete
-                            ? 'linear-gradient(90deg, #4ade80, #22c55e)'
-                            : 'linear-gradient(90deg, #3b82f6, #6366f1)',
+                            ? 'var(--accent-green)'
+                            : 'var(--accent-blue)',
                           borderRadius: '3px',
                           transition: 'width 0.3s ease'
                         }} />
@@ -1831,8 +1795,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     </div>
 
                     {/* Card Footer Actions */}
-                    <div className="deck-overview-card-footer" style={{ borderTop: '1px solid var(--border-glass)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    <div className="deck-overview-card-footer">
+                      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
                         Created {new Date(deck.created_at).toLocaleDateString()}
                       </span>
 
@@ -1840,7 +1804,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         {deck.inventory_type === 'collection' && (deck.checked_out ? (
                           <button
                             className="btn btn-secondary"
-                            style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid rgba(234,179,8,0.4)', color: '#eab308' }}
+                            style={{ padding: '0.3rem 0.65rem', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid var(--border-glass)', color: 'var(--accent-yellow)' }}
                             onClick={(e) => { e.stopPropagation(); handleReturn(deck); }}
                             disabled={checkingOut}
                           >
@@ -1849,7 +1813,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         ) : (
                           <button
                             className="btn btn-secondary"
-                            style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            style={{ padding: '0.3rem 0.65rem', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '4px' }}
                             onClick={(e) => { e.stopPropagation(); handleCheckout(deck); }}
                             disabled={checkingOut}
                           >
@@ -1859,7 +1823,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
                         <button
                           className="btn btn-primary"
-                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          style={{ padding: '0.3rem 0.65rem', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '4px' }}
                           onClick={(e) => { e.stopPropagation(); loadDeckDetails(deck.id); }}
                         >
                           Open <ArrowRight size={12} />
@@ -1868,7 +1832,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
                         <button
                           className="btn btn-secondary"
-                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          style={{ padding: '0.3rem 0.65rem', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '4px' }}
                           onClick={(e) => { e.stopPropagation(); handleDuplicateDeck(deck.id); }}
                         >
                           <Copy size={12} /> {t('deck.duplicateDeck')}
@@ -1891,9 +1855,9 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           ) : (
             /* --- TABLE VIEW --- */
             <div className="glass-panel" style={{ overflowX: 'auto', padding: 0 }}>
-              <table className="collection-table deck-list-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem', '--deck-mana-count-size': '1rem' }}>
+              <table className="collection-table deck-list-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 'var(--text-md)', '--deck-mana-count-size': '1rem' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-glass)', background: 'rgba(0,0,0,0.2)', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border-glass)', background: 'var(--surface-1)', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', textTransform: 'none', letterSpacing: 'normal' }}>
                     <th style={{ padding: '0.75rem 1rem' }}>{t('deck.deckName')}</th>
                     <th style={{ padding: '0.75rem 1rem' }}>{t('deck.format')}</th>
                     <th style={{ padding: '0.75rem 1rem' }}>{t('deck.inventoryType')}</th>
@@ -1916,7 +1880,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         key={deck.id}
                         style={{ borderBottom: '1px solid var(--border-glass)', cursor: 'pointer', transition: 'background 0.15s' }}
                         onClick={() => loadDeckDetails(deck.id)}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                       >
                         <td data-label={t('deck.deckName')} style={{ padding: '0.75rem 1rem' }}>
@@ -1935,9 +1899,9 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                             fontWeight: 700,
                             padding: '1px 6px',
                             borderRadius: '4px',
-                            background: deck.inventory_type === 'arena' ? 'rgba(168,85,247,0.12)' : 'rgba(74,222,128,0.12)',
-                            color: deck.inventory_type === 'arena' ? '#c084fc' : '#4ade80',
-                            border: deck.inventory_type === 'arena' ? '1px solid rgba(168,85,247,0.25)' : '1px solid rgba(74,222,128,0.25)'
+                            background: 'var(--surface-2)',
+                            color: deck.inventory_type === 'arena' ? 'var(--accent-purple)' : 'var(--accent-green)',
+                            border: '1px solid var(--border-glass)'
                           }}>
                             {deck.inventory_type === 'graveyard' ? t('collection.graveyard') : deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}
                           </span>
@@ -1947,36 +1911,36 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         </td>
                         <td data-label={t('deck.category')} style={{ padding: '0.75rem 1rem' }}>
                           {deck.category && (
-                            <span style={{ fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.25)' }}>
+                            <span style={{ fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'var(--surface-2)', color: 'var(--accent-blue)', border: '1px solid var(--border-glass)' }}>
                               {deck.category}
                             </span>
                           )}
                         </td>
                         <td data-label={t('deck.colCapacity')} style={{ padding: '0.75rem 1rem', width: '160px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                            <div style={{ fontWeight: 700, color: isComplete ? '#4ade80' : 'var(--text-strong)' }}>
+                            <div style={{ fontWeight: 700, color: isComplete ? 'var(--accent-green)' : 'var(--text-strong)' }}>
                               {totalCards} / {targetSize} Cards
                             </div>
-                            <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${percent}%`, background: isComplete ? '#4ade80' : '#3b82f6' }} />
+                            <div style={{ width: '100%', height: '4px', background: 'var(--surface-3)', borderRadius: '2px', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${percent}%`, background: isComplete ? 'var(--accent-green)' : 'var(--accent-blue)' }} />
                             </div>
                           </div>
                         </td>
                         <td data-label={t('admin.colStatus')} style={{ padding: '0.75rem 1rem' }}>
                           {deck.missing_cards > 0 ? (
-                            <span style={{ fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: 'color-mix(in srgb, var(--text-negative) 15%, transparent)', color: 'var(--text-negative)', border: '1px solid var(--text-negative)' }}>
+                            <span style={{ fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: 'color-mix(in srgb, var(--text-negative) 15%, transparent)', color: 'var(--text-negative)', border: '1px solid var(--text-negative)' }}>
                               {t('deck.statusMissingCards')}
                             </span>
                           ) : deck.checked_out ? (
-                            <span style={{ fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid rgba(234,179,8,0.4)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: 'var(--surface-2)', color: 'var(--accent-yellow)', border: '1px solid var(--border-glass)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <Gamepad2 size={11} /> {t('deck.inPlay')}
                             </span>
                           ) : isComplete ? (
-                            <span style={{ fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: 'rgba(74, 222, 128, 0.15)', color: '#4ade80', border: '1px solid rgba(74, 222, 128, 0.3)' }}>
+                            <span style={{ fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: 'var(--surface-2)', color: 'var(--accent-green)', border: '1px solid var(--border-glass)' }}>
                               {t('deck.statusReady')}
                             </span>
                           ) : (
-                            <span style={{ fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid var(--border-glass)' }}>
+                            <span style={{ fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border-glass)' }}>
                               {t('deck.statusBuilding')}
                             </span>
                           )}
@@ -1984,7 +1948,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         <td data-label={t('admin.colActions')} style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
                           <div className="deck-overview-actions" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                             {deck.inventory_type === 'collection' && (deck.checked_out ? (
-                              <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: 'inherit', color: '#eab308' }} onClick={() => handleReturn(deck)} disabled={checkingOut}>
+                              <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: 'inherit', color: 'var(--accent-yellow)' }} onClick={() => handleReturn(deck)} disabled={checkingOut}>
                                 {t('deck.return')}
                               </button>
                             ) : (
@@ -2032,13 +1996,13 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   <input className="input-control" value={deckDraft.name} onChange={(event) => setDeckDraft({ ...deckDraft, name: event.target.value })} />
                 </label>
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.4rem', display: 'block' }}>{t('deck.inventoryType')}</label>
+                  <label style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.4rem', display: 'block' }}>{t('deck.inventoryType')}</label>
                   <div className="sub-nav-tabs" style={{ margin: 0 }}>
                     <button type="button" className={`sub-nav-tab ${deckDraft.inventory_type === 'collection' ? 'active' : ''}`} onClick={() => setDeckDraft({ ...deckDraft, inventory_type: 'collection' })}>{t('deck.physical')}</button>
                     <button type="button" className={`sub-nav-tab ${deckDraft.inventory_type === 'arena' ? 'active' : ''}`} onClick={() => setDeckDraft({ ...deckDraft, inventory_type: 'arena' })}>{t('deck.arena')}</button>
                     <button type="button" className={`sub-nav-tab ${deckDraft.inventory_type === 'graveyard' ? 'active' : ''}`} disabled={!!activeDeck.checked_out} aria-describedby={activeDeck.checked_out ? 'deck-inventory-hint' : undefined} onClick={() => setDeckDraft({ ...deckDraft, inventory_type: 'graveyard' })}>{t('collection.graveyard')}</button>
                   </div>
-                  {!!activeDeck.checked_out && <p id="deck-inventory-hint" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>{t('deck.returnBeforeEditing')}</p>}
+                  {!!activeDeck.checked_out && <p id="deck-inventory-hint" style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-md)', marginTop: '0.5rem' }}>{t('deck.returnBeforeEditing')}</p>}
                 </div>
                 <div className="deck-format-fields">
                   <label className="form-group" style={{ margin: 0 }}>
@@ -2072,59 +2036,48 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   <button className="btn btn-secondary" onClick={() => setDeckDraft(null)}>{t('common.cancel')}</button>
                   <button className="btn btn-primary" disabled={!deckDraft.name.trim() || !Number.isInteger(Number(deckDraft.target_size)) || Number(deckDraft.target_size) < 1 || Number(deckDraft.target_size) > 300 || editorBusy} onClick={handleApplyDeckProperties}>{t('deck.applyProperties')}</button>
                 </div>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>{t('deck.saveDraftHint')}</p>
+                <p style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', margin: 0 }}>{t('deck.saveDraftHint')}</p>
                 </fieldset>
               </div>
             </Modal>
           )}
 
-          <div className="glass-panel deck-editor-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', position: 'relative', overflow: 'hidden' }}>
+          <div className="glass-panel deck-editor-header">
             
-            {/* Checked out banner */}
-            {activeDeck.checked_out ? (
-              <div style={{
-                position: 'absolute',
-                top: 0, left: 0, right: 0,
-                height: '4px',
-                background: 'linear-gradient(90deg, #eab308, #f59e0b, #eab308)',
-                backgroundSize: '200% auto',
-                animation: 'shimmer-gold 2s linear infinite'
-              }} />
-            ) : null}
 
             <div className="deck-editor-identity" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <button className="btn btn-secondary btn-icon-only" onClick={leaveDeck} aria-label={t('deck.backToDecks')} style={{ borderRadius: '50%' }}>
                 <ChevronLeft size={16} />
               </button>
               <div>
-                <h2 style={{ fontSize: '1.25rem', color: 'var(--text-strong)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <h2 style={{ fontSize: 'var(--text-lg)', color: 'var(--text-strong)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   {activeDeck.name}
-                  {activeDeck.inventory_type === 'graveyard' && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t('collection.graveyard')}</span>}
-                  <span style={{ fontSize: '0.8rem', color: totalDeckCardsCount === targetDeckCardsCount ? 'var(--accent-green)' : 'var(--accent-yellow)', fontWeight: 600 }}>
+                  {activeDeck.inventory_type === 'graveyard' && <span style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>{t('collection.graveyard')}</span>}
+                  <span style={{ fontSize: 'var(--text-md)', color: totalDeckCardsCount === targetDeckCardsCount ? 'var(--accent-green)' : 'var(--accent-yellow)', fontWeight: 600 }}>
                     ({totalDeckCardsCount}/{targetDeckCardsCount} cards)
                   </span>
-                  {hasUnsavedChanges && <span role="status" style={{ fontSize: '0.75rem', color: 'var(--accent-yellow)' }}>{t('deck.unsavedChanges')}</span>}
+                  {hasUnsavedChanges && <span role="status" style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-yellow)' }}>{t('deck.unsavedChanges')}</span>}
                   {activeDeck.checked_out ? (
                     <span style={{
-                      fontSize: '0.65rem',
-                      background: 'rgba(234,179,8,0.15)',
-                      border: '1px solid rgba(234,179,8,0.4)',
-                      color: '#eab308',
+                      fontSize: 'var(--text-sm)',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border-glass)',
+                      color: 'var(--accent-yellow)',
                       padding: '2px 8px',
                       borderRadius: '12px',
                       fontWeight: 700,
-                      letterSpacing: '0.05em',
-                      textTransform: 'uppercase',
+                      letterSpacing: 'normal',
+                      textTransform: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '4px'
                     }}>
-                      🎮 {t('deck.inPlay')}
+                      <Gamepad2 size={14} aria-hidden="true" /> {t('deck.inPlay')}
                     </span>
                   ) : null}
                 </h2>
                 {!!activeDeck.checked_out && activeDeck.checked_out_at && (
-                  <p style={{ color: '#eab308', fontSize: '0.7rem', marginTop: '2px' }}>
+                  <p style={{ color: 'var(--accent-yellow)', fontSize: 'var(--text-sm)', marginTop: '2px' }}>
                     Checked out since {new Date(activeDeck.checked_out_at).toLocaleString()}
                   </p>
                 )}
@@ -2138,7 +2091,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   className="btn btn-secondary"
                   onClick={() => handleReturn(activeDeck)}
                   disabled={editorBusy}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', border: '1px solid rgba(234,179,8,0.4)', color: '#eab308' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', border: '1px solid var(--border-glass)', color: 'var(--accent-yellow)' }}
                 >
                   <PackageCheck size={14} /> Return to Storage
                 </button>
@@ -2227,7 +2180,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   >
                     <FolderPlus size={14} aria-hidden="true" /> {t('deck.createContainer')}
                   </button>
-                  {hasUnsavedChanges && <p id="deck-container-save-first" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>{t('deck.saveFirst')}</p>}
+                  {hasUnsavedChanges && <p id="deck-container-save-first" style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>{t('deck.saveFirst')}</p>}
                 </div>
               )}
             </div>
@@ -2248,20 +2201,20 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           {/* Checked out info banner */}
           {!!activeDeck.checked_out && (
             <div style={{
-              background: 'rgba(234,179,8,0.06)',
-              border: '1px solid rgba(234,179,8,0.25)',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border-glass)',
               borderRadius: 'var(--radius-md)',
               padding: '0.85rem 1.25rem',
               display: 'flex',
               alignItems: 'center',
               gap: '0.75rem',
-              fontSize: '0.85rem',
-              color: '#eab308'
+              fontSize: 'var(--text-md)',
+              color: 'var(--accent-yellow)'
             }}>
-              <span style={{ fontSize: '1.25rem' }}>🎮</span>
+              <Gamepad2 size={20} aria-hidden="true" />
               <div>
                 <strong>{t('deck.checkedOutBanner')}</strong>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>
                   {t('deck.checkedOutHint')}
                 </div>
               </div>
@@ -2269,16 +2222,16 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           )}
 
           {!compactEditor && deckSummary}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1.5rem', alignItems: 'start' }}>
+          <div className="deck-editing-workspace">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
               
               {/* Deck Card List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
+              <div className="deck-card-workspace">
                 
                 {/* Search & Quick Add to Deck */}
                 <div className="glass-panel">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', margin: 0 }}>{t('deck.addCardsTitle')}</h3>
+                    <h3 style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)', margin: 0 }}>{t('deck.addCardsTitle')}</h3>
                   </div>
                   <form onSubmit={handleSearchCards} className="deck-search-form">
                     <input
@@ -2294,7 +2247,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }} title={t('shared.search')}>
                       <Search size={16} />
                     </button>
-                    <button type="button" className="btn btn-secondary" onClick={(e) => handleSearchCards(e, true)} style={{ padding: '0.5rem 0.9rem', fontSize: '0.75rem', whiteSpace: 'nowrap' }} title={t('deck.browseHint')}>
+                    <button type="button" className="btn btn-secondary" onClick={(e) => handleSearchCards(e, true)} style={{ padding: '0.5rem 0.9rem', fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }} title={t('deck.browseHint')}>
                       {t('deck.browseCollection')}
                     </button>
                   </form>
@@ -2342,8 +2295,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                               <button type="button" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', cursor: 'pointer', minWidth: 0, padding: 0, border: 0, background: 'transparent', textAlign: 'left' }} onClick={() => setPreviewCard(card)} aria-label={`${t('deck.previewArt')}: ${displayName(card)}`}>
                                 <CardImage card={card} loading="lazy" style={{ width: '100%', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: '4px' }} />
                                 <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, width: '100%' }}>
-                                  <span style={{ fontSize: '0.8rem', color: 'var(--text-strong)', overflowWrap: 'anywhere' }}>{displayName(card)} ({card.set_name} • #{card.number})</span>
-                                  <span style={{ fontSize: '0.65rem', color: isAtMaxOwned ? 'var(--accent-red)' : 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Owned: {ownedQty} | In Deck: {qtyInDeck}</span>
+                                  <span style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)', overflowWrap: 'anywhere' }}>{displayName(card)} ({card.set_name} • #{card.number})</span>
+                                  <span style={{ fontSize: 'var(--text-sm)', color: isAtMaxOwned ? 'var(--accent-red)' : 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Owned: {ownedQty} | In Deck: {qtyInDeck}</span>
                                 </div>
                               </button>
                               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.35rem', marginTop: 'auto' }}>
@@ -2364,15 +2317,15 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 {/* Deck Cards Header & Display Mode Toggle */}
                 <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <h3 ref={cardsHeadingRef} tabIndex={-1} className="deck-cards-heading" style={{ fontSize: '1rem', color: 'var(--text-strong)', borderLeft: '3px solid var(--accent-red)', paddingLeft: '0.5rem', margin: 0 }}>
+                    <h3 ref={cardsHeadingRef} tabIndex={-1} className="deck-cards-heading" style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)', margin: 0 }}>
                       Deck Cards ({totalDeckCardsCount} / {targetDeckCardsCount})
                     </h3>
                     <div className="deck-display-controls">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--surface-1)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                       <button
                         type="button"
                         className={`btn ${cardDisplayMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        style={{ padding: '0.25rem 0.5rem', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '4px' }}
                         onClick={() => setCardDisplayMode('list')}
                         aria-pressed={cardDisplayMode === 'list'}
                       >
@@ -2381,14 +2334,14 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                       <button
                         type="button"
                         className={`btn ${cardDisplayMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`}
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        style={{ padding: '0.25rem 0.5rem', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '4px' }}
                         onClick={() => setCardDisplayMode('grid')}
                         aria-pressed={cardDisplayMode === 'grid'}
                       >
                         <LayoutGrid size={12} /> Grid
                       </button>
                     </div>
-                      <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
+                      <div style={{ display: 'flex', background: 'var(--surface-1)', padding: '2px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                         <button
                           type="button"
                           className="btn btn-icon-only btn-secondary"
@@ -2417,7 +2370,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                       value={deckCardSortBy}
                       onChange={(e) => setDeckCardSortBy(e.target.value)}
                       aria-label={t('collection.sortBy')}
-                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', height: 'auto' }}
+                      style={{ padding: '0.25rem 0.5rem', fontSize: 'var(--text-sm)', height: 'auto' }}
                     >
                       <option value="type">{t('deck.sortByType')}</option>
                       <option value="color">{t('collection.fColor')}</option>
@@ -2428,7 +2381,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   </div>
                   
                   {activeDeck.cards.length === 0 ? (
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem 0' }}>{t('deck.emptyDeck')}</p>
+                    <p style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem 0' }}>{t('deck.emptyDeck')}</p>
                   ) : (
                     deckCardGroups.map(({ name: supertype, cards: list }) => {
                       if (list.length === 0) return null;
@@ -2436,7 +2389,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
                       return (
                         <div key={supertype} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          <h4 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.25rem', display: 'flex', justifyContent: 'space-between' }}>
+                          <h4 style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.25rem', display: 'flex', justifyContent: 'space-between' }}>
                             <span>{deckCardSortBy === 'type' ? t(CARD_GROUP_LABELS[supertype]) : supertype}</span>
                             <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{sum}</span>
                           </h4>
@@ -2445,15 +2398,15 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                           {cardDisplayMode === 'list' && (
                             <div className="deck-card-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', zoom: deckCardScale, '--deck-card-scale': deckCardScale }}>
                               {list.map(card => (
-                                <div key={card.id} className="deck-card-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', background: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? 'rgba(127,29,29,0.16)' : 'rgba(255,255,255,0.01)', borderRadius: 'var(--radius-sm)', border: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? '1px solid var(--accent-red)' : '1px solid var(--border-glass)', gap: '0.6rem' }}>
+                                <div key={card.id} className="deck-card-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', background: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? 'color-mix(in srgb, var(--text-negative) 12%, var(--surface-1))' : 'var(--surface-1)', borderRadius: 'var(--radius-sm)', border: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? '1px solid var(--accent-red)' : '1px solid var(--border-glass)', gap: '0.6rem' }}>
                                   <button type="button" aria-label={`${t('deck.previewArt')}: ${displayName(card)}`} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', minWidth: 0, flex: '1 1 14rem', padding: 0, border: 0, background: 'transparent', textAlign: 'left' }} onClick={() => setPreviewCard(card)}>
                                     <CardImage card={card} src={card.image_url?.replace(/^(https:\/\/cards\.scryfall\.io)\/normal\//, '$1/small/')} loading="lazy" style={{ width: 56 * deckListImageScale, height: 78 * deckListImageScale, objectFit: 'cover', borderRadius: '2px', flexShrink: 0 }} />
                                     <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                                      {activeDeck.commander_card_id === card.id && <div className="deck-commander-tag" style={{ backgroundColor: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '2px 6px', fontSize: '0.7rem', fontWeight: 800 }}>{t('deck.commander')}</div>}
-                                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(card)}</div>
-                                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.set_name} • #{card.number}</div>
+                                      {activeDeck.commander_card_id === card.id && <div className="deck-commander-tag" style={{ backgroundColor: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '2px 6px', fontSize: 'var(--text-sm)', fontWeight: 700 }}>{t('deck.commander')}</div>}
+                                      <div style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(card)}</div>
+                                      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.set_name} • #{card.number}</div>
                                       {deckCardLocations[card.id]?.length > 0 && (
-                                        <div title={formatCardLocations(deckCardLocations[card.id])} style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.68rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <div title={formatCardLocations(deckCardLocations[card.id])} style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           <MapPin size={11} /> {formatCardLocations(deckCardLocations[card.id])}
                                         </div>
                                       )}
@@ -2462,17 +2415,17 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
                                   <div className="deck-card-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
                                     {card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) && (
-                                      <span style={{ color: 'var(--accent-red)', fontSize: '0.7rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }} title={card.locked_decks || t('deck.unavailableCopies', { count: card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0)) })}>
+                                      <span style={{ color: 'var(--accent-red)', fontSize: 'var(--text-sm)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }} title={card.locked_decks || t('deck.unavailableCopies', { count: card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0)) })}>
                                         <AlertTriangle size={13} /> {card.locked_decks ? t('deck.unavailableCopiesInDecks', { count: card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0)), decks: card.locked_decks }) : t('deck.unavailableCopies', { count: card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0)) })}
                                       </span>
                                     )}
                                     {activeDeck.inventory_type === 'collection' && (
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', color: card.checked_out ? 'var(--accent-green)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 600 }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', color: card.checked_out ? 'var(--accent-green)' : 'var(--text-secondary)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
                                       <input type="checkbox" role="switch" className="deck-card-toggle" checked={!!card.checked_out} disabled={editorBusy} onChange={(e) => handlePulledChange(card.id, e.target.checked)} />
                                       {t('deck.pulled')}
                                     </label>
                                     )}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--surface-1)', padding: '2px', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
                                       <button
                                         className={`btn ${card.quantity === 1 ? 'btn-danger' : 'btn-secondary'} btn-icon-only`}
                                         style={{ width: '22px', height: '22px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -2483,7 +2436,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                                       >
                                         {card.quantity === 1 ? <Trash2 size={11} /> : '-'}
                                       </button>
-                                      <span style={{ padding: '0 0.4rem', fontSize: '0.85rem', fontWeight: 700, minWidth: '18px', textAlign: 'center', color: 'var(--text-strong)' }}>{card.quantity}</span>
+                                      <span style={{ padding: '0 0.4rem', fontSize: 'var(--text-md)', fontWeight: 700, minWidth: '18px', textAlign: 'center', color: 'var(--text-strong)' }}>{card.quantity}</span>
                                       <button
                                         className="btn btn-secondary btn-icon-only"
                                         style={{ width: '22px', height: '22px', padding: 0 }}
@@ -2504,36 +2457,36 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                           {cardDisplayMode === 'grid' && (
                             <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${110 * deckCardScale}px), 1fr))`, gap: '0.75rem' }}>
                               {list.map(card => (
-                                <div key={card.id} style={{ position: 'relative', borderRadius: '6px', overflow: 'hidden', border: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', background: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? 'rgba(127,29,29,0.16)' : 'rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', transition: 'transform 0.15s' }}>
+                                <div key={card.id} style={{ position: 'relative', borderRadius: '6px', overflow: 'hidden', border: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', background: card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) ? 'color-mix(in srgb, var(--text-negative) 12%, var(--surface-1))' : 'var(--surface-1)', display: 'flex', flexDirection: 'column', transition: 'transform 0.15s' }}>
                                   <button type="button" aria-label={`${t('deck.previewArt')}: ${displayName(card)}`} style={{ position: 'relative', width: '100%', aspectRatio: 0.718, cursor: 'pointer', padding: 0, border: 0, background: 'transparent' }} onClick={() => setPreviewCard(card)}>
                                     <CardImage card={card} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    {activeDeck.commander_card_id === card.id && <div className="deck-commander-tag" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center', backgroundColor: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '4px', fontSize: '0.75rem', fontWeight: 800 }}>{t('deck.commander')}</div>}
-                                    <span style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.85)', color: 'var(--accent-yellow)', fontSize: '0.75rem', fontWeight: 800, padding: '1px 6px', borderRadius: '10px', border: '1px solid var(--accent-yellow)' }}>
+                                    {activeDeck.commander_card_id === card.id && <div className="deck-commander-tag" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center', backgroundColor: 'var(--accent-yellow)', color: 'var(--bg-primary)', padding: '4px', fontSize: 'var(--text-sm)', fontWeight: 700 }}>{t('deck.commander')}</div>}
+                                    <span style={{ position: 'absolute', top: '4px', right: '4px', background: 'var(--bg-secondary)', color: 'var(--accent-yellow)', fontSize: 'var(--text-sm)', fontWeight: 700, padding: '1px 6px', borderRadius: '10px', border: '1px solid var(--accent-yellow)' }}>
                                       x{card.quantity}
                                     </span>
                                     {card.quantity > (card.owned_qty || 0) - (card.locked_qty || 0) && (
-                                      <span style={{ position: 'absolute', top: '4px', left: '4px', background: 'rgba(127,29,29,0.92)', color: '#fff', fontSize: '0.65rem', fontWeight: 800, padding: '2px 5px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={card.locked_decks || t('deck.unavailableCopies', { count: card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0)) })}>
+                                      <span style={{ position: 'absolute', top: '4px', left: '4px', background: 'var(--media-background)', color: 'var(--text-strong)', fontSize: 'var(--text-sm)', fontWeight: 700, padding: '2px 5px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={card.locked_decks || t('deck.unavailableCopies', { count: card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0)) })}>
                                         <AlertTriangle size={10} /> {card.quantity - ((card.owned_qty || 0) - (card.locked_qty || 0))}
                                       </span>
                                     )}
                                   </button>
                                   {deckCardLocations[card.id]?.length > 0 && (
-                                    <div title={formatCardLocations(deckCardLocations[card.id])} style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 5px 0', fontSize: '0.65rem', color: 'var(--text-secondary)', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                    <div title={formatCardLocations(deckCardLocations[card.id])} style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 5px 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                                       <MapPin size={10} /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatCardLocations(deckCardLocations[card.id])}</span>
                                     </div>
                                   )}
-                                  <div style={{ padding: '4px', display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
+                                  <div style={{ padding: '4px', display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', background: 'var(--bg-secondary)' }}>
                                     {activeDeck.inventory_type === 'collection' && (
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', color: card.checked_out ? 'var(--accent-green)' : 'var(--text-secondary)', fontSize: '0.65rem', fontWeight: 600 }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', color: card.checked_out ? 'var(--accent-green)' : 'var(--text-secondary)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
                                       <input type="checkbox" role="switch" className="deck-card-toggle" checked={!!card.checked_out} disabled={editorBusy} onChange={(e) => handlePulledChange(card.id, e.target.checked)} />
                                       {t('deck.pulled')}
                                     </label>
                                     )}
                                     <div style={{ display: 'flex', gap: '2px' }}>
-                                      <button aria-label={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')} className={`btn ${card.quantity === 1 ? 'btn-danger' : 'btn-secondary'} btn-icon-only`} style={{ width: '20px', height: '20px', fontSize: '0.7rem', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} disabled={editorBusy} onClick={() => handleUpdateCardQty(card.id, card.quantity - 1)} title={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')}>
+                                      <button aria-label={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')} className={`btn ${card.quantity === 1 ? 'btn-danger' : 'btn-secondary'} btn-icon-only`} style={{ width: '20px', height: '20px', fontSize: 'var(--text-sm)', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} disabled={editorBusy} onClick={() => handleUpdateCardQty(card.id, card.quantity - 1)} title={t(card.quantity === 1 ? 'deck.removeFromDeck' : 'deck.decreaseQty')}>
                                         {card.quantity === 1 ? <Trash2 size={10} /> : '-'}
                                       </button>
-                                      <button aria-label={t('deck.increaseQty')} className="btn btn-secondary btn-icon-only" style={{ width: '20px', height: '20px', fontSize: '0.7rem', padding: 0 }} disabled={editorBusy || card.quantity >= (card.owned_qty || 0) || (!isBasicLand(card, deckGame) && deckCountByName(activeDeck.cards, card.name) >= 4)} onClick={() => handleUpdateCardQty(card.id, card.quantity + 1)}>+</button>
+                                      <button aria-label={t('deck.increaseQty')} className="btn btn-secondary btn-icon-only" style={{ width: '20px', height: '20px', fontSize: 'var(--text-sm)', padding: 0 }} disabled={editorBusy || card.quantity >= (card.owned_qty || 0) || (!isBasicLand(card, deckGame) && deckCountByName(activeDeck.cards, card.name) >= 4)} onClick={() => handleUpdateCardQty(card.id, card.quantity + 1)}>+</button>
                                     </div>
                                   </div>
                                 </div>
@@ -2556,7 +2509,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 {/* Bar Chart: Mana Cost Curve */}
                 {manaCurveData.some(d => d.count > 0) && (
                   <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <h3 style={{ fontSize: '0.95rem', color: 'var(--text-strong)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h3 style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <BarChart2 size={14} style={{ color: 'var(--accent-blue)' }} /> Mana Cost Curve
                     </h3>
                     <div style={{ width: '100%', height: '180px' }}>
@@ -2564,7 +2517,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         <BarChart data={manaCurveData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
                           <XAxis dataKey="cost" stroke="var(--text-muted)" fontSize={10} tickLine={false} />
                           <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} />
-                          <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.8)', border: '1px solid var(--border-glass)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-strong)' }} />
+                          <Tooltip contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', borderRadius: '4px', fontSize: 'var(--text-md)', color: 'var(--text-strong)' }} />
                           <Bar dataKey="count" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
@@ -2602,11 +2555,11 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               <X size={16} />
             </button>
 
-            <h3 id="deck-create-title" style={{ fontSize: '1.25rem', color: 'var(--text-strong)', fontWeight: 800, marginBottom: '0.25rem', paddingRight: '2.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h3 id="deck-create-title" style={{ fontSize: 'var(--text-lg)', color: 'var(--text-strong)', fontWeight: 700, marginBottom: '0.25rem', paddingRight: '2.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <FolderPlus size={20} style={{ color: 'var(--accent-yellow)' }} />
               {t('deck.createTitle')}
             </h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+            <p style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
               {t('deck.createSubtitle')}
             </p>
 
@@ -2615,18 +2568,18 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               <div className="deck-create-body">
               
               <div className="form-group">
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.4rem', display: 'block' }}>{t('deck.inventoryType')}</label>
+                <label style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.4rem', display: 'block' }}>{t('deck.inventoryType')}</label>
                 <div className="sub-nav-tabs" style={{ margin: 0 }}>
                   <button type="button" className={`sub-nav-tab ${newDeckInventoryType === 'collection' ? 'active' : ''}`} onClick={() => setNewDeckInventoryType('collection')}>{t('deck.physical')}</button>
                   <button type="button" className={`sub-nav-tab ${newDeckInventoryType === 'arena' ? 'active' : ''}`} onClick={() => setNewDeckInventoryType('arena')}>{t('deck.arena')}</button>
                   <button type="button" className={`sub-nav-tab ${newDeckInventoryType === 'graveyard' ? 'active' : ''}`} onClick={() => setNewDeckInventoryType('graveyard')}>{t('collection.graveyard')}</button>
                 </div>
-                {newDeckInventoryType === 'graveyard' && <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>{t('deck.graveyardCreateHint')}</p>}
+                {newDeckInventoryType === 'graveyard' && <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-md)', marginTop: '0.5rem' }}>{t('deck.graveyardCreateHint')}</p>}
               </div>
               {/* Format & Target Size Row */}
               <div className="deck-format-fields">
                 <div className="form-group">
-                  <label htmlFor="new-deck-format" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.format')}</label>
+                  <label htmlFor="new-deck-format" style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.format')}</label>
                   <select
                     id="new-deck-format"
                     className="input-control"
@@ -2637,16 +2590,16 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                       if (selectedFmt.includes('Commander')) setNewDeckTargetSize('100');
                       else if (selectedFmt.includes('Standard') || selectedFmt.includes('Modern') || selectedFmt.includes('Pioneer')) setNewDeckTargetSize('60');
                     }}
-                    style={{ fontSize: '0.85rem' }}
+                    style={{ fontSize: 'var(--text-md)' }}
                   >
                     {MTG_FORMATS.map(fmt => (
-                      <option key={fmt} value={fmt} style={{ background: '#1e293b', color: '#fff' }}>{fmt}</option>
+                      <option key={fmt} value={fmt} style={{ background: 'var(--bg-secondary)', color: 'var(--text-strong)' }}>{fmt}</option>
                     ))}
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="new-deck-size" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.targetSize')}</label>
+                  <label htmlFor="new-deck-size" style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.targetSize')}</label>
                   <input
                     id="new-deck-size"
                     type="number"
@@ -2657,14 +2610,14 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     className="input-control"
                     value={newDeckTargetSize}
                     onChange={(e) => setNewDeckTargetSize(e.target.value)}
-                    style={{ fontSize: '0.85rem' }}
+                    style={{ fontSize: 'var(--text-md)' }}
                   />
                 </div>
               </div>
 
               {/* Deck Name */}
               <div className="form-group">
-                <label htmlFor="new-deck-name" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.deckName')}</label>
+                <label htmlFor="new-deck-name" style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.deckName')}</label>
                 <input 
                   id="new-deck-name"
                   type="text" 
@@ -2679,7 +2632,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
               {/* Category Pills */}
               <div className="form-group">
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.4rem', display: 'block' }}>{t('deck.category')}</label>
+                <label style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.4rem', display: 'block' }}>{t('deck.category')}</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                   {DECK_CATEGORIES.map(cat => {
                     const isSelected = newDeckCategory === cat;
@@ -2690,15 +2643,15 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         aria-pressed={isSelected}
                         onClick={() => setNewDeckCategory(cat)}
                         style={{
-                          fontSize: '0.75rem',
+                          fontSize: 'var(--text-sm)',
                           fontWeight: 700,
                           padding: '0.3rem 0.65rem',
                           borderRadius: '12px',
                           border: isSelected ? '1px solid var(--accent-yellow)' : '1px solid var(--border-glass)',
-                          background: isSelected ? 'rgba(234, 179, 8, 0.2)' : 'rgba(0,0,0,0.2)',
+                          background: isSelected ? 'var(--surface-3)' : 'var(--surface-1)',
                           color: isSelected ? 'var(--accent-yellow)' : 'var(--text-secondary)',
                           cursor: 'pointer',
-                          transition: 'all 0.15s'
+                          transition: 'background-color 150ms ease-out, color 150ms ease-out'
                         }}
                       >
                         {cat}
@@ -2710,7 +2663,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
               {/* Deck Accent Color */}
               <div className="form-group">
-                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.4rem', display: 'block' }}>{t('deck.accentColor')}</label>
+                <label style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.4rem', display: 'block' }}>{t('deck.accentColor')}</label>
                 <div style={{ display: 'flex', itemsAlign: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   {DECK_ACCENT_COLORS.map(c => {
                     const isSelected = newDeckAccentColor === c.hex;
@@ -2728,8 +2681,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                           borderRadius: '50%',
                           backgroundColor: c.hex,
                           cursor: 'pointer',
-                          border: isSelected ? '2px solid #ffffff' : '2px solid transparent',
-                          boxShadow: isSelected ? `0 0 10px ${c.hex}` : 'none',
+                          border: isSelected ? '2px solid var(--text-strong)' : '2px solid transparent',
                           transform: isSelected ? 'scale(1.15)' : 'scale(1)',
                           transition: 'transform 0.15s'
                         }}
@@ -2741,11 +2693,11 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
               {/* Description (Optional) */}
               <div className="form-group">
-                <label htmlFor="new-deck-description" style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.descriptionOptional')}</label>
+                <label htmlFor="new-deck-description" style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.3rem', display: 'block' }}>{t('deck.descriptionOptional')}</label>
                 <textarea
                   id="new-deck-description"
                   className="input-control"
-                  style={{ minHeight: '65px', resize: 'vertical', fontSize: '0.85rem' }}
+                  style={{ minHeight: '65px', resize: 'vertical', fontSize: 'var(--text-md)' }}
                   placeholder={t('deck.notesPlaceholder')}
                   value={newDeckDesc}
                   onChange={(e) => setNewDeckDesc(e.target.value)}
@@ -2758,7 +2710,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   onClick={() => setShowPreconPicker(!showPreconPicker)}
                   className="btn btn-secondary"
                   aria-expanded={showPreconPicker}
-                  style={{ width: '100%', minHeight: '48px', justifyContent: 'flex-start', fontSize: '1rem', borderColor: 'var(--accent-yellow)', color: 'var(--accent-yellow)' }}
+                  style={{ width: '100%', minHeight: '48px', justifyContent: 'flex-start', fontSize: 'var(--text-md)', borderColor: 'var(--accent-yellow)', color: 'var(--accent-yellow)' }}
                 >
                   <FileText size={20} style={{ flexShrink: 0 }} />
                   {t('mtgDeck.title')}
@@ -2790,7 +2742,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   onClick={() => setShowImportDecklistArea(!showImportDecklistArea)}
                   className="btn btn-secondary"
                   aria-expanded={showImportDecklistArea}
-                  style={{ width: '100%', minHeight: '48px', justifyContent: 'flex-start', fontSize: '1rem', borderColor: 'var(--accent-yellow)', color: 'var(--accent-yellow)' }}
+                  style={{ width: '100%', minHeight: '48px', justifyContent: 'flex-start', fontSize: 'var(--text-md)', borderColor: 'var(--accent-yellow)', color: 'var(--accent-yellow)' }}
                 >
                   <FileText size={20} style={{ flexShrink: 0 }} />
                   {showImportDecklistArea ? t('deck.hideQuickImport') : t('deck.showQuickImport')}
@@ -2812,7 +2764,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                             setNewDeckTargetSize('100');
                           }
                         }}
-                        style={{ flex: '1 1 220px', minWidth: 0, minHeight: '48px', fontSize: '1rem', padding: '0.75rem' }}
+                        style={{ flex: '1 1 220px', minWidth: 0, minHeight: '48px', fontSize: 'var(--text-md)', padding: '0.75rem' }}
                       >
                         <option value="plain">{t('deck.importFormatPlain')}</option>
                         <option value="manabox">{t('deck.importFormatManaBox')}</option>
@@ -2829,7 +2781,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     <textarea
                       aria-label={t('deck.showQuickImport')}
                       className="input-control"
-                      style={{ width: '100%', boxSizing: 'border-box', minHeight: '90px', resize: 'vertical', fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre' }}
+                      style={{ width: '100%', boxSizing: 'border-box', minHeight: '90px', resize: 'vertical', fontFamily: 'var(--font-main)', fontSize: 'var(--text-md)', whiteSpace: 'pre' }}
                       placeholder={t('deck.pasteDecklistPlaceholder')}
                       value={newDeckImportText}
                       onChange={(e) => {
@@ -2837,7 +2789,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         setNewDeckPreconFile('');
                       }}
                     />
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
+                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
                       {t('deck.importOnCreateHint')}
                     </span>
                   </div>
@@ -2865,8 +2817,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             </button>
 
             <div style={{ paddingRight: '2.5rem' }}>
-              <h3 id="deck-simulator-title" style={{ fontSize: '1.25rem', color: 'var(--text-strong)', margin: 0 }}>{t('deck.handSimulator')}</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+              <h3 id="deck-simulator-title" style={{ fontSize: 'var(--text-lg)', color: 'var(--text-strong)', margin: 0 }}>{t('deck.handSimulator')}</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-md)', marginTop: '0.2rem' }}>
                 {t('deck.mulliganCountText', { mulligans: mulliganCount, handSize: hand.length })}
               </p>
             </div>
@@ -2874,7 +2826,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             {/* Hand Area */}
             <div className="deck-simulator-hand">
               {hand.length === 0 ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t('deck.noCardsDrawn')}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 'var(--text-md)' }}>{t('deck.noCardsDrawn')}</div>
               ) : (
                 hand.map((card, idx) => (
                   <button type="button" aria-label={displayName(card)} key={idx} style={{
@@ -2882,7 +2834,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     aspectRatio: 0.718, 
                     borderRadius: '8px', 
                     overflow: 'hidden', 
-                    boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+                    boxShadow: 'none',
                     border: '1px solid var(--border-glass)',
                     position: 'relative',
                     cursor: 'pointer'
@@ -2985,13 +2937,13 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             <button aria-label={t('common.close')} className="btn btn-secondary btn-icon-only" onClick={() => setShowExportModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', borderRadius: '50%' }}>
               <X size={16} />
             </button>
-            <h3 id="deck-export-title" style={{ fontSize: '1.2rem', color: 'var(--text-strong)', marginBottom: '0.5rem' }}>{t('deck.exportTitle')}</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>{t('deck.exportHintBody')}</p>
+            <h3 id="deck-export-title" style={{ fontSize: 'var(--text-lg)', color: 'var(--text-strong)', marginBottom: '0.5rem' }}>{t('deck.exportTitle')}</h3>
+            <p style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', marginBottom: '1rem' }}>{t('deck.exportHintBody')}</p>
             <label htmlFor="deck-export-format">{t('deck.exportFormatLabel')}</label>
             <select
               id="deck-export-format"
               className="input-control"
-              style={{ width: '100%', marginBottom: '1rem', fontSize: '0.85rem' }}
+              style={{ width: '100%', marginBottom: '1rem', fontSize: 'var(--text-md)' }}
               value={exportFormat}
               onChange={e => { setExportFormat(e.target.value); setExportCopyStatus(''); }}
             >
@@ -3000,7 +2952,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               <option value="buylist">{t('deck.formatBuylist')}</option>
             </select>
             {exportFormat === 'buylist' && (
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '-0.5rem', marginBottom: '1rem' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: '-0.5rem', marginBottom: '1rem' }}>
                 {t('deck.buylistHint')}
               </p>
             )}
@@ -3010,7 +2962,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               ref={exportTextRef}
               readOnly
               className="input-control"
-              style={{ width: '100%', height: '220px', fontFamily: 'monospace', fontSize: '0.8rem', resize: 'vertical' }}
+              style={{ width: '100%', height: '220px', fontFamily: 'var(--font-main)', fontSize: 'var(--text-md)', resize: 'vertical' }}
               value={handleExportDeckText()}
             />
             <p role="status">{exportCopyStatus}</p>
@@ -3032,15 +2984,15 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             <button aria-label={t('common.close')} disabled={comparingImport} className="btn btn-secondary btn-icon-only" onClick={closeImportModal} style={{ position: 'absolute', top: '1rem', right: '1rem', borderRadius: '50%' }}>
               <X size={16} />
             </button>
-            <h3 id="deck-import-title" style={{ fontSize: '1.2rem', color: 'var(--text-strong)', marginBottom: '0.5rem' }}>{t('deck.importTitle')}</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>{t('deck.pasteDecklistHint')}</p>
+            <h3 id="deck-import-title" style={{ fontSize: 'var(--text-lg)', color: 'var(--text-strong)', marginBottom: '0.5rem' }}>{t('deck.importTitle')}</h3>
+            <p style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', marginBottom: '1rem' }}>{t('deck.pasteDecklistHint')}</p>
             
             <label htmlFor="deck-import-text">{t('deck.decklistLabel')}</label>
             <textarea
               id="deck-import-text"
               disabled={comparingImport}
               className="input-control"
-              style={{ width: '100%', minHeight: '120px', maxHeight: '180px', fontFamily: 'monospace', fontSize: '0.8rem', resize: 'vertical' }}
+              style={{ width: '100%', minHeight: '120px', maxHeight: '180px', fontFamily: 'var(--font-main)', fontSize: 'var(--text-md)', resize: 'vertical' }}
               placeholder={'4 Llanowar Elves\n2 Lightning Bolt\n20 Forest'}
               value={importText}
               onChange={e => { setImportText(e.target.value); setImportComparison(null); }}
@@ -3050,19 +3002,19 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             {comparingImport ? (
               <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                 <div className="spinner" style={{ margin: '0 auto 0.5rem auto' }}></div>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t('deck.comparing')}</span>
+                <span style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>{t('deck.comparing')}</span>
               </div>
             ) : importComparison && (
               <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, overflowY: 'auto' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
                   <span>{t('deck.availabilityBreakdown')}</span>
                   <span style={{ color: 'var(--accent-yellow)', fontWeight: 700 }}>
                     {t('deck.fullyOwnedCards', { owned: importComparison.filter(i => i.status === 'full').length, total: importComparison.length })}
                   </span>
                 </div>
-                <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
+                <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
                   {importComparison.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm)', padding: '0.25rem 0.5rem', background: 'var(--surface-2)', borderRadius: '4px' }}>
                       <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{item.rawName}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span style={{ color: 'var(--text-secondary)' }}>{t('deck.reqQuantity', { count: item.requestedQty })}</span>
@@ -3070,10 +3022,10 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                           padding: '2px 6px',
                           borderRadius: '10px',
                           fontWeight: 700,
-                          fontSize: '0.65rem',
-                          background: item.status === 'full' ? 'rgba(74, 222, 128, 0.15)' : item.status === 'partial' ? 'rgba(234, 179, 8, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          fontSize: 'var(--text-sm)',
+                          background: 'var(--surface-2)',
                           color: item.status === 'full' ? 'var(--accent-green)' : item.status === 'partial' ? 'var(--accent-yellow)' : 'var(--accent-red)',
-                          border: item.status === 'full' ? '1px solid rgba(74, 222, 128, 0.3)' : item.status === 'partial' ? '1px solid rgba(234, 179, 8, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)'
+                          border: '1px solid var(--border-glass)'
                         }}>
                           {item.status === 'full' ? `Owned (${item.ownedQty})` : item.status === 'partial' ? `Partial (${item.ownedQty}/${item.requestedQty})` : `Missing (0)`}
                         </span>
@@ -3099,15 +3051,15 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
       {importSummary && (
         <Modal onClose={() => setImportSummary(null)} aria-labelledby="deck-import-summary-title">
           <div className="glass-panel deck-text-panel">
-            <h3 id="deck-import-summary-title" style={{ fontSize: '1.2rem', color: 'var(--text-strong)', marginBottom: '0.5rem' }}>{t('deck.importSummary')}</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>{t('deck.imported', { count: importSummary.addedCount })}</p>
-            <p style={{ fontSize: '0.8rem', color: 'var(--accent-yellow)' }}>{t('deck.saveDraftHint')}</p>
+            <h3 id="deck-import-summary-title" style={{ fontSize: 'var(--text-lg)', color: 'var(--text-strong)', marginBottom: '0.5rem' }}>{t('deck.importSummary')}</h3>
+            <p style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', marginBottom: '1rem' }}>{t('deck.imported', { count: importSummary.addedCount })}</p>
+            <p style={{ fontSize: 'var(--text-md)', color: 'var(--accent-yellow)' }}>{t('deck.saveDraftHint')}</p>
             {importSummary.skipped.length > 0 && (
               <>
-                <h4 style={{ fontSize: '0.9rem', color: 'var(--accent-yellow)', margin: '0 0 0.5rem' }}>{t('deck.notImported')}</h4>
+                <h4 style={{ fontSize: 'var(--text-md)', color: 'var(--accent-yellow)', margin: '0 0 0.5rem' }}>{t('deck.notImported')}</h4>
                 <div style={{ maxHeight: '260px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   {importSummary.skipped.map((item, index) => (
-                    <div key={`${item.name}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', padding: '0.5rem 0.65rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}>
+                    <div key={`${item.name}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', padding: '0.5rem 0.65rem', background: 'var(--surface-2)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-md)' }}>
                       <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{item.name}</span>
                       <span style={{ color: 'var(--text-secondary)' }}>{t('deck.reqQuantity', { count: item.quantity })} · {t(item.reason)}</span>
                     </div>
@@ -3129,10 +3081,10 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             </button>
             <CardImage
               card={previewCard}
-              style={{ width: '100%', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }}
+              style={{ width: '100%', borderRadius: '10px', boxShadow: 'none' }}
             />
-            <h4 id="deck-preview-title" style={{ color: 'var(--text-strong)', margin: '0.75rem 0 0.25rem 0', fontSize: '1rem' }}>{displayName(previewCard)}</h4>
-            <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.75rem' }}>
+            <h4 id="deck-preview-title" style={{ color: 'var(--text-strong)', margin: '0.75rem 0 0.25rem 0', fontSize: 'var(--text-md)' }}>{displayName(previewCard)}</h4>
+            <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: 'var(--text-sm)' }}>
               {previewCard.set_name} • #{previewCard.number} ({previewCard.rarity || 'Common'})
             </p>
             {previewDeckCard && (

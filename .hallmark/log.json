@@ -1,0 +1,126 @@
+[
+ {
+  "shape": "app screen",
+  "theme": "Manafolio brand (retained)",
+  "axes": [
+   "solid surfaces",
+   "artwork-led inventory",
+   "task-first density"
+  ],
+  "hero": "dashboard summary rail and collection history",
+  "nav": "two-level desktop; bottom navigation and More on mobile",
+  "footer": "existing application status only",
+  "imagery": "real bundled sample card and container artwork",
+  "photos": [],
+  "entry": ".",
+  "fingerprint": "manafolio-collection-workbench",
+  "sections": [
+   "Dashboard",
+   "Collection and search",
+   "Storage",
+   "Decks and AI setup",
+   "Trade",
+   "Account and help",
+   "Public and offline views"
+  ],
+  "signature": "collection artwork workbench",
+  "prompt": "redesign .; go ahead",
+  "material": {
+   "real": "Manafolio product, shipped sample inventory and existing artwork",
+   "standins": [],
+   "absent": [
+    "invented metrics",
+    "testimonials",
+    "logo walls"
+   ],
+   "nextUseful": "An anonymized dense real-world collection would broaden future usability validation; no replacement asset slots are required."
+  },
+  "copyChanges": [
+   {
+    "before": "TCG MARKET PRICE",
+    "after": "TCG market price"
+   },
+   {
+    "before": "EST. PURCHASE VALUE",
+    "after": "Est. purchase value"
+   },
+   {
+    "before": "TCG MARKET PRICE ({printing})",
+    "after": "TCG market price ({printing})"
+   },
+   {
+    "scope": "de/es/fr/it/pt-BR/ru equivalents",
+    "change": "Sentence case only; existing wording and placeholders retained"
+   },
+   {
+    "scope": "loc.prev and loc.next in all11 locales",
+    "change": "Removed text arrows; existing translated words retained beside Lucide icons"
+   },
+   {
+    "scope": "deck/container/trade headings",
+    "change": "Decorative em-dash and middle-dot separators replaced by colons or separate text spans; factual content retained"
+   },
+   {
+    "scope": "Storage locked option",
+    "change": "Emoji lock replaced by existing translated Locked label; Unlock uses existing translation"
+   }
+  ],
+  "dropped": [
+   "5 decorative hover/lift handlers; workflow handlers retained",
+   "colorVal and priceGlow gradient definitions; chart data retained",
+   "ornamental glow and foil motion"
+  ],
+  "checks": {
+   "frontendLint": "pass, zero warnings",
+   "frontendUtilities": "52 passed",
+   "locales": "all files valid; existing English fallbacks retained",
+   "productionBuild": "pass,2197 modules",
+   "existingBrowserSuites": "13 passed under isolated Chromium with existing fixture harness; not Electron runtime",
+   "interactionSmoke": [
+    "skip link focuses main",
+    "collection inspector opens with keyboard",
+    "Escape closes inspector and restores focus",
+    "mobile More closes on Escape",
+    "mobile deck detail navigable at320 with no horizontal overflow",
+    "deck description precedes Notes and remains visible"
+   ],
+   "finishReview": "ship after final deck/settings/admin recapture; screenshot review, not accessibility certification"
+  },
+  "limitations": [
+   "Fixture-backed demo only; no personal or production database",
+   "No live camera, AI/provider requests, physical devices, screen reader certification or zoom certification",
+   "Electron/Xvfb unavailable; equivalent existing browser suites executed using isolated Chromium",
+   "Valid original screenshot baseline is setup-obscured; transitional dashboard captures excluded from original comparison",
+   "Existing SSR useLayoutEffect, Node localStorage and fixture duplicate-key/act warnings observed; not suppressed",
+   "Admin screenshots include fixture catalog/backup error states; successful loading is covered by fixture tests, not these screenshots."
+  ],
+  "judgedWarnings": {
+   "3": "Binder stripe marks a real saved set boundary, not decorative panel trim.",
+   "74": "Existing Arcane accent and archive chart semantics retained; not a newly selected generic palette.",
+   "28a": "All four reported first images are20x20 set-symbol options, not artwork/LCP assets.",
+   "F25": "375px deck table restacks as labelled records; name and actions remain available with no page overflow.",
+   "F24": "Mobile floating nav uses overlay elevation; export menus use an edge without shadow."
+  },
+  "waived": {
+   "7b": "Pure black and white for printable container labels",
+   "28b": "Live camera stream has explicit readiness/error states; prerecorded poster would misrepresent readiness",
+   "39b": "Artwork-bearing selection targets intentionally exceed toolbar control height"
+  },
+  "sweep": {
+   "floorFailures": 0,
+   "openReflexes": 0,
+   "warnings": 8,
+   "waivedFindings": 14,
+   "answeredFinishChecks": 1,
+   "sourceFiles": 85,
+   "urls": 19,
+   "screenshots": 95,
+   "viewports": "1280x800,1440x900,1920x1080 folds;1440/375 full pages;320px responsive probes",
+   "kept": "30/30links,14/14fields,928/933handlers (5 decorative drops recorded),15/15headings,27/27figures",
+   "comparison": ".hallmark/compare.html"
+  },
+  "ponytail": "PASS: no dependencies or speculative abstractions; removed ornamental handlers, glows and redundant layout machinery; preserved validation/security/accessibility and workflows.",
+  "date": "2026-10-29",
+  "mode": "build"
+ }
+]

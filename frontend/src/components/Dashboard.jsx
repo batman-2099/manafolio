@@ -13,18 +13,18 @@ import DashboardAnalytics, { ChartDataTable } from './DashboardAnalytics';
 const CameraScanner = lazy(() => import('./CameraScanner'));
 
 const COLORS = [
-  '#60a5fa', '#4ade80', '#fbbf24', '#f87171', '#a78bfa',
-  '#f472b6', '#2dd4bf', '#fb923c', '#e879f9', '#818cf8'
+  'var(--chart-series-1)', 'var(--chart-series-2)', 'var(--chart-series-3)', 'var(--chart-series-4)', 'var(--chart-series-5)',
+  'var(--chart-series-6)', 'var(--chart-series-7)', 'var(--chart-series-8)', 'var(--chart-series-9)', 'var(--chart-series-10)'
 ];
 
 const TYPE_COLORS = {
-  'Colorless': '#cbd5e1',
-  'White': '#fef08a',
-  'Blue': '#60a5fa',
-  'Black': '#a78bfa',
-  'Red': '#f87171',
-  'Green': '#4ade80',
-  'Land': '#fbbf24'
+  'Colorless': 'var(--chart-colorless)',
+  'White': 'var(--chart-white)',
+  'Blue': COLORS[0],
+  'Black': COLORS[4],
+  'Red': COLORS[3],
+  'Green': COLORS[1],
+  'Land': COLORS[2]
 };
 
 function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEntryId, onUpdate, showToast }) {
@@ -43,7 +43,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
   const gameFilter = defaultGameFilter();
   const [inventoryFilter, setInventoryFilter] = useState('collection');
   const isArchive = inventoryFilter === 'graveyard';
-  const valueColor = isArchive ? '#8b5cf6' : 'var(--accent-green)';
+  const valueColor = isArchive ? 'var(--chart-archive)' : 'var(--accent-green)';
   
   // Timeline Chart State
   const [historyState, setHistoryState] = useState(null);
@@ -251,6 +251,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
       {statsStatus}
       {isArchive && <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.5 }}>{t('dash.archiveValueNote')}</p>}
 
+      <div className="dashboard-overview">
       <div className="dashboard-summary">
         <dl className="dashboard-summary-primary">
           <div>
@@ -305,27 +306,22 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={historyData} role="img" aria-labelledby="dashboard-timeline-title" margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={valueColor} stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor={valueColor} stopOpacity={0.0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" tickFormatter={formatDate} stroke="var(--text-secondary)" style={{ fontSize: '0.7rem' }} />
-                <YAxis stroke="var(--text-secondary)" style={{ fontSize: '0.7rem' }} tickFormatter={(v) => `${quoteSymbol}${v}`} />
+                <XAxis dataKey="date" tickFormatter={formatDate} stroke="var(--text-secondary)" style={{ fontSize: '0.875rem' }} />
+                <YAxis stroke="var(--text-secondary)" style={{ fontSize: '0.875rem' }} tickFormatter={(v) => `${quoteSymbol}${v}`} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-glass)' }}
                   labelStyle={{ color: 'var(--text-primary)' }}
                   labelFormatter={formatDate}
                   formatter={v => [formatMoney(v), t(isArchive ? 'dash.archivedValue' : 'dash.portfolioValue')]}
                 />
-                <Area type="monotone" dataKey="value" stroke={valueColor} strokeWidth={2} fillOpacity={1} fill="url(#colorVal)" />
+                <Area type="monotone" dataKey="value" stroke={valueColor} strokeWidth={2} fillOpacity={0.08} fill={valueColor} />
               </AreaChart>
             </ResponsiveContainer>
           )}
         </div>
         {historyData?.length > 0 && <ChartDataTable titleId="dashboard-timeline-title" title={timelineTitle} category={t('dash.date')} categoryKey="date" formatCategory={formatDate} rows={historyData} series={[{ key: 'value', label: t(isArchive ? 'dash.archivedValue' : 'dash.portfolioValue') }]} format={formatMoney} />}
       </section>
+      </div>
 
       <section className="dashboard-analytics view-section" aria-labelledby="dashboard-analytics-title">
         <h2 id="dashboard-analytics-title" className="section-heading">{t('dash.analytics')}</h2>
@@ -352,7 +348,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                         {getCardDisplayName(card.name, card.printed_name)}
                       </div>
                       <div className="dashboard-card-meta">
-                        <span>{card.set_name} • #{card.number}</span>
+                        <span>{card.set_name}</span><span>#{card.number}</span>
                         {card.printing && card.printing !== 'Normal' && (
                           <span className="collection-card-tag" style={getPrintingBadgeStyle(card.printing)}>
                             {getPrintingBadgeLabel(card.printing)}
@@ -387,7 +383,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                       {getCardDisplayName(card.name, card.printed_name)}
                     </div>
                     <div className="dashboard-card-meta">
-                      <span>{card.set_name} • {card.rarity}</span>
+                      <span>{card.set_name}</span><span>{card.rarity}</span>
                       {card.printing && card.printing !== 'Normal' && (
                         <span className="collection-card-tag" style={getPrintingBadgeStyle(card.printing)}>
                           {getPrintingBadgeLabel(card.printing)}
@@ -447,7 +443,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
                       <g>
                         <Text x={x - 32} y={y} width={112} textAnchor="end" verticalAnchor="middle" fill="var(--text-secondary)" fontSize="0.8rem">{payload.value}</Text>
                         {setSymbols[sets[index]?.id] && <foreignObject x={x - 26} y={y - 12} width={24} height={24} aria-hidden="true">
-                          <img src={setSymbols[sets[index].id]} alt="" width={24} height={24} style={{ objectFit: 'contain', background: '#fff', borderRadius: '3px', padding: '2px' }} onError={event => { event.currentTarget.style.display = 'none'; }} />
+                          <img src={setSymbols[sets[index].id]} alt="" width={24} height={24} style={{ objectFit: 'contain', background: 'var(--symbol-background)', borderRadius: '3px', padding: '2px' }} onError={event => { event.currentTarget.style.display = 'none'; }} />
                         </foreignObject>}
                       </g>
                     )}

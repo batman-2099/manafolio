@@ -1,0 +1,13 @@
+{
+  "scanned": "2026-10-29",
+  "findings": {
+    "fonts": "Outfit UI and Cinzel branding: frontend/src/index.css:2, frontend/src/arcane.css:42",
+    "palette": "Arcane Blue default and selectable account palettes: frontend/src/arcane.css:2-32, frontend/src/index.css:65 onward",
+    "spacing": "Existing --space-1 through --space-8: frontend/src/index.css:57-62",
+    "framework": "React 18, Vite 8, lucide-react, Recharts: frontend/package.json:20-44",
+    "runtime": "Isolated fixture-backed demo on https://127.0.0.1:5177; no production database",
+    "scope": "App screens: dashboard, add cards/search/scanner, collection and set completion, storage, decks and AI builder, trades, settings, administration, help, auth/setup, public shares, offline collection"
+  },
+  "preserve": ["Brand and account palette choices", "All content, navigation destinations, handlers and data contracts", "Inventory separation and existing accessibility behaviors"],
+  "introduce": ["Restrained collection-workbench composition", "Consistent controls and neutral surfaces", "Hallmark checks and responsive verification"]
+}
