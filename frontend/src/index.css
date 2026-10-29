@@ -301,7 +301,6 @@ button, input, select, textarea {
   flex-direction: column;
   min-height: 100vh;
   width: 100%;
-  max-width: var(--container);
   margin: 0 auto;
   /* Safe-area insets so the header/content clear the notch + status bar and the
      bottom clears the pinned nav bar + home indicator (viewport-fit=cover). */

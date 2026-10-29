@@ -12,7 +12,6 @@
   --text-xl: 1.44rem;
   --text-2xl: 1.728rem;
   --text-3xl: 2.074rem;
-  --container: 1480px;
   --gutter: var(--space-8);
   --color-paper: var(--bg-primary);
   --color-paper-2: var(--bg-secondary);
