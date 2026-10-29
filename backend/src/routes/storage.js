@@ -1043,7 +1043,7 @@ router.post('/locations/:id/resort', async (req, res) => {
 
     const cards = await db.all(`
       SELECT c.id as entry_id, c.card_id, c.reverse_card_id, c.printing, c.language, c.quantity, c.favorite, c.is_trade, c.list_type,
-             cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.rarity, cc.supertype, cc.image_url, cc.game,
+             cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.subtypes, cc.rarity, cc.supertype, cc.image_url, cc.game,
              cc.price_trend, cc.price_normal, cc.price_holofoil, cc.cmc, cc.color_identity
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id

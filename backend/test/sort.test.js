@@ -17,7 +17,7 @@ process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 
 
 const db = require('../src/db');
-const { recommendSlot, sortCards, getSortCategory, locationAcceptsCard } = require('../src/utils/compartmentSort');
+const { recommendSlot, sortCards, getSortCategory, locationAcceptsCard, rebalanceCompartmentByScheme } = require('../src/utils/compartmentSort');
 
 // Pure test (no DB): the 'language' filing scheme orders by language rank
 // (English, Japanese, ...) then by name, and buckets cards by language.
@@ -62,6 +62,54 @@ function testMtgContainerFilters() {
   ] } }, { ...land, color_identity: [] }), true, 'colorless cards must match the Colorless identity rule');
 }
 
+async function testCardTypeFiling(userId) {
+  const cards = [
+    { name: 'Land', subtypes: ['Basic', 'Land', 'Plains'], types: ['White'] },
+    { name: 'Battle', subtypes: ['Battle', 'Siege'] },
+    { name: 'Artifact', subtypes: ['Artifact', 'Equipment'] },
+    { name: 'Enchantment', subtypes: ['Enchantment', 'Aura'] },
+    { name: 'Sorcery', subtypes: ['Sorcery'] },
+    { name: 'Instant', subtypes: ['Kindred', 'Instant', 'Elf'] },
+    { name: 'Planeswalker', subtypes: ['Legendary', 'Planeswalker'] },
+    { name: 'Z creature', subtypes: ['Artifact', 'Creature', 'Golem'], types: [] },
+    { name: 'A creature', subtypes: ['Enchantment', 'Creature'], types: ['Green'] },
+    { name: 'Other', subtypes: ['Conspiracy'] },
+  ];
+  const expected = ['A creature', 'Z creature', 'Planeswalker', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Battle', 'Land', 'Other'];
+  assert.deepStrictEqual(sortCards(cards, 'type-name').map(card => card.name), expected);
+  assert.deepStrictEqual(sortCards(cards, [{ by: 'type', dir: 'desc' }, { by: 'name' }]).map(card => card.name),
+    ['Other', 'Land', 'Battle', 'Artifact', 'Enchantment', 'Sorcery', 'Instant', 'Planeswalker', 'A creature', 'Z creature']);
+  assert.strictEqual(getSortCategory({ subtypes: '["Artifact","Creature"]' }, 'type-name'), 'Creature');
+  assert.strictEqual(getSortCategory({ subtypes: '{broken' }, 'type-name'), 'Other');
+  assert.strictEqual(getSortCategory({}, 'type-name'), 'Other');
+
+  const locationId = (await db.run(
+    `INSERT INTO locations (name, type, sort_order, user_id) VALUES ('Card type fixture', 'Box', 'type-name', ?)`, [userId]
+  )).lastID;
+  const compartmentId = (await db.run(
+    'INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 20)', [locationId]
+  )).lastID;
+  for (const [index, card] of cards.entries()) {
+    const id = `type-fixture-${index}`;
+    await db.run('INSERT INTO card_cache (id, name, types, subtypes) VALUES (?, ?, ?, ?)',
+      [id, card.name, JSON.stringify(card.types || []), JSON.stringify(card.subtypes)]);
+    await db.run('INSERT INTO collection (card_id, user_id, location_id, compartment_id, position) VALUES (?, ?, ?, ?, ?)',
+      [id, userId, locationId, compartmentId, (index + 1) * 1000]);
+  }
+  await rebalanceCompartmentByScheme(db, compartmentId, 'type-name', 'normals_first');
+  const stored = await db.all(`SELECT cc.name, c.position FROM collection c JOIN card_cache cc ON cc.id = c.card_id
+    WHERE c.compartment_id = ? ORDER BY c.position`, [compartmentId]);
+  assert.deepStrictEqual(stored.map(card => card.name), expected, 'database-backed rebalancing must load card types');
+  assert.deepStrictEqual(stored.map(card => card.position), expected.map((_, index) => (index + 1) * 1000));
+  const location = await db.get('SELECT * FROM locations WHERE id = ?', [locationId]);
+  const recommended = await recommendSlot(db, location, { name: 'B creature', types: ['Blue'], subtypes: ['Creature'] });
+  assert.strictEqual(recommended.compartment_id, compartmentId);
+  assert.strictEqual(recommended.position, 2000, 'new cards must carry their type into filing comparisons');
+  assert.strictEqual(recommended.after.name, 'A creature');
+  assert.strictEqual(recommended.before.name, 'Z creature');
+  console.log('PASS: card-type filing, dividers, stored ordering and insertion positions');
+}
+
 function cleanup() {
   try { db.dbConnection.close(); } catch { /* already closed */ }
   for (const suffix of ['', '-wal', '-shm']) {
@@ -83,6 +131,7 @@ async function main() {
   testMtgContainerFilters();
   await db.initDb(); // creates schema + default admin (user id 1)
   const userId = 1;
+  await testCardTypeFiling(userId);
 
   // Three cards that all share sort-category 'A' (first letter), so the full
   // page below is a genuine candidate for the new card — the exact condition

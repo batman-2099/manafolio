@@ -109,15 +109,15 @@ function locationAcceptsCard(location, cardMetadata) {
 const cardOrder = require('../../../shared/cardOrder.json');
 const sortSchemes = require('../../../shared/sortSchemes.json');
 const TYPE_ORDER = cardOrder.type;
+const TYPE_CATEGORIES = Object.keys(TYPE_ORDER);
 const PRINTING_ORDER_NORMALS_FIRST = cardOrder.printingNormalsFirst;
 const PRINTING_ORDER_FOILS_FIRST = cardOrder.printingFoilsFirst;
 const LANGUAGE_ORDER = cardOrder.language;
 const WUBRG_ORDER = cardOrder.wubrg;
 
-function typeCategory(types) {
-  const t = Array.isArray(types) ? types : safeJsonParse(types, []);
-  if (t.length > 1) return 'Multicolor';
-  return t[0] || 'Colorless';
+function typeCategory(subtypes) {
+  const types = Array.isArray(subtypes) ? subtypes : safeJsonParse(subtypes, []);
+  return Array.isArray(types) ? TYPE_CATEGORIES.find(type => types.includes(type)) || 'Other' : 'Other';
 }
 
 
@@ -199,8 +199,8 @@ function sortCards(cards, sortOrder, foilSorting) {
           cmp = (printingOrder[a.printing] || 10) - (printingOrder[b.printing] || 10);
           break;
         case 'type': {
-          const orderA = TYPE_ORDER[typeCategory(a.types)] || 50;
-          const orderB = TYPE_ORDER[typeCategory(b.types)] || 50;
+          const orderA = TYPE_ORDER[typeCategory(a.subtypes)];
+          const orderB = TYPE_ORDER[typeCategory(b.subtypes)];
           cmp = orderA - orderB;
           break;
         }
@@ -487,6 +487,7 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
     name: cardMetadata.name || '',
     supertype: cardMetadata.supertype || '',
     types: cardMetadata.types || [],
+    subtypes: cardMetadata.subtypes || [],
     rarity: cardMetadata.rarity || '',
     set_name: cardMetadata.set_name || '',
     number: cardMetadata.number || '0',
@@ -582,7 +583,7 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
 async function rebalanceCompartmentByScheme(database, compartmentId, sortOrder, foilSorting) {
   const dbClient = database || db;
   const cards = await dbClient.all(
-    `SELECT c.*, cc.name, cc.printed_name, cc.set_id as set_code, cc.set_name, cc.number, cc.types, cc.rarity, cc.price_trend,
+    `SELECT c.*, cc.name, cc.printed_name, cc.set_id as set_code, cc.set_name, cc.number, cc.types, cc.subtypes, cc.rarity, cc.price_trend,
             cc.cmc, cc.color_identity
      FROM collection c
      LEFT JOIN card_cache cc ON c.card_id = cc.id
@@ -661,15 +662,7 @@ function getSortCategory(card, sortOrder) {
   if (primary === 'color_identity' || primary === 'color') {
     return getColorCategory(card);
   }
-  if (primary === 'type') {
-    let types = [];
-    if (card.types) {
-      try {
-        types = typeof card.types === 'string' ? JSON.parse(card.types) : card.types;
-      } catch (e) { types = Array.isArray(card.types) ? card.types : []; }
-    }
-    return typeCategory(types);
-  }
+  if (primary === 'type') return typeCategory(card.subtypes);
   if (primary === 'price') {
     const p = card.price_trend || 0;
     if (p >= 100) return '$100+';

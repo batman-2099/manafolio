@@ -3,7 +3,7 @@ import { Plus, Minus, Trash2, Copy, X, ChevronLeft, Play, BarChart2, Search, Log
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { shuffleArray } from '../utils/shuffle';
 import { displayName } from '../utils/languages';
-import { TYPE_ORDER, typeCategory } from '../utils/cardSort';
+import { TYPE_ORDER, typeCategory, COLOR_ORDER, colorCategory } from '../utils/cardSort';
 import CheckoutWizardModal from './CheckoutWizardModal';
 import { useBackGuard } from '../utils/useBackGuard';
 import { ownedImportIndex, findOwnedImportCard, buildDeckExport, parseDeckLine } from '../utils/deckText';
@@ -197,7 +197,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     return [
       ['set_name', 'collection.allSets', values('set_name')],
       ['type', 'collection.allTypes', [...new Set(browseEntries.flatMap(card => [...(card.types || []), ...(card.subtypes || [])]))].sort()],
-      ['color', 'collection.allColors', Object.keys(TYPE_ORDER).filter(color => browseEntries.some(card => typeCategory(card.types) === color))],
+      ['color', 'collection.allColors', Object.keys(COLOR_ORDER).filter(color => browseEntries.some(card => colorCategory(card.types) === color))],
       ['rarity', 'collection.allRarities', values('rarity')],
       ['condition', 'collection.allConditions', values('condition')],
       ['printing', 'collection.allPrintings', values('printing')],
@@ -209,7 +209,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
       Object.entries(browseFilters).every(([field, value]) => {
         if (!value) return true;
         if (field === 'type') return [...(entry.types || []), ...(entry.subtypes || [])].includes(value);
-        if (field === 'color') return typeCategory(entry.types) === value;
+        if (field === 'color') return colorCategory(entry.types) === value;
         if (field === 'deckStatus') return value === 'inPlay' ? entry.checked_out_qty > 0 : !(entry.checked_out_qty > 0);
         return entry[field] === value;
       })
@@ -1134,15 +1134,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
   const deckGame = activeDeck?.game;
 
-  // MTG card-type buckets, read off the parsed type line stored in subtypes.
-  const MTG_MAIN_TYPES = ['Creature', 'Planeswalker', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Battle', 'Land'];
-  const cardGroup = (card) => {
-    const subs = card.subtypes || [];
-    for (const t of MTG_MAIN_TYPES) if (subs.includes(t)) return t;
-    return 'Other';
-  };
-
-  const GROUP_ORDER = [...MTG_MAIN_TYPES, 'Other'];
+  const cardGroup = (card) => typeCategory(card.subtypes);
+  const GROUP_ORDER = Object.keys(TYPE_ORDER);
 
   const deckCardGroups = activeDeck && deckCardSortBy === 'pulled'
     ? [false, true].map(pulled => ({
@@ -1165,9 +1158,9 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
         })
       }]
     : activeDeck && deckCardSortBy === 'color'
-    ? Object.keys(TYPE_ORDER).map(color => ({
+    ? Object.keys(COLOR_ORDER).map(color => ({
         name: t(`dash.color.${color}`),
-        cards: activeDeck.cards.filter(card => typeCategory(card.types) === color)
+        cards: activeDeck.cards.filter(card => colorCategory(card.types) === color)
           .sort((a, b) => displayName(a).localeCompare(displayName(b)))
       }))
     : GROUP_ORDER.map(name => ({

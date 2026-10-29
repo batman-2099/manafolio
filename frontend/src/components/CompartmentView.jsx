@@ -71,15 +71,8 @@ function categoryForField(card, field, setsList = []) {
       const names = { 'W': 'White', 'U': 'Blue', 'B': 'Black', 'R': 'Red', 'G': 'Green' };
       return names[ci] || ci || 'Colorless';
     }
-    case 'type': {
-      let types = [];
-      if (card.types) {
-        try {
-          types = typeof card.types === 'string' ? JSON.parse(card.types) : card.types;
-        } catch (e) { types = Array.isArray(card.types) ? card.types : []; }
-      }
-      return typeCategory(types);
-    }
+    case 'type':
+      return typeCategory(card.subtypes);
     case 'cmc':
       return `CMC ${card.cmc != null && card.cmc !== '' ? card.cmc : '?'}`;
     case 'rarity':

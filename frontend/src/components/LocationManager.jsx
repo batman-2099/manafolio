@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { DndContext, DragOverlay, MouseSensor, useSensor, useSensors, useDraggable, useDroppable, pointerWithin } from '@dnd-kit/core';
 import { Plus, Minus, Trash2, X, Settings, RefreshCw, Lock, LayoutGrid, List, MousePointerClick, ChevronDown, ChevronUp, Edit3, Download, Search, SlidersHorizontal, Layers, Check, ClipboardCheck } from 'lucide-react';
-import { sortCardsByOrder, TYPE_ORDER, typeCategory } from '../utils/cardSort';
+import { sortCardsByOrder, COLOR_ORDER, colorCategory } from '../utils/cardSort';
 import { priceText } from '../utils/formatPrice';
 import { getFoilOverlayClass, getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
 import { getCardRarityBorder, getRarityBadgeStyle, getRarityBadgeLabel } from '../utils/cardRarity';
@@ -698,7 +698,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const unsortedFilterOptions = useMemo(() => ({
     sets: Array.from(new Set(unsortedCollection.map(card => card.set_name).filter(Boolean))).sort(),
     types: Array.from(new Set(unsortedCollection.flatMap(card => [...(card.types || []), ...(card.subtypes || [])]).filter(Boolean))).sort(),
-    colors: Object.keys(TYPE_ORDER).filter(color => unsortedCollection.some(card => typeCategory(card.types) === color)),
+    colors: Object.keys(COLOR_ORDER).filter(color => unsortedCollection.some(card => colorCategory(card.types) === color)),
     rarities: Array.from(new Set(unsortedCollection.map(card => card.rarity).filter(Boolean))).sort(),
     conditions: Array.from(new Set(unsortedCollection.map(card => card.condition).filter(Boolean))).sort(),
     printings: Array.from(new Set(unsortedCollection.map(card => card.printing).filter(Boolean))).sort(),
@@ -711,7 +711,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       (!search || [card.name, card.printed_name, card.reverse_name, card.reverse_printed_name, card.set_name, card.number].some(value => String(value || '').toLowerCase().includes(search)))
       && (!unsortedFilters.set || card.set_name === unsortedFilters.set)
       && (!unsortedFilters.type || [...(card.types || []), ...(card.subtypes || [])].includes(unsortedFilters.type))
-      && (!unsortedFilters.color || typeCategory(card.types) === unsortedFilters.color)
+      && (!unsortedFilters.color || colorCategory(card.types) === unsortedFilters.color)
       && (!unsortedFilters.rarity || card.rarity === unsortedFilters.rarity)
       && (!unsortedFilters.condition || card.condition === unsortedFilters.condition)
       && (!unsortedFilters.printing || card.printing === unsortedFilters.printing)

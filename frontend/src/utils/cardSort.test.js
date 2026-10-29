@@ -55,3 +55,33 @@ test('alphabetical set filing differs from chronological collection sorting', as
     await server.close();
   }
 });
+
+test('card type sorting uses the type line, with stable multi-type precedence and name ties', async () => {
+  const server = await createServer({
+    root: fileURLToPath(new URL('../../', import.meta.url)),
+    configFile: false,
+    server: { middlewareMode: true, ws: false },
+    appType: 'custom',
+    logLevel: 'error',
+  });
+  try {
+    const { sortCardsByOrder, typeCategory, colorCategory, COLLECTION_SORT_CRITERIA } = await server.ssrLoadModule('/src/utils/cardSort.js');
+    const cards = [
+      { name: 'A sorcery', types: ['White'], subtypes: ['Sorcery'] },
+      { name: 'Z creature', types: [], subtypes: ['Artifact', 'Creature', 'Golem'] },
+      { name: 'B creature', types: ['Green'], subtypes: ['Legendary', 'Enchantment', 'Creature'] },
+      { name: 'C land', types: [], subtypes: '["Basic","Land","Island"]' },
+      { name: 'Other', types: ['Blue'], subtypes: [] },
+    ];
+    assert.deepEqual(sortCardsByOrder([...cards], COLLECTION_SORT_CRITERIA['type-asc']).map(card => card.name),
+      ['B creature', 'Z creature', 'A sorcery', 'C land', 'Other']);
+    assert.deepEqual(sortCardsByOrder([...cards], [{ by: 'type', dir: 'desc' }, { by: 'name' }]).map(card => card.name),
+      ['Other', 'C land', 'A sorcery', 'B creature', 'Z creature']);
+    assert.equal(typeCategory('not JSON'), 'Other');
+    assert.equal(typeCategory({ Creature: true }), 'Other');
+    assert.equal(colorCategory(['White', 'Blue']), 'Multicolor', 'printed-color filters remain independent of card type');
+    assert.equal(colorCategory([]), 'Colorless');
+  } finally {
+    await server.close();
+  }
+});

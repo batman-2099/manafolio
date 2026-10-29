@@ -404,6 +404,8 @@ This does not move cards into one storage pocket or merge their real-world locat
 
 **Quantity (High-Low)** sorts by the total shown on each display stack, including when split by condition or finish. Turning stacking off sorts individual entry quantities instead; changing the display never changes owned copies.
 
+**Card type** sorts Creature → Planeswalker → Instant → Sorcery → Enchantment → Artifact → Battle → Land → Other, then by name within each group. A multi-type card uses the first matching category: Artifact Creatures and Enchantment Creatures belong under Creature. Supertypes such as Legendary and Basic do not form their own groups; missing or unrecognized card types go under Other. This order also applies to Storage's **Card type** rule and its dividers. It does not use card colors.
+
 ### Use the card inspector
 
 1. Open a card. If it represents a stack, choose the stored entry you mean to change.
@@ -582,12 +584,14 @@ Labels are private navigation links, **not public shares**. The QR contains only
 
 ### Choose between sort rules and moving rules
 
-- **Sort** answers “in what order?” Rules can order cards by name, set/number, value, finish, type/color, language, and other offered fields. Rule priority matters.
+- **Sort** answers “in what order?” Rules can order cards by name, set/number, value, finish, card type, color identity, language, and other offered fields. Rule priority matters.
 - **Moving Rules (Allow/Deny List)** answers “which cards are allowed here?” Use **Add Rule**, **Require** or **Exclude**, a field, comparison, and value.
 - Container rules apply to the whole container. A row/page's **Accepts** control adds restrictions for that compartment.
 - Locks affect whether a card can be moved. Capacity is advisory: eligible cards can be moved beyond the configured limit.
 
 For example, a binder can sort by set then collector number while accepting only one set. These are separate decisions: sorting by set does not by itself reject cards from other sets.
+
+**Card type** uses the same category order as Collection and Deck Builder; **Reversed** reverses those groups, while the next rule breaks ties within a group. **Color Identity** remains a separate sort rule. Existing saved Type rules now group by card type rather than color; review any manually assigned page/row categories that used color names. Opening a view does not rewrite saved positions—use **Re-sort Container** when you want the physical filing order updated, then rearrange the real cards to match.
 
 **Warning:** saving moving rules that existing cards no longer match can move those cards to Unsorted. Check the resulting location changes and move the physical cards as needed.
 

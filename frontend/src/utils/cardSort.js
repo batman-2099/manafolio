@@ -26,8 +26,18 @@ export const COLLECTION_SORT_CRITERIA = {
 // the backend filing engine (compartmentSort.js) exactly.
 export const TYPE_ORDER = cardOrder.type;
 
-// Mirrors typeCategory in the backend: multi-color MTG cards bucket together.
-export function typeCategory(types) {
+const TYPE_CATEGORIES = Object.keys(TYPE_ORDER);
+
+export function typeCategory(subtypes) {
+  if (typeof subtypes === 'string') {
+    try { subtypes = JSON.parse(subtypes); } catch { return 'Other'; }
+  }
+  return Array.isArray(subtypes) ? TYPE_CATEGORIES.find(type => subtypes.includes(type)) || 'Other' : 'Other';
+}
+
+export const COLOR_ORDER = cardOrder.color;
+
+export function colorCategory(types) {
   const t = Array.isArray(types) ? types : [];
   if (t.length > 1) return 'Multicolor';
   return t[0] || 'Colorless';
@@ -126,8 +136,8 @@ export function sortCardsByOrder(cards, sortOrder, foilSorting, setsList = []) {
           break;
         }
         case 'type': {
-          const orderA = TYPE_ORDER[typeCategory(a.types)] || 50;
-          const orderB = TYPE_ORDER[typeCategory(b.types)] || 50;
+          const orderA = TYPE_ORDER[typeCategory(a.subtypes)];
+          const orderB = TYPE_ORDER[typeCategory(b.subtypes)];
           cmp = orderA - orderB;
           break;
         }
