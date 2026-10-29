@@ -44,6 +44,17 @@ Download the package for your platform from [GitHub Releases](https://github.com
 
 **Your data stays separate from the app.** Quit Manafolio and back up its data directory before updating; finish imports and saves before quitting. Existing Docker or server-archive data is **not imported automatically**—follow the [migration guide](docs/INSTALLATION.md#migrate-an-existing-installation). Scan models/catalogs and native OCR prerequisites are not bundled; see [scanning setup](docs/INSTALLATION.md#card-scanning). On Windows, use Docker for native scanning/OCR and ChatGPT/Codex.
 
+#### Allow Manafolio to open on macOS
+
+The current macOS app is not Developer ID signed or notarized. Only follow these steps if you downloaded it from this project's [GitHub Releases](https://github.com/batman-2099/manafolio/releases) and trust the download:
+
+1. Open `Manafolio-macos-arm64.dmg`, drag **Manafolio.app** into **Applications**, and eject the DMG.
+2. Open **Manafolio** from **Applications** once. If macOS says the developer cannot be verified or Apple cannot check the app for malicious software, dismiss the alert.
+3. Open **Apple menu → System Settings → Privacy & Security**, scroll to **Security**, and click **Open Anyway** for Manafolio.
+4. Authenticate if prompted, then click **Open** in the confirmation dialog. macOS saves an exception for this app; subsequent launches normally work from **Applications**.
+
+Do not disable Gatekeeper globally or bypass an alert that the app **will damage your computer** or **is damaged**. Stop and investigate those warnings instead. On a managed Mac, your administrator may restrict exceptions. See [Apple's instructions for safely opening apps](https://support.apple.com/en-us/102445).
+
 ### Docker
 
 For a **new installation**, install Docker with Compose, then run:
