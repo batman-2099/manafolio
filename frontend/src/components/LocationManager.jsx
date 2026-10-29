@@ -1890,9 +1890,14 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
 
       {showRulesModal && selectedLoc && (
         <Modal onClose={() => savingSettings ? false : setShowRulesModal(false)} aria-labelledby="container-settings-title">
-          <form onSubmit={event => { event.preventDefault(); saveContainerSettings(); }} className="glass-panel dialog-panel-spacing" style={{ width: '640px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
+          <form onSubmit={event => { event.preventDefault(); saveContainerSettings(); }} className="glass-panel dialog-panel-spacing container-settings-panel" style={{ width: 'var(--container-settings-width, 640px)', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-secondary)' }}>
             <fieldset disabled={savingSettings} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, display: 'contents' }}>
-            <h3 id="container-settings-title" style={{ margin: 0 }}>{t('loc.containerSettings')}</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+              <h3 id="container-settings-title" style={{ margin: 0 }}>{t('loc.containerSettings')}</h3>
+              <label className="btn btn-secondary container-settings-expand">
+                <input type="checkbox" /> {t('loc.expand')}
+              </label>
+            </div>
             <button type="button" className="btn btn-secondary" onClick={() => setCoverLocation(selectedLoc)}>{t('loc.chooseCover')}</button>
             {unitsFeedback}
             <StorageUnitSelect units={storageUnits} value={storageUnitDraft} onChange={setStorageUnitDraft} disabled={unitsLoading || unitsError} />

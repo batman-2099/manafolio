@@ -184,6 +184,17 @@ export async function runUiContainerRegressions() {
     await click('loc.containerSettings');
     assert(host.querySelector('#container-settings-title') && host.textContent.includes('0 / 1'), 'settings capacity excludes tokens');
     assert(!host.querySelector('.storage-capacity-warning'), 'settings does not warn for token-only occupancy');
+    const settingsPanel = host.querySelector('#container-settings-title').closest('form');
+    const expand = settingsPanel.querySelector('.container-settings-expand input');
+    const compactWidth = settingsPanel.getBoundingClientRect().width;
+    await act(async () => expand.click());
+    const expandedWidth = settingsPanel.getBoundingClientRect().width;
+    assert(innerWidth > 768 ? expandedWidth > compactWidth : expandedWidth === compactWidth, 'settings expansion is desktop-only');
+    settingsPanel.scrollTop = settingsPanel.scrollHeight;
+    assert(expandedWidth <= innerWidth && button('admin.saveSettings').getBoundingClientRect().bottom <= settingsPanel.getBoundingClientRect().bottom, 'expanded settings stay within the viewport and keep Save reachable');
+    await act(async () => expand.click());
+    assert(settingsPanel.getBoundingClientRect().width === compactWidth, 'settings can return to their original width');
+    cases.push('desktop settings expansion, viewport bounds and restore');
     await back();
     assert(!host.querySelector('#container-settings-title') && button('collection.select'), 'Back closes container settings before leaving its workspace');
     await back();

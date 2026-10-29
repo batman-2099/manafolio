@@ -676,6 +676,14 @@ dialog.modal-overlay::backdrop {
   .dialog-panel-spacing { padding: var(--space-4); }
 }
 
+.container-settings-panel .container-settings-expand { display: none; }
+@media (min-width: 769px) {
+  .container-settings-panel .container-settings-expand { display: inline-flex; }
+  .container-settings-panel:has(.container-settings-expand input:checked) {
+    --container-settings-width: 1100px;
+  }
+}
+
 button.tcg-card,
 button.ci-image-wrap,
 button.collection-card-trigger {

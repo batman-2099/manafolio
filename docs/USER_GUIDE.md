@@ -563,6 +563,8 @@ Layout counts must be positive whole numbers. **Next** or Enter validates the la
 
 Storage opens as a gallery. Search container names/types or sort by name/quantity, then open a container. Select **More → Container Settings** on its toolbar. **Choose container image** selects a card-art cover; **Automatic image** returns to an automatic cover. The container's **More** actions are alphabetized by their displayed labels, including the current Lock/Unlock and Move to Graveyard/Restore action. Page navigation, views, selection, and Arrange remain directly available. For a ManaBox container import, choose **Create Container**, then **Import ManaBox container** in the first (**Type**) step; it is no longer a separate More-menu action.
 
+On desktop, check **Expand** in the Container Settings header for a wider window; uncheck it to return to the compact width. Unsaved settings stay intact. The control is hidden on phones, where the window continues to fit the screen.
+
 Browser **Back** closes the current storage dialog first, then returns an open container to the gallery. The toolbar's **Storage** button also returns to the gallery. In binder layouts, use the page's **Rename** button to edit its label; Enter saves, Escape discards, and either returns keyboard focus to the button.
 
 In the container's card view, a **FOIL** badge identifies foil copies. If **Stack Duplicates** is enabled and **Split by Holo/Printing** is off, mixed-finish stacks show the foil count—for example, **FOIL 1/3** means one of the three copies is foil. Normal-only cards and stacks have no foil badge.
