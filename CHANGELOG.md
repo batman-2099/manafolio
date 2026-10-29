@@ -15,6 +15,7 @@ Release history starts with Manafolio 2.0.
 - Align public asset names with the 2.4.2 downloads and remove unused packaging modes, chart customization, and dropdown selectors.
 - Make Type sorting use Magic card types consistently in Collection, shared views, storage filing, and dividers, matching Deck Builder's type order. Preserve separate color filters and Color Identity sorting; rename the option to Card type in all interface languages.
 - Add a keyboard-accessible Expand control to Container Settings on desktop; keep mobile sizing and scrollable settings unchanged.
+- Show saved sort-rule dividers and their colors in the container's Detail list view under Storage order, preserving card order and the separate Tokens section.
 
 ## 2.4.2 — 2026-10-28
 

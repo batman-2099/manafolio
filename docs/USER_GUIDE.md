@@ -553,7 +553,7 @@ Choose **Automatic image** to let the gallery use a recent eligible card. If a m
 2. Choose **Create Container**.
 3. In **Type**, choose a suitable layout: **Binder**, **Toploader Binder**, **Box**, **Toploader Box**, **Graded Slab Box**, **Display Shelf / Stand**, **Deck Box**, **Tin / Case**, or **Other**.
 4. In **Layout**, enter a recognizable **Name**, choose **Sleeved** (**None**, **Single**, **Double**, or **Triple**), and enter the actual number of pages/rows and cards per page/row. Read the total-capacity summary.
-5. In **Sort**, add ordering rules if desired. Leave this empty for manual **Custom** order. A rule's **Divider** option shows labeled category breaks.
+5. In **Sort**, add ordering rules if desired. Leave this empty for manual **Custom** order. A rule's **Divider** option shows labeled category breaks. In Detail list view, choose **Storage order** to show the saved divider labels and colors, including multiple divider levels. Other view sorts use their own headings. Dividers do not reorder cards or consume storage slots; tokens remain in their separate section.
 6. In **Moving**, add restrictions only if needed. No rules is a useful starting point for a general-purpose container.
 7. Choose **Create Container**.
 

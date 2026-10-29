@@ -1220,14 +1220,19 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
         tokens.push(card);
         continue;
       }
-      const label = field ? getSortCategories(card, [{ by: field, divider: true }])[0]?.label || 'Other' : null;
+      const categories = containerSortBy === 'storage' ? getSortCategories(card, selectedLoc?.sort_order, setsList) : [];
+      const label = containerSortBy === 'storage'
+        ? categories.map(category => category.label).join(' / ') || null
+        : field ? getSortCategories(card, [{ by: field, divider: true }])[0]?.label || 'Other' : null;
       const section = sections.at(-1);
-      if (!section || section.label !== label) sections.push({ label, cards: [card] });
+      if (!section || section.label !== label || categories.some((category, index) => category.label !== section.categories[index]?.label)) {
+        sections.push({ label, categories, cards: [card] });
+      }
       else section.cards.push(card);
     }
     if (tokens.length) sections.push({ label: t('tokens.title'), cards: tokens, tokens: true });
     return sections;
-  }, [containerSortBy, displayContainerListCards, t]);
+  }, [containerSortBy, displayContainerListCards, selectedLoc?.sort_order, setsList, t]);
 
   const inspectorCards = useMemo(() => !inspectorCard?.location_id ? unsortedCards
     : containerViewMode === 'list' ? containerListSections.flatMap(section => section.cards)
@@ -2475,8 +2480,12 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
             {containerViewMode === 'list' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {containerListSections.map(section => (
-                  <section key={section.tokens ? 'tokens' : `cards:${section.label || 'storage'}`} aria-label={section.label || undefined}>
-                    {section.label && <h3 style={{ margin: '0 0 0.4rem', color: 'var(--text-strong)', fontSize: '0.85rem' }}>{section.label}</h3>}
+                  <section key={section.tokens ? 'tokens' : `cards:${section.cards[0].entry_id}`} aria-label={section.label || undefined}>
+                    {section.label && <h3 style={{ margin: '0 0 0.4rem', color: 'var(--text-strong)', fontSize: '0.85rem', display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                      {section.categories?.length ? section.categories.map((category, index) => (
+                        <span key={`${category.field}:${index}`} style={{ borderBottom: `2px solid ${category.color}`, paddingBottom: '0.2rem' }}>{category.label}</span>
+                      )) : section.label}
+                    </h3>}
                     <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${110 * containerCardScale}px), 1fr))`, gap: '0.75rem' }}>
                       {section.cards.map(card => {
                   const selected = storage.selectedIds.has(card.entry_id);

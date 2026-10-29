@@ -264,6 +264,38 @@ export async function runUiContainerRegressions() {
     assert(nativeImages?.length === 2 && nativeImages[1].alt === 'Phyrexian'
       && nativeImages[1].getAttribute('src') === '/logo.svg?native-back', 'native double-faced token renders both artworks without creating a second owned entry');
     cases.push('native token reverse artwork in container gallery');
+    await clear();
+    cards = [
+      ...['Creature', 'Instant', 'Creature'].map((type, index) => ({
+        entry_id: index + 1, card_id: `divider-${index}`, name: `Sample ${index + 1}`,
+        set_name: 'Sample Set', subtypes: [type], game: 'mtg', location_id: 3,
+        compartment_id: 30, position: (index + 1) * 1000, quantity: 1, image_url: '/logo.svg'
+      })),
+      { ...cards[0], entry_id: 4, position: 4000 }
+    ];
+    for (const sortOrder of [
+      JSON.stringify([{ by: 'set', divider: true, dividerColor: '#ff0000' }, { by: 'type', divider: true, dividerColor: '#00ff00' }]),
+      JSON.stringify([{ by: 'type', divider: false }]),
+      'custom',
+      'type-name'
+    ]) {
+      locations[2] = { ...locations[2], sort_order: sortOrder };
+      await act(async () => root.render(<LocationManager onUpdate={() => {}} showToast={() => {}} />));
+      await act(async () => [...host.querySelectorAll('button')].find(node => node.textContent.includes('Token box')).click());
+      const sections = [...host.querySelectorAll('section')].filter(section => section.querySelector('img[alt^="Sample "]'));
+      const enabled = sortOrder === 'type-name' || sortOrder.includes('"divider":true');
+      assert(sections.length === (enabled ? 3 : 1), 'saved dividers separate consecutive categories, including repeated groups, only when enabled');
+      assert(sections.flatMap(section => [...section.querySelectorAll('img')].map(image => image.alt)).join(',') === 'Sample 1,Sample 2,Sample 3', 'dividers never reorder stored cards');
+      if (enabled) {
+        assert(sections.map(section => section.getAttribute('aria-label')).join(',') === (sortOrder === 'type-name'
+          ? 'Creature,Instant,Creature' : 'Sample Set / Creature,Sample Set / Instant,Sample Set / Creature'), 'all enabled divider levels are named');
+      }
+      assert(tokenSection()?.querySelector('img[alt="Incubator"]'), 'saved dividers preserve the separate token section');
+      await change(searchSelector, 'Sample 2');
+      assert(host.querySelector('section img[alt="Sample 2"]') && !host.querySelector('section img[alt="Sample 1"]'), 'filtering preserves the matching divider group');
+      await clear();
+    }
+    cases.push('detail list saved and legacy dividers, multiple levels, repeated groups, disabled/custom rules, filtering and storage order');
     return { passed: cases.length, cases };
   } finally {
     await act(async () => root.unmount());
