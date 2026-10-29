@@ -9,7 +9,7 @@ const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'manafolio-storage-units-')
 process.env.DB_PATH = path.join(tmpDir, 'test.db');
 process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 const db = require('../src/db');
-const { authenticateToken } = require('../src/middleware/auth');
+const { authenticateToken, importLimiter } = require('../src/middleware/auth');
 
 async function main() {
   let server;
@@ -49,6 +49,8 @@ async function main() {
     server = await new Promise(resolve => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
     const base = `http://127.0.0.1:${server.address().port}/api`;
     async function request(method, suffix, body, user = 1, status = 200) {
+      // These fixtures test backup validation; importprogress.test.js covers the request ceiling.
+      if (suffix === 'import') importLimiter.resetKey('127.0.0.1');
       const response = await fetch(`${base}/${suffix}`, { method,
         headers: { 'Content-Type': 'application/json', ...(user ? { Authorization: `Bearer ${user === 1 ? 'owner' : 'other'}-session` } : {}) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }) });

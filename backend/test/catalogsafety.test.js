@@ -22,6 +22,7 @@ const metaFile = catalog.metaPath('mtg', 'English');
 let behavior = 'normal', calls = 0, sessions = 0, releases = 0;
 ort.InferenceSession.create = async () => {
   sessions++;
+  if (behavior === 'init-fail') throw new Error('invalid model protobuf');
   let released = false;
   return {
     run: async () => {
@@ -45,8 +46,10 @@ const build = async (opts = {}) => {
     assert(Date.now() < deadline, 'catalog job must finish');
     await new Promise(resolve => setTimeout(resolve, 5));
   }
-  assert.strictEqual(sessions, calls ? 1 : 0, 'only builds doing inference create a session');
-  assert.strictEqual(releases, sessions, 'success, cancellation and failure release their session');
+  assert.strictEqual(sessions, behavior === 'init-fail' ? 1 : calls ? 1 : 0,
+    'model initialization is attempted once, only for builds needing inference');
+  assert.strictEqual(releases, behavior === 'init-fail' ? 0 : sessions,
+    'success, cancellation and failure release their acquired session');
   return catalog.lastResult();
 };
 const snapshot = () => {
@@ -64,6 +67,33 @@ const snapshot = () => {
   fs.writeFileSync(catalog.binPath('mtg'), Buffer.from(new Float32Array(24).fill(0.5).buffer));
   fs.writeFileSync(path.join(models, 'milo.onnx'), 'fixture');
   fs.writeFileSync(path.join(models, 'cornelius.onnx'), 'fixture');
+  const createSession = ort.InferenceSession.create;
+  for (const failedModel of ['cornelius.onnx', 'milo.onnx']) {
+    const failure = new Error(`${failedModel} initialization failed`);
+    let finishSibling, attempts = 0, released = 0, settled = false;
+    ort.InferenceSession.create = file => {
+      attempts++;
+      return path.basename(file) === failedModel ? Promise.reject(failure)
+        : new Promise(resolve => { finishSibling = resolve; });
+    };
+    const pending = Promise.allSettled([cv.load(), cv.load()]).then(results => {
+      settled = true;
+      return results;
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(settled, false, 'failed initialization waits for the sibling session');
+    assert.strictEqual(attempts, 2, 'concurrent loads share one initialization');
+    finishSibling({ release: async () => {
+      released++;
+      if (failedModel === 'milo.onnx') throw new Error('cleanup failure');
+    } });
+    for (const result of await pending) {
+      assert.strictEqual(result.status, 'rejected');
+      assert.strictEqual(result.reason, failure, 'cleanup does not hide the initialization error');
+    }
+    assert.strictEqual(released, 1, 'late successful sibling is released exactly once');
+  }
+  ort.InferenceSession.create = createSession;
   assert.deepStrictEqual((await cv.load()).ids, ids, 'installed legacy pairs remain readable');
   const before = snapshot();
   behavior = 'cancel';
@@ -73,6 +103,11 @@ const snapshot = () => {
   behavior = 'fail';
   assert.strictEqual((await build()).phase, 'error');
   assert.deepStrictEqual(snapshot(), before);
+  behavior = 'init-fail';
+  const failedInit = await build();
+  assert.strictEqual(failedInit.phase, 'error');
+  assert.match(failedInit.message, /initialize milo\.onnx: invalid model protobuf.*catalog unchanged/);
+  assert.deepStrictEqual(snapshot(), before, 'initialization failure preserves the published catalog');
   behavior = 'normal';
   const write = fs.writeFileSync, rename = fs.renameSync;
   for (const point of ['binary', 'metadata', 'commit']) {

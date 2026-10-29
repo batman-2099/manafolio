@@ -34,7 +34,7 @@ async function printingInLanguage(card, language) {
   }
   if (languages.toName(card.language) === languages.toName(language)) return null;
   const set = String(card.set_id || '').replace(/^mtg-/, '');
-  return scryfallApi.getPrintingInLang(set, card.number, language).catch(() => null);
+  return scryfallApi.getPrintingInLang(set, card.number, language);
 }
 
 module.exports = { isMtgId, gameOf, getCardById, printingInLanguage };

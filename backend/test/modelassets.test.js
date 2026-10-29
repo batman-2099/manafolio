@@ -29,6 +29,37 @@ const originalFetch = global.fetch;
       assert.deepStrictEqual(fs.readFileSync(dest), installed, 'failed download must preserve the installed model');
       assert.strictEqual(fs.existsSync(`${dest}.tmp`), false, 'failed download must remove its temporary file');
     }
+    for (const chunks of [[Buffer.alloc(9)], [Buffer.alloc(4), Buffer.alloc(5), Buffer.alloc(2)]]) {
+      const body = Readable.from(chunks);
+      global.fetch = async () => ({ ok: true, body });
+      const createWriteStream = fs.createWriteStream;
+      let written = 0;
+      fs.createWriteStream = (...args) => {
+        const stream = createWriteStream(...args);
+        const write = stream.write;
+        stream.write = function (chunk, ...rest) {
+          written += chunk.length;
+          return write.call(this, chunk, ...rest);
+        };
+        return stream;
+      };
+      const progress = [];
+      try {
+        await assert.rejects(assets.fetchAsset(asset, got => progress.push(got)), /exceeded expected 8/);
+      } finally {
+        fs.createWriteStream = createWriteStream;
+      }
+      assert(written <= 4, 'the chunk crossing the limit must never reach the file stream');
+      assert(progress.every(got => got <= asset.bytes), 'progress never exceeds the declared size');
+      assert(body.destroyed, 'oversized response is closed');
+      assert.deepStrictEqual(fs.readFileSync(dest), installed);
+      assert.strictEqual(fs.existsSync(`${dest}.tmp`), false);
+    }
+
+    global.fetch = async () => ({ ok: true, body: Readable.from([Buffer.from('1234'), Buffer.from('5678')]) });
+    await assets.fetchAsset(asset);
+    assert.strictEqual(fs.readFileSync(dest, 'utf8'), '12345678', 'exact-size downloads still install');
+    assert.strictEqual(fs.existsSync(`${dest}.tmp`), false);
 
     const [cornelius, milo] = assets.MODELS;
     const corneliusPath = path.join(dir, cornelius.name);

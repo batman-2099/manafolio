@@ -97,13 +97,9 @@ function hashPassword(password) {
 
 // Initialize tables
 async function initDb() {
-  const existingCollectionCols = await all(`PRAGMA table_info(collection)`).catch(() => []);
+  const existingCollectionCols = await all(`PRAGMA table_info(collection)`);
   if (existingCollectionCols.some(c => c.name === 'sub_location_1')) {
-    console.log('Resetting locations/collection tables for the new compartment-based storage schema...');
-    await run(`PRAGMA foreign_keys = OFF`);
-    await run(`DROP TABLE IF EXISTS collection`);
-    await run(`DROP TABLE IF EXISTS locations`);
-    await run(`PRAGMA foreign_keys = ON`);
+    throw new Error('Unsupported legacy storage migration: collection.sub_location_1 requires an explicit migration to compartments. Existing tables have been preserved; back up the database before migrating.');
   }
 
   // Create users table

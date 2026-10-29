@@ -297,6 +297,7 @@ databaseInitialization
   .catch(err => {
     console.error('Failed to initialize database:', err);
   });
+databaseInitialization.catch(() => { void stopServer(); });
 
 // Readiness/liveness probe for orchestrators (Docker HEALTHCHECK, etc.).
 // Unauthenticated; pings the DB so a wedged database reads as unhealthy.
@@ -312,6 +313,12 @@ app.get('/api/health', async (req, res) => {
   } catch (err) {
     res.status(503).json({ status: 'db_unavailable' });
   }
+});
+
+// Initialization failures must never expose partially migrated tables to routes.
+app.use((req, res, next) => {
+  if (!dbReady) return res.status(503).json({ error: 'Database is not ready' });
+  next();
 });
 
 // gzip. Mounted HERE, above the routes, because it has to see a response to
@@ -409,12 +416,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-for (const signal of process.platform === 'win32' ? ['SIGINT', 'SIGTERM'] : ['SIGINT', 'SIGTERM', 'SIGUSR2']) {
-  process.once(signal, () => {
-    require('./codexDeckClient').shutdown().finally(() => process.kill(process.pid, signal));
-  });
-}
-
 // Start Express Server
 let httpsServer;
 const httpServer = app.listen(PORT, '0.0.0.0', () => {
@@ -431,32 +432,40 @@ const httpServer = app.listen(PORT, '0.0.0.0', () => {
   }
 });
 
-// Windows has no graceful child.kill signal. Only the owning desktop's IPC
-// channel can request this shutdown; a crashed desktop disconnects it too.
+// Signals and the owning Windows desktop's IPC channel share the same drain.
+let stopping = false;
+async function stopServer() {
+  if (stopping) return;
+  stopping = true;
+  const warning = setTimeout(() => {
+    console.error('Server shutdown is still waiting for active requests or database writes. No writes have been force-stopped.');
+  }, 30000);
+  warning.unref();
+  try {
+    const listeners = [httpServer, await httpsServer].filter(Boolean);
+    await Promise.all([
+      databaseInitialization,
+      require('./codexDeckClient').shutdown(),
+      ...listeners.map(server => new Promise((resolve, reject) => {
+        server.close(error => error ? reject(error) : resolve());
+      })),
+    ]);
+    // Drain the existing query/transaction queue before closing SQLite.
+    await db.get('SELECT 1');
+    await new Promise((resolve, reject) => db.dbConnection.close(error => error ? reject(error) : resolve()));
+    process.exit(0);
+  } catch (error) {
+    console.error('Server shutdown failed:', error);
+    process.exit(1);
+  } finally {
+    clearTimeout(warning);
+  }
+}
+for (const signal of process.platform === 'win32' ? ['SIGINT', 'SIGTERM'] : ['SIGINT', 'SIGTERM', 'SIGUSR2']) {
+  process.on(signal, () => { void stopServer(); });
+}
 if (process.env.MANAFOLIO_WINDOWS_APP === '1' && process.send) {
-  let stopping = false;
-  const stopDesktopServer = async () => {
-    if (stopping) return;
-    stopping = true;
-    try {
-      await databaseInitialization;
-      const listeners = [httpServer, await httpsServer].filter(Boolean);
-      await Promise.all([
-        require('./codexDeckClient').shutdown(),
-        ...listeners.map(server => new Promise((resolve, reject) => {
-          server.close(error => error ? reject(error) : resolve());
-        })),
-      ]);
-      // Drain the existing query/transaction queue before closing SQLite.
-      await db.get('SELECT 1');
-      await new Promise((resolve, reject) => db.dbConnection.close(error => error ? reject(error) : resolve()));
-      process.exit(0);
-    } catch (error) {
-      console.error('Desktop server shutdown failed:', error);
-      process.exit(1);
-    }
-  };
-  process.on('message', message => { if (message?.type === 'shutdown') void stopDesktopServer(); });
-  process.once('disconnect', () => { void stopDesktopServer(); });
-  if (!process.connected) void stopDesktopServer();
+  process.on('message', message => { if (message?.type === 'shutdown') void stopServer(); });
+  process.once('disconnect', () => { void stopServer(); });
+  if (!process.connected) void stopServer();
 }

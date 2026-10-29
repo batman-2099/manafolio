@@ -61,15 +61,42 @@ if (process.type === 'renderer') {
       app.exit(failed ? 1 : 0);
       return;
     }
-    server.once('exit', () => app.exit(failed ? 1 : 0));
+    let shutdownTimer;
+    const waitForShutdown = () => {
+      shutdownTimer = setTimeout(async () => {
+        if (server.exitCode !== null || server.signalCode !== null) return;
+        const message = 'The local server has not stopped after 30 seconds.';
+        record(`${message}\n`);
+        const { response } = await dialog.showMessageBox({
+          type: 'warning', title: 'Manafolio is still saving', message,
+          detail: `Wait to let active requests and database writes finish. Force quit may lose data or interrupt a save. Diagnostics: ${logPath}`,
+          buttons: ['Keep waiting', 'Force quit'], defaultId: 0, cancelId: 0,
+        });
+        if (server.exitCode !== null || server.signalCode !== null) return;
+        if (response === 1) {
+          failed = true;
+          record('User chose to force quit the local server; unfinished writes may be lost.\n');
+          if (!server.kill('SIGKILL')) {
+            record('Could not force quit the local server; continuing to wait.\n');
+            waitForShutdown();
+          }
+        } else waitForShutdown();
+      }, 30000);
+    };
+    server.once('exit', (code, signal) => {
+      clearTimeout(shutdownTimer);
+      if (!failed && (code !== 0 || signal)) {
+        failed = true;
+        dialog.showErrorBox('Manafolio could not stop cleanly', `The local server exited (${signal || code}). Check ${logPath} before reopening Manafolio.`);
+      }
+      app.exit(failed ? 1 : 0);
+    });
+    waitForShutdown();
     if (isWindows) {
       if (server.connected) server.send({ type: 'shutdown' }, error => {
         if (error) record(`Could not request server shutdown: ${error.message}\n`);
       });
-    } else {
-      server.kill('SIGTERM');
-      setTimeout(() => server.kill('SIGKILL'), 5000).unref();
-    }
+    } else server.kill('SIGTERM');
   }
 
   app.on('before-quit', async event => {

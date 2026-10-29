@@ -5,11 +5,11 @@
 // returns a card, just a slightly worse-framed one, and accuracy drifts with
 // nothing pointing at the cause.
 //
-// So this replays the client path in Node and asserts both paths land on the
-// same card with near-identical cosine. Needs the ONNX models and an MTG
-// catalog; skips rather than fails when the install has neither.
+// Deterministic shared geometry checks always run, without models or downloads.
+// The optional --models diagnostic also compares real frame matches and cosine;
+// it needs installed ONNX models, an MTG catalog and local scan-debug frames.
 //
-// Run: node test/clientcrop.test.js
+// Run: node test/clientcrop.test.js [--models]
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -19,7 +19,6 @@ const ort = require('onnxruntime-node');
 const MODEL_DIR = path.join(__dirname, '..', 'data', 'models');
 const FRAME_DIR = path.join(__dirname, '..', 'data', 'scan-debug');
 const CORN = 384, EMBED = 448;
-const MEAN = [0.485, 0.456, 0.406], STD = [0.229, 0.224, 0.225];
 
 const cvScan = require('../src/cvScan');
 
@@ -31,17 +30,12 @@ function frames() {
 async function corners(session, buf) {
   const { data } = await sharp(buf).resize(CORN, CORN, { fit: 'fill' }).removeAlpha()
     .raw().toBuffer({ resolveWithObject: true });
-  const f = new Float32Array(3 * CORN * CORN);
-  for (let i = 0; i < CORN * CORN; i++) {
-    for (let c = 0; c < 3; c++) f[c * CORN * CORN + i] = (data[i * 3 + c] / 255 - MEAN[c]) / STD[c];
-  }
-  const out = await session.run({ image: new ort.Tensor('float32', f, [1, 3, CORN, CORN]) });
+  const out = await session.run({ image: cvScan.toTensor(data, CORN) });
   const c = out.corners.data;
-  const isCorn = c[1] > c[5];
-  const order = isCorn ? [2, 3, 1, 0] : [0, 2, 1, 3];
+  const { orderQuad } = await import('../../shared/imgproc.mjs');
   return {
     sharpness: out.sharpness ? out.sharpness.data[0] : 1,
-    quad: order.map(i => ({ x: c[i * 2], y: c[i * 2 + 1] })),
+    quad: orderQuad(Array.from({ length: 4 }, (_, i) => ({ x: c[i * 2], y: c[i * 2 + 1] }))),
   };
 }
 
@@ -52,13 +46,58 @@ async function clientCrop(buf, quad) {
   const w = info.width, h = info.height, N = EMBED - 1;
   const src = quad.map(p => ({ x: p.x * w, y: p.y * h }));
   const dst = [{ x: 0, y: 0 }, { x: N, y: 0 }, { x: N, y: N }, { x: 0, y: N }];
-  const rgba = warpPerspective(new Uint8ClampedArray(data), w, h,
-    getPerspectiveTransform(src, dst), EMBED, EMBED);
+  const transform = getPerspectiveTransform(src, dst);
+  assert(transform, 'diagnostic corners must define an invertible perspective transform');
+  const rgba = warpPerspective(new Uint8ClampedArray(data), w, h, transform, EMBED, EMBED);
   return sharp(Buffer.from(rgba.buffer), { raw: { width: EMBED, height: EMBED, channels: 4 } })
     .jpeg({ quality: 90 }).toBuffer();
 }
 
+async function geometry() {
+  const { orderQuad, getPerspectiveTransform, warpPerspective } = await import('../../shared/imgproc.mjs');
+  const expected = [{ x: 1, y: 1 }, { x: 7, y: 2 }, { x: 6, y: 7 }, { x: 1, y: 6 }];
+  const dst = [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }, { x: 0, y: 4 }];
+  const pixels = new Uint8ClampedArray(9 * 9 * 4);
+  for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) {
+    pixels.set([x * 20, y * 20, 80, 255], (y * 9 + x) * 4);
+  }
+  const permutations = points => points.length === 1 ? [points]
+    : points.flatMap((point, index) => permutations(points.filter((_, i) => i !== index))
+      .map(rest => [point, ...rest]));
+  for (const points of permutations(expected)) {
+    const src = orderQuad(points);
+    assert.deepStrictEqual(src, expected, 'all detector corner permutations use the same non-crossing order');
+    const transform = getPerspectiveTransform(src, dst);
+    assert(transform);
+    for (let k = 0; k < 4; k++) {
+      const { x, y } = src[k];
+      const denominator = transform[6] * x + transform[7] * y + 1;
+      assert(Math.abs((transform[0] * x + transform[1] * y + transform[2]) / denominator - dst[k].x) < 1e-8);
+      assert(Math.abs((transform[3] * x + transform[4] * y + transform[5]) / denominator - dst[k].y) < 1e-8);
+    }
+    const warped = warpPerspective(pixels, 9, 9, transform, 5, 5);
+    for (let k = 0; k < 4; k++) {
+      const offset = (dst[k].y * 5 + dst[k].x) * 4;
+      assert(Math.abs(warped[offset] - src[k].x * 20) <= 1);
+      assert(Math.abs(warped[offset + 1] - src[k].y * 20) <= 1);
+      assert.strictEqual(warped[offset + 2], 80);
+      assert.strictEqual(warped[offset + 3], 255);
+    }
+  }
+  assert.deepStrictEqual(Array.from(warpPerspective(pixels, 9, 9,
+    getPerspectiveTransform(dst, dst), 9, 9)), Array.from(pixels), 'identity preserves every pixel');
+  const line = [0, 1, 2, 3].map(x => ({ x, y: x }));
+  for (const invalid of [line, Array(4).fill(dst[0]), [dst[0], dst[0], dst[2], dst[3]],
+    [{ x: NaN, y: 0 }, ...dst.slice(1)], dst.slice(1)]) {
+    assert.strictEqual(getPerspectiveTransform(invalid, dst), null, 'invalid source is rejected');
+    assert.strictEqual(getPerspectiveTransform(dst, invalid), null, 'invalid destination is rejected');
+  }
+  console.log('clientcrop.test.js: deterministic ordering, perspective and pixel geometry passed');
+}
+
 async function main() {
+  await geometry();
+  if (!process.argv.includes('--models')) return;
   const files = frames();
   if (!fs.existsSync(path.join(MODEL_DIR, 'cornelius.onnx')) || !cvScan.isBuilt('mtg') || !files.length) {
     console.log('clientcrop.test.js: no models/catalog/frames present — skipped');

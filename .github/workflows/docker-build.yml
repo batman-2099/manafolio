@@ -6,6 +6,8 @@ on:
     tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
+  release:
+    types: [published]
   # Lets a tag be rebuilt/re-tagged without moving the git tag (run this
   # workflow against a v* ref to republish its image tags).
   workflow_dispatch:
@@ -31,6 +33,9 @@ jobs:
         run: npm test
         working-directory: backend
 
+      - name: Release policy regressions
+        run: node backend/test/desktoprelease.test.cjs
+
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend
@@ -43,6 +48,11 @@ jobs:
       - name: Frontend tests and locales
         run: npm test
         working-directory: frontend
+
+      - name: Frontend browser regressions
+        run: |
+          npm ci --prefix desktop/electron
+          xvfb-run -a npm run test:browser --prefix frontend
 
   # One leg per architecture, each on a runner of that architecture. QEMU
   # emulation was the alternative and it is far slower here: the image compiles
@@ -141,6 +151,8 @@ jobs:
     needs: build
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    outputs:
+      stable: ${{ steps.stable.outputs.eligible }}
     permissions:
       contents: read
       packages: write
@@ -172,15 +184,9 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.image.outputs.name }}
-          # `latest` follows the newest RELEASE, not main. The README tells
-          # self-hosters to run :latest, and main can contain unreleased work —
-          # gating it on refs/heads/main silently handed them untagged code.
-          # It also meant `latest` and the version numbers were applied by two
-          # separate runs (main push, then tag push), so they landed on two
-          # different digests and never appeared together in the registry.
-          # Main now publishes `edge` for anyone who wants to track it.
+          flavor: latest=false
+          # latest is promoted separately, after checking the current stable release.
           tags: |
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -195,3 +201,50 @@ jobs:
 
       - name: Inspect published manifest
         run: docker buildx imagetools inspect ${{ steps.image.outputs.name }}:${{ steps.meta.outputs.version }}
+
+      - name: Check stable release eligibility
+        id: stable
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RELEASE=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest") || {
+            echo "::warning::Could not resolve the current stable release; latest is unchanged."
+            exit 0
+          }
+          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] &&
+             jq -e --arg tag "$GITHUB_REF_NAME" '.tag_name == $tag and .draft == false and .prerelease == false' <<< "$RELEASE" >/dev/null; then
+            echo "eligible=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  latest:
+    needs: merge
+    if: needs.merge.outputs.stable == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: docker-latest-promotion
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Promote current stable release to latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Recheck after acquiring the lock: a newer release may now be current.
+          RELEASE=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest")
+          if jq -e --arg tag "$GITHUB_REF_NAME" '.tag_name == $tag and .draft == false and .prerelease == false' <<< "$RELEASE" >/dev/null; then
+            IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
+            docker buildx imagetools create -t "$IMAGE:latest" "$IMAGE:${GITHUB_REF_NAME#v}"
+          else
+            echo "Not the current stable release; latest is unchanged."
+          fi

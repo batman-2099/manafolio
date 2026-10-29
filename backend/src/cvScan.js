@@ -139,10 +139,17 @@ function loadModels() {
   if (!models) {
     const cornPath = path.join(MODEL_DIR, 'cornelius.onnx');
     const isFastWeb = fs.existsSync(cornPath) && fs.statSync(cornPath).size < 4000000;
-    models = Promise.all([
+    models = Promise.allSettled([
       ort.InferenceSession.create(cornPath, SESSION_OPTS),
       ort.InferenceSession.create(path.join(MODEL_DIR, 'milo.onnx'), SESSION_OPTS),
-    ]).then(([corn, milo]) => {
+    ]).then(async (results) => {
+      const failure = results.find(result => result.status === 'rejected');
+      if (failure) {
+        await Promise.allSettled(results.filter(result => result.status === 'fulfilled')
+          .map(result => Promise.resolve().then(() => result.value.release())));
+        throw failure.reason;
+      }
+      const [corn, milo] = results.map(result => result.value);
       corn.isFastWeb = isFastWeb;
       return { corn, milo };
     }).catch((err) => { models = null; throw err; });
@@ -239,30 +246,6 @@ function warpRgb(src, sw, sh, M, size) {
   return out;
 }
 
-// Solve for the 8 homography coefficients mapping src quad -> dst quad.
-function perspectiveTransform(src, dst) {
-  const A = [], b = [];
-  for (let i = 0; i < 4; i++) {
-    A.push([src[i].x, src[i].y, 1, 0, 0, 0, -src[i].x * dst[i].x, -src[i].y * dst[i].x]); b.push(dst[i].x);
-    A.push([0, 0, 0, src[i].x, src[i].y, 1, -src[i].x * dst[i].y, -src[i].y * dst[i].y]); b.push(dst[i].y);
-  }
-  for (let col = 0; col < 8; col++) {
-    let piv = col;
-    for (let r = col + 1; r < 8; r++) if (Math.abs(A[r][col]) > Math.abs(A[piv][col])) piv = r;
-    [A[col], A[piv]] = [A[piv], A[col]];
-    [b[col], b[piv]] = [b[piv], b[col]];
-    const p = A[col][col];
-    if (!p) return null;
-    for (let r = 0; r < 8; r++) {
-      if (r === col) continue;
-      const factor = A[r][col] / p;
-      for (let k = col; k < 8; k++) A[r][k] -= factor * A[col][k];
-      b[r] -= factor * b[col];
-    }
-  }
-  return A.map((row, r) => b[r] / row[r]);
-}
-
 // Detect the card and return a dewarped EMBED_SIZE square of raw RGB.
 // An already-rectified crop from the browser. Resized rather than trusted to
 // be exact: JPEG round-trips and older clients can hand over something a few
@@ -299,13 +282,13 @@ async function detectAndDewarp(session, imageBuffer) {
   for (let k = 0; k < 4; k++) {
     pts.push({ x: corners[k * 2] * info.width, y: corners[k * 2 + 1] * info.height });
   }
-  const { orderQuad } = await import('../../shared/imgproc.mjs');
+  const { orderQuad, getPerspectiveTransform } = await import('../../shared/imgproc.mjs');
   const src = orderQuad(pts);
   const dst = [
     { x: 0, y: 0 }, { x: EMBED_SIZE - 1, y: 0 },
     { x: EMBED_SIZE - 1, y: EMBED_SIZE - 1 }, { x: 0, y: EMBED_SIZE - 1 },
   ];
-  const M = perspectiveTransform(src, dst);
+  const M = getPerspectiveTransform(src, dst);
   if (!M) {
     const { data } = await sharp(imageBuffer).resize(EMBED_SIZE, EMBED_SIZE, { fit: 'fill' })
       .removeAlpha().raw().toBuffer({ resolveWithObject: true });

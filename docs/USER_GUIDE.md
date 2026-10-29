@@ -110,6 +110,7 @@ On narrow screens, use **More** for navigation items that are not shown in the b
 
 ### What the numbers mean
 
+- Unique cards counts distinct printing IDs within the selected inventory; duplicate copies is the remaining quantity beyond one copy of each printing. Splitting copies into separate stored entries or combining their quantities does not change these metrics.
 - Collection growth uses current quantities of retained owned records, grouped by original addition month over the last 12 UTC calendar months. Editing or deleting old entries can change earlier months; this is not a permanent transaction ledger.
 - Deck performance uses manually saved wins and losses, games, and win rate, scoped to inventory. No recorded games means no win rate; fewer than ten games is a small sample. Match dates, opponents, and matchups are not a match-history feature.
 - Ownership-versus-deck comparisons count saved deck slots. A card used in multiple deck definitions appears in each, so deck-slot totals can exceed available physical copies.
@@ -240,6 +241,8 @@ The collection import adds owned copies; do not assume ManaBox binder/list names
 Quantities must be whole numbers from 1 to 2,147,483,647. Missing quantities default to one; malformed, fractional, zero, or negative values are reported as errors rather than silently changed.
 
 **Import activity** reports lookups, provider rate-limit waits, preparation, and saving. Collection, deck, precon, and container imports resolve printings through the local Scryfall bulk catalog first, with API fallback for unresolved cards.
+
+Collection-file imports and complete-account restores share a limit of 20 requests per hour per client IP. A rate-limited request is rejected before saving; wait for the indicated retry period. Previewing a file does not consume this import allowance.
 
 **Important import warning:** lookup/preparation is not the same as saving. While an Add Cards file import is committing, app navigation, mode changes, and sign-out are blocked so its activity log and completion summary remain available. The browser warns before unloading, but forcing it closed or losing the connection still disconnects the log without rolling back the server import. There are no automatic import retries. After a lost connection, inspect the destination before submitting the same file again; repeating a successful import can add unwanted copies.
 
@@ -1262,7 +1265,7 @@ If you do not see **Admin**, ask the person who operates your server. Do not cha
 4. Give ordinary users the Member role. Administrator access includes sensitive instance operations; grant it only to trusted people.
 5. In **Manage Planeswalkers**, use **Reset Password** when necessary. This signs out every Manafolio session for the selected account, including your current session if you reset your own account here. The account must sign in again; other accounts and read-only API keys are unaffected. Verify the selected account before changing its role or deleting it.
 
-Account deletion is destructive. Back up required data first and read the confirmation. **Replace collection data with test cards…** is also destructive: it deletes the current user's existing entries across Physical, Arena, Wishlist, and Graveyard for the seed sets before inserting randomized entries. These sets are normally Limited Edition Alpha (`lea`) and Modern Horizons 3 (`mh3`); if remote data is unavailable, cached cards can be used and entries for those cached sets deleted instead. Download a backup first. Do not use this action on a real collection merely to test whether the server works.
+Account deletion is destructive. Back up required data first and read the confirmation. Production administration no longer offers an action that replaces collection data with randomized test cards; use a separate disposable installation for sample data.
 
 Deletion also stops the account's local ChatGPT/Codex work and removes its credential directory. It does not contact OpenAI, revoke provider authorization, or erase backups. If credential cleanup fails, the account remains and an error is shown; correct the filesystem problem and retry deletion.
 

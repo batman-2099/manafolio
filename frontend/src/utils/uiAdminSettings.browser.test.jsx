@@ -6,7 +6,7 @@ import { I18nProvider } from './i18n';
 import en from '../locales/en.json';
 
 // Isolated Vite page only: await (await import('/src/utils/uiAdminSettings.browser.test.jsx')).runUiAdminSettingsRegressions()
-// Fetch is fully intercepted; failures exercise retry without downloading files or seeding a server.
+// Fetch is fully intercepted; failures exercise retry without downloading files or contacting a server.
 export async function runUiAdminSettingsRegressions() {
   const assert = (value, message) => { if (!value) throw new Error(message); };
   const saved = { fetch: window.fetch, confirm: window.confirm, act: globalThis.IS_REACT_ACT_ENVIRONMENT,
@@ -34,7 +34,7 @@ export async function runUiAdminSettingsRegressions() {
     window.confirm = () => true;
     window.fetch = async (url, options = {}) => {
       url = String(url);
-      if (url === '/api/locations' || url.startsWith('/api/export?') || url === '/api/admin/seed-cards' || url.endsWith('/download') || (url === '/api/admin/users/901' && options.method)) return defer(url);
+      if (url === '/api/locations' || url.startsWith('/api/export?') || url.endsWith('/download') || (url === '/api/admin/users/901' && options.method)) return defer(url);
       if (url === '/api/admin/users') return response([{ ...user, created_at: '2025-01-01', total_cards: 0 }]);
       if (url === '/api/admin/backups') return response({ backups: [{ file: 'fixture.db', size: 12, created_at: '2025-01-01' }] });
       if (url === '/api/settings') return response({ public_base_url: 'https://fixture.invalid' });
@@ -77,14 +77,7 @@ export async function runUiAdminSettingsRegressions() {
     assert(host.querySelector('#settings-access-key').type === 'text', 'key reveal still works');
 
     await render(<AdminPanel user={{ ...user, role: 'admin' }} showToast={showToast} onUpdateUser={() => {}} />);
-    let confirmation = '';
-    window.confirm = text => { confirmation = text; return true; };
-    const seed = button('admin.generateTestCards');
-    await click(seed, seed);
-    assert(counts.get('/api/admin/seed-cards') === 1 && seed.disabled, 'seed is synchronously locked');
-    assert(confirmation.includes('lea') && confirmation.includes('mh3') && /backup/i.test(confirmation) && /delet/i.test(confirmation), 'seed confirmation discloses replacement scope and backup');
-    await settle('/api/admin/seed-cards');
-    assert(!seed.disabled, 'seed failure releases pending state');
+    assert(![...host.querySelectorAll('button')].some(node => /test cards|replace collection/i.test(node.textContent)), 'production admin has no destructive seed action');
     const role = button('admin.toggleRole');
     const remove = button('admin.deleteAccount');
     await click(role, remove);
@@ -102,7 +95,7 @@ export async function runUiAdminSettingsRegressions() {
     await click(download);
     assert(counts.get('/api/admin/backups/fixture.db/download') === 2, 'backup download supports retry');
     await settle('/api/admin/backups/fixture.db/download');
-    return { passed: ['clipboard unavailable/denied and version manual selection', 'container loading/error/retry/empty preserves sharing', 'export pending/duplicate/failure/retry', '44px key reveal', 'seed truthful confirmation/pending/failure', 'per-user conflicting actions/failure/retry', 'admin backup pending/failure/retry'] };
+    return { passed: ['clipboard unavailable/denied and version manual selection', 'container loading/error/retry/empty preserves sharing', 'export pending/duplicate/failure/retry', '44px key reveal', 'no production seed action', 'per-user conflicting actions/failure/retry', 'admin backup pending/failure/retry'] };
   } finally {
     await act(async () => root.unmount());
     host.remove();

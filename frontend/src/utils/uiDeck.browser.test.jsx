@@ -216,8 +216,8 @@ export async function runUiDeckRegressions() {
       Object.defineProperty(fileInput, 'files', { configurable: true, value: [new File(['2 Fixture card'], 'fixture.txt', { type: 'text/plain' })] });
       fileInput.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    for (let frames = 0; frames < 60 && ![...host.querySelectorAll('textarea')].some(el => el.value === '2 Fixture card'); frames++) {
-      await act(async () => new Promise(requestAnimationFrame));
+    for (let attempts = 0; attempts < 60 && ![...host.querySelectorAll('textarea')].some(el => el.value === '2 Fixture card'); attempts++) {
+      await act(async () => new Promise(resolve => setTimeout(resolve, 16)));
     }
     assert([...host.querySelectorAll('textarea')].some(el => el.value === '2 Fixture card'), 'ManaBox file contents still populate import text');
     await cancelDialog();

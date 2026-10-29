@@ -15,12 +15,9 @@ export default function PriceHistoryChart({
   // The card's own currency. Stored prices are never converted, so the axis and the
   // tooltip have to read in whatever marketplace quoted them (see utils/formatPrice).
   currency,
-  height = 150,
-  defaultRange = '30d',
-  titlePrefix,
 }) {
   const { t, locale } = useT();
-  const [range, setRange] = useState(defaultRange);
+  const [range, setRange] = useState('30d');
   const [historyState, setHistoryState] = useState(null);
   const [refresh, setRefresh] = useState(0);
   const scope = JSON.stringify([cardId, range, currency]);
@@ -78,7 +75,7 @@ export default function PriceHistoryChart({
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px', gap: '0.5rem' }}>
         <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          {titlePrefix ?? t('priceHistory.title')} ({rangeName})
+          {t('priceHistory.title')} ({rangeName})
         </span>
         {pctChange !== null && (
           <span style={{ fontSize: '0.7rem', fontWeight: 800, color: trendColor }}>
@@ -139,7 +136,7 @@ export default function PriceHistoryChart({
         </div>
       )}
 
-      <div style={{ width: '100%', height: `${height}px` }} aria-busy={loading}>
+      <div style={{ width: '100%', height: '100px' }} aria-busy={loading}>
         {!result ? null : insufficientHistory ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
             {t('priceHistory.insufficient')}

@@ -117,6 +117,57 @@ async function main() {
   assert.strictEqual((await db.get('SELECT compartment_id FROM collection WHERE id = ?', [misplaced])).compartment_id, null);
   assert.strictEqual((await db.get('SELECT compartment_id FROM collection WHERE id = ?', [first])).compartment_id, null);
   assert.strictEqual((await request('DELETE', `/compartments/${b.compartments[1]}`)).status, 400);
+
+  const rulesLocation = await location(user, 'Rules');
+  const rejected = [];
+  for (let i = 0; i < 2; i++) rejected.push(await entry('a', 1, rulesLocation.compartments[0], rulesLocation.id));
+  const accepted = await entry('b', 1, rulesLocation.compartments[0], rulesLocation.id);
+  const beforeRules = await db.all('SELECT * FROM compartments ORDER BY id');
+  const beforeEviction = await db.all('SELECT * FROM collection ORDER BY id');
+  const updateRules = () => request('PATCH', `/compartments/${rulesLocation.compartments[0]}?updateAll=true`, {
+    capacity: 42, label: 'Only B', locked: true,
+    rule_config: { rules: [{ action: 'include', field: 'name', operator: 'equals', value: 'Card B' }] }
+  });
+  await db.run(`CREATE TRIGGER reject_eviction BEFORE UPDATE OF compartment_id ON collection
+    WHEN OLD.id = ${rejected[1]} BEGIN SELECT RAISE(ABORT, 'injected eviction failure'); END`);
+  assert.strictEqual((await updateRules()).status, 500);
+  assert.deepStrictEqual(await db.all('SELECT * FROM compartments ORDER BY id'), beforeRules,
+    'failed eviction rolls back rules, label, lock and all sibling capacities');
+  assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), beforeEviction,
+    'failed eviction rolls back earlier card moves');
+  await db.run('DROP TRIGGER reject_eviction');
+  const updatedRules = await updateRules();
+  assert.strictEqual(updatedRules.status, 200);
+  assert.strictEqual(updatedRules.body.evicted, 2);
+  for (const id of rejected) {
+    assert.deepStrictEqual(await db.get('SELECT location_id, compartment_id, position FROM collection WHERE id = ?', [id]),
+      { location_id: null, compartment_id: null, position: 0 });
+  }
+  assert.strictEqual((await db.get('SELECT compartment_id FROM collection WHERE id = ?', [accepted])).compartment_id, rulesLocation.compartments[0]);
+  assert.deepStrictEqual(
+    await db.all('SELECT * FROM collection WHERE id NOT IN (?, ?) ORDER BY id', rejected),
+    beforeEviction.filter(row => !rejected.includes(row.id)),
+    'successful eviction preserves matching entries and other containers/accounts'
+  );
+
+  const beforeDelete = await db.all('SELECT * FROM collection ORDER BY id');
+  const locationsBeforeDelete = await db.all('SELECT * FROM locations ORDER BY id');
+  const compartmentsBeforeDelete = await db.all('SELECT * FROM compartments ORDER BY id');
+  await db.run(`CREATE TRIGGER reject_location_delete BEFORE DELETE ON locations
+    WHEN OLD.id = ${rulesLocation.id} BEGIN SELECT RAISE(ABORT, 'injected location deletion failure'); END`);
+  assert.strictEqual((await request('DELETE', `/locations/${rulesLocation.id}`)).status, 500);
+  assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), beforeDelete,
+    'failed container deletion preserves original card placements');
+  assert.deepStrictEqual(await db.all('SELECT * FROM locations ORDER BY id'), locationsBeforeDelete);
+  assert.deepStrictEqual(await db.all('SELECT * FROM compartments ORDER BY id'), compartmentsBeforeDelete);
+  await db.run('DROP TRIGGER reject_location_delete');
+  assert.strictEqual((await request('DELETE', `/locations/${foreign.id}`)).status, 404);
+  assert.strictEqual((await request('DELETE', `/locations/${rulesLocation.id}`)).status, 200);
+  assert.strictEqual(await db.get('SELECT id FROM locations WHERE id = ?', [rulesLocation.id]), undefined);
+  assert.deepStrictEqual(await db.get('SELECT location_id, compartment_id, position FROM collection WHERE id = ?', [accepted]),
+    { location_id: null, compartment_id: null, position: 0 });
+  assert.deepStrictEqual(await db.all('SELECT * FROM collection WHERE id != ? ORDER BY id', [accepted]),
+    beforeDelete.filter(row => row.id !== accepted), 'deleting a container must preserve all other entries');
   console.log('inventorymutations.test.js passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {

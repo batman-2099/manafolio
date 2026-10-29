@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { importLimiter } = require('../middleware/auth');
 const { parseThirdPartyCSV, parseManaboxText } = require('../utils/csvMappers');
 const scryfallApi = require('../scryfallApi');
 const { generateExportCSV } = require('../utils/csvExporters');
@@ -272,13 +273,15 @@ async function restoreCompleteBackup(backup, userId) {
           id, name, supertype, subtypes, types, rarity, set_id, set_name, number, image_url,
           price_trend, price_normal, price_holofoil, price_avg1, price_avg7,
           price_avg30, price_currency, price_source, cmc, color_identity, game,
-          language, printed_name, tcgplayer_product_id, last_updated, image_url_back, name_back
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          language, printed_name, tcgplayer_product_id, last_updated, image_url_back, name_back,
+          tcgplayer_url, cardmarket_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         card.id, card.name, card.supertype, card.subtypes, card.types, card.rarity, card.set_id, card.set_name, card.number, card.image_url,
         card.price_trend, card.price_normal, card.price_holofoil, card.price_avg1, card.price_avg7,
         card.price_avg30, card.price_currency, card.price_source, card.cmc, card.color_identity, card.game,
-        card.language, card.printed_name, card.tcgplayer_product_id, card.last_updated, card.image_url_back ?? null, card.name_back ?? null
+        card.language, card.printed_name, card.tcgplayer_product_id, card.last_updated, card.image_url_back ?? null, card.name_back ?? null,
+        card.tcgplayer_url ?? null, card.cardmarket_url ?? null
       ]);
     }
 
@@ -536,7 +539,7 @@ router.post('/import/preview', (req, res) => {
   }
 });
 // Import endpoint
-router.post('/import', async (req, res) => {
+router.post('/import', importLimiter, async (req, res) => {
   const { format = 'internal', data, list_type = 'collection', mapping } = req.body;
   if (req.body.game !== undefined && req.body.game !== 'mtg') {
     return res.status(400).json({ error: 'Unsupported game' });

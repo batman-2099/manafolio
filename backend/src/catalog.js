@@ -359,12 +359,18 @@ async function embedPhase(job) {
       inflight.delete(settled.row.id);
       if (settled.err) failed++;
       else {
+        if (!session) {
+          try {
+            session = await ort.InferenceSession.create(path.join(MODEL_DIR, 'milo.onnx'), {
+              intraOpNumThreads: 1, interOpNumThreads: 1, executionMode: 'sequential',
+            });
+          } catch (cause) {
+            throw new Error(`Could not initialize milo.onnx: ${cause.message}; check the installed scan model and retry; catalog unchanged`, { cause });
+          }
+        }
         try {
           const { data } = await sharp(settled.buf).resize(SIZE, SIZE, { fit: 'fill' })
             .removeAlpha().raw().toBuffer({ resolveWithObject: true });
-          session ||= await ort.InferenceSession.create(path.join(MODEL_DIR, 'milo.onnx'), {
-            intraOpNumThreads: 1, interOpNumThreads: 1, executionMode: 'sequential',
-          });
           const out = await session.run({ image: cvScan.toTensor(data, SIZE) });
           vecs.push(out.embedding.data);
           ids.push(settled.row.id);

@@ -96,8 +96,7 @@ const searchLimiter = rateLimit({
   message: { error: 'Too many searches. Please slow down and try again shortly.' }
 });
 
-// Import is heavy (up to 5000 rows, many serial writes each) and rare in normal
-// use, so it gets a tight ceiling.
+// Bulk imports perform many serial writes and are rare in normal use.
 const importLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 20,

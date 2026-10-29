@@ -10,9 +10,7 @@
 // to check dispatch and missing-printing behavior without network requests.
 const assert = require('assert');
 
-process.env.DB_PATH = require('path').join(
-  require('os').tmpdir(), `manafolio-addcardlang-${process.pid}.db`
-);
+process.env.DB_PATH = ':memory:';
 
 (async () => {
   const cardApi = require('../src/utils/cardApi');
@@ -71,6 +69,44 @@ process.env.DB_PATH = require('path').join(
     assert.ok(mtg, `${l.name}: a Magic printing should resolve`);
     assert.strictEqual(mtg.language, l.name, `${l.name}: row tagged with the language asked for`);
     assert.ok(mtg.id.endsWith(`-${l.scryfall}`), `${l.name}: asked Scryfall for ${l.scryfall}`);
+  }
+
+  const providerGet = scryfall.client.get;
+  const outage = Object.assign(new Error('Fixture provider outage'), { response: { status: 503 } });
+  scryfall.client.get = async () => { throw outage; };
+  await assert.rejects(cardApi.printingInLanguage({ ...english, number: '2' }, 'Japanese'),
+    error => error === outage, 'provider outages are not missing printings');
+  scryfall.client.get = providerGet;
+  await db.run(`CREATE TEMP TRIGGER reject_localized_cache BEFORE INSERT ON card_cache
+    WHEN NEW.id = 'mtg-neo-2-ja' BEGIN SELECT RAISE(ABORT, 'Fixture cache failure'); END`);
+  await assert.rejects(cardApi.printingInLanguage({ ...english, number: '2' }, 'Japanese'),
+    /Fixture cache failure/, 'persistence failures cannot silently retain the original printing');
+  await db.run('DROP TRIGGER reject_localized_cache');
+
+  const { lastID: userId } = await db.run(
+    "INSERT INTO users (username, password_hash, share_token) VALUES ('language-fixture', 'unused', 'language-fixture')");
+  await db.run(`INSERT INTO card_cache (id, name, game, set_id, number, language)
+    VALUES ('mtg-original', 'Original printing', 'mtg', 'neo', '2', 'English')`);
+  const express = require('express');
+  const app = express();
+  app.use(express.json());
+  app.use((req, res, next) => { req.user = { id: userId }; next(); });
+  app.use('/api', require('../src/routes/collection'));
+  const server = await new Promise(resolve => {
+    const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
+  });
+  try {
+    scryfall.client.get = async () => { throw outage; };
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/collection`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ card_id: 'mtg-original', language: 'Japanese', quantity: 1 })
+    });
+    assert.strictEqual(response.status, 500);
+    assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM collection')).count, 0,
+      'failed localization must not add a copy under the original identity');
+  } finally {
+    scryfall.client.get = providerGet;
+    await new Promise(resolve => server.close(resolve));
   }
 
   console.log('addcardlang.test.js: all assertions passed');

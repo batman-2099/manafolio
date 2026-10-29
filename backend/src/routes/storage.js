@@ -651,15 +651,15 @@ router.put('/locations/:id', async (req, res) => {
 router.delete('/locations/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const loc = await db.get(`SELECT id FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
-    if (!loc) {
-      return res.status(404).json({ error: 'Location not found' });
-    }
-
-    await db.run(`UPDATE collection SET location_id = NULL, compartment_id = NULL, position = 0 WHERE location_id = ? AND user_id = ?`, [id, req.user.id]);
-
-    await db.run(`DELETE FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
-    res.json({ message: 'Location deleted successfully (any stored cards moved to Unsorted)' });
+    const result = await db.withTransaction(async () => {
+      const loc = await db.get(`SELECT id FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
+      if (!loc) return { status: 404, error: 'Location not found' };
+      await db.run(`UPDATE collection SET location_id = NULL, compartment_id = NULL, position = 0 WHERE location_id = ? AND user_id = ?`, [id, req.user.id]);
+      await db.run(`DELETE FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
+      return { message: 'Location deleted successfully (any stored cards moved to Unsorted)' };
+    });
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    res.json(result);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to delete location' });
@@ -808,37 +808,40 @@ router.patch('/compartments/:id', async (req, res) => {
   const updateAll = req.query.updateAll === 'true';
   const { label, capacity, rule_config, locked } = req.body;
   try {
-    const comp = await getOwnedCompartment(id, req.user.id);
-    if (!comp) return res.status(404).json({ error: 'Compartment not found' });
+    const result = await db.withTransaction(async () => {
+      const comp = await getOwnedCompartment(id, req.user.id);
+      if (!comp) return { status: 404, error: 'Compartment not found' };
 
-    let ruleConfigJson;
-    if (rule_config !== undefined) {
-      try { ruleConfigJson = normalizeRuleConfig(rule_config); }
-      catch { return res.status(400).json({ error: 'rule_config must be valid JSON' }); }
-    }
+      let ruleConfigJson;
+      if (rule_config !== undefined) {
+        try { ruleConfigJson = normalizeRuleConfig(rule_config); }
+        catch { return { status: 400, error: 'rule_config must be valid JSON' }; }
+      }
+      await updateCompartment(comp, { label, capacity, rule_config: ruleConfigJson, locked }, updateAll);
 
-    await updateCompartment(comp, { label, capacity, rule_config: ruleConfigJson, locked }, updateAll);
-
-    // Evict cards this row/page no longer accepts after a rule change.
-    let evicted = 0;
-    if (rule_config !== undefined) {
-      const cfg = ruleConfigJson ? JSON.parse(ruleConfigJson) : null;
-      const compForCheck = { ruleConfig: cfg };
-      const stored = await db.all(`
-        SELECT c.id AS entry_id, c.card_id, c.reverse_card_id, c.printing, c.language,
-               cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.subtypes, cc.rarity, cc.supertype, cc.game,
-               cc.price_trend, cc.cmc, cc.color_identity
-        FROM collection c JOIN card_cache cc ON c.card_id = cc.id
-        WHERE c.compartment_id = ? AND c.user_id = ? AND COALESCE(c.list_type, 'collection') = ?`, [id, req.user.id, comp.inventory_type]);
-      for (const entry of stored) {
-        try { entry.types = JSON.parse(entry.types || '[]'); } catch { entry.types = []; }
-        if (!compartmentAcceptsCard(compForCheck, entry)) {
-          await db.run(`UPDATE collection SET location_id = NULL, compartment_id = NULL, position = 0 WHERE id = ? AND user_id = ?`, [entry.entry_id, req.user.id]);
-          evicted++;
+      // Evict cards this row/page no longer accepts after a rule change.
+      let evicted = 0;
+      if (rule_config !== undefined) {
+        const cfg = ruleConfigJson ? JSON.parse(ruleConfigJson) : null;
+        const compForCheck = { ruleConfig: cfg };
+        const stored = await db.all(`
+          SELECT c.id AS entry_id, c.card_id, c.reverse_card_id, c.printing, c.language,
+                 cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.subtypes, cc.rarity, cc.supertype, cc.game,
+                 cc.price_trend, cc.cmc, cc.color_identity
+          FROM collection c JOIN card_cache cc ON c.card_id = cc.id
+          WHERE c.compartment_id = ? AND c.user_id = ? AND COALESCE(c.list_type, 'collection') = ?`, [id, req.user.id, comp.inventory_type]);
+        for (const entry of stored) {
+          try { entry.types = JSON.parse(entry.types || '[]'); } catch { entry.types = []; }
+          if (!compartmentAcceptsCard(compForCheck, entry)) {
+            await db.run(`UPDATE collection SET location_id = NULL, compartment_id = NULL, position = 0 WHERE id = ? AND user_id = ?`, [entry.entry_id, req.user.id]);
+            evicted++;
+          }
         }
       }
-    }
-    res.json({ message: 'Compartment updated', evicted });
+      return { message: 'Compartment updated', evicted };
+    });
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    res.json(result);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update compartment' });

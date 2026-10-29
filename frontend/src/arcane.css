@@ -117,17 +117,17 @@
   outline-offset: 3px;
 }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) button:disabled { opacity: 0.5; cursor: not-allowed; }
-:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) :is(.kebab-dropdown, .dropdown-menu, .quick-add-drawer) {
+:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) :is(.kebab-dropdown, .quick-add-drawer) {
   background: var(--bg-secondary);
   border-color: var(--border-glass-hover);
   box-shadow: 0 8px 24px rgba(var(--arcane-shadow-rgb, 1, 7, 20), 0.4);
 }
-:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) :is(.kebab-item, .dropdown-item) {
+:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .kebab-item {
   font-family: var(--font-main);
   text-transform: none;
   color: var(--text-primary);
 }
-:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) :is(.kebab-item:hover, .dropdown-item:hover) { background: var(--surface-2); }
+:root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .kebab-item:hover { background: var(--surface-2); }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .tcg-card { border-radius: 6px; }
 :root:is([data-theme="dark"], [data-theme="mana-white"], [data-theme="mana-blue"], [data-theme="mana-black"], [data-theme="mana-red"], [data-theme="mana-green"], [data-theme="mana-colorless"]) .collection-table-wrapper {
   border: 1px solid var(--border-glass);

@@ -39,7 +39,7 @@ async function testImportRoute() {
   const previewHandler = importRouter.stack.find(layer => layer.route?.path === '/import/preview').route.stack[0].handle;
   const originalBulkFetch = scryfallApi.bulkFetchByIdentifier;
   const originalCacheCards = scryfallApi.cacheCards;
-  const importHandler = importRouter.stack.find(layer => layer.route?.path === '/import').route.stack[0].handle;
+  const importHandler = importRouter.stack.find(layer => layer.route?.path === '/import').route.stack.at(-1).handle;
   const handler = (req, res) => importHandler({ ...req, accepts: () => 'application/json' }, res);
 
   try {

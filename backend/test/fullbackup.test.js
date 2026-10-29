@@ -10,13 +10,13 @@ process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 const db = require('../src/db');
 const importExportRouter = require('../src/routes/importExport');
 const exportBackup = importExportRouter.stack.find(layer => layer.route?.path === '/export' && layer.route.methods.get).route.stack[0].handle;
-const importHandler = importExportRouter.stack.find(layer => layer.route?.path === '/import' && layer.route.methods.post).route.stack[0].handle;
+const importHandler = importExportRouter.stack.find(layer => layer.route?.path === '/import' && layer.route.methods.post).route.stack.at(-1).handle;
 const importBackup = (req, res) => importHandler({ ...req, accepts: () => 'application/json' }, res);
 
 async function testFullBackup() {
   try {
     await db.initDb();
-    await db.run(`INSERT INTO card_cache (id, name, game) VALUES ('backup-card', 'Backup Card', 'mtg')`);
+    await db.run(`INSERT INTO card_cache (id, name, game, tcgplayer_url, cardmarket_url) VALUES ('backup-card', 'Backup Card', 'mtg', 'https://www.tcgplayer.com/product/123', 'https://www.cardmarket.com/en/Magic/Products/Singles/Test/Card')`);
     const location = await db.run(`INSERT INTO locations (name, type, user_id, sleeved) VALUES ('Backup Box', 'Box', 1, 3)`);
     const compartment = await db.run(`INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 100)`, [location.lastID]);
     await db.run(`INSERT INTO compartment_assignments (compartment_id, filter_value) VALUES (?, 'mtg')`, [compartment.lastID]);
@@ -51,6 +51,11 @@ async function testFullBackup() {
     assert.deepStrictEqual(res.body.decks.map(deck => deck.notes), ['Private plans\nKeep all whitespace  ', '']);
     assert.deepStrictEqual(res.body.deck_cards.map(card => [card.card_id, card.quantity, card.checked_out]), [['backup-card', 2, 1]]);
     assert.deepStrictEqual(res.body.card_cache.map(card => card.id), ['backup-card']);
+    // Restore without the source cache row so INSERT OR IGNORE cannot mask lost fields.
+    await db.run("DELETE FROM collection WHERE card_id = 'backup-card'");
+    await db.run('DELETE FROM decks WHERE id = ?', [deck.lastID]);
+    await db.run("DELETE FROM card_cache WHERE id = 'backup-card'");
+    assert.strictEqual(await db.get("SELECT id FROM card_cache WHERE id = 'backup-card'"), undefined);
 
     await db.run(`INSERT INTO card_cache (id, name, game) VALUES ('discard-card', 'Discard Card', 'mtg')`);
     const discardedLocation = await db.run(`INSERT INTO locations (name, type, user_id) VALUES ('Discard Box', 'Box', 1)`);
@@ -69,6 +74,10 @@ async function testFullBackup() {
     assert.strictEqual(restoreRes.body.cards, 1);
     assert.strictEqual(restoreRes.body.locations, res.body.locations.length);
     assert.strictEqual(restoreRes.body.decks, 2);
+    assert.deepStrictEqual(await db.get("SELECT tcgplayer_url, cardmarket_url FROM card_cache WHERE id = 'backup-card'"), {
+      tcgplayer_url: res.body.card_cache[0].tcgplayer_url,
+      cardmarket_url: res.body.card_cache[0].cardmarket_url
+    }, 'fresh-cache restore preserves marketplace links');
     assert.deepStrictEqual(await db.all(`SELECT card_id, position FROM collection WHERE user_id = 1 ORDER BY id`), [{ card_id: 'backup-card', position: 1000 }]);
     assert.strictEqual((await db.get(`SELECT COUNT(*) AS count FROM locations WHERE user_id = 1 AND name = 'Discard Box'`)).count, 0);
     assert.strictEqual((await db.get("SELECT sleeved FROM locations WHERE user_id = 1 AND name = 'Backup Box'")).sleeved, 3);

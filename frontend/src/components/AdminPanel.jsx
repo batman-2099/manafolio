@@ -66,8 +66,6 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupsStatus, setBackupsStatus] = useState('loading');
   const backupsRequestRef = useRef(0);
-  const seedBusyRef = useRef(false);
-  const [seedBusy, setSeedBusy] = useState(false);
   const userBusyRef = useRef(new Set());
   const [pendingUsers, setPendingUsers] = useState(new Set());
   const downloadBusyRef = useRef(false);
@@ -101,31 +99,6 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
 
 
 
-
-  const handleSeedDatabase = async () => {
-    if (seedBusyRef.current) return;
-    if (!window.confirm(t('admin.confirmSeed'))) {
-      return;
-    }
-    seedBusyRef.current = true;
-    setSeedBusy(true);
-    try {
-      const res = await fetch('/api/admin/seed-cards', { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        showToast(data.message, 'success');
-        fetchUsers(); // Refresh stats
-      } else {
-        showToast(t('admin.errSeed'), 'error');
-      }
-    } catch (err) {
-      console.error(err);
-      showToast(t('admin.errSeedGeneric'), 'error');
-    } finally {
-      seedBusyRef.current = false;
-      setSeedBusy(false);
-    }
-  };
 
   const fetchBackups = async () => {
     const request = ++backupsRequestRef.current;
@@ -422,17 +395,6 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
             {t('admin.runSetupWizard')}
           </button>
 
-          <button 
-            type="button" 
-            className="btn btn-secondary btn-sm" 
-            onClick={handleSeedDatabase}
-            disabled={seedBusy}
-            style={{ padding: '0.5rem 1rem', height: '34px', fontSize: '0.8rem', border: '1px solid var(--border-glass)' }}
-          >
-            {t('admin.generateTestCards')}
-          </button>
-          {seedBusy && <span role="status">{t('admin.seeding')}</span>}
-          
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.02)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', height: '34px' }}>
             <Users size={16} style={{ color: 'var(--accent-red)' }} />
             <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{t('admin.totalUsers', { count: users.length })}</span>

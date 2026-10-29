@@ -459,8 +459,11 @@ export function minAreaRect(hull) {
 }
 
 // Perspective transform from 4 source points to 4 destination points, returned
-// as the 8 coefficients of the 3x3 homography (h22 fixed at 1).
+// as the 8 coefficients of the 3x3 homography (h22 fixed at 1), or null if singular.
 export function getPerspectiveTransform(src, dst) {
+  if (src?.length !== 4 || dst?.length !== 4
+      || !src.every(p => Number.isFinite(p?.x) && Number.isFinite(p?.y))
+      || !dst.every(p => Number.isFinite(p?.x) && Number.isFinite(p?.y))) return null;
   // Solve A x = b for the 8 unknowns, by Gaussian elimination.
   const A = [], b = [];
   for (let i = 0; i < 4; i++) {
@@ -474,7 +477,8 @@ export function getPerspectiveTransform(src, dst) {
     for (let r = col + 1; r < 8; r++) if (Math.abs(A[r][col]) > Math.abs(A[piv][col])) piv = r;
     [A[col], A[piv]] = [A[piv], A[col]];
     [b[col], b[piv]] = [b[piv], b[col]];
-    const d = A[col][col] || 1e-12;
+    const d = A[col][col];
+    if (!Number.isFinite(d) || Math.abs(d) < 1e-12) return null;
     for (let r = 0; r < 8; r++) {
       if (r === col) continue;
       const f = A[r][col] / d;
@@ -482,7 +486,11 @@ export function getPerspectiveTransform(src, dst) {
       b[r] -= f * b[col];
     }
   }
-  return A.map((row, i) => b[i] / (row[i] || 1e-12));
+  const coeffs = A.map((row, i) => b[i] / row[i]);
+  if (!coeffs.every(Number.isFinite)) return null;
+  const [a, bb, c, d, e, f, g, i] = coeffs;
+  const det = a * (e - f * i) - bb * (d - f * g) + c * (d * i - e * g);
+  return Number.isFinite(det) && Math.abs(det) >= 1e-12 ? coeffs : null;
 }
 
 // Warp RGBA pixels through a homography into a dstW x dstH RGBA buffer, with

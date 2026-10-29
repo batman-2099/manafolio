@@ -109,6 +109,8 @@ async function main() {
       assert.strictEqual(response.summary.physicalCards, physical ? 21 : 0);
       assert.strictEqual(response.summary.digitalCards, arena ? 7 : 0);
       assert.strictEqual(response.summary.totalCards, (physical ? 21 : 0) + (arena ? 7 : 0));
+      assert.strictEqual(response.summary.uniqueCards, (physical ? 4 : 0) + (arena ? 1 : 0));
+      assert.strictEqual(response.summary.duplicateCopies, response.summary.totalCards - response.summary.uniqueCards);
       assert.strictEqual(response.summary.unsortedCount, physical ? 21 : 0);
       assert.strictEqual(response.summary.totalValue, (physical ? 77 : 0) + (arena ? 49 : 0));
       assert.deepStrictEqual(response.summary.currencies, physical ? ['EUR', 'USD'] : ['USD']);
@@ -198,10 +200,26 @@ async function main() {
     assert.deepStrictEqual(emptyArchive.analytics, blank);
     assert.strictEqual(emptyArchive.summary.totalCards, 0);
     assert.strictEqual(emptyArchive.summary.archivedCards, 0);
+    assert.strictEqual(emptyArchive.summary.uniqueCards, 0);
+    assert.strictEqual(emptyArchive.summary.duplicateCopies, 0);
     assert.deepStrictEqual(emptyArchive.topValuable, []);
     assert.deepStrictEqual(emptyArchive.recentAdditions, []);
     assert.deepStrictEqual(emptyArchive.setProgress, []);
     assert.deepStrictEqual((await stats(empty, 'graveyard', '/stats/history')).map(point => point.value), [0, 0, 0, 0, 0, 0, 0]);
+
+    await db.run("INSERT INTO collection (user_id, card_id, quantity, list_type) VALUES (?, 'multi', 4, 'collection')", [empty]);
+    const stacked = (await stats(empty, 'collection')).summary;
+    await db.run("DELETE FROM collection WHERE user_id = ? AND list_type = 'collection'", [empty]);
+    for (let i = 0; i < 4; i++) {
+      await db.run("INSERT INTO collection (user_id, card_id, quantity, list_type) VALUES (?, 'multi', 1, 'collection')", [empty]);
+    }
+    const split = (await stats(empty, 'collection')).summary;
+    assert.deepStrictEqual(
+      [split.totalCards, split.uniqueCards, split.duplicateCopies],
+      [stacked.totalCards, stacked.uniqueCards, stacked.duplicateCopies],
+      'splitting identical printings into separate rows must not change copy counts'
+    );
+    assert.deepStrictEqual([split.totalCards, split.uniqueCards, split.duplicateCopies], [4, 1, 3]);
   } finally {
     Date.now = realNow;
     await new Promise(resolve => db.dbConnection.close(resolve));

@@ -29,8 +29,14 @@ jobs:
         run: npm ci --prefix backend && npm ci --prefix frontend
       - name: Test backend
         run: npm test --prefix backend
+      - name: Release policy regressions
+        run: node backend/test/desktoprelease.test.cjs
       - name: Check frontend
         run: npm run lint --prefix frontend && npm test --prefix frontend
+      - name: Frontend browser regressions
+        run: |
+          npm ci --prefix desktop/electron
+          xvfb-run -a npm run test:browser --prefix frontend
 
   server:
     needs: verify
@@ -199,7 +205,7 @@ jobs:
       # original layout server.js expects.
       - name: Package
         run: |
-          NAME="Manafolio-Server-${{ matrix.target }}"
+          NAME="Manafolio-${{ matrix.target }}"
           if [ "${{ matrix.archive }}" = "zip" ]; then
             ( cd build/manafolio-server && 7z a "$GITHUB_WORKSPACE/$NAME.zip" ./* >/dev/null )
             echo "ASSET=$NAME.zip" >> "$GITHUB_ENV"
@@ -234,12 +240,12 @@ jobs:
           EOF
           curl -fL https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage -o build/appimagetool
           chmod +x build/appimagetool
-          ARCH=x86_64 build/appimagetool --appimage-extract-and-run "$APPDIR" build/Manafolio-Server-linux-x64.AppImage
+          ARCH=x86_64 build/appimagetool --appimage-extract-and-run "$APPDIR" build/Manafolio-linux-x64.AppImage
 
       - name: Smoke test Linux AppImage
         if: runner.os == 'Linux'
         run: |
-          xvfb-run -a node backend/scripts/smoke-linux.js ./build/Manafolio-Server-linux-x64.AppImage ./build/linux-desktop-smoke
+          xvfb-run -a node backend/scripts/smoke-linux.js ./build/Manafolio-linux-x64.AppImage ./build/linux-desktop-smoke
 
       - uses: actions/upload-artifact@v4
         if: always() && runner.os == 'Linux'
@@ -251,13 +257,13 @@ jobs:
         if: runner.os == 'Linux'
         with:
           name: manafolio-server-linux-x64-appimage
-          path: build/Manafolio-Server-linux-x64.AppImage
+          path: build/Manafolio-linux-x64.AppImage
 
       - name: Attach AppImage to release
         if: github.ref_type == 'tag' && runner.os == 'Linux'
         uses: softprops/action-gh-release@v2
         with:
-          files: build/Manafolio-Server-linux-x64.AppImage
+          files: build/Manafolio-linux-x64.AppImage
 
       - name: Build Windows desktop installer
         if: runner.os == 'Windows'
@@ -332,15 +338,15 @@ jobs:
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict "$APP"
           ln -s /Applications build/dmg/Applications
-          hdiutil create -volname Manafolio -srcfolder build/dmg -format UDZO build/Manafolio-Server-macos-arm64.dmg
+          hdiutil create -volname Manafolio -srcfolder build/dmg -format UDZO build/Manafolio-macos-arm64.dmg
 
       - name: Smoke test mounted macOS DMG
         if: runner.os == 'macOS'
         run: |
           mkdir -p build/dmg-mounted
-          hdiutil attach build/Manafolio-Server-macos-arm64.dmg -readonly -nobrowse -mountpoint "$PWD/build/dmg-mounted"
+          hdiutil attach build/Manafolio-macos-arm64.dmg -readonly -nobrowse -mountpoint "$PWD/build/dmg-mounted"
           trap 'hdiutil detach "$PWD/build/dmg-mounted"' EXIT
-          node backend/scripts/smoke-package.js "$PWD/build/dmg-mounted/Manafolio.app/Contents/Resources/server/manafolio-server" --mac-app
+          node backend/scripts/smoke-package.js "$PWD/build/dmg-mounted/Manafolio.app/Contents/Resources/server/manafolio-server"
           cp -R build/dmg-mounted/Manafolio.app build/mac-wrapper-smoke.app
           swiftc -D SMOKE_TEST -target arm64-apple-macos14.4 backend/macos/Manafolio.swift -o build/mac-wrapper-smoke.app/Contents/MacOS/Manafolio
           codesign --force --deep --sign - build/mac-wrapper-smoke.app
@@ -358,13 +364,13 @@ jobs:
         if: runner.os == 'macOS'
         with:
           name: manafolio-server-macos-arm64-dmg
-          path: build/Manafolio-Server-macos-arm64.dmg
+          path: build/Manafolio-macos-arm64.dmg
 
       - name: Attach DMG to release
         if: github.ref_type == 'tag' && runner.os == 'macOS'
         uses: softprops/action-gh-release@v2
         with:
-          files: build/Manafolio-Server-macos-arm64.dmg
+          files: build/Manafolio-macos-arm64.dmg
 
       - uses: actions/upload-artifact@v4
         with:

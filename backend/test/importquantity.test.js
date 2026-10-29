@@ -8,7 +8,7 @@ process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 const db = require('../src/db');
 const scryfall = require('../src/scryfallApi');
 const router = require('../src/routes/importExport');
-const handler = route => router.stack.find(layer => layer.route?.path === route && layer.route.methods.post).route.stack[0].handle;
+const handler = route => router.stack.find(layer => layer.route?.path === route && layer.route.methods.post).route.stack.at(-1).handle;
 async function request(body, route = '/import') {
   const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
   await handler(route)({ body, user: { id: 1 }, accepts: () => 'application/json' }, res);

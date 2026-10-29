@@ -69,7 +69,7 @@ Follow the Node versions in Docker and CI when reproducing builds. Native depend
 
 ## Runtime data and secrets
 
-`.env.example` is the configuration reference. Preserve `DB_PATH`, TLS, CORS, `PUBLIC_BASE_URL`, `TRUST_PROXY`, bootstrap authentication, and supported credential semantics. Namespace changes require the documented offline migration; startup does not rename previous database files. Very old `sub_location_1` schemas take a destructive migration path: retain explicit operator warnings and offline-backup guidance.
+`.env.example` is the configuration reference. Preserve `DB_PATH`, TLS, CORS, `PUBLIC_BASE_URL`, `TRUST_PROXY`, bootstrap authentication, and supported credential semantics. Namespace changes require the documented offline migration; startup does not rename previous database files. Very old `sub_location_1` schemas must fail initialization without dropping tables: retain explicit migration-required errors and offline-backup guidance.
 
 Never commit real environment files, credentials, collection exports, SQLite/WAL files, build output, or downloaded models/catalogs. Screenshots and demos must use clearly identified sample data. Production must not inherit demo sessions or fixtures.
 
@@ -84,4 +84,4 @@ Scan assets are persistent downloads outside the image. A missing catalog must r
 - Frontend utility checks use `node:test` and `node:assert` alongside utilities. Do not add a testing framework.
 - Frontend lint treats warnings as failures. Locale changes must pass `npm run check:locales --prefix frontend`; preserve English key order, placeholders, and language-specific plural forms.
 - Exercise changed flows in the actual app as well as focused automated checks. For visual work, inspect desktop/mobile layouts and affected account themes.
-- CI gates backend checks, frontend lint, and locale validation. No coverage threshold or coverage tool is configured.
+- CI gates backend checks, frontend lint, locale validation, isolated Electron browser regressions, and Linux release-policy checks. Run `npm ci --prefix desktop/electron` before `npm run test:browser --prefix frontend`; headless Linux needs `xvfb-run -a`. No coverage threshold or coverage tool is configured.

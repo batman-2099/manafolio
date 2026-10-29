@@ -24,6 +24,8 @@ Windows packages include ONNX Runtime's required Microsoft Visual C++ DLLs besid
 
 Manafolio opens in its own sandboxed window and starts the bundled server without a console. Closing the window or choosing **Quit** asks for confirmation, then waits for active server requests and database writes before exiting. Finish imports and saves first. Setup and uninstall refuse to overwrite a running installed app/server; quit it and wait for shutdown before proceeding. Stop any older console-launched server too, since a port conflict is reported rather than connecting to another process.
 
+If shutdown is still waiting after 30 seconds, choose **Keep waiting** to allow active work to finish. **Force quit** is an explicit last resort and can lose in-flight work; there is no automatic forced termination.
+
 Persistent files live separately in `%LOCALAPPDATA%\Manafolio`: `manafolio.db`, backups, artwork, TLS material, and `models/`. Optional configuration goes in that directory's `.env`, using [`.env.example`](../.env.example) as a reference. Environment variables take precedence; `DB_PATH` and `CV_MODEL_DIR` override the defaults, and relative paths resolve from the data directory. The private Chromium profile lives in `desktop/`; server/startup diagnostics go to `desktop.log` (current launch, capped at 4 MiB). Startup errors offer **Show log**.
 
 The app uses native file dialogs, clipboard shortcuts, Back/Forward, reload, zoom, printing, and text prompts with Cancel/Escape. Camera access requires permission. External links open in your browser; sign-in redirects stay in the app session, although some identity providers reject embedded browsers. Browser sessions are not shared with Edge or Chrome.
@@ -34,16 +36,16 @@ The installer is **unsigned**; Windows SmartScreen may warn about an unknown pub
 
 ## Linux AppImage
 
-Tagged releases also build `Manafolio-Server-linux-x64.AppImage` for x86-64 Linux. Download it from [GitHub Releases](https://github.com/batman-2099/manafolio/releases), then run:
+Tagged releases also build `Manafolio-linux-x64.AppImage` for x86-64 Linux. Download it from [GitHub Releases](https://github.com/batman-2099/manafolio/releases), then run:
 
 ```bash
-chmod +x Manafolio-Server-linux-x64.AppImage
-./Manafolio-Server-linux-x64.AppImage
+chmod +x Manafolio-linux-x64.AppImage
+./Manafolio-linux-x64.AppImage
 ```
 
-The image opens Manafolio in its own desktop window and runs its bundled server in the background. No Terminal or browser is needed after launch. Closing the window or choosing **Quit** asks for confirmation, then stops the server; finish imports and saves first. Stop the previous browser-based AppImage server before launching this version. Node, Electron, Chromium, and application dependencies are included; the existing server-only `.tar.gz` remains available.
+The image opens Manafolio in its own desktop window and runs its bundled server in the background. No Terminal or browser is needed after launch. Closing the window or choosing **Quit** asks for confirmation, then drains active server requests and database writes. After 30 seconds, **Keep waiting** remains the safe default; **Force quit** requires explicit consent and can lose in-flight work. Finish imports and saves first. Stop the previous browser-based AppImage server before launching this version. Node, Electron, Chromium, and application dependencies are included; the existing server-only `.tar.gz` remains available.
 
-The x86-64 image targets Ubuntu 22.04 or newer compatible desktop distributions with GTK 3, NSS, ALSA, and GBM runtime libraries. Chromium's sandbox requires unprivileged user namespaces; run as a normal user and **do not use `--no-sandbox` or run as root**. If a distro's AppArmor policy blocks user namespaces, configure a narrowly scoped policy for the installed app rather than disabling sandbox protections globally. If FUSE is unavailable, use `./Manafolio-Server-linux-x64.AppImage --appimage-extract-and-run`. Wayland and X11 are supported; if your compositor has rendering problems, launch with `--ozone-platform=x11` on an X11/XWayland session.
+The x86-64 image targets Ubuntu 22.04 or newer compatible desktop distributions with GTK 3, NSS, ALSA, and GBM runtime libraries. Chromium's sandbox requires unprivileged user namespaces; run as a normal user and **do not use `--no-sandbox` or run as root**. If a distro's AppArmor policy blocks user namespaces, configure a narrowly scoped policy for the installed app rather than disabling sandbox protections globally. If FUSE is unavailable, use `./Manafolio-linux-x64.AppImage --appimage-extract-and-run`. Wayland and X11 are supported; if your compositor has rendering problems, launch with `--ozone-platform=x11` on an X11/XWayland session.
 
 By default, persistent files live in `~/.local/share/manafolio/` (`$XDG_DATA_HOME/manafolio/` when set): `manafolio.db`, backups, artwork, TLS material, and `models/` for scan models/catalogs. Optional configuration goes in that directory's `.env`; use [`.env.example`](../.env.example) as a reference. Environment variables take precedence over `.env`; `DB_PATH` and `CV_MODEL_DIR` can override the defaults. Relative configuration paths resolve from this data directory. The private Chromium profile lives in `desktop/`; sign in again when switching from the old browser UI. Current-launch server diagnostics go to `desktop.log` (capped at 4 MiB), and startup errors offer **Show log**.
 
@@ -55,15 +57,15 @@ The server retains its normal network behavior, including LAN access. Protect ac
 
 ## macOS DMG
 
-Tagged releases also build `Manafolio-Server-macos-arm64.dmg` for **Apple Silicon Macs running macOS 14.4 or later**. Download it from [GitHub Releases](https://github.com/batman-2099/manafolio/releases), open the disk image, drag **Manafolio.app** into **Applications**, and eject the image. The existing macOS `.tar.gz` server archive remains available.
+Tagged releases also build `Manafolio-macos-arm64.dmg` for **Apple Silicon Macs running macOS 14.4 or later**. Download it from [GitHub Releases](https://github.com/batman-2099/manafolio/releases), open the disk image, drag **Manafolio.app** into **Applications**, and eject the image. The existing macOS `.tar.gz` server archive remains available.
 
-Open **Manafolio** from Applications. The app starts its bundled server in the background and displays Manafolio inside a native WebKit window; no Terminal or browser is required. Closing the window or pressing **Command+Q** asks for confirmation, then stops the server. Finish saves/imports before quitting. Stop an older Terminal-launched server before opening the new app; a port conflict is reported instead of silently connecting to another process.
+Open **Manafolio** from Applications. The app starts its bundled server in the background and displays Manafolio inside a native WebKit window; no Terminal or browser is required. Closing the window or pressing **Command+Q** asks for confirmation, then drains active server requests and database writes. After 30 seconds, choose **Keep waiting** unless you explicitly accept the risk of losing in-flight work with **Force quit**. Finish saves/imports before quitting. Stop an older Terminal-launched server before opening the new app; a port conflict is reported instead of silently connecting to another process.
 
 File imports and exports use macOS Open/Save dialogs. The Edit menu supports clipboard shortcuts; View offers Back, Forward, Reload, zoom, and Print. Camera access requires permission. External links open in your default browser; HTTP(S) sign-in redirects remain in the app's web session, although identity providers may disallow embedded browsers. The app has its own persistent WebKit session, separate from Safari/Chrome; sign in again after switching from the old browser launcher.
 
 The bundle is ad-hoc signed, **not Developer ID signed or notarized**. Gatekeeper may block a downloaded copy. Only if you trust the release, use macOS **System Settings → Privacy & Security → Open Anyway** after the first launch attempt. Do not disable Gatekeeper globally. Intel Macs are not supported by this artifact.
 
-Persistent files live in `~/Library/Application Support/Manafolio/`: `manafolio.db`, backups, artwork, TLS material, and `models/` for downloaded scan assets. Put optional configuration in that directory's `.env`, using [`.env.example`](../.env.example) as a reference. Environment variables take precedence; `DB_PATH` and `CV_MODEL_DIR` override the defaults. Relative configuration paths resolve from this data directory. Startup/server output goes to `desktop.log` there, replaced on each launch; startup failures offer **Show log**.
+Persistent files live in `~/Library/Application Support/Manafolio/`: `manafolio.db`, backups, artwork, TLS material, and `models/` for downloaded scan assets. Put optional configuration in that directory's `.env`, using [`.env.example`](../.env.example) as a reference. Environment variables take precedence; `DB_PATH` and `CV_MODEL_DIR` override the defaults. Relative configuration paths resolve from this data directory. Startup/server output goes to `desktop.log` there, replaced on each launch and capped at 4 MiB; startup failures offer **Show log**.
 
 Before updating, stop the server and back up the entire data directory, then replace the app in Applications. Existing archive/Docker data is **not imported automatically**; follow the [offline migration procedure](#migrate-an-existing-installation). The normal LAN access and first-owner setup rules still apply: protect access until setup is complete and use HTTPS for remote access. The DMG does not bundle native Tesseract or scan models/catalogs; packaging does not remove the existing [scanning prerequisites](#card-scanning).
 
@@ -77,7 +79,7 @@ Manafolio uses its own database, deployment, browser, and backup names. Startup 
 4. Update `.env`, service definitions, external scripts, and mounts. Docker uses `/app/database/manafolio.db`; source defaults to `backend/database/manafolio.db`. Copy the stopped persistent volume's complete contents into the new `manafolio-data` volume, preserving ownership, permissions, backups, TLS material, models, catalogs, and account credentials. Compose project names affect actual volume names: inspect the resolved mount rather than assuming it.
 5. Rebuild and restart. Verify accounts, collection quantities, storage, decks, and backups before retiring the old deployment. If a populated installation shows owner creation, stop and correct the mount or `DB_PATH`; do not initialize a replacement collection.
 
-Very old databases containing the `sub_location_1` schema take a destructive legacy migration path that drops collection and location tables. Preserve a verified offline copy and review [`backend/src/db.js`](../backend/src/db.js) before starting Manafolio against such a database.
+Very old databases containing `collection.sub_location_1` are rejected at startup without dropping collection or location tables. Preserve a verified offline copy and arrange an explicit migration to the compartment schema before retrying. Earlier versions could destructively reset these tables; do not downgrade and launch against the original database as a workaround.
 
 Browser keys use `manafolio_*`: sign in again and reselect browser-only preferences; old keys are not migrated. Older compatible JSON exports need the explicit [backup format conversion](USER_GUIDE.md#restore-a-backup-into-the-signed-in-account) before restore.
 
@@ -133,7 +135,7 @@ The app supplies its own S256 PKCE challenge and random state to `/api/auth/nati
 
    From source, run `node scripts/fetch-models.mjs` in `backend/`.
 2. Build the relevant language catalog under **Admin → Catalogs**. Downloading data and fingerprinting artwork can take hours. Stopped or failed builds keep the working catalog and cached card data; uncommitted embeddings are discarded. The next build reuses unchanged vectors from the last successful publication.
-3. Source installations need Tesseract at `/usr/bin/tesseract`, the path used by the scanner, with `eng` trained data (`/usr/bin/tesseract --list-langs`). On Debian/Ubuntu, install `tesseract-ocr tesseract-ocr-eng`. Source-built Docker images include both.
+3. Linux source installations need Tesseract at `/usr/bin/tesseract` with `eng` trained data (`/usr/bin/tesseract --list-langs`). On Debian/Ubuntu, install `tesseract-ocr tesseract-ocr-eng`. Source-built Docker images include both. On macOS, install Tesseract through Homebrew (`brew install tesseract`) and verify `eng` with `/opt/homebrew/bin/tesseract --list-langs`. The app checks `/opt/homebrew/bin/tesseract`, then `/usr/local/bin/tesseract`, directly so Finder does not need your shell's PATH. The DMG does not include Tesseract or its language data.
 
 Phones require HTTPS. See [the image-identification pipeline](../PROJECT.md#image-identification-pipeline) for details and limitations, and [Scan physical cards with a camera](USER_GUIDE.md#scan-physical-cards-with-a-camera) for capture, verification, Scan review, and accuracy warnings.
 

@@ -9,6 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const assert = require('assert');
 const express = require('express');
+const { spawnServer, waitForServer, stopServer } = require('./e2e/server-helper');
 
 const tmpDb = path.join(os.tmpdir(), `manafolio-bootstrap-test-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
@@ -27,9 +28,32 @@ function cleanup() {
   for (const suffix of ['', '-wal', '-shm']) {
     try { fs.unlinkSync(tmpDb + suffix); } catch { /* not present */ }
   }
+  fs.rmSync(`${tmpDb}.models`, { recursive: true, force: true });
 }
 
 async function main() {
+  await db.run('CREATE TABLE locations (id INTEGER PRIMARY KEY, name TEXT)');
+  await db.run('CREATE TABLE collection (id INTEGER PRIMARY KEY, location_id INTEGER REFERENCES locations(id), sub_location_1 TEXT)');
+  await db.run("INSERT INTO locations VALUES (7, 'Legacy binder')");
+  await db.run("INSERT INTO collection VALUES (11, 7, 'Page 3')");
+  const legacySchema = await db.all('SELECT * FROM sqlite_master ORDER BY name');
+  await assert.rejects(db.initDb(), /Unsupported legacy storage migration.*preserved/);
+  const legacyServer = spawnServer([path.join(__dirname, '../src/server.js')], {
+    env: { DB_PATH: tmpDb, CV_MODEL_DIR: `${tmpDb}.models`, DEFAULT_ADMIN_PASSWORD: '' }
+  });
+  try {
+    await assert.rejects(waitForServer(legacyServer), /exited before readiness \(1\):[\s\S]*Unsupported legacy storage migration/);
+    await legacyServer.closed;
+    assert.strictEqual(legacyServer.exitCode, 1, 'unsupported databases must stop the real server, not just log an initialization failure');
+  } finally {
+    await stopServer(legacyServer);
+  }
+  assert.deepStrictEqual(await db.all('SELECT * FROM sqlite_master ORDER BY name'), legacySchema, 'unsupported initialization must leave the schema intact');
+  assert.deepStrictEqual(await db.all('SELECT * FROM locations'), [{ id: 7, name: 'Legacy binder' }]);
+  assert.deepStrictEqual(await db.all('SELECT * FROM collection'), [{ id: 11, location_id: 7, sub_location_1: 'Page 3' }]);
+  assert.strictEqual((await db.get('PRAGMA foreign_keys')).foreign_keys, 1);
+  await db.run('DROP TABLE collection');
+  await db.run('DROP TABLE locations');
   await db.initDb();
   const app = express();
   app.use(express.json());

@@ -7,6 +7,7 @@ final class Manafolio: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
     private var server: Process?
     private var output: Pipe?
     private var log: FileHandle?
+    private var logBytes = 0
     private var pendingOutput = ""
     private var origin: URL?
     private var stopping = false
@@ -65,6 +66,12 @@ final class Manafolio: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
             // Keep only the current launch's diagnostics, not an unbounded log archive.
             _ = FileManager.default.createFile(atPath: logURL.path, contents: nil, attributes: [.posixPermissions: 0o600])
             log = try FileHandle(forWritingTo: logURL)
+            #if SMOKE_TEST
+            receive(Data(repeating: 120, count: 4 * 1024 * 1024))
+            receive(Data("\nlog limit reached\n".utf8))
+            let logSize = try log?.offset()
+            guard logSize == 4 * 1024 * 1024 else { fail("Desktop log exceeded its 4 MiB limit"); return }
+            #endif
             let child = Process()
             child.executableURL = Bundle.main.resourceURL!.appendingPathComponent("server/manafolio-server")
             child.currentDirectoryURL = dataDirectory
@@ -81,10 +88,20 @@ final class Manafolio: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
                 guard !data.isEmpty else { handle.readabilityHandler = nil; return }
                 DispatchQueue.main.async { self?.receive(data) }
             }
-            child.terminationHandler = { [weak self] _ in
+            child.terminationHandler = { [weak self] child in
                 DispatchQueue.main.async {
                     guard let self = self else { return }
-                    if !self.stopping { self.fail("The local server stopped. Check desktop.log for details, then quit and reopen Manafolio.") }
+                    if self.stopping {
+                        if child.terminationStatus != 0 && !self.failed {
+                            let alert = NSAlert()
+                            alert.messageText = "Manafolio could not stop cleanly"
+                            alert.informativeText = "Check desktop.log before reopening Manafolio."
+                            alert.runModal()
+                        }
+                        NSApp.reply(toApplicationShouldTerminate: true)
+                    } else {
+                        self.fail("The local server stopped. Check desktop.log for details, then quit and reopen Manafolio.")
+                    }
                 }
             }
             server = child
@@ -98,7 +115,14 @@ final class Manafolio: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
     }
 
     private func receive(_ data: Data) {
-        try? log?.write(contentsOf: data)
+        let remaining = 4 * 1024 * 1024 - logBytes
+        if remaining > 0 {
+            let bytes = data.prefix(remaining)
+            do {
+                try log?.write(contentsOf: bytes)
+                logBytes += bytes.count
+            } catch { /* A full disk must not stop pipe draining or readiness parsing. */ }
+        }
         pendingOutput += String(decoding: data, as: UTF8.self)
         while let newline = pendingOutput.firstIndex(of: "\n") {
             let line = String(pendingOutput[..<newline])
@@ -167,11 +191,26 @@ final class Manafolio: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavi
         stopping = true
         guard let server = server, server.isRunning else { return .terminateNow }
         server.terminate()
-        DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
-            if server.isRunning { kill(server.processIdentifier, SIGKILL) }
+        waitForShutdown()
+        return .terminateLater
+    }
+
+    private func waitForShutdown() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+            guard let self = self, let server = self.server, server.isRunning else { return }
+            let alert = NSAlert()
+            alert.messageText = "Manafolio is still saving"
+            alert.informativeText = "The local server has not stopped after 30 seconds. Wait to let active requests and database writes finish. Force quit may lose data or interrupt a save. Check desktop.log for diagnostics."
+            alert.addButton(withTitle: "Keep waiting")
+            alert.addButton(withTitle: "Force quit")
+            alert.beginSheetModal(for: self.window) { response in
+                guard server.isRunning else { return }
+                if response == .alertSecondButtonReturn {
+                    self.failed = true
+                    if kill(server.processIdentifier, SIGKILL) != 0 { self.waitForShutdown() }
+                } else { self.waitForShutdown() }
+            }
         }
-        server.waitUntilExit()
-        return .terminateNow
     }
 
     private func isLocal(_ url: URL?) -> Bool {

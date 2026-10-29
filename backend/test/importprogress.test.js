@@ -13,6 +13,7 @@ const db = require('../src/db');
 const scryfall = require('../src/scryfallApi');
 const scryfallBulk = require('../src/scryfallBulk');
 const router = require('../src/routes/importExport');
+const { importLimiter } = require('../src/middleware/auth');
 
 async function run() {
   const originalGet = scryfall.client.get;
@@ -99,6 +100,24 @@ async function run() {
       { card_id: `mtg-${raw.id}`, user_id: 1, list_type: 'arena' }
     ]);
     assert.equal((await db.get('SELECT SUM(quantity) AS copies FROM collection')).copies, 10);
+    importLimiter.resetKey('127.0.0.1');
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const response = await request({});
+      assert.equal(response.status, 400);
+      await response.json();
+    }
+    const limited = await request({ format: 'json', data: [{ card_id: `mtg-${raw.id}`, quantity: 1 }] });
+    assert.equal(limited.status, 429);
+    assert.match(limited.headers.get('content-type'), /application\/json/);
+    assert(limited.headers.has('retry-after'));
+    assert.deepEqual(await limited.json(), { error: 'Too many imports. Please wait before importing again.' });
+    assert.equal((await db.get('SELECT SUM(quantity) AS copies FROM collection')).copies, 10, 'rate limiting rejects before streaming or saving');
+    const preview = await fetch(`${url}/preview`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ format: 'manabox', data: '1 Forest (FDN) 280' })
+    });
+    assert.equal(preview.status, 200, 'previews do not consume the import allowance');
+    await preview.json();
     console.log('Streaming CSV/TXT local hits, API fallback, rate limits, persistence, and failure checks passed');
   } finally {
     scryfall.client.get = originalGet;

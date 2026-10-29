@@ -808,8 +808,9 @@ async function getPrintingInLang(setCode, number, lang) {
     if (languages.toCode(norm.language) !== languages.toCode(code)) return null;
     await cacheCards([norm]);
     return norm;
-  } catch {
-    return null;   // 404 (no such printing in that language) or a transient error
+  } catch (error) {
+    if (error.response?.status === 404) return null;
+    throw error;
   }
 }
 

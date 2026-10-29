@@ -98,6 +98,9 @@ async function fetchAsset(a, onProgress, { timeoutMs = 900000 } = {}) {
     await pipeline(res.body, async function* (chunks) {
       for await (const chunk of chunks) {
         got += chunk.length;
+        if (got > a.bytes) {
+          throw new Error(`${a.name} exceeded expected ${a.bytes} bytes — refusing to install it`);
+        }
         yield chunk;
         onProgress?.(got);
       }

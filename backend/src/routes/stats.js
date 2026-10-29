@@ -32,7 +32,7 @@ router.get('/stats', async (req, res) => {
     const rows = await db.all(query, statsParams);
 
     let totalCards = 0;
-    let uniqueCards = rows.length;
+    const uniqueCards = new Set(rows.map(row => row.card_id)).size;
     let totalValue = 0;
     let totalSpent = 0;
     let unsortedCount = 0;

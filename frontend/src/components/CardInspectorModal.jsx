@@ -953,7 +953,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
               )}
 
               {/* Price History Area Chart */}
-              <PriceHistoryChart cardId={activeCard.card_id || activeCard.id} currency={activeCard.price_currency} height={100} defaultRange="30d" />
+              <PriceHistoryChart cardId={activeCard.card_id || activeCard.id} currency={activeCard.price_currency} />
 
             </>
           )}

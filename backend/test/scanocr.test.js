@@ -1,6 +1,10 @@
 const assert = require('assert');
 const sharp = require('sharp');
 const { parsePrintingTsv, readCardText, parseNameTsv } = require('../src/utils/scanOcr');
+const fs = require('fs');
+const vm = require('vm');
+const { EventEmitter } = require('events');
+const { PassThrough, Writable } = require('stream');
 
 function tsv(lines) {
   return lines.map((line, index) => line.map((word, column) => {
@@ -9,7 +13,64 @@ function tsv(lines) {
   }).join('\n')).join('\n');
 }
 
+async function executableResolution() {
+  const source = fs.readFileSync(require.resolve('../src/utils/scanOcr'), 'utf8');
+  const image = await sharp({ create: { width: 128, height: 128, channels: 3, background: '#fff' } }).png().toBuffer();
+  for (const [platform, available, expected] of [
+    ['linux', ['/usr/bin/tesseract'], '/usr/bin/tesseract'],
+    ['darwin', ['/opt/homebrew/bin/tesseract', '/usr/local/bin/tesseract'], '/opt/homebrew/bin/tesseract'],
+    ['darwin', ['/usr/local/bin/tesseract'], '/usr/local/bin/tesseract'],
+    ['darwin', [], '/usr/bin/tesseract'],
+  ]) {
+    const calls = [];
+    const module = { exports: {} };
+    vm.runInNewContext(source, {
+      module, Buffer, console, setTimeout, clearTimeout,
+      process: { platform, env: { PATH: '/usr/bin:/bin', OMP_THREAD_LIMIT: '99' } },
+      require: name => {
+        if (name === 'fs') return {
+          constants: fs.constants,
+          accessSync: (file, mode) => {
+            assert.strictEqual(mode, fs.constants.X_OK);
+            if (!available.includes(file)) throw Object.assign(new Error('not executable'), { code: 'EACCES' });
+          },
+        };
+        if (name !== 'child_process') return require(name);
+        return { spawn: (file, args, options) => {
+          calls.push(file);
+          assert.strictEqual(file, expected, 'OCR resolves an absolute executable without a shell PATH');
+          assert.deepStrictEqual(Array.from(args), ['stdin', 'stdout', '-l', 'eng', '--psm', '6', 'tsv']);
+          assert.strictEqual(options.shell, undefined);
+          assert.strictEqual(options.env.OMP_THREAD_LIMIT, '1');
+          const child = new EventEmitter();
+          child.stdout = new PassThrough();
+          child.stderr = new PassThrough();
+          child.stdin = new Writable({ write: (_chunk, _encoding, done) => done() });
+          child.kill = () => {};
+          child.stdin.on('finish', () => {
+            if (!available.includes(file)) child.emit('error', Object.assign(new Error('missing OCR'), { code: 'ENOENT' }));
+            else child.stdout.end('fixture TSV');
+            child.stderr.end();
+            child.emit('close', available.includes(file) ? 0 : -2);
+          });
+          return child;
+        } };
+      },
+    });
+    const result = await module.exports.readCardText(image);
+    if (available.length) {
+      assert.strictEqual(result.tsv, 'fixture TSV');
+      assert.strictEqual(result.nameTsv, 'fixture TSV');
+      assert.strictEqual(calls.length, 2, 'both crops use the resolved executable');
+    } else {
+      assert.strictEqual(result.status, 'unavailable', 'missing native OCR remains explicit');
+      assert.strictEqual(calls.length, 1);
+    }
+  }
+}
+
 async function main() {
+  await executableResolution();
   const parse = (lines, setCodes = ['mkm', 'eld', 'msc', '2xm']) => parsePrintingTsv(tsv(lines), { setCodes });
   assert.deepStrictEqual(parse([['0012', 'R'], ['MKM', '•', 'EN']]), {
     status: 'read', setCode: 'mkm', number: '12', confidence: 0.95,

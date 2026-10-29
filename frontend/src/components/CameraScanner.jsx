@@ -1196,8 +1196,10 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
       if (src.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y))) return null;
       const N = RECTIFIED_SIZE - 1;
       const dst = [{ x: 0, y: 0 }, { x: N, y: 0 }, { x: N, y: N }, { x: 0, y: N }];
+      const transform = getPerspectiveTransform(src, dst);
+      if (!transform) return null;
       const rgba = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data;
-      const out = warpPerspective(rgba, w, h, getPerspectiveTransform(src, dst), RECTIFIED_SIZE, RECTIFIED_SIZE);
+      const out = warpPerspective(rgba, w, h, transform, RECTIFIED_SIZE, RECTIFIED_SIZE);
       const c = dewarpCanvas.current || (dewarpCanvas.current = document.createElement('canvas'));
       c.width = RECTIFIED_SIZE; c.height = RECTIFIED_SIZE;
       c.getContext('2d').putImageData(new ImageData(out, RECTIFIED_SIZE, RECTIFIED_SIZE), 0, 0);

@@ -329,6 +329,56 @@ async function testPendingBound() {
   }
 }
 
+async function testConcurrentLinks() {
+  process.env.OIDC_ENABLED = 'true';
+  for (const browser of [true, false]) {
+    const username = browser ? 'browser-race' : 'native-race';
+    const subjects = [`${username}-a`, `${username}-b`];
+    const account = await db.run('INSERT INTO users (username, password_hash, role, share_token) VALUES (?, ?, ?, ?)',
+      [username, 'oidc_locked:test', 'member', `${username}-share`]);
+    const attempts = [];
+    for (const sub of subjects) attempts.push(await begin({ browser, sub, username }));
+    const beforeSessions = (await db.get('SELECT COUNT(*) AS count FROM sessions')).count;
+    const originalGet = db.get;
+    let release;
+    const bothRead = new Promise(resolve => { release = resolve; });
+    const snapshots = [];
+    db.get = async (sql, params) => {
+      const row = await originalGet(sql, params);
+      if (sql === 'SELECT * FROM users WHERE username = ?' && params[0] === username) {
+        snapshots.push(row.oidc_sub);
+        if (snapshots.length === 2) release();
+        await bothRead;
+      }
+      return row;
+    };
+    let results;
+    try {
+      results = await Promise.all(attempts.map(attempt => callback(attempt)));
+    } finally {
+      db.get = originalGet;
+    }
+    assert.deepStrictEqual(snapshots, [null, null], 'both callbacks observed the account before either claimed it');
+    const urls = results.map(result => new URL(result.location, base));
+    const successKey = browser ? 'oidc_token' : 'code';
+    const winner = urls.findIndex(url => url.searchParams.has(successKey));
+    assert.notStrictEqual(winner, -1);
+    assert.strictEqual(urls.filter(url => url.searchParams.has(successKey)).length, 1, 'only one subject receives a credential');
+    const loser = urls[1 - winner];
+    assert.match(loser.searchParams.get(browser ? 'oidc_error' : 'error'), browser ? /already linked/ : /^identity_conflict$/);
+    assert.strictEqual(loser.origin, browser ? base : new URL(CALLBACK).origin);
+    assert.strictEqual((await db.get('SELECT oidc_sub FROM users WHERE id = ?', [account.lastID])).oidc_sub, subjects[winner]);
+    assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM sessions')).count, beforeSessions + (browser ? 1 : 0));
+    if (!browser) {
+      const exchanged = await request('/native/exchange', { method: 'POST', body: exchangeBody(urls[winner].searchParams.get('code')) });
+      assert.strictEqual(exchanged.status, 200);
+      const me = await request('/me', { token: exchanged.body.token });
+      assert.strictEqual(me.status, 200);
+      assert.strictEqual(me.body.user.id, account.lastID);
+    }
+  }
+}
+
 async function main() {
   testHandoffStore();
   await db.initDb();
@@ -336,6 +386,7 @@ async function main() {
   console.error = (...args) => logs.push(args.join(' '));
   console.warn = (...args) => logs.push(args.join(' '));
   await testRoutes();
+  await testConcurrentLinks();
   await testPendingBound();
   console.log('PASS: native PKCE handoff, replay/race/expiry/capacity protection, correlation, provisioning, browser regression and rate limits');
 }

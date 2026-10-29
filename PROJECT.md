@@ -144,9 +144,12 @@ Public routes are mounted deliberately **before** the single `app.use('/api', au
 - AI account/model/preferences and suggestion operations require a browser session. The read-only AI inventory endpoint remains accessible with an API key.
 - Local auth/bootstrap and optional OIDC live in `routes/auth.js`, `utils/oidc.js`, and `utils/nativeAuth.js`. Registration is closed unless `ALLOW_REGISTRATION=true`.
 - OIDC state is HMAC-signed, browser-bound with an HttpOnly SameSite=Lax cookie, and single-use. At most 1,000 pending attempts expire after ten minutes and are process-local; a backend restart requires a new login. HTTPS callbacks use Secure cookies.
+- Opt-in username linking claims an unlinked account atomically. Concurrent callbacks from different subjects cannot both link that account or receive sessions/native handoffs.
 - On an empty installation, `DEFAULT_ADMIN_PASSWORD` seeds `admin`; otherwise `/api/auth/bootstrap` creates that account through first-run setup. Protect access until setup is complete. Passwords must not be logged.
 
 `GET /api/health` is public, checks database readiness and a query, and returns `{"status":"ok"}` when healthy or HTTP 503 while unavailable. It is the Docker healthcheck target.
+
+Database initialization failure prevents API operations and exits nonzero. Signals and desktop IPC share HTTP/TLS request draining and a SQLite queue barrier before closing the database. Desktop shells offer **Keep waiting** or an explicitly destructive **Force quit** after 30 seconds, rather than silently killing active work.
 
 ### Native SSO contract
 
@@ -176,7 +179,7 @@ File names in this table are under `backend/src/routes/`. The table groups actua
 | --- | --- | --- |
 | `/api/auth` | `auth.js` | Config/bootstrap, registration/login/logout/me, OIDC, account settings/theme, API keys |
 | `/api/shared` | `shared.js` | Opt-in public collection/container views and independently shared deck definitions |
-| `/api/admin` | `admin.js` | Users, seed data, catalogs/build/stop/progress, model assets, backup management |
+| `/api/admin` | `admin.js` | Users, catalogs/build/stop/progress, model assets, backup management; production test-card seeding is not exposed |
 | `/api/card-art` | `cardArt.js` | Public art index/images; authenticated upload/delete |
 | `/api` | `collection.js` | Search, scan coverage/match, certification lookup, collection CRUD/bulk operations/placement/value, printing localization, related tokens, MTGJSON precons/import |
 | `/api` | `storage.js` | Locations/compartments, locks/rules/covers, inventory transfer, recommend/recommend-batch/apply-all/resort |
@@ -211,6 +214,10 @@ Current transactional workflows include complete deck editor saves, AI deck save
 
 Collection add/edit and storage create/settings/resort operations also keep their related writes in one transaction. Provider resolution happens before collection-add transactions. A multi-request frontend container-settings save can still partially succeed across requests: the dialog retains the draft and reloads current compartments before retrying. Deck deletion uses one owner-scoped `DELETE`; existing foreign-key cascades remove dependent records atomically.
 
+Container deletion and flat compartment PATCH updates/evictions are atomic. Nested compartment PUT retains its existing non-evicting behavior; do not change that external API policy implicitly. A rejected flat PATCH leaves settings and placements unchanged.
+
+`POST /api/import`, including complete-account restore, uses the existing 20-requests-per-hour client-IP limiter. Rejected requests receive JSON HTTP 429 with `Retry-After` before streaming or writes. Preview and container reassignment routes are separate. There is no implicit 5,000-row limit.
+
 Acquisition planning uses authenticated `POST /api/decks/acquisition-plan` and `/api/decks/acquisition-plan/wishlist`. Preview sums selected account-owned saved decks, then matching non-missing inventory once (Physical or Arena, never mixed). Exact matching uses card IDs; any-printing matching uses canonical cached Magic names. Reservations remain ownership, not checkout availability. The confirmation recomputes the plan inside `db.withTransaction`, checks its SHA-256 revision, and adds only deficits beyond existing Wishlist quantities. It creates ordinary Wishlist rows, no new table or durable plan state; Arena previews cannot write the physical Wishlist. Prices come only from cached nonfoil quotes, with unknowns and separate currency totals.
 
 Trade confirmation accepts a client-generated `trade_id`, exact giving entry IDs/quantities/snapshot fingerprints, and receiving printing IDs/finish/language/condition/quantities. Provider cache hydration happens before the transaction; cached receiving identity, giving snapshots, ownership, locks, missing state, and checkout allocations are revalidated inside it. Any reserved entry is excluded, including partially reserved quantity rows. Giving quantities decrease in place, zero rows are removed, and received raw quantities are inserted into Physical Unassigned Pile with a null purchase price. `completed_trades` stores only account-scoped ID, canonical-request SHA-256, given/received counts, and completion time, atomically with the inventory changes. Exact retry returns the original counts; reuse with another payload is a conflict. Account export includes receipts; restore validates/imports them and retains existing receipt tombstones even for older backups, so old requests cannot replay against remapped entry IDs. Account deletion cascades receipts. Review values are cached finish-specific quotes grouped by explicit USD/EUR, with missing/unsupported currency unknown and no conversion; quotes are not saved as purchase costs.
@@ -219,7 +226,7 @@ Trade confirmation accepts a client-generated `trade_id`, exact giving entry IDs
 
 Use [the offline migration procedure](docs/INSTALLATION.md#migrate-an-existing-installation) before changing an existing deployment. Preserve the entire stopped data directory, mount identity, ownership, and matching WAL/SHM sidecars; a WAL can contain committed data not yet in the main file. Never treat an unexpected setup screen as permission to initialize a replacement database.
 
-Startup does not rename previous database files; complete the offline procedure before restarting. **Very old schemas containing `collection.sub_location_1` trigger a destructive collection/location reset in `initDb`.** Back up and inspect such databases before starting this version; automatic initialization is not a lossless upgrade for that schema.
+Startup does not rename previous database files; complete the offline procedure before restarting. **Very old schemas containing `collection.sub_location_1` are rejected by `initDb` without dropping their tables.** Back up and arrange an explicit migration before restarting; the server does not offer an automatic lossless upgrade for that schema.
 
 Startup preserves quantity-bearing collection entries rather than expanding them into metadata-losing copies. Bulk purchase splitting weights shares by quantity, allocates entry totals in integer cents, and divides each share by its quantity. Fractional-cent per-copy costs preserve the rounded purchase total and existing entry/reservation identities.
 
@@ -339,7 +346,7 @@ Set scope filters rows before scoring, separately for each catalog. A catalog wi
 
 The response's `safety` object contains `autoAddSafe`, reason codes, footer `ocr` status, informational title `name` data, quality flags, and context. `readCardText` reads bounded title and footer crops; `parseNameTsv(tsv)` returns `read` with text and confidence for one confident title line, or `unreadable` while retaining uncertain text. Title OCR is never compared against artwork candidates or used to allow or block auto-add. Near ties/same-artwork printings remain ambiguous unless printing evidence narrows them. An exact cached footer match outside the visual shortlist can be shown manually but cannot acquire an invented visual score.
 
-`scanOcr.js` spawns **`/usr/bin/tesseract`**, without a shell, using `eng` data. The Docker runtime installs it there; a source installation must provide that path, not merely a differently located executable on PATH. Processing has bounded image/output sizes, a five-second timeout per subprocess, and at most two concurrent requests, each running its footer and title subprocesses sequentially. Missing footer OCR, footer execution errors, and conflicting footer readings block auto-add while preserving manual candidates. An `unreadable` footer result supplies no corroborating evidence but is **not by itself** an auto-add rejection; artwork, ambiguity, quality, and context checks still apply.
+`scanOcr.js` spawns Tesseract without a shell, using `eng` data. Linux uses **`/usr/bin/tesseract`**, which the Docker runtime installs. macOS checks executable Homebrew paths **`/opt/homebrew/bin/tesseract`**, then **`/usr/local/bin/tesseract`**, independently of Finder's PATH. Processing has bounded image/output sizes, a five-second timeout per subprocess, and at most two concurrent requests, each running its footer and title subprocesses sequentially. Missing footer OCR, footer execution errors, and conflicting footer readings block auto-add while preserving manual candidates. An `unreadable` footer result supplies no corroborating evidence but is **not by itself** an auto-add rejection; artwork, ambiguity, quality, and context checks still apply.
 
 These checks are heuristics, not guaranteed printing accuracy. The title crop targets standard upper-left names; long names, non-English scripts (the engine uses English data), alternate title positions, older footers, sleeves, glare, focus, and reprinted artwork may require manual review. No gate detects condition or finish.
 
@@ -438,33 +445,29 @@ The Vite frontend uses `https://localhost:5173`; the API uses `http://localhost:
 | `npm test --prefix backend` | Backend unit and e2e runners |
 | `npm run test:e2e --prefix backend` | Backend e2e only |
 | `npm test --prefix frontend` | Node frontend utility tests plus locale validation |
+| `npm run test:browser --prefix frontend` | Existing real-DOM browser suites in isolated Electron sessions; install `desktop/electron` dependencies first |
 | `npm run lint --prefix frontend` | ESLint, zero warnings |
 | `npm run check:locales --prefix frontend` | Translation key/placeholder checks |
 | `npm run build:frontend` | Production frontend build |
 | `npm start` | Backend serving API and an existing `frontend/dist` build |
 
-Test runners give each invocation its own temporary directory and database defaults, then delete only that directory. HTTP E2E servers bind OS-assigned ports, announce their own listener over IPC, and are awaited during shutdown; another process's health response cannot satisfy startup. Both Docker publication and server-binary builds depend on backend tests plus frontend lint, utility tests, and locale validation.
+Test runners give each invocation its own temporary directory and database defaults, then delete only that directory. HTTP E2E servers bind OS-assigned ports, announce their own listener over IPC, and are awaited during shutdown; another process's health response cannot satisfy startup. Docker publication and server-binary builds require backend tests, frontend lint, utility/locale checks, browser regressions, and the Linux-only release-policy check (`node backend/test/desktoprelease.test.cjs`).
 
 When changing a workflow, exercise the actual user path as well as relevant tests: inventory boundaries, ownership checks, rollback behavior, lost progress connections, deck draft saves, and physical placement are consumer-visible contracts. Scanner validation needs actual models/catalogs and camera conditions; AI verification needs the selected provider. Do not claim these optional integrations were exercised by an unrelated unit suite.
 
-The real-DOM mutation regression is intentionally separate from `npm test`. With Vite running, serve a temporary HTML page under `frontend/` containing the module script below (do not mount `App`), open it in a disposable browser profile, and inspect its console result. Vite supplies the React preamble. The regression mounts real components, uses synthetic data and intercepted requests, and cleans up its roots and globals. Delete the temporary page afterward.
+Run the real-DOM regressions without creating a temporary HTML page:
 
-```html
-<script type="module">
-  const { runFrontendMutationRegressions } =
-    await import('/src/utils/frontendMutations.browser.test.jsx');
-  console.log(await runFrontendMutationRegressions());
-</script>
+```sh
+npm ci --prefix desktop/electron
+npm run test:browser --prefix frontend
+# Linux without a graphical session:
+xvfb-run -a npm run test:browser --prefix frontend
 ```
 
-The same isolated page can run the UI audit regressions. Their fetch, media, clipboard, and history fixtures do not use the server or a real collection. They are separate from `npm test`; scanner fixtures are not a substitute for physical-camera checks.
+The runner starts its own Vite server, discovers `*.browser.test.jsx`, and executes each suite in a fresh sandboxed Electron session. External/API requests are blocked; suites provide sample API, camera, clipboard, and history behavior. Failures and timeouts exit nonzero. These checks are a separate local command from `npm test`, but both publication workflows run them. Camera fixtures do not replace physical-camera checks.
 
-```js
-for (const group of ['AdminSettings', 'Search', 'Container', 'PublicTrade', 'Storage', 'Deck', 'Scanner']) {
-  const module = await import(`/src/utils/ui${group}.browser.test.jsx`);
-  console.log(group, await module[`runUi${group}Regressions`]());
-}
-console.log(await (await import('/src/utils/publicCollection.browser.test.jsx')).runPublicCollectionRegressions());
-```
+`node backend/test/clientcrop.test.js` always checks deterministic geometry and synthetic pixels. Its optional real-model/frame diagnostic requires `--models` plus the local models, catalog, and sample frames.
+
+Docker version tags publish independently of `latest`. Only the current stable GitHub release can promote `latest`; a serialized promotion job rechecks eligibility before publishing. If the GitHub release does not yet exist when the build checks, `latest` remains unchanged; rerun the tag workflow after publishing the release.
 
 The storage runner additionally accepts `{ pressKey, dragCard }`: `pressKey(key)` sends a trusted browser key to the focused element, and `dragCard(fromSelector, toSelector)` performs a real pointer drag between the supplied elements, allowing a paint after activation and before release. Without these callbacks, the runner verifies native click activation and reports `trustedKeyboard: false` and `pointerDrag: false`; test actual keyboard, pointer filing, and focus restoration separately.

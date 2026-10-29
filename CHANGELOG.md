@@ -2,6 +2,18 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Removed destructive production test-card seeding and reject unsupported legacy storage schemas without dropping their tables.
+- Made OIDC username linking atomic, container deletion and compartment PATCH evictions transactional, and complete-backup restoration preserve marketplace links.
+- Count distinct printings consistently across separate entries and quantity stacks; propagate operational failures during language-printing resolution instead of silently retaining the wrong identity.
+- Unify backend shutdown across signals and desktop IPC; wait for requests/database writes and require explicit consent before forcing desktop termination. Cap macOS diagnostics at 4 MiB.
+- Release partially initialized scan sessions, fail catalog model initialization promptly, reject oversized downloads during streaming, and resolve standard macOS Homebrew OCR paths.
+- Share the perspective-transform solver with explicit invalid-geometry fallback; replace stale crop diagnostic reconstruction with deterministic geometry coverage.
+- Recover frontend server availability after successful requests without treating intentional cancellation as an outage; publish interface locale and dictionary together without discarding drafts.
+- Apply the existing import throttle, automate browser regressions with the existing Electron runtime, and protect Docker `latest` from older/prerelease tag builds.
+- Align public asset names with the 2.4.2 downloads and remove unused packaging modes, chart customization, and dropdown selectors.
+
 ## 2.4.2 — 2026-10-28
 
 - Added desktop packages with bundled servers: Linux x86-64 AppImage, Apple Silicon macOS DMG, and a per-user Windows x64 installer.

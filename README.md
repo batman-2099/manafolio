@@ -36,8 +36,8 @@ Download the package for your platform from [GitHub Releases](https://github.com
 
 | Platform | Download | Install and launch |
 | --- | --- | --- |
-| **Linux x86-64** — Ubuntu 22.04 or compatible newer desktop distributions | `Manafolio-Server-linux-x64.AppImage` | Make it executable with `chmod +x Manafolio-Server-linux-x64.AppImage`, then open it. See [Linux requirements and FUSE troubleshooting](docs/INSTALLATION.md#linux-appimage). |
-| **macOS 14.4+ on Apple Silicon** | `Manafolio-Server-macos-arm64.dmg` | Open the DMG, drag **Manafolio.app** to **Applications**, then launch it. Intel Macs are not supported by this package. See [macOS installation](docs/INSTALLATION.md#macos-dmg). |
+| **Linux x86-64** — Ubuntu 22.04 or compatible newer desktop distributions | `Manafolio-linux-x64.AppImage` | Make it executable with `chmod +x Manafolio-linux-x64.AppImage`, then open it. See [Linux requirements and FUSE troubleshooting](docs/INSTALLATION.md#linux-appimage). |
+| **macOS 14.4+ on Apple Silicon** | `Manafolio-macos-arm64.dmg` | Open the DMG, drag **Manafolio.app** to **Applications**, then launch it. Intel Macs are not supported by this package. See [macOS installation](docs/INSTALLATION.md#macos-dmg). |
 | **Windows 10+ x64** | `Manafolio-Setup-windows-x64.exe` | Run Setup, then open **Manafolio** from the Start Menu. Installs for the current user without administrator privileges; a desktop shortcut is optional. See [Windows installation](docs/INSTALLATION.md#windows-installer). |
 
 **Security notices:** the Windows installer is unsigned, and the macOS app is not Developer ID signed or notarized, so SmartScreen or Gatekeeper may warn. Download only from a trusted source and follow the platform-specific instructions above; do not disable system protections globally. On Linux, run as a normal user with Chromium's sandbox enabled.
@@ -58,7 +58,7 @@ Open **http://localhost:3001**. Without `DEFAULT_ADMIN_PASSWORD`, the first brow
 
 The `manafolio-data` volume holds the database, backups, TLS material, scan models, and catalogs. Keep protected backups outside that volume. Use **HTTPS for remote access and phone scanning**.
 
-**Existing installation?** Read the [offline migration procedure](docs/INSTALLATION.md#migrate-an-existing-installation) before starting a renamed or moved deployment. Back up the stopped data directory first; very old `sub_location_1` schemas take a destructive migration path. An unexpected owner-creation screen means you should stop and check the volume mount and `DB_PATH`, not initialize a replacement collection.
+**Existing installation?** Read the [offline migration procedure](docs/INSTALLATION.md#migrate-an-existing-installation) before starting a renamed or moved deployment. Back up the stopped data directory first; very old `sub_location_1` schemas are rejected without dropping their tables and require an explicit migration. An unexpected owner-creation screen means you should stop and check the volume mount and `DB_PATH`, not initialize a replacement collection.
 
 See the [installation guide](docs/INSTALLATION.md) for updates, configuration, HTTPS/reverse proxies, phone access, and scanning assets. Available environment variables are documented in [`.env.example`](.env.example).
 

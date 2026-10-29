@@ -1,4 +1,4 @@
-// Exercise the shipped executable, not a source-server substitute.
+// Exercise the macOS package's shipped server, separately from its native window.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
@@ -10,11 +10,8 @@ const { setTimeout: delay } = require('node:timers/promises');
 
 async function main() {
   const image = path.resolve(process.argv[2]);
-  const macApp = process.argv[3] === '--mac-app';
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'manafolio-package-'));
-  const data = macApp
-    ? path.join(root, 'Library', 'Application Support', 'Manafolio')
-    : path.join(root, 'data with spaces', 'manafolio');
+  const data = path.join(root, 'Library', 'Application Support', 'Manafolio');
   const socket = net.createServer();
   socket.listen(0, '127.0.0.1');
   await once(socket, 'listening');
@@ -25,10 +22,9 @@ async function main() {
   try {
     for (let run = 0; run < 2; run++) {
       await fs.writeFile(path.join(data, '.env'), config + (run === 0 ? 'DEFAULT_ADMIN_PASSWORD=Package-smoke-only-7291\n' : ''));
-      const env = { ...process.env, XDG_DATA_HOME: path.dirname(data), HOME: root };
-      for (const key of ['DB_PATH', 'CV_MODEL_DIR', 'PORT', 'HTTPS_PORT', 'DEFAULT_ADMIN_PASSWORD', 'MANAFOLIO_MAC_APP', 'APPIMAGE']) delete env[key];
-      if (macApp) env.MANAFOLIO_MAC_APP = '1';
-      const child = spawn(image, macApp ? [] : ['--appimage-extract-and-run'], { env, cwd: root, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      const env = { ...process.env, HOME: root, MANAFOLIO_MAC_APP: '1' };
+      for (const key of ['DB_PATH', 'CV_MODEL_DIR', 'PORT', 'HTTPS_PORT', 'DEFAULT_ADMIN_PASSWORD']) delete env[key];
+      const child = spawn(image, [], { env, cwd: root, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
       let output = '';
       child.stdout.on('data', chunk => { output += chunk; });
       child.stderr.on('data', chunk => { output += chunk; });
@@ -41,7 +37,7 @@ async function main() {
             const response = await fetch(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(1000) });
             ready = response.ok;
             await response.text();
-          } catch { /* Wait for extraction and database initialization. */ }
+          } catch { /* Wait for database initialization. */ }
           if (ready) break;
           await delay(500);
         }

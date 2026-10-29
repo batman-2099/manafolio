@@ -155,17 +155,17 @@ router.get('/oidc/callback', authLimiter, async (req, res) => {
         }, 'account_link_required');
       }
       if (existingUser) {
-        // An account already bound to a DIFFERENT IdP identity is never re-bound.
-        // Two subjects claiming one username is the collision this whole flag is
-        // about, and silently moving the account to whoever logged in last is the
-        // worst of the available answers.
-        if (existingUser.oidc_sub && existingUser.oidc_sub !== sub) {
+        // Claim the account atomically: another callback may have linked it since the read.
+        const linked = await db.run(
+          `UPDATE users SET oidc_sub = ? WHERE id = ? AND (oidc_sub IS NULL OR oidc_sub = '' OR oidc_sub = ?)`,
+          [sub, existingUser.id, sub]
+        );
+        if (linked.changes !== 1) {
           console.warn(`OIDC: refusing to relink "${username}" — already bound to another identity.`);
           return frontendRedirect({
             oidc_error: 'That username is already linked to a different single sign-on identity. Ask an administrator.'
           }, 'identity_conflict');
         }
-        await db.run(`UPDATE users SET oidc_sub = ? WHERE id = ?`, [sub, existingUser.id]);
         console.log(`OIDC: linked identity to existing account "${username}" (OIDC_ALLOW_USERNAME_LINK).`);
         user = await db.get(`SELECT * FROM users WHERE id = ?`, [existingUser.id]);
       }

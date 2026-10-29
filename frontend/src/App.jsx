@@ -85,12 +85,15 @@ window.fetch = function (input, options = {}) {
       // Dispatch custom event to trigger logout without page refresh
       window.dispatchEvent(new Event('manafolio_logout'));
     }
-    if (token && url.startsWith('/api/') && response.status >= 500) {
-      window.dispatchEvent(new Event('manafolio_server_unavailable'));
+    if (token && token === localStorage.getItem('manafolio_token') && url.startsWith('/api/')) {
+      if (response.status >= 500) window.dispatchEvent(new Event('manafolio_server_unavailable'));
+      else if (response.ok) window.dispatchEvent(new Event('manafolio_server_available'));
     }
     return response;
   }).catch(error => {
-    if (token && url.startsWith('/api/')) window.dispatchEvent(new Event('manafolio_server_unavailable'));
+    if (error.name !== 'AbortError' && token && token === localStorage.getItem('manafolio_token') && url.startsWith('/api/')) {
+      window.dispatchEvent(new Event('manafolio_server_unavailable'));
+    }
     throw error;
   });
 };
@@ -121,6 +124,7 @@ function App() {
       } catch { /* Settings reports storage errors; this optional shortcut stays hidden. */ }
     };
     const unavailable = () => setServerUnavailable(true);
+    const available = () => setServerUnavailable(false);
     const storage = event => {
       load();
       if (event.key && !['manafolio_token', 'manafolio_user'].includes(event.key)) return;
@@ -133,12 +137,14 @@ function App() {
     window.addEventListener('storage', storage);
     window.addEventListener('offline', unavailable);
     window.addEventListener('manafolio_server_unavailable', unavailable);
+    window.addEventListener('manafolio_server_available', available);
     return () => {
       revision++;
       window.removeEventListener(OFFLINE_EVENT, load);
       window.removeEventListener('storage', storage);
       window.removeEventListener('offline', unavailable);
       window.removeEventListener('manafolio_server_unavailable', unavailable);
+      window.removeEventListener('manafolio_server_available', available);
     };
   }, [token, user?.id]);
   const sessionRevision = useRef(0);

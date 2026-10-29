@@ -38,30 +38,32 @@ export const localeName = (code, inLocale = code) => {
 const Ctx = createContext(null);
 
 export function I18nProvider({ children }) {
-  const [locale, setLocale] = useState(() => (
+  const [requestedLocale, setRequestedLocale] = useState(() => (
     localStorage.getItem('manafolio_ui_lang')
     || pickLocale(LOCALES, navigator.languages?.length ? navigator.languages : [navigator.language || 'en'])
   ));
-  const [dict, setDict] = useState(() => (locale === 'en' ? en : null));
+  const [loaded, setLoaded] = useState(() => (requestedLocale === 'en' ? { locale: 'en', dict: en } : null));
 
   useEffect(() => {
-    const load = LOCALE_FILES[locale];
-    if (!load) { setDict(en); return; }
+    const load = LOCALE_FILES[requestedLocale];
+    if (!load) { setLoaded({ locale: 'en', dict: en }); return; }
     let live = true;
-    load().then(mod => { if (live) setDict(mod.default || mod); })
-      .catch(() => { if (live) setDict(en); });
+    load().then(mod => { if (live) setLoaded({ locale: requestedLocale, dict: mod.default || mod }); })
+      .catch(() => { if (live) setLoaded({ locale: 'en', dict: en }); });
     return () => { live = false; };
-  }, [locale]);
+  }, [requestedLocale]);
+
+  const { locale, dict } = loaded || {};
 
   useEffect(() => {
-    document.documentElement.lang = locale;
+    if (locale) document.documentElement.lang = locale;
   }, [locale]);
 
   const value = useMemo(() => ({
     locale,
     setLocale: (next) => {
       localStorage.setItem('manafolio_ui_lang', next);
-      setLocale(next);
+      setRequestedLocale(next);
     },
     // t('key') / t('key', { name: 'Ash' }) / t('cards.count', { count: 3 })
     t: (key, vars) => translate(dict, en, locale, key, vars),

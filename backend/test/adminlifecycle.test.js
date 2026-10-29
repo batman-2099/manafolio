@@ -41,6 +41,20 @@ async function main() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
+    await db.run("INSERT INTO card_cache (id, name, set_id, game) VALUES ('owned-lea', 'Owned Alpha card', 'lea', 'mtg')");
+    const { lastID: locationId } = await db.run(
+      "INSERT INTO locations (name, type, user_id) VALUES ('Real collection', 'Binder', ?)", [owner.id]);
+    await db.run(`INSERT INTO collection (card_id, user_id, quantity, location_id, notes)
+      VALUES ('owned-lea', ?, 3, ?, 'Keep this real collection entry')`, [owner.id, locationId]);
+    const collectionBeforeSeed = await db.all('SELECT * FROM collection ORDER BY id');
+    const locationsBeforeSeed = await db.all('SELECT * FROM locations ORDER BY id');
+    const seedResponse = await fetch(`http://127.0.0.1:${server.address().port}/api/admin/seed-cards`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.strictEqual(seedResponse.status, 404, 'production admin API must not expose collection seeding');
+    assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), collectionBeforeSeed,
+      'a seed request must not replace real administrator entries from former seed sets');
+    assert.deepStrictEqual(await db.all('SELECT * FROM locations ORDER BY id'), locationsBeforeSeed);
     const sessionsBefore = await db.all('SELECT * FROM sessions ORDER BY token');
     const before = await db.get('SELECT * FROM users WHERE id = ?', [memberId]);
     assert.strictEqual((await request('PUT', memberId, { password: 'replacement-password', role: 'invalid' })).status, 400);

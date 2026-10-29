@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const fs = require('fs');
 const sharp = require('sharp');
 
 const MIN_CONFIDENCE = 70;
@@ -72,7 +73,15 @@ function parsePrintingTsv(tsv, { setCodes = [] } = {}) {
 
 function recognize(image) {
   return new Promise((resolve, reject) => {
-    const child = spawn('/usr/bin/tesseract', ['stdin', 'stdout', '-l', 'eng', '--psm', '6', 'tsv'], {
+    let executable = '/usr/bin/tesseract';
+    // Finder does not inherit the shell PATH; use standard Homebrew prefixes directly.
+    if (process.platform === 'darwin') {
+      for (const candidate of ['/opt/homebrew/bin/tesseract', '/usr/local/bin/tesseract']) {
+        try { fs.accessSync(candidate, fs.constants.X_OK); executable = candidate; break; }
+        catch { /* Try the other prefix before reporting OCR unavailable. */ }
+      }
+    }
+    const child = spawn(executable, ['stdin', 'stdout', '-l', 'eng', '--psm', '6', 'tsv'], {
       stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, OMP_THREAD_LIMIT: '1' },
     });
     let bytes = 0;
