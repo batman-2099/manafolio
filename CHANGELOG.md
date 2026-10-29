@@ -2,7 +2,7 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.4.3 — 2026-10-29
 
 - Removed destructive production test-card seeding and reject unsupported legacy storage schemas without dropping their tables.
 - Made OIDC username linking atomic, container deletion and compartment PATCH evictions transactional, and complete-backup restoration preserve marketplace links.
