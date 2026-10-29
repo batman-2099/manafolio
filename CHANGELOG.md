@@ -19,6 +19,7 @@ Release history starts with Manafolio 2.0.
 - Redesign the application as a collection-focused workbench: compact navigation, consistent account-theme controls, artwork-led collection and storage views, a dashboard summary rail, clearer deck and AI setup layouts, and indexed account/help screens. Preserve inventory, scanning, checkout, sharing, and editing workflows; retain visible deck description/notes and AI guidance.
 - Align rarity badges and card values on the same baseline in Collection gallery tiles, keeping set information and condition details on separate rows.
 - Restore the Manafolio wordmark's original blue color gradient without changing its size, position, or stationary behavior.
+- Let desktop application pages use the full browser width while retaining edge padding, readable text measures, and existing mobile layouts.
 
 ## 2.4.2 — 2026-10-28
 
