@@ -85,6 +85,18 @@ jobs:
         working-directory: backend
         run: npm ci --omit=dev
 
+      # Upstream's npm package omits Intel macOS binaries; build the locked version.
+      - name: Build Intel macOS inference runtime
+        if: matrix.target == 'macos-x64'
+        run: |
+          ORT_VERSION=$(node -p "require('./backend/node_modules/onnxruntime-node/package.json').version")
+          git clone --depth 1 --branch "v$ORT_VERSION" --recurse-submodules --shallow-submodules https://github.com/microsoft/onnxruntime.git "$RUNNER_TEMP/onnxruntime"
+          "$RUNNER_TEMP/onnxruntime/build.sh" --config Release --build_nodejs --parallel 3 --update --build \
+            --build_dir "$RUNNER_TEMP/onnxruntime/build/MacOS" \
+            --cmake_extra_defines CMAKE_OSX_ARCHITECTURES=x86_64 CMAKE_OSX_DEPLOYMENT_TARGET=14.4 onnxruntime_BUILD_UNIT_TESTS=OFF
+          cp -R "$RUNNER_TEMP/onnxruntime/js/node/bin/napi-v6/darwin/x64" backend/node_modules/onnxruntime-node/bin/napi-v6/darwin/
+          node -e "console.log(require('./backend/node_modules/onnxruntime-node').env.versions)"
+
       - name: Prepare Linux desktop runtime
         if: runner.os == 'Linux'
         run: |
