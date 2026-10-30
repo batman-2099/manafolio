@@ -2,8 +2,10 @@ import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DndContext, MouseSensor, useSensor, useSensors } from '@dnd-kit/core';
 import CompartmentView from '../components/CompartmentView';
+import CardDeckStatus from '../components/CardDeckStatus';
 import CheckoutWizardModal from '../components/CheckoutWizardModal';
 import { I18nProvider } from './i18n';
+import en from '../locales/en.json';
 
 // Isolated Vite page: await runUiStorageRegressions({ pressKey }).
 // Optional pressKey(key) must send a trusted browser key to the focused element
@@ -80,6 +82,50 @@ export async function runUiStorageRegressions({ pressKey, dragCard } = {}) {
   }
   const cases = [];
   try {
+    const reserved = { ...cards[0], quantity: 4, checked_out_qty: 2, in_deck_qty: 2,
+      deck_allocations: [{ deck_id: 1, name: 'Boros, skies', quantity: 2, checked_out: true }] };
+    const pulledCopy = { ...cards[1], quantity: 2, checked_out_qty: 0, in_deck_qty: 1,
+      deck_allocations: [{ deck_id: 2, name: 'Draft deck', quantity: 1, checked_out: false }] };
+    await act(async () => render(<CardDeckStatus card={cards[0]} />));
+    assert(!host.textContent, 'unallocated cards must not claim deck membership');
+    await act(async () => render(<CardDeckStatus card={reserved} />));
+    const summary = () => host.querySelector('.card-deck-status-summary');
+    assert(summary().textContent.match(/\d+/g).join() === '2,4', 'partial status must show allocated and owned quantities');
+    assert(!host.textContent.includes('Boros, skies'), 'list status must show checkout counts without deck names');
+    const partialWeight = Number(getComputedStyle(summary()).fontWeight);
+    await act(async () => render(<CardDeckStatus card={{ ...reserved, quantity: 2 }} />));
+    assert(Number(getComputedStyle(summary()).fontWeight) > partialWeight, 'fully allocated cards must receive stronger emphasis');
+    await act(async () => render(<CardDeckStatus card={{ ...reserved, quantity: 6, stack_entries: [reserved, pulledCopy] }} details />));
+    assert(summary().textContent.match(/\d+/g).join() === '3,6', 'stack status must include every stored entry, not only the lead');
+    const allocations = [...host.querySelectorAll('[role="listitem"]')];
+    assert(allocations.length === 2 && allocations[0].textContent.includes('Boros, skies') && allocations[1].textContent.includes('Draft deck'),
+      'stack details must identify both assigned decks');
+    assert(allocations[0].textContent.includes('Checked out') && allocations[1].textContent.includes('Pulled'),
+      'pulled checklist copies must not be presented as reservations');
+    await act(async () => render(<CardDeckStatus card={{ ...reserved, quantity: 8, stack_entries: [reserved, { ...reserved, entry_id: 3 }] }} details />));
+    assert(host.querySelectorAll('[role="listitem"]').length === 1
+      && host.querySelector('[role="listitem"]').textContent.match(/\d+/g).join() === '4', 'one deck spanning stored entries must combine its quantities');
+    const single = { ...reserved, quantity: 1, in_deck_qty: 1, checked_out_qty: 1,
+      deck_allocations: [{ ...reserved.deck_allocations[0], quantity: 1 }] };
+    for (const compact of [false, true]) {
+      await act(async () => render(<CardDeckStatus card={single} compact={compact} />));
+      assert(summary().textContent === en['deck.inPlay'], 'a single checked-out copy needs no fraction');
+    }
+    await act(async () => render(<CardDeckStatus card={{ ...single, quantity: 4 }} />));
+    assert(summary().textContent.match(/\d+/g).join() === '1,4', 'one checked-out copy in a larger stack must retain counts');
+    await act(async () => render(<CardDeckStatus card={{ ...pulledCopy, quantity: 1 }} />));
+    assert(summary().textContent !== en['deck.inPlay'], 'a single Pulled copy must not be relabeled as checked out');
+    cases.push('checkout counts, full emphasis, stacked sources, distinct decks and pulled status');
+
+    const missingStack = [reserved, { ...reserved, entry_id: 3, missing: 1 }];
+    await act(async () => render(<CompartmentView compartment={compartment} cards={missingStack} locationType="Binder" allowStacking />));
+    assert(getComputedStyle(host.querySelector('.binder-pocket')).outlineStyle === 'solid',
+      'a missing member must outline its whole stack even when the lead entry is present');
+    await act(async () => render(<CompartmentView compartment={compartment} cards={missingStack.map(card => ({ ...card, missing: 0 }))} locationType="Binder" allowStacking />));
+    assert(getComputedStyle(host.querySelector('.binder-pocket')).outlineStyle === 'none',
+      'marking the missing copy found must clear the border even while copies remain checked out');
+    cases.push('missing stack outline and found transition independent of checkout');
+
     const opened = [];
     await act(async () => { render(<CompartmentView compartment={compartment} cards={cards} locationType="Binder" onCardClick={card => opened.push(card.entry_id)} />); });
     await activate(host.querySelector('.binder-pocket'), 'Enter');

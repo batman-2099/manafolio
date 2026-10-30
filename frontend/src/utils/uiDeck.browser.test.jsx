@@ -30,6 +30,7 @@ export async function runUiDeckRegressions() {
   let settleMutation;
   const mutations = { checkout: 0, return: 0 };
   let locationRequests = 0;
+  let detailRequests = 0;
   const response = (body, status = 200) => ({ ok: status < 400, status, headers: new Headers(), json: async () => body });
   const card = { id: 'fixture', name: 'Fixture card', game: 'mtg', quantity: 2, owned_qty: 0, types: [], subtypes: [], number: '1' };
   const deck = { id: 7, name: 'Fixture deck', game: 'mtg', inventory_type: 'arena', format: 'Casual', target_size: 60, cards: [card], total_cards: 2 };
@@ -56,7 +57,7 @@ export async function runUiDeckRegressions() {
   window.open = () => { opened++; return null; };
   window.fetch = async (url, options = {}) => {
     if (url === '/api/decks') return response([deck]);
-    if (url === '/api/decks/7') return response(deck);
+    if (url === '/api/decks/7') { detailRequests++; return response(deck); }
     if (url === '/api/decks/7/locations') {
       locationRequests++;
       return response(locationsFail ? { error: 'Fixture locations failure' } : locations, locationsFail ? 503 : 200);
@@ -81,6 +82,16 @@ export async function runUiDeckRegressions() {
   };
   try {
     await render();
+    for (const view of ['deck.gridView', 'deck.tableView']) {
+      await click(button(view));
+      const name = [...host.querySelectorAll('button')].find(element => element.textContent.trim() === deck.name);
+      assert(name?.tabIndex === 0, 'deck names remain reachable without a separate Open action');
+      const before = detailRequests;
+      await click(name);
+      assert(button('deck.backToDecks') && detailRequests === before + 1, 'activating a deck name opens it once without bubbling into another load');
+      await click(button('deck.backToDecks'));
+    }
+    await click(button('deck.gridView'));
     await click(button('aiDeck.title'));
     assert(guard.current(), 'pristine AI builder must allow navigation');
     await change(host.querySelector('#ai-format'), 'Casual');
@@ -116,13 +127,15 @@ export async function runUiDeckRegressions() {
     const overview = host.querySelector('.deck-summary-layout');
     assert(cards && overview, `saved deck must load card editing and overview; notices: ${JSON.stringify(toasts)}`);
     assert(cards.compareDocumentPosition(overview) & Node.DOCUMENT_POSITION_FOLLOWING, 'mobile card list must precede analytics in DOM');
-    const disclosure = host.querySelector('.deck-actions-disclosure');
-    assert(disclosure && !disclosure.open, 'mobile secondary deck actions start collapsed');
-    await click(disclosure.querySelector('summary'));
-    assert(disclosure.open && disclosure.contains(button('deck.share')) && disclosure.contains(host.querySelector('[title="' + en['deck.exportHint'] + '"]')), 'native disclosure exposes secondary actions without duplicates');
+    assert(button('deck.share').checkVisibility()
+      && host.querySelector('[title="' + en['deck.exportHint'] + '"]').checkVisibility(),
+    'mobile deck actions must be visible without expanding a menu');
     assert(host.querySelectorAll('[title="' + en['deck.exportHint'] + '"]').length === 1, 'responsive actions exist only once');
     await act(async () => { compact = false; mediaChange(); });
     assert(host.querySelector('.deck-summary-layout').compareDocumentPosition(host.querySelector('.deck-cards-heading')) & Node.DOCUMENT_POSITION_FOLLOWING, 'desktop preserves overview before card list');
+    assert(button('deck.share').checkVisibility()
+      && host.querySelector('[title="' + en['deck.exportHint'] + '"]').checkVisibility(),
+    'desktop deck actions remain visible after a viewport change');
     const exportTrigger = host.querySelector(`[title="${en['deck.exportHint']}"]`);
     await click(exportTrigger);
     assert(host.querySelector('dialog[open]').contains(document.activeElement), 'native export must own focus');
@@ -221,7 +234,7 @@ export async function runUiDeckRegressions() {
     }
     assert([...host.querySelectorAll('textarea')].some(el => el.value === '2 Fixture card'), 'ManaBox file contents still populate import text');
     await cancelDialog();
-    return ['AI dirty/busy navigation, unload, settings, Back, save failure/retry/success', 'mobile/desktop ordering and native secondary-action disclosure', 'native export focus/cancel and clipboard failure/recovery', 'pending import dismissal and long summary scroll', 'checkout/return locations failure and safe retry', 'cancel failure/progress retention, Back/Escape veto and duplicate-mutation guards', 'native ManaBox picker and file import'];
+    return ['AI dirty/busy navigation, unload, settings, Back, save failure/retry/success', 'mobile/desktop ordering and always-visible deck actions', 'native export focus/cancel and clipboard failure/recovery', 'pending import dismissal and long summary scroll', 'checkout/return locations failure and safe retry', 'cancel failure/progress retention, Back/Escape veto and duplicate-mutation guards', 'native ManaBox picker and file import'];
   } finally {
     await act(async () => { root.unmount(); });
     host.remove();

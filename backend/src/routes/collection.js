@@ -469,27 +469,37 @@ router.get('/collection', async (req, res) => {
         l.type as location_type,
         cp.idx as compartment_idx,
         cp.label as compartment_label,
-        cp.capacity as compartment_capacity,
-        checked_out_decks.deck_names
+        cp.capacity as compartment_capacity
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
       LEFT JOIN card_cache rc ON rc.id = c.reverse_card_id
       LEFT JOIN locations l ON c.location_id = l.id
       LEFT JOIN storage_units su ON su.id = l.storage_unit_id AND su.user_id = c.user_id
       LEFT JOIN compartments cp ON c.compartment_id = cp.id
-      LEFT JOIN (
-        SELECT dc.card_id, d.user_id, GROUP_CONCAT(d.name, ', ') AS deck_names
-        FROM deck_cards dc
-        JOIN decks d ON d.id = dc.deck_id
-        WHERE d.user_id = ? AND d.inventory_type = 'collection' AND (d.checked_out = 1 OR dc.checked_out = 1)
-        GROUP BY dc.card_id, d.user_id
-      ) checked_out_decks ON checked_out_decks.card_id = c.card_id AND checked_out_decks.user_id = c.user_id
       ${filterSql}
       ORDER BY c.added_at DESC
     `;
-    const rows = await db.all(query, [req.user.id, ...filterParams]);
+    const rows = await db.all(query, filterParams);
 
-    const alloc = listType === 'collection' ? await checkedOutAllocation(req.user.id) : new Map();
+    const alloc = new Map();
+    const deckAllocations = new Map();
+    const deckNames = new Map(listType === 'collection'
+      ? (await db.all("SELECT id, name FROM decks WHERE user_id = ? AND inventory_type = 'collection'", [req.user.id]))
+        .map(deck => [deck.id, deck.name])
+      : []);
+    function recordAllocation(entryId, deckId, quantity, checkedOut) {
+      if (!deckAllocations.has(entryId)) deckAllocations.set(entryId, []);
+      const allocations = deckAllocations.get(entryId);
+      const existing = allocations.find(item => item.deck_id === deckId && item.checked_out === checkedOut);
+      if (existing) existing.quantity += quantity;
+      else allocations.push({ deck_id: deckId, name: deckNames.get(deckId), quantity, checked_out: checkedOut });
+    }
+    if (listType === 'collection') {
+      for (const source of await checkedOutSources(req.user.id)) {
+        alloc.set(source.entry_id, (alloc.get(source.entry_id) || 0) + source.quantity);
+        recordAllocation(source.entry_id, source.deck_id, source.quantity, true);
+      }
+    }
     // Display pulled copies without turning a pull flag into a reservation.
     const inDeck = new Map(alloc);
     if (listType === 'collection') {
@@ -505,7 +515,10 @@ router.get('/collection', async (req, res) => {
         for (const entry of sourceEntries(entries, card, card.game)) {
           const used = inDeck.get(entry.entry_id) || 0;
           const take = Math.min(needed, Math.max(0, entry.quantity - used));
-          if (take > 0) inDeck.set(entry.entry_id, used + take);
+          if (take > 0) {
+            inDeck.set(entry.entry_id, used + take);
+            recordAllocation(entry.entry_id, card.deck_id, take, false);
+          }
           needed -= take;
           if (needed <= 0) break;
         }
@@ -517,6 +530,10 @@ router.get('/collection', async (req, res) => {
       price_trend: resolveCardPrice(row),
       checked_out_qty: alloc.get(row.entry_id) || 0,
       in_deck_qty: inDeck.get(row.entry_id) || 0,
+      deck_allocations: deckAllocations.get(row.entry_id) || [],
+      deck_names: deckAllocations.has(row.entry_id)
+        ? [...new Set(deckAllocations.get(row.entry_id).map(item => item.name))].join(', ')
+        : null,
       compartment_display_label: row.compartment_id
         ? compartmentLabel({ idx: row.compartment_idx, label: row.compartment_label }, row.location_type)
         : null,

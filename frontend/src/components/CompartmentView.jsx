@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useId } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Lock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getPrintingBadgeStyle, getPrintingBadgeLabel, getFoilOverlayClass } from '../utils/cardPrinting';
@@ -9,6 +9,7 @@ import { isBinderType } from '../utils/cardOptions';
 import { displayName } from '../utils/languages';
 import { useLongPress } from '../utils/useLongPress';
 import CardImage from './CardImage';
+import CardDeckStatus from './CardDeckStatus';
 import { useT } from '../utils/i18n';
 import './LocationManager.css';
 
@@ -262,6 +263,7 @@ export function FocusedCardInfo({ card, slotNumber, moveSelect = null }) {
             {card.purchase_price > 0 && <span style={infoChipStyle}>{t('compartment.paid', { price: priceText(card.purchase_price) })}</span>}
           </div>
         )}
+        {!isEmpty && !isDivider && !isGhost && <CardDeckStatus card={card} details />}
       </div>
     </div>
   );
@@ -326,6 +328,7 @@ export default function CompartmentView({
   dropEnabled = false
 }) {
   const { t, locale } = useT();
+  const deckStatusId = useId();
   const isBinder = isBinderType(locationType);
   const isSelected = (entryId) => !!(selectedIds && selectedIds.has(entryId));
   const highlightSet = new Set(highlightEntryIds);
@@ -660,7 +663,9 @@ export default function CompartmentView({
                   key={card.entry_id || `slot-${i}`}
                   id={card.entry_id ? `card-${card.entry_id}` : undefined}
                   className={`binder-pocket ${categoryStart ? 'set-start' : ''} ${card.entry_id === focusEntryId ? 'focus-flash' : ''}`}
+                  data-missing={Boolean(card.missing || card.stack_entries?.some(entry => entry.missing))}
                   aria-label={t('compartment.cardSlot', { name: displayName(card), slot: pos })}
+                  aria-describedby={!pullMode && card.in_deck_qty > 0 ? `${deckStatusId}-${card.entry_id}` : undefined}
                   aria-pressed={pullMode ? pulledSet.has(card.entry_id) : selectMode ? isSelected(card.entry_id) : placementMode ? pickedEntryId === card.entry_id : undefined}
                   disabled={isGrey(card.entry_id) && !placementMode && !selectMode}
                   style={{
@@ -694,18 +699,19 @@ export default function CompartmentView({
                   <CardImage card={card} alt={displayName(card)} title={displayName(card)} loading="lazy" decoding="async" draggable={dropEnabled ? false : undefined} />
                   {getFoilOverlayClass(card.printing) && <div className={getFoilOverlayClass(card.printing)} style={{ borderRadius: '4px' }} />}
                   <PrintingBadge printing={card.printing} />
-                  {allowStacking && card.quantity > 1 && (
+                  {allowStacking && card.quantity > 1 && (pullMode || !(card.in_deck_qty > 0)) && (
                     <span title={t('compartment.stackedHere', { count: card.quantity })} style={{ position: 'absolute', bottom: '3px', left: '3px', zIndex: 24, fontSize: '0.6rem', fontWeight: 900, padding: '1px 4px', borderRadius: '4px', background: 'var(--media-background)', border: '1px solid var(--border-glass-hover)', color: 'var(--media-foreground)' }}>
                       &times;{card.quantity}
                     </span>
                   )}
-                  {(pullMode ? pulledSet.has(card.entry_id) : card.in_deck_qty > 0) && (
+                  {pullMode && pulledSet.has(card.entry_id) && (
                     <div style={{ position: 'absolute', inset: 0, background: 'color-mix(in srgb, var(--media-background) 62%, transparent)', borderRadius: '4px', zIndex: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-strong)', background: 'var(--surface-3)', padding: '2px 5px', borderRadius: '4px' }}>
-                        {pullMode ? 'Pulled' : (card.in_deck_qty < card.quantity ? `${card.in_deck_qty}/${card.quantity} Out` : t('loc.inPlay'))}
+                        {t('deck.pulled')}
                       </span>
                     </div>
                   )}
+                  {!pullMode && <CardDeckStatus card={card} compact id={`${deckStatusId}-${card.entry_id}`} />}
                   {selectMode && (
                     <div style={{ position: 'absolute', top: '3px', left: '3px', zIndex: 25, width: '18px', height: '18px', borderRadius: '50%', background: isSelected(card.entry_id) ? 'var(--accent-red)' : 'var(--media-background)', border: '2px solid var(--media-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.65rem', fontWeight: 900 }}>{isSelected(card.entry_id) ? '✓' : ''}</div>
                   )}
@@ -985,10 +991,12 @@ export default function CompartmentView({
                 return (
                   <button type="button" tabIndex={offset === 0 ? 0 : -1}
                     aria-label={t('compartment.cardSlot', { name: displayName(card), slot: pos })}
+                    aria-describedby={!pullMode && card.in_deck_qty > 0 ? `${deckStatusId}-${card.entry_id}` : undefined}
                     aria-pressed={pullMode ? pulledSet.has(card.entry_id) : selectMode ? isSelected(card.entry_id) : placementMode ? pickedEntryId === card.entry_id : undefined}
                     aria-disabled={pullMode && isGrey(card.entry_id) && offset === 0 && !placementMode && !selectMode ? true : undefined}
                     key={card.entry_id}
                     className={`box-coverflow-card ${offset === 0 ? 'active' : ''}`}
+                    data-missing={Boolean(card.missing || card.stack_entries?.some(entry => entry.missing))}
                     style={{ padding: 0, border: 0, background: 'transparent', transform, zIndex, opacity, filter, ...highlightStyle, ...getCardRarityBorder(card.rarity), ...(isSelected(card.entry_id) ? selectedOutline : {}), ...(placementMode && pickedEntryId === card.entry_id ? selectedOutline : {}), ...(isGrey(card.entry_id) ? { opacity: opacity * 0.3, filter: 'grayscale(1) brightness(0.5)' } : {}) }}
                     {...pressHandlers(card.entry_id)}
                     onClick={() => {
@@ -1013,13 +1021,14 @@ export default function CompartmentView({
                     {absOffset <= IMG_WINDOW && <CardImage card={card} decoding="async" />}
                     {getFoilOverlayClass(card.printing) && <div className={getFoilOverlayClass(card.printing)} style={{ borderRadius: '4.5px' }} />}
                     <PrintingBadge printing={card.printing} />
-                    {(pullMode ? pulledSet.has(card.entry_id) : card.in_deck_qty > 0) && (
+                    {pullMode && pulledSet.has(card.entry_id) && (
                       <div style={{ position: 'absolute', inset: 0, background: 'color-mix(in srgb, var(--media-background) 62%, transparent)', borderRadius: '5px', zIndex: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                         <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-strong)', background: 'var(--surface-3)', padding: '3px 8px', borderRadius: '4px' }}>
-                          {pullMode ? 'Pulled' : (card.in_deck_qty < card.quantity ? `${card.in_deck_qty}/${card.quantity} Out` : t('loc.inPlay'))}
+                          {t('deck.pulled')}
                         </span>
                       </div>
                     )}
+                    {!pullMode && <CardDeckStatus card={card} compact id={`${deckStatusId}-${card.entry_id}`} />}
                     {selectMode && (
                       <div style={{ position: 'absolute', top: '4px', left: '4px', zIndex: 25, width: '20px', height: '20px', borderRadius: '50%', background: isSelected(card.entry_id) ? 'var(--accent-red)' : 'var(--media-background)', border: '2px solid var(--media-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.7rem', fontWeight: 900 }}>{isSelected(card.entry_id) ? '✓' : ''}</div>
                     )}

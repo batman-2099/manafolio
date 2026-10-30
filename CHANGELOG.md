@@ -2,6 +2,22 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Show allocated-copy counts beneath collection and container cards, keeping deck names in card details rather than list/gallery rows; use high-contrast, theme-colored status labels and compact binder and box badges instead of darkening checked-out artwork. Reserve the red outer border for missing cards, including stacks containing a missing entry, rather than checkout status. Emphasize fully allocated cards with heavier label text.
+- Show exact per-deck quantities in card details, including stacked entries and dashboard cards. Keep Pulled checklist flags distinct from reserved checkout copies, and do not label unallocated copies or saved-only decklists as checked out.
+- Place Last verified above the checkout status in container card details.
+- Label a single checked-out copy “Checked out” without a fraction; retain counts for multi-copy stacks and keep Pulled status separate.
+- Center checkout labels beneath cards and compact badges at the bottom of artwork, including their icon and text.
+- Place the Missing tag in the centered status area below Last verified, using a dark red background and white text, including stacks with a missing copy.
+- Remove redundant Open buttons from Deck Builder cards and rows; keep card/row activation and keyboard-accessible deck names.
+- Remove the save-draft guidance from the deck Edit Properties dialog; retain it in the import summary.
+- Remove Vault Accent Color controls and the decorative deck accent dot; preserve existing stored values and save compatibility.
+- Keep deck actions visible beside the deck name in one wrapping toolbar, with general actions left-aligned and Check Out / Return and Save grouped on the right, instead of using a collapsible More deck actions section.
+- Remove the deck editor's Jump to cards and Jump to add cards buttons.
+- Remove icons from checked-out deck status labels and the checked-out banner; retain action-button icons.
+- Remove the Checked out tag and Checked out since timestamp from the open deck's name area; retain the checkout banner and Return to Storage action.
+
 ## 2.4.5 — 2026-10-29
 
 - Fix macOS app quit hanging after its server stops: deliver process-exit callbacks and the slow-shutdown warning through AppKit's modal termination run loop. Preserve graceful shutdown and explicit consent before forced termination.

@@ -7,6 +7,7 @@ import { formatPrice, priceText } from '../utils/formatPrice';
 import { resolveCardPrice } from '../utils/resolveCardPrice';
 import { tcgplayerUrl, cardmarketUrl, searchUrl, priceSource, noLinkReason } from '../utils/marketplaceLinks';
 import CardImage from './CardImage';
+import CardDeckStatus from './CardDeckStatus';
 import CardImageZoom from './CardImageZoom';
 import CardEntryFields from './CardEntryFields';
 import PriceHistoryChart from './PriceHistoryChart';
@@ -84,6 +85,24 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   const closeRef = useRef(null);
   const titleId = useId();
   const isOpen = !!card;
+  const [deckDetails, setDeckDetails] = useState();
+  const [deckDetailsError, setDeckDetailsError] = useState(false);
+  const [deckDetailsRetry, setDeckDetailsRetry] = useState(0);
+  const needsDeckDetails = card.deck_allocations === undefined && (card.list_type || 'collection') === 'collection';
+
+  useEffect(() => {
+    if (!needsDeckDetails) return;
+    const controller = new AbortController();
+    setDeckDetails(undefined);
+    setDeckDetailsError(false);
+    fetch(`/api/collection?${new URLSearchParams({ card_id: card.card_id || card.id, list_type: 'collection' })}`, { signal: controller.signal })
+      .then(response => { if (!response.ok) throw new Error(); return response.json(); })
+      .then(entries => {
+        if (!controller.signal.aborted) setDeckDetails(entries.find(entry => entry.entry_id === (card.entry_id || card.id)) || null);
+      })
+      .catch(() => { if (!controller.signal.aborted) setDeckDetailsError(true); });
+    return () => controller.abort();
+  }, [card, needsDeckDetails, deckDetailsRetry]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -515,6 +534,11 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
               )}
               {(activeCard.number || activeCard.collector_number || activeCard.card_number) ? ` • #${activeCard.number || activeCard.collector_number || activeCard.card_number}` : ''}{activeCard.rarity ? ` • ${activeCard.rarity}` : ''} • {t(activeCard.list_type === 'graveyard' ? 'inspector.archived' : 'inspector.owned', { count: activeCard.quantity ?? 1 })}
             </p>
+            {needsDeckDetails && deckDetails === undefined && !deckDetailsError && <p role="status">{t('common.loading')}</p>}
+            {needsDeckDetails && deckDetailsError && <p role="alert">
+              {t('loc.errLoadCards')} <button type="button" className="btn btn-secondary" onClick={() => setDeckDetailsRetry(value => value + 1)}>{t('loc.retry')}</button>
+            </p>}
+            {(!needsDeckDetails || deckDetails) && <CardDeckStatus card={needsDeckDetails ? deckDetails : card} details />}
 
             {/* MTG color pips and type line. */}
             {(activeCard.supertype === 'MTG' || activeCard.game === 'mtg') && (
@@ -987,6 +1011,7 @@ function CardInspectorSelection(props) {
               <span>{entry.printing || 'Normal'} · {entry.condition || 'Near Mint'} · {entry.language || 'English'} · ×{entry.quantity ?? 1}</span>
               <span>{[entry.storage_unit_name, entry.location_name || (entry.location_id ? t('inspector.currentStorage') : t('bulk.unassignedPile')), entry.compartment_name, entry.position != null && getSlotNumber(entry) != null ? t('stocktake.slot', { slot: getSlotNumber(entry) }) : null].filter(Boolean).join(' · ')}</span>
               <span>{t('inspector.entryIdentifier', { id: entry.entry_id || entry.id })}</span>
+              <CardDeckStatus card={entry} details />
             </button>
           ))}
         </div>

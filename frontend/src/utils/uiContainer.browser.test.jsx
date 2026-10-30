@@ -222,9 +222,9 @@ export async function runUiContainerRegressions() {
     await clear();
     cards = [
       { entry_id: 1, card_id: 'sample-spell', name: 'Sample spell', set_name: 'Sample Set' },
-      { entry_id: 2, card_id: 'sample-token', name: 'Goblin', subtypes: ['Token'], set_name: 'Sample Set', reverse_name: 'Soldier', reverse_card_id: 'sample-reverse' },
+      { entry_id: 2, card_id: 'sample-token', name: 'Goblin', subtypes: ['Token'], set_name: 'Sample Set', reverse_name: 'Soldier', reverse_card_id: 'sample-reverse', checked_out_qty: 1, in_deck_qty: 1 },
       { entry_id: 3, card_id: 'sample-set-token', name: 'Treasure', set_name: 'Sample Tokens' },
-      { entry_id: 4, card_id: 'sample-token', name: 'Goblin', subtypes: ['Token'], set_name: 'Sample Set', reverse_name: 'Soldier', reverse_card_id: 'sample-reverse' },
+      { entry_id: 4, card_id: 'sample-token', name: 'Goblin', subtypes: ['Token'], set_name: 'Sample Set', reverse_name: 'Soldier', reverse_card_id: 'sample-reverse', missing: 1 },
     ].map(card => ({ ...card, id: card.card_id, game: 'mtg', location_id: 3, compartment_id: 30, position: card.entry_id * 1000, quantity: 1 }));
     await act(async () => root.render(<LocationManager onUpdate={() => {}} showToast={() => {}} />));
     await act(async () => [...host.querySelectorAll('button')].find(node => node.textContent.includes('Token box')).click());
@@ -233,6 +233,13 @@ export async function runUiContainerRegressions() {
     assert(tokenSection()?.querySelectorAll('button').length === 2, 'typed and token-set cards share a separate section, with duplicate pairs stacked');
     assert(!tokenSection().textContent.includes('Sample spell') && tokenSection().previousElementSibling.textContent.includes('Sample spell'), 'ordinary cards precede the token section');
     const tokenButtons = tokenSection().querySelectorAll('button');
+    const missingTag = tokenButtons[0].querySelector('.card-missing-status');
+    assert(missingTag?.textContent === en['inspector.missing'], 'a missing non-leading stack member must show the Missing tag');
+    const missingBox = missingTag.getBoundingClientRect();
+    const checkoutBox = tokenButtons[0].querySelector('.card-deck-status').getBoundingClientRect();
+    assert(missingBox.top >= missingTag.previousElementSibling.getBoundingClientRect().bottom
+      && missingBox.bottom <= checkoutBox.top, 'Missing must sit below verification and above checkout without overlapping either');
+    assert(getComputedStyle(missingTag).color === 'rgb(255, 255, 255)', 'Missing uses white lettering');
     const pairedImages = tokenButtons[0].querySelectorAll('img');
     assert(pairedImages.length === 2 && pairedImages[0].alt === 'Goblin' && pairedImages[1].alt === 'Soldier', 'paired token displays its front and reverse together in order');
     assert(tokenButtons[1].querySelectorAll('img').length === 1, 'unpaired token keeps one image');

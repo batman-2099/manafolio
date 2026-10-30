@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useId } from 'react';
 import './CatalogueWorkbench.css';
 import { Search, Trash2, Edit2, LayoutGrid, List, SlidersHorizontal, X, MousePointerClick, Download, ChevronDown } from 'lucide-react';
 import { pairedCardName } from '../utils/tokenFaces';
@@ -16,6 +16,7 @@ import CardInspectorModal from './CardInspectorModal';
 import AddToDeckSelect from './AddToDeckSelect';
 import PackPriceSplitter from './PackPriceSplitter';
 import CardImage from './CardImage';
+import CardDeckStatus from './CardDeckStatus';
 import MultiSelectDropdown from './MultiSelectDropdown';
 import Modal from './Modal';
 import SetCompletion from './SetCompletion';
@@ -42,6 +43,7 @@ function Field({ label, id, children }) {
 
 function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter, setSelectedCardFilter, onNavigate, setSelectedLocationId, setFocusEntryId }) {
   const { t } = useT();
+  const deckStatusId = useId();
   const [collectionState, setCollectionState] = useState(null);
   const [collectionRefresh, setCollectionRefresh] = useState(0);
   const [locations, setLocations] = useState([]);
@@ -820,8 +822,10 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                 type="button"
                 key={item.entry_id}
                 className="tcg-card"
+                data-missing={Boolean(item.missing || item.stack_entries?.some(entry => entry.missing))}
                 style={{ cursor: 'pointer', touchAction: 'pan-y' }}
                 aria-label={pairedCardName(item)}
+                aria-describedby={item.in_deck_qty > 0 || item.stack_entries?.some(entry => entry.in_deck_qty > 0) ? `${deckStatusId}-${item.entry_id}` : undefined}
                 aria-pressed={selectMode ? selected : undefined}
                 disabled={bulkPending}
                 aria-haspopup={selectMode ? undefined : 'dialog'}
@@ -843,6 +847,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                 </span>
                 <span className="tcg-card-info">
                   <span className="tcg-card-name">{pairedCardName(item)}</span>
+                  <CardDeckStatus card={item} id={`${deckStatusId}-${item.entry_id}`} />
                   <span className="tcg-card-meta">
                     <span>{item.set_name} • #{item.number}</span>
                   </span>
@@ -880,7 +885,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                 {pageCards.map((item) => {
                   const selected = selectedIds.has(item.entry_id);
                   return (
-                  <tr key={item.entry_id} style={selected ? { background: 'var(--surface-2)' } : undefined}>
+                  <tr key={item.entry_id} data-missing={Boolean(item.missing || item.stack_entries?.some(entry => entry.missing))} style={selected ? { background: 'var(--surface-2)' } : undefined}>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         {selectMode && (
@@ -920,6 +925,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                           <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
                             {item.printing} • {item.condition}
                           </div>
+                          <CardDeckStatus card={item} />
                           {!selectMode && (
                             <div style={{ display: 'flex', gap: '0.35rem', marginTop: '2px' }}>
                               <button className="btn btn-secondary btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => openEdit(item)} title={t('common.edit')} aria-label={t('common.edit')}>

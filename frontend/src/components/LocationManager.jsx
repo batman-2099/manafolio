@@ -14,6 +14,7 @@ import CompartmentView, { FocusedCardInfo, getSortCategories } from './Compartme
 import { SortBuilder, FilterBuilder } from './SortFilterBuilder';
 import CreateContainerModal from './CreateContainerModal';
 import CardImage from './CardImage';
+import CardDeckStatus from './CardDeckStatus';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
 import Modal from './Modal';
@@ -2498,6 +2499,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                     <button
                       key={card.entry_id}
                       type="button"
+                      data-missing={Boolean(card.missing || card.stack_entries?.some(entry => entry.missing))}
                       disabled={storage.bulkPending}
                       onClick={() => storage.selectMode ? storage.toggleSelect(card.entry_id) : setInspectorCard(card)}
                       style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', padding: '0.25rem', border: selected ? '2px solid var(--accent-red)' : '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', background: selected ? 'var(--surface-2)' : 'var(--surface-1)', cursor: 'pointer' }}
@@ -2515,21 +2517,15 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       <span style={{ width: '100%', marginTop: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.875rem', overflowWrap: 'anywhere' }}>
                         {t('stocktake.lastVerified', { date: card.last_verified_at ? new Date(card.last_verified_at).toLocaleDateString(locale) : t('stocktake.never') })}
                       </span>
+                      {(card.missing || card.stack_entries?.some(entry => entry.missing)) && (
+                        <span className="card-missing-status">{t('inspector.missing')}</span>
+                      )}
+                      <CardDeckStatus card={card} />
                       {foilQuantity > 0 && (
                         <span style={{ position: 'absolute', top: '0.35rem', left: '0.35rem', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, ...getPrintingBadgeStyle('Holofoil') }}>
                           {getPrintingBadgeLabel('Holofoil')}{foilQuantity < card.quantity && ` ${foilQuantity}/${card.quantity}`}
                         </span>
                       )}
-                      {card.in_deck_qty > 0 && (
-                        <span title={`${t('loc.inPlay')}: ${card.deck_names}`} style={{ position: 'absolute', right: '0.35rem', bottom: '1.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.45rem', borderRadius: '999px', background: 'var(--media-background)', border: '2px solid var(--accent-red)', color: 'var(--media-foreground)', fontSize: '0.85rem', fontWeight: 800 }}>
-                          <Layers size={14} /> {card.in_deck_qty < card.quantity ? `${card.in_deck_qty}/${card.quantity} Out` : t('loc.inPlay')}
-                        </span>
-                      )}
-                      {card.missing ? (
-                        <span style={{ position: 'absolute', left: '0.35rem', bottom: '1.35rem', padding: '0.25rem 0.45rem', borderRadius: '999px', background: 'var(--accent-red)', color: 'var(--media-foreground)', fontSize: '0.85rem', fontWeight: 800 }}>
-                          {t('inspector.missing')}
-                        </span>
-                      ) : null}
                     </button>
                   );
                       })}

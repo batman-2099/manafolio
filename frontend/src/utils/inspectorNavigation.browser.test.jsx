@@ -20,8 +20,13 @@ export async function runInspectorNavigationRegressions() {
   cards[2] = { ...cards[2], stack_entries: [{ ...cards[2] }, { ...cards[2], entry_id: 4, quantity: 1 }] };
   let settle;
   let updates = 0;
+  let deckLookupFails = true;
   window.fetch = async (url, options = {}) => {
     if (options.method === 'PUT') return new Promise(resolve => { settle = () => resolve({ ok: true }); });
+    if (url.startsWith('/api/collection?')) return { ok: !deckLookupFails, json: async () => cards.map((card, index) => ({
+      ...card, checked_out_qty: index === 0 ? 1 : 0, in_deck_qty: index < 2 ? 1 : 0,
+      deck_allocations: index < 2 ? [{ deck_id: index + 1, name: index === 0 ? 'Reserved sample' : 'Pulled sample', quantity: 1, checked_out: index === 0 }] : [],
+    })) };
     if (url === '/api/sets?game=mtg') return { ok: true, json: async () => [{ id: 'mtg-set1', symbol_url: '/logo.svg' }] };
     if (url.startsWith('/api/locations?') || url === '/api/decks' || url.includes('price-history')) return { ok: true, json: async () => [] };
     if (url.includes('card-art')) return { ok: true, json: async () => ({}) };
@@ -38,6 +43,11 @@ export async function runInspectorNavigationRegressions() {
   const setDetails = () => [...host.querySelectorAll('p')].find(node => node.textContent.includes('Sample Set'));
   try {
     await act(async () => root.render(<Preview />));
+    assert(host.textContent.includes(en['loc.errLoadCards']), 'missing dashboard allocation data must report lookup failures');
+    deckLookupFails = false;
+    await click(button(en['loc.retry']));
+    assert(host.querySelector('.card-deck-status [role="list"]')?.textContent.includes('Reserved sample'),
+      'retry must show the current stored entry allocation, not another copy of the printing');
     assert(previous().disabled && !next().disabled, 'first card has only next available');
     assert(setDetails().textContent.includes('Sample Set 1') && setDetails().querySelector('img')?.getAttribute('src') === '/logo.svg', 'set metadata shows the current symbol beside the name');
     assert(host.textContent.split('Sample Set 1').length === 2, 'the set name is not duplicated under Printing');
@@ -57,6 +67,8 @@ export async function runInspectorNavigationRegressions() {
     assert(host.querySelector('.section-heading').textContent.includes('Sample 2'), 'same-printing entries navigate by entry identity');
     assert(setDetails().textContent.includes('Sample Set 2') && !setDetails().querySelector('img'), 'navigation keeps the set name without leaking the previous set symbol');
     assert(host.querySelectorAll('.ci-image-col .ci-image-wrap').length === 1, 'unpaired card does not retain the previous reverse artwork');
+    assert(host.querySelector('.card-deck-status [role="list"]')?.textContent.includes('Pulled sample')
+      && !host.textContent.includes('Reserved sample'), 'navigation must replace deck allocation details with the new entry');
     await click(button(en['inspector.editCard']));
     const notes = host.querySelector('textarea');
     await act(async () => {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { Plus, Minus, Trash2, Copy, X, ChevronLeft, Play, BarChart2, Search, LogOut, PackageCheck, LayoutGrid, List, Download, Upload, Eye, Filter, CheckCircle, AlertTriangle, Layers, Zap, Swords, Gamepad2, SlidersHorizontal, ArrowRight, FolderPlus, FileText, MapPin, Share2 } from 'lucide-react';
+import { Plus, Minus, Trash2, Copy, X, ChevronLeft, Play, BarChart2, Search, LogOut, PackageCheck, LayoutGrid, List, Download, Upload, Eye, Filter, CheckCircle, AlertTriangle, Layers, Zap, Swords, SlidersHorizontal, FolderPlus, FileText, MapPin, Share2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { shuffleArray } from '../utils/shuffle';
 import { displayName } from '../utils/languages';
@@ -110,7 +110,6 @@ function ManaCounts({ deck }) {
 
 function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const { t } = useT();
-  const cardsHeadingRef = useRef(null);
   const [compactEditor, setCompactEditor] = useState(() => window.matchMedia('(max-width: 768px)').matches);
   useEffect(() => {
     const media = window.matchMedia('(max-width: 768px)');
@@ -118,7 +117,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
-  const addCardsInputRef = useRef(null);
   const [decks, setDecks] = useState([]);
   const [activeDeck, setActiveDeck] = useState(null);
   const [savedEditorState, setSavedEditorState] = useState(null);
@@ -143,17 +141,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
   // Deck Creation States & Constants
   const DECK_CATEGORIES = ['Competitive', 'Casual', 'Tournament', 'Theorycraft', 'Proxy', 'Trade'];
-  const DECK_ACCENT_COLORS = [
-    { name: 'Gold', hex: '#eab308' },
-    { name: 'Red', hex: '#ef4444' },
-    { name: 'Blue', hex: '#3b82f6' },
-    { name: 'Green', hex: '#10b981' },
-    { name: 'Purple', hex: '#a855f7' },
-    { name: 'Slate', hex: '#64748b' },
-    { name: 'Pink', hex: '#ec4899' },
-    { name: 'Orange', hex: '#f97316' },
-  ];
-
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAcquisitionPlanner, setShowAcquisitionPlanner] = useState(false);
   const [creatingDeck, setCreatingDeck] = useState(false);
@@ -171,7 +158,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const [newDeckInventoryType, setNewDeckInventoryType] = useState('collection');
   const [newDeckFormat, setNewDeckFormat] = useState(NEW_DECK_DEFAULTS.format);
   const [newDeckCategory, setNewDeckCategory] = useState('Competitive');
-  const [newDeckAccentColor, setNewDeckAccentColor] = useState('#eab308');
   const [newDeckTargetSize, setNewDeckTargetSize] = useState(String(NEW_DECK_DEFAULTS.targetSize));
   const [newDeckImportText, setNewDeckImportText] = useState('');
   const [newDeckImportFormat, setNewDeckImportFormat] = useState('plain');
@@ -445,7 +431,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     setNewDeckDesc('');
     setNewDeckFormat(NEW_DECK_DEFAULTS.format);
     setNewDeckCategory('Competitive');
-    setNewDeckAccentColor('#eab308');
     setNewDeckTargetSize(String(NEW_DECK_DEFAULTS.targetSize));
     setNewDeckImportText('');
     setNewDeckImportFormat('plain');
@@ -513,7 +498,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
           game: 'mtg',
           format: newDeckFormat,
           category: newDeckCategory,
-          accent_color: newDeckAccentColor,
           target_size: targetSize,
           decklist_text: newDeckImportText,
           decklist_format: newDeckImportFormat,
@@ -1655,7 +1639,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 const isComplete = totalCards >= targetSize;
                 const hasMissingCards = deck.missing_cards > 0;
                 const percent = Math.min(100, Math.round((totalCards / targetSize) * 100));
-                const accentColor = deck.accent_color || '#ef4444';
 
                 return (
                   <div
@@ -1669,12 +1652,9 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                       e.currentTarget.style.backgroundColor = '';
                     }}
                   >
-                    <span className="deck-accent-marker" style={{ backgroundColor: accentColor }} aria-hidden="true" />
-
                     {/* In Play Banner */}
                     {deck.checked_out ? (
                       <div className="deck-in-play">
-                        <Gamepad2 size={12} />
                         <span>{t('deck.inPlay')}</span>
                         {deck.checked_out_at && (
                           <span style={{ marginLeft: 'auto', opacity: 0.8, fontWeight: 600 }}>
@@ -1689,7 +1669,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                             <h3 style={{ color: 'var(--text-strong)', fontSize: 'var(--text-lg)', fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>
-                              {deck.name}
+                              <button type="button" className="deck-name-button" onClick={event => { event.stopPropagation(); loadDeckDetails(deck.id); }}>{deck.name}</button>
                             </h3>
                             <span style={{
                               fontSize: 'var(--text-sm)',
@@ -1822,15 +1802,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                         ))}
 
                         <button
-                          className="btn btn-primary"
-                          style={{ padding: '0.3rem 0.65rem', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '4px' }}
-                          onClick={(e) => { e.stopPropagation(); loadDeckDetails(deck.id); }}
-                        >
-                          Open <ArrowRight size={12} />
-                        </button>
-
-
-                        <button
                           className="btn btn-secondary"
                           style={{ padding: '0.3rem 0.65rem', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: '4px' }}
                           onClick={(e) => { e.stopPropagation(); handleDuplicateDeck(deck.id); }}
@@ -1885,7 +1856,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                       >
                         <td data-label={t('deck.deckName')} style={{ padding: '0.75rem 1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{deck.name}</span>
+                            <button type="button" className="deck-name-button" onClick={event => { event.stopPropagation(); loadDeckDetails(deck.id); }}>{deck.name}</button>
                           </div>
                         </td>
                         <td data-label={t('deck.format')} style={{ padding: '0.75rem 1rem' }}>
@@ -1933,7 +1904,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                             </span>
                           ) : deck.checked_out ? (
                             <span style={{ fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: 'var(--surface-2)', color: 'var(--accent-yellow)', border: '1px solid var(--border-glass)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <Gamepad2 size={11} /> {t('deck.inPlay')}
+                              {t('deck.inPlay')}
                             </span>
                           ) : isComplete ? (
                             <span style={{ fontWeight: 700, padding: '2px 8px', borderRadius: '10px', background: 'var(--surface-2)', color: 'var(--accent-green)', border: '1px solid var(--border-glass)' }}>
@@ -1956,9 +1927,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                                 {t('deck.checkout')}
                               </button>
                             ))}
-                            <button className="btn btn-primary" style={{ padding: '0.25rem 0.6rem', fontSize: 'inherit' }} onClick={() => loadDeckDetails(deck.id)}>
-                              {t('deck.open')}
-                            </button>
                             <button className="btn btn-secondary btn-icon-only" style={{ padding: '0.25rem' }} onClick={() => handleDuplicateDeck(deck.id)} aria-label={t('deck.duplicateDeck')} title={t('deck.duplicateDeck')}>
                               <Copy size={12} />
                             </button>
@@ -2016,18 +1984,12 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     <input type="number" min="1" max="300" className="input-control" value={deckDraft.target_size} onChange={(event) => setDeckDraft({ ...deckDraft, target_size: event.target.value })} />
                   </label>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.75rem', alignItems: 'end' }}>
-                  <label className="form-group" style={{ margin: 0 }}>
-                    {t('deck.category')}
-                    <select className="input-control" value={deckDraft.category} onChange={(event) => setDeckDraft({ ...deckDraft, category: event.target.value })}>
-                      {DECK_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
-                    </select>
-                  </label>
-                  <label className="form-group" style={{ margin: 0 }}>
-                    {t('deck.accentColor')}
-                    <input type="color" value={deckDraft.accent_color} onChange={(event) => setDeckDraft({ ...deckDraft, accent_color: event.target.value })} style={{ display: 'block', width: '42px', height: '38px', padding: 0, border: 0, background: 'none' }} />
-                  </label>
-                </div>
+                <label className="form-group" style={{ margin: 0 }}>
+                  {t('deck.category')}
+                  <select className="input-control" value={deckDraft.category} onChange={(event) => setDeckDraft({ ...deckDraft, category: event.target.value })}>
+                    {DECK_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                  </select>
+                </label>
                 <label className="form-group" style={{ margin: 0 }}>
                   {t('deck.descriptionOptional')}
                   <textarea className="input-control" style={{ minHeight: '80px', resize: 'vertical' }} value={deckDraft.description} onChange={(event) => setDeckDraft({ ...deckDraft, description: event.target.value })} />
@@ -2036,7 +1998,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   <button className="btn btn-secondary" onClick={() => setDeckDraft(null)}>{t('common.cancel')}</button>
                   <button className="btn btn-primary" disabled={!deckDraft.name.trim() || !Number.isInteger(Number(deckDraft.target_size)) || Number(deckDraft.target_size) < 1 || Number(deckDraft.target_size) > 300 || editorBusy} onClick={handleApplyDeckProperties}>{t('deck.applyProperties')}</button>
                 </div>
-                <p style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', margin: 0 }}>{t('deck.saveDraftHint')}</p>
                 </fieldset>
               </div>
             </Modal>
@@ -2057,59 +2018,11 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                     ({totalDeckCardsCount}/{targetDeckCardsCount} cards)
                   </span>
                   {hasUnsavedChanges && <span role="status" style={{ fontSize: 'var(--text-sm)', color: 'var(--accent-yellow)' }}>{t('deck.unsavedChanges')}</span>}
-                  {activeDeck.checked_out ? (
-                    <span style={{
-                      fontSize: 'var(--text-sm)',
-                      background: 'var(--surface-2)',
-                      border: '1px solid var(--border-glass)',
-                      color: 'var(--accent-yellow)',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      fontWeight: 700,
-                      letterSpacing: 'normal',
-                      textTransform: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}>
-                      <Gamepad2 size={14} aria-hidden="true" /> {t('deck.inPlay')}
-                    </span>
-                  ) : null}
                 </h2>
-                {!!activeDeck.checked_out && activeDeck.checked_out_at && (
-                  <p style={{ color: 'var(--accent-yellow)', fontSize: 'var(--text-sm)', marginTop: '2px' }}>
-                    Checked out since {new Date(activeDeck.checked_out_at).toLocaleString()}
-                  </p>
-                )}
               </div>
             </div>
 
-            <div className="deck-primary-actions">
-              {/* Checkout / Return button */}
-              {activeDeck.inventory_type === 'collection' && (activeDeck.checked_out ? (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => handleReturn(activeDeck)}
-                  disabled={editorBusy}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', border: '1px solid var(--border-glass)', color: 'var(--accent-yellow)' }}
-                >
-                  <PackageCheck size={14} /> Return to Storage
-                </button>
-              ) : (
-                <button
-                  className={`btn ${hasUnsavedChanges ? 'btn-secondary' : 'btn-primary'}`}
-                  onClick={() => handleCheckout(activeDeck)}
-                  disabled={editorBusy}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                >
-                  <LogOut size={14} /> Check Out for Play
-                </button>
-              ))}
-              <button className="btn btn-primary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
-            </div>
-            <details className="deck-actions-disclosure" open={!compactEditor}>
-              <summary>{t('deck.moreActions')}</summary>
-              <div className="deck-tools">
+            <div className="deck-tools">
               <button className="btn btn-secondary" disabled={editorBusy || savingRecord} onClick={() => setShowHistory(true)}>{t('history.title')}</button>
               {activeDeck.game === 'mtg' && (
                 <button className="btn btn-secondary" disabled={editorBusy || savingRecord} onClick={event => {
@@ -2184,16 +2097,30 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 </div>
               )}
             </div>
-            </details>
-          </div>
-            <div className="deck-jump-controls">
-              <button type="button" className="btn btn-secondary" onClick={() => cardsHeadingRef.current?.focus()}>
-                {t('deck.jumpToCards')} <ArrowRight size={14} aria-hidden="true" />
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => addCardsInputRef.current?.focus()}>
-                {t('deck.jumpToAddCards')} <ArrowRight size={14} aria-hidden="true" />
-              </button>
+            <div className="deck-primary-actions">
+              {/* Checkout / Return button */}
+              {activeDeck.inventory_type === 'collection' && (activeDeck.checked_out ? (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => handleReturn(activeDeck)}
+                  disabled={editorBusy}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', border: '1px solid var(--border-glass)', color: 'var(--accent-yellow)' }}
+                >
+                  <PackageCheck size={14} /> Return to Storage
+                </button>
+              ) : (
+                <button
+                  className={`btn ${hasUnsavedChanges ? 'btn-secondary' : 'btn-primary'}`}
+                  onClick={() => handleCheckout(activeDeck)}
+                  disabled={editorBusy}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <LogOut size={14} /> Check Out for Play
+                </button>
+              ))}
+              <button className="btn btn-primary" disabled={!hasUnsavedChanges || editorBusy || savingRecord || searching || !!deckDraft} onClick={() => handleSaveDeck()}>{t(savingDeck ? 'deck.saving' : 'common.save')}</button>
             </div>
+          </div>
           {saveDeckError && !previewDeckCard && <p role="alert" className="deck-source-error">{saveDeckError} {t('deck.saveRetryHint')}</p>}
 
 
@@ -2211,7 +2138,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
               fontSize: 'var(--text-md)',
               color: 'var(--accent-yellow)'
             }}>
-              <Gamepad2 size={20} aria-hidden="true" />
               <div>
                 <strong>{t('deck.checkedOutBanner')}</strong>
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: '2px' }}>
@@ -2235,7 +2161,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                   </div>
                   <form onSubmit={handleSearchCards} className="deck-search-form">
                     <input
-                      ref={addCardsInputRef}
                       type="text"
                       aria-label={t('deck.searchPlaceholder')}
                       className="input-control"
@@ -2317,7 +2242,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                 {/* Deck Cards Header & Display Mode Toggle */}
                 <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <h3 ref={cardsHeadingRef} tabIndex={-1} className="deck-cards-heading" style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)', margin: 0 }}>
+                    <h3 className="deck-cards-heading" style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)', margin: 0 }}>
                       Deck Cards ({totalDeckCardsCount} / {targetDeckCardsCount})
                     </h3>
                     <div className="deck-display-controls">
@@ -2656,36 +2581,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
                       >
                         {cat}
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Deck Accent Color */}
-              <div className="form-group">
-                <label style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-strong)', marginBottom: '0.4rem', display: 'block' }}>{t('deck.accentColor')}</label>
-                <div style={{ display: 'flex', itemsAlign: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {DECK_ACCENT_COLORS.map(c => {
-                    const isSelected = newDeckAccentColor === c.hex;
-                    return (
-                      <button
-                        type="button"
-                        key={c.hex}
-                        aria-label={c.name}
-                        aria-pressed={isSelected}
-                        onClick={() => setNewDeckAccentColor(c.hex)}
-                        title={c.name}
-                        style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '50%',
-                          backgroundColor: c.hex,
-                          cursor: 'pointer',
-                          border: isSelected ? '2px solid var(--text-strong)' : '2px solid transparent',
-                          transform: isSelected ? 'scale(1.15)' : 'scale(1)',
-                          transition: 'transform 0.15s'
-                        }}
-                      />
                     );
                   })}
                 </div>
