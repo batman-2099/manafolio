@@ -59,6 +59,10 @@ jobs:
             target: macos-arm64
             exe: manafolio-server
             archive: tar
+          - os: macos-15-intel
+            target: macos-x64
+            exe: manafolio-server
+            archive: tar
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -309,7 +313,7 @@ jobs:
         run: |
           APP=build/dmg/Manafolio.app
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-          swiftc -target arm64-apple-macos14.4 backend/macos/Manafolio.swift -o "$APP/Contents/MacOS/Manafolio"
+          swiftc -target "$(uname -m)-apple-macos14.4" backend/macos/Manafolio.swift -o "$APP/Contents/MacOS/Manafolio"
           cp -R build/manafolio-server "$APP/Contents/Resources/server"
           cat > "$APP/Contents/Info.plist" <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
@@ -341,24 +345,24 @@ jobs:
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict "$APP"
           ln -s /Applications build/dmg/Applications
-          hdiutil create -volname Manafolio -srcfolder build/dmg -format UDZO build/Manafolio-macos-arm64.dmg
+          hdiutil create -volname Manafolio -srcfolder build/dmg -format UDZO build/Manafolio-${{ matrix.target }}.dmg
 
       - name: Smoke test mounted macOS DMG
         if: runner.os == 'macOS'
         run: |
           mkdir -p build/dmg-mounted
-          hdiutil attach build/Manafolio-macos-arm64.dmg -readonly -nobrowse -mountpoint "$PWD/build/dmg-mounted"
+          hdiutil attach build/Manafolio-${{ matrix.target }}.dmg -readonly -nobrowse -mountpoint "$PWD/build/dmg-mounted"
           trap 'hdiutil detach "$PWD/build/dmg-mounted"' EXIT
           node backend/scripts/smoke-package.js "$PWD/build/dmg-mounted/Manafolio.app/Contents/Resources/server/manafolio-server"
           cp -R build/dmg-mounted/Manafolio.app build/mac-wrapper-smoke.app
-          swiftc -D SMOKE_TEST -target arm64-apple-macos14.4 backend/macos/Manafolio.swift -o build/mac-wrapper-smoke.app/Contents/MacOS/Manafolio
+          swiftc -D SMOKE_TEST -target "$(uname -m)-apple-macos14.4" backend/macos/Manafolio.swift -o build/mac-wrapper-smoke.app/Contents/MacOS/Manafolio
           codesign --force --deep --sign - build/mac-wrapper-smoke.app
           node backend/scripts/smoke-macos.js "$PWD/build/mac-wrapper-smoke.app" "$PWD/build/mac-wrapper-smoke-data"
 
       - uses: actions/upload-artifact@v4
         if: always() && runner.os == 'macOS'
         with:
-          name: manafolio-macos-wrapper-smoke
+          name: manafolio-${{ matrix.target }}-wrapper-smoke
           path: |
             build/mac-wrapper-smoke-data/Library/Application Support/Manafolio/wrapper.png
             build/mac-wrapper-smoke-data/Library/Application Support/Manafolio/desktop.log
@@ -366,14 +370,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: runner.os == 'macOS'
         with:
-          name: manafolio-server-macos-arm64-dmg
-          path: build/Manafolio-macos-arm64.dmg
+          name: manafolio-server-${{ matrix.target }}-dmg
+          path: build/Manafolio-${{ matrix.target }}.dmg
 
       - name: Attach DMG to release
         if: github.ref_type == 'tag' && runner.os == 'macOS'
         uses: softprops/action-gh-release@v2
         with:
-          files: build/Manafolio-macos-arm64.dmg
+          files: build/Manafolio-${{ matrix.target }}.dmg
 
       - uses: actions/upload-artifact@v4
         with:
