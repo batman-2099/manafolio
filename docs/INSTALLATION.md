@@ -57,13 +57,18 @@ The server retains its normal network behavior, including LAN access. Protect ac
 
 ## macOS DMG
 
-Tagged releases also build `Manafolio-macos-arm64.dmg` for **Apple Silicon Macs running macOS 14.4 or later**. Download it from [GitHub Releases](https://github.com/batman-2099/manafolio/releases), open the disk image, drag **Manafolio.app** into **Applications**, and eject the image. The existing macOS `.tar.gz` server archive remains available.
+macOS desktop packages require **macOS 14.4 or later**. Choose the package for your processor:
+
+- **Apple Silicon:** [`Manafolio-macos-arm64.dmg`](https://github.com/batman-2099/manafolio/releases/latest/download/Manafolio-macos-arm64.dmg).
+- **Intel x86-64:** [`Manafolio-macos-x64.dmg`](https://github.com/batman-2099/manafolio/releases/latest/download/Manafolio-macos-x64.dmg).
+
+Open the disk image, drag **Manafolio.app** into **Applications**, and eject the image. Matching `Manafolio-macos-arm64.tar.gz` and `Manafolio-macos-x64.tar.gz` server archives are available from [GitHub Releases](https://github.com/batman-2099/manafolio/releases). Intel packages build the locked ONNX Runtime version from source because its npm package does not include an Intel macOS binary.
 
 Open **Manafolio** from Applications. The app starts its bundled server in the background and displays Manafolio inside a native WebKit window; no Terminal or browser is required. Closing the window or pressing **Command+Q** asks for confirmation, then drains active server requests and database writes. After 30 seconds, choose **Keep waiting** unless you explicitly accept the risk of losing in-flight work with **Force quit**. Finish saves/imports before quitting. Stop an older Terminal-launched server before opening the new app; a port conflict is reported instead of silently connecting to another process.
 
 File imports and exports use macOS Open/Save dialogs. The Edit menu supports clipboard shortcuts; View offers Back, Forward, Reload, zoom, and Print. Camera access requires permission. External links open in your default browser; HTTP(S) sign-in redirects remain in the app's web session, although identity providers may disallow embedded browsers. The app has its own persistent WebKit session, separate from Safari/Chrome; sign in again after switching from the old browser launcher.
 
-The bundle is ad-hoc signed, **not Developer ID signed or notarized**. Gatekeeper may block a downloaded copy. Only if you trust the release, use macOS **System Settings → Privacy & Security → Open Anyway** after the first launch attempt. Do not disable Gatekeeper globally. Intel Macs are not supported by this artifact.
+The bundle is ad-hoc signed, **not Developer ID signed or notarized**. Gatekeeper may block a downloaded copy. Only if you trust the release, use macOS **System Settings → Privacy & Security → Open Anyway** after the first launch attempt. Do not disable Gatekeeper globally.
 
 Persistent files live in `~/Library/Application Support/Manafolio/`: `manafolio.db`, backups, artwork, TLS material, and `models/` for downloaded scan assets. Put optional configuration in that directory's `.env`, using [`.env.example`](../.env.example) as a reference. Environment variables take precedence; `DB_PATH` and `CV_MODEL_DIR` override the defaults. Relative configuration paths resolve from this data directory. Startup/server output goes to `desktop.log` there, replaced on each launch and capped at 4 MiB; startup failures offer **Show log**.
 
