@@ -14,36 +14,30 @@ Manafolio is a self-hosted, multi-user collection, storage, and deck manager for
 
 Built with React, Express, and SQLite, it runs as a desktop app on Linux, macOS, and Windows, as one Docker service, or from source. The web interface also works in desktop and phone browsers. No hosted Manafolio account or AI subscription is required.
 
-## Features
-
-- **Separate inventories:** Physical and Arena collections, Wishlist acquisition plans, and Graveyard archives. Wishlist and Graveyard do not inflate owned totals.
-- **Collection management:** Search exact printings, track condition, finish, language, purchase prices, and graded slabs; check set completion and estimated value.
-- **[Double-sided tokens](docs/USER_GUIDE.md#track-a-double-sided-token):** Choose a reverse from any set when adding a token, or leave an unknown/blank back unpaired. A unique collector-number match selects the reverse automatically. Search either face and see both images in card details and container galleries, while tracking one physical quantity, storage location, and checkout allocation. Cards from Token/Tokens sets are recognized as tokens even without token type metadata.
-- **Physical storage:** Organize boxes and binders by page, row, and slot; group containers into storage units, print QR labels, and reconcile copies with Take Stock.
-- **[Tokens in storage](docs/USER_GUIDE.md#capacity-stacking-and-locks):** Container galleries give tokens their own section. Deck Boxes exclude tokens from card totals and over-limit warnings; other container types still count them. Tokens remain selectable and included in Take Stock.
-- **Deck building and play:** Import lists and precons, including supplied tokens with known quantities and explicitly selected verified token editions; tokens stay separate from playable deck totals. Choose commanders, simulate draws, track results, compare revisions, and reserve physical copies with storage-aware pull lists.
-- **Planning and trading:** Combine deck shortfalls into a Shopping List, add confirmed deficits to Wishlist, and review both sides of a Physical inventory exchange.
-- **Import, export, and recovery:** Review collection imports, export filtered views or decklists, and create complete account backups and server snapshots.
-- **Scanning and price checks:** Identify printing candidates with local models and OCR. Review scans before adding inventory, or check prices without adding cards. Requires [server scan setup](docs/INSTALLATION.md#card-scanning).
-- **Optional AI:** Use your own ChatGPT/Codex account, Gemini or OpenRouter key, or Ollama service; review and edit suggestions before saving.
-- **Your own server:** Multi-user accounts, invite-only registration by default, read-only API keys, opt-in public shares, account themes, translated interfaces, and opt-in text-only offline collection lookup.
-
 ## Install
 
 ### Desktop apps
 
 Download the package for your platform from [GitHub Releases](https://github.com/batman-2099/manafolio/releases). Each desktop app includes its own window and bundled server; no separate Node.js installation or browser is needed.
 
-| Platform | Download | Install and launch |
-| --- | --- | --- |
-| **Linux x86-64** — Ubuntu 22.04 or compatible newer desktop distributions | [`Manafolio-linux-x64.AppImage`](https://github.com/batman-2099/manafolio/releases/latest/download/Manafolio-linux-x64.AppImage) | Make it executable with `chmod +x Manafolio-linux-x64.AppImage`, then open it. See [Linux requirements and FUSE troubleshooting](docs/INSTALLATION.md#linux-appimage). |
-| **macOS 14.4+ on Apple Silicon** | [`Manafolio-macos-arm64.dmg`](https://github.com/batman-2099/manafolio/releases/latest/download/Manafolio-macos-arm64.dmg) | Open the DMG, drag **Manafolio.app** to **Applications**, then launch it. See [macOS installation](docs/INSTALLATION.md#macos-dmg). |
-| **macOS 14.4+ on Intel x86-64** | [`Manafolio-macos-x64.dmg`](https://github.com/batman-2099/manafolio/releases/latest/download/Manafolio-macos-x64.dmg) | Open the DMG, drag **Manafolio.app** to **Applications**, then launch it. See [macOS installation](docs/INSTALLATION.md#macos-dmg). |
-| **Windows 10+ x64** | [`Manafolio-Setup-windows-x64.exe`](https://github.com/batman-2099/manafolio/releases/latest/download/Manafolio-Setup-windows-x64.exe) | Run Setup, then open **Manafolio** from the Start Menu. Installs for the current user without administrator privileges; a desktop shortcut is optional. See [Windows installation](docs/INSTALLATION.md#windows-installer). |
+| Platform | Download |
+| --- | --- |
+| **Linux x86-64** — Ubuntu 22.04 or compatible newer desktop distributions | [`Manafolio-linux-x64.AppImage`](https://github.com/batman-2099/manafolio/releases/latest/download/Manafolio-linux-x64.AppImage) |
+| **macOS 14.4+ on Apple Silicon** | [`Manafolio-macos-arm64.dmg`](https://github.com/batman-2099/manafolio/releases/latest/download/Manafolio-macos-arm64.dmg) |
+| **macOS 14.4+ on Intel x86-64** | [`Manafolio-macos-x64.dmg`](https://github.com/batman-2099/manafolio/releases/latest/download/Manafolio-macos-x64.dmg) |
+| **Windows 10+ x64** | [`Manafolio-Setup-windows-x64.exe`](https://github.com/batman-2099/manafolio/releases/latest/download/Manafolio-Setup-windows-x64.exe) |
+
+**Install and launch**
+
+- **Linux:** Make it executable with `chmod +x Manafolio-linux-x64.AppImage`, then open it. See [Linux requirements and FUSE troubleshooting](docs/INSTALLATION.md#linux-appimage).
+- **macOS:** Open the DMG, drag **Manafolio.app** to **Applications**, then launch it. See [macOS installation](docs/INSTALLATION.md#macos-dmg).
+- **Windows:** Run Setup, then open **Manafolio** from the Start Menu. Installs for the current user without administrator privileges; a desktop shortcut is optional. See [Windows installation](docs/INSTALLATION.md#windows-installer).
 
 **Security notices:** the Windows installer is unsigned, and the macOS app is not Developer ID signed or notarized, so SmartScreen or Gatekeeper may warn. Download only from a trusted source and follow the platform-specific instructions above; do not disable system protections globally. On Linux, run as a normal user with Chromium's sandbox enabled.
 
-**Your data stays separate from the app.** Quit Manafolio and back up its data directory before updating; finish imports and saves before quitting. Existing Docker or server-archive data is **not imported automatically**—follow the [migration guide](docs/INSTALLATION.md#migrate-an-existing-installation). Scan models/catalogs and native OCR prerequisites are not bundled; see [scanning setup](docs/INSTALLATION.md#card-scanning). On Windows, use Docker for native scanning/OCR and ChatGPT/Codex.
+**Your data stays separate from the app.** Quit Manafolio and back up its data directory before updating; finish imports and saves before quitting. Existing Docker or server-archive data is **not imported automatically**—follow the [migration guide](docs/INSTALLATION.md#migrate-an-existing-installation).
+
+**Scanning and AI prerequisites:** Scan models/catalogs and native OCR prerequisites are not bundled; see [scanning setup](docs/INSTALLATION.md#card-scanning). On Windows, use Docker for native scanning/OCR and ChatGPT/Codex.
 
 #### Allow Manafolio to open on macOS
 
@@ -73,6 +67,26 @@ The `manafolio-data` volume holds the database, backups, TLS material, scan mode
 **Existing installation?** Read the [offline migration procedure](docs/INSTALLATION.md#migrate-an-existing-installation) before starting a renamed or moved deployment. Back up the stopped data directory first; very old `sub_location_1` schemas are rejected without dropping their tables and require an explicit migration. An unexpected owner-creation screen means you should stop and check the volume mount and `DB_PATH`, not initialize a replacement collection.
 
 See the [installation guide](docs/INSTALLATION.md) for updates, configuration, HTTPS/reverse proxies, phone access, and scanning assets. Available environment variables are documented in [`.env.example`](.env.example).
+
+## Features
+
+- **Separate inventories:** Physical and Arena collections, Wishlist acquisition plans, and Graveyard archives. Wishlist and Graveyard do not inflate owned totals.
+- **Collection management:** Search exact printings, track condition, finish, language, purchase prices, and graded slabs; check set completion and estimated value.
+- **Physical storage:** Organize boxes and binders by page, row, and slot; group containers into storage units, print QR labels, and reconcile copies with Take Stock.
+- **Deck building and play:** Import lists and precons, including supplied tokens with known quantities and explicitly selected verified token editions; tokens stay separate from playable deck totals. Choose commanders, simulate draws, track results, compare revisions, and reserve physical copies with storage-aware pull lists.
+- **Planning and trading:** Combine deck shortfalls into a Shopping List, add confirmed deficits to Wishlist, and review both sides of a Physical inventory exchange.
+- **Import, export, and recovery:** Review collection imports, export filtered views or decklists, and create complete account backups and server snapshots.
+- **Scanning and price checks:** Identify printing candidates with local models and OCR. Review scans before adding inventory, or check prices without adding cards. Requires [server scan setup](docs/INSTALLATION.md#card-scanning).
+- **Optional AI:** Use your own ChatGPT/Codex account, Gemini or OpenRouter key, or Ollama service; review and edit suggestions before saving.
+- **Your own server:** Multi-user accounts, invite-only registration by default, read-only API keys, opt-in public shares, account themes, translated interfaces, and opt-in text-only offline collection lookup.
+
+<details>
+<summary>Double-sided tokens and storage rules</summary>
+
+- **[Double-sided tokens](docs/USER_GUIDE.md#track-a-double-sided-token):** Choose a reverse from any set when adding a token, or leave an unknown/blank back unpaired. A unique collector-number match selects the reverse automatically. Search either face and see both images in card details and container galleries, while tracking one physical quantity, storage location, and checkout allocation. Cards from Token/Tokens sets are recognized as tokens even without token type metadata.
+- **[Tokens in storage](docs/USER_GUIDE.md#capacity-stacking-and-locks):** Container galleries give tokens their own section. Deck Boxes exclude tokens from card totals and over-limit warnings; other container types still count them. Tokens remain selectable and included in Take Stock.
+
+</details>
 
 ## Screenshots
 
@@ -129,7 +143,7 @@ Choose inventory filters, format, play style, and target power level. Live AI re
 
 | Guide | What it covers |
 | --- | --- |
-| [Installation and administration](docs/INSTALLATION.md) | Docker, upgrades/migration, configuration, HTTPS, native SSO, scanning assets, and Ollama deployment |
+| [Installation and administration](docs/INSTALLATION.md) | Desktop installers, Docker, upgrades/migration, configuration, HTTPS, native SSO, scanning assets, and Ollama deployment |
 | [User guide](docs/USER_GUIDE.md) | Collection, storage, decks, trading, shopping, scanning, AI, sharing, and troubleshooting |
 | [Backup and restore](docs/USER_GUIDE.md#back-up-restore-or-move-account-data) | Complete account exports, destructive restore warnings, and format compatibility |
 | [Server backups](docs/USER_GUIDE.md#take-a-server-backup) | SQLite snapshots and offline whole-volume recovery precautions |
