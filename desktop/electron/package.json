@@ -1,6 +1,6 @@
 {
   "name": "manafolio-desktop",
-  "version": "2.4.5",
+  "version": "2.5.0",
   "private": true,
   "description": "Sandboxed desktop window for the packaged Manafolio server",
   "main": "main.cjs",
