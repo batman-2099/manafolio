@@ -7,7 +7,7 @@ import { I18nProvider } from './i18n';
 // Isolated Vite page only; every fetch is mocked, including AI generation/save.
 export async function runUiDeckRegressions() {
   const assert = (condition, message) => { if (!condition) throw new Error(message); };
-  const original = { fetch: window.fetch, confirm: window.confirm, open: window.open, matchMedia: window.matchMedia, pushState: history.pushState, back: history.back, act: globalThis.IS_REACT_ACT_ENVIRONMENT, clipboard: Object.getOwnPropertyDescriptor(navigator, 'clipboard') };
+  const original = { fetch: window.fetch, confirm: window.confirm, open: window.open, pushState: history.pushState, back: history.back, act: globalThis.IS_REACT_ACT_ENVIRONMENT, clipboard: Object.getOwnPropertyDescriptor(navigator, 'clipboard') };
   const originalLocale = localStorage.getItem('manafolio_ui_lang');
   const originalLang = document.documentElement.lang;
   localStorage.setItem('manafolio_ui_lang', 'en');
@@ -16,8 +16,6 @@ export async function runUiDeckRegressions() {
   const root = createRoot(host);
   const guard = { current: null };
   const toasts = [];
-  let compact = true;
-  let mediaChange;
   let settleSuggest;
   let settleSave;
   let settleCompare;
@@ -52,7 +50,6 @@ export async function runUiDeckRegressions() {
   // Keep guard stack behavior real without navigating the isolated test document.
   history.pushState = () => {};
   history.back = () => queueMicrotask(() => window.dispatchEvent(new PopStateEvent('popstate')));
-  window.matchMedia = query => query === '(max-width: 768px)' ? { get matches() { return compact; }, addEventListener: (_, listener) => { mediaChange = listener; }, removeEventListener: () => {} } : original.matchMedia.call(window, query);
   window.confirm = () => { confirms++; return false; };
   window.open = () => { opened++; return null; };
   window.fetch = async (url, options = {}) => {
@@ -126,16 +123,12 @@ export async function runUiDeckRegressions() {
     const cards = host.querySelector('.deck-cards-heading');
     const overview = host.querySelector('.deck-summary-layout');
     assert(cards && overview, `saved deck must load card editing and overview; notices: ${JSON.stringify(toasts)}`);
-    assert(cards.compareDocumentPosition(overview) & Node.DOCUMENT_POSITION_FOLLOWING, 'mobile card list must precede analytics in DOM');
+    assert(host.querySelector('.deck-editor-header').compareDocumentPosition(overview) & Node.DOCUMENT_POSITION_FOLLOWING, 'deck overview must follow the name and actions');
+    assert(overview.compareDocumentPosition(cards) & Node.DOCUMENT_POSITION_FOLLOWING, 'deck overview must precede card editing on every screen');
     assert(button('deck.share').checkVisibility()
       && host.querySelector('[title="' + en['deck.exportHint'] + '"]').checkVisibility(),
     'mobile deck actions must be visible without expanding a menu');
     assert(host.querySelectorAll('[title="' + en['deck.exportHint'] + '"]').length === 1, 'responsive actions exist only once');
-    await act(async () => { compact = false; mediaChange(); });
-    assert(host.querySelector('.deck-summary-layout').compareDocumentPosition(host.querySelector('.deck-cards-heading')) & Node.DOCUMENT_POSITION_FOLLOWING, 'desktop preserves overview before card list');
-    assert(button('deck.share').checkVisibility()
-      && host.querySelector('[title="' + en['deck.exportHint'] + '"]').checkVisibility(),
-    'desktop deck actions remain visible after a viewport change');
     const exportTrigger = host.querySelector(`[title="${en['deck.exportHint']}"]`);
     await click(exportTrigger);
     assert(host.querySelector('dialog[open]').contains(document.activeElement), 'native export must own focus');
@@ -241,7 +234,6 @@ export async function runUiDeckRegressions() {
     window.fetch = original.fetch;
     window.confirm = original.confirm;
     window.open = original.open;
-    window.matchMedia = original.matchMedia;
     history.pushState = original.pushState;
     history.back = original.back;
     if (original.clipboard) Object.defineProperty(navigator, 'clipboard', original.clipboard); else delete navigator.clipboard;

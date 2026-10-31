@@ -16,6 +16,8 @@ Open `http://localhost:3001`. Without `DEFAULT_ADMIN_PASSWORD`, the first browse
 
 The `manafolio-data` volume contains the SQLite database, automatic backups, TLS material, scan models, and catalogs. To configure optional variables in Compose, uncomment the `environment:` header and the desired entries below it; [`.env.example`](../.env.example) documents available settings. Builds use local source, not an assumed published image or binary. After updating your checkout, run `docker compose up -d --build` again. Existing installations must follow the [migration instructions](#migrate-an-existing-installation) first.
 
+Finish imports and saves before updating or stopping the container. Compose allows two minutes for graceful shutdown; after that deadline Docker can forcibly terminate unfinished work. The server warns after 30 seconds if it is still draining. A longer grace period is not a substitute for completing active operations and taking a backup.
+
 ## Windows installer
 
 Tagged releases also build `Manafolio-Setup-windows-x64.exe` for **64-bit Windows 10 or later**. Download it from [GitHub Releases](https://github.com/batman-2099/manafolio/releases), run Setup, and open **Manafolio** from the Start Menu. Setup installs for the current user without requesting administrator privileges, defaults to `%LOCALAPPDATA%\Programs\Manafolio`, and offers an optional desktop shortcut. Node, Electron, Chromium, and application dependencies are included; the server-only `.zip` remains available.
@@ -140,6 +142,7 @@ The app supplies its own S256 PKCE challenge and random state to `/api/auth/nati
 
    From source, run `node scripts/fetch-models.mjs` in `backend/`.
 2. Build the relevant language catalog under **Admin → Catalogs**. Downloading data and fingerprinting artwork can take hours. Stopped or failed builds keep the working catalog and cached card data; uncommitted embeddings are discarded. The next build reuses unchanged vectors from the last successful publication.
+   Rebuild existing local catalogs to include native double-faced cards' reverse artwork; unchanged front artwork is reused.
 3. Linux source installations need Tesseract at `/usr/bin/tesseract` with `eng` trained data (`/usr/bin/tesseract --list-langs`). On Debian/Ubuntu, install `tesseract-ocr tesseract-ocr-eng`. Source-built Docker images include both. On macOS, install Tesseract through Homebrew (`brew install tesseract`) and verify `eng` with `/opt/homebrew/bin/tesseract --list-langs`. The app checks `/opt/homebrew/bin/tesseract`, then `/usr/local/bin/tesseract`, directly so Finder does not need your shell's PATH. The DMG does not include Tesseract or its language data.
 
 Phones require HTTPS. See [the image-identification pipeline](../PROJECT.md#image-identification-pipeline) for details and limitations, and [Scan physical cards with a camera](USER_GUIDE.md#scan-physical-cards-with-a-camera) for capture, verification, Scan review, and accuracy warnings.

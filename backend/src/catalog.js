@@ -134,7 +134,7 @@ async function list() {
         if (fs.existsSync(metaPath(game, lang))) {
           const meta = JSON.parse(fs.readFileSync(metaPath(game, lang), 'utf8'));
           built = {
-            rows: meta.ids.length,
+            rows: new Set(meta.ids.map(id => id.replace(/_back$/, ''))).size,
             builtAt: meta.builtAt,
             bytes: fs.statSync(binaryPath(metaPath(game, lang), meta)).size,
           };
@@ -175,7 +175,7 @@ async function list() {
 async function setCounts(game, lang = 'English') {
   if (game !== 'mtg') throw new Error('Unsupported game');
   const rows = await db.all(
-    `SELECT id, LOWER(set_id) sid FROM card_cache
+    `SELECT id, image_url_back, LOWER(set_id) sid FROM card_cache
       WHERE game = ? AND language = ? AND set_id IS NOT NULL AND set_id != ''
         AND image_url IS NOT NULL AND image_url != ''`,
     [game, lang]
@@ -192,12 +192,13 @@ async function setCounts(game, lang = 'English') {
     const sid = r.sid;
     const bare = sid.replace(/^mtg-/, '');
     const e = sets[sid] || (sets[sid] = { cached: 0, embedded: 0 });
+    const complete = embedded && embedded.has(r.id) && (!r.image_url_back || embedded.has(`${r.id}_back`));
     e.cached++;
-    if (embedded && embedded.has(r.id)) e.embedded++;
+    if (complete) e.embedded++;
     if (bare !== sid) {
       const eBare = sets[bare] || (sets[bare] = { cached: 0, embedded: 0 });
       eBare.cached++;
-      if (embedded && embedded.has(r.id)) eBare.embedded++;
+      if (complete) eBare.embedded++;
     }
   }
   return {
@@ -265,10 +266,10 @@ async function cachePhase(job) {
 // card_cache. Keeping it would leave a vector that can win a scan and then resolve
 // to no card at all.
 function keptFromPrev(prev, embeddedIds) {
-  const embedded = new Set(embeddedIds);
+  const embedded = new Set(embeddedIds.map(id => id.replace(/_back$/, '')));
   const out = [];
   for (const [id, vec] of prev.vecs) {
-    if (embedded.has(id)) continue;
+    if (embedded.has(id.replace(/_back$/, ''))) continue;
     out.push({ id, vec, src: prev.srcs.get(id) });
   }
   return out;
@@ -286,13 +287,18 @@ async function embedPhase(job) {
     const bare = s.replace(/^mtg-/, '');
     return [bare, `${job.game}-${bare}`];
   }) : [];
-  const rows = await db.all(
-    `SELECT id, image_url FROM card_cache
+  const cards = await db.all(
+    `SELECT id, image_url, image_url_back FROM card_cache
       WHERE game = ? AND language = ? AND image_url IS NOT NULL AND image_url != ''
         ${scoped ? `AND LOWER(set_id) IN (${setFilter.map(() => '?').join(',')})` : ''}
       ORDER BY id`,
     scoped ? [job.game, job.lang, ...setFilter.map(s => String(s).toLowerCase())] : [job.game, job.lang]
   );
+  // Only provider-native reverse artwork shares a printing; owned token pairs
+  // remain separate card_cache identities.
+  const rows = cards.flatMap(card => card.image_url_back
+    ? [card, { id: `${card.id}_back`, image_url: card.image_url_back }]
+    : [card]);
   job.phase = 'embed';
   job.total = rows.length;
   job.done = 0;
@@ -402,7 +408,7 @@ async function embedPhase(job) {
       model: 'milo1', views: 1, builtAt: new Date().toISOString(),
     }, vecs);
     cvScan.reload(job.game, job.lang);
-    return { built, reused, failed, wrote: true, rows: ids.length };
+    return { built, reused, failed, wrote: true, rows: new Set(ids.map(id => id.replace(/_back$/, ''))).size };
   } finally {
     if (session) await session.release();
   }

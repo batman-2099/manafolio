@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: manafolio
     restart: unless-stopped
+    stop_grace_period: 2m
     # Same app on both ports — only the transport differs. 3001 is what you point a
     # reverse proxy at; 3443 is what you use directly when there is no proxy (card
     # scanning needs a secure context, so phones must use https://<host>:3443).

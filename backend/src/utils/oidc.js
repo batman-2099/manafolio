@@ -180,9 +180,10 @@ function resolveRedirectUri(req) {
     return `${base}/api/auth/oidc/callback`;
   }
   if (req) {
-    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-    const host = req.headers['x-forwarded-host'] || req.get('host');
-    return `${proto}://${host}/api/auth/oidc/callback`;
+    const trustProxy = req.app.get('trust proxy fn');
+    const forwardedHost = trustProxy(req.socket.remoteAddress, 0) && req.get('x-forwarded-host');
+    const host = forwardedHost ? forwardedHost.split(',')[0].trim() : req.get('host');
+    return `${req.protocol}://${host}/api/auth/oidc/callback`;
   }
   return 'http://localhost:3001/api/auth/oidc/callback';
 }
@@ -266,7 +267,7 @@ function generatePkce() {
 }
 
 /**
- * Create a signed, tamper-proof state token for CSRF protection and PKCE storage.
+ * Create a signed, tamper-proof state token for CSRF protection.
  */
 function createStateToken(data = {}) {
   const payload = {
@@ -324,7 +325,6 @@ async function buildAuthorizationUrl(req, res, native = null) {
   const redirectUri = resolveRedirectUri(req);
 
   const stateToken = createStateToken({
-    cv: codeVerifier,
     n: nonce,
     ru: redirectUri
   });
@@ -345,7 +345,7 @@ async function buildAuthorizationUrl(req, res, native = null) {
   }
   const correlation = crypto.randomBytes(32).toString('base64url');
   res.cookie(LOGIN_COOKIE, correlation, { ...loginCookieOptions(req), maxAge: STATE_TTL_MS });
-  pendingLogins.set(stateToken, { correlation, native, expires: Date.now() + STATE_TTL_MS });
+  pendingLogins.set(stateToken, { correlation, codeVerifier, native, expires: Date.now() + STATE_TTL_MS });
 
   return url.toString();
 }
@@ -393,7 +393,7 @@ function getNativeLogin({ stateToken, req, cancel = false }) {
  * Exchange authorization code at token_endpoint and fetch user claims.
  */
 async function exchangeCode({ code, stateToken, req }) {
-  const { stateData } = getPendingLogin({ stateToken, req });
+  const { login, stateData } = getPendingLogin({ stateToken, req });
   // Consume before the first await, including when the provider later rejects the code.
   pendingLogins.delete(stateToken);
 
@@ -420,7 +420,7 @@ async function exchangeCode({ code, stateToken, req }) {
     grant_type: 'authorization_code',
     code,
     redirect_uri: redirectUri,
-    code_verifier: stateData.cv
+    code_verifier: login.codeVerifier
   });
 
   const headers = {

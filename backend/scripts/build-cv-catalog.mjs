@@ -100,13 +100,16 @@ async function main() {
   await db.initDb();
   fs.mkdirSync(MODEL_DIR, { recursive: true });
 
-  const rows = await db.all(
-    `SELECT id, name, image_url FROM card_cache
+  const cards = await db.all(
+    `SELECT id, name, image_url, image_url_back FROM card_cache
       WHERE game = ? AND language = ? AND image_url IS NOT NULL AND image_url != ''
       ORDER BY id` + (limit ? ` LIMIT ${limit}` : ''),
     [game, lang]
   );
-  console.log(`${rows.length} ${game} cards with artwork in card_cache (${lang})`);
+  console.log(`${cards.length} ${game} cards with artwork in card_cache (${lang})`);
+  const rows = cards.flatMap(card => card.image_url_back
+    ? [card, { id: `${card.id}_back`, image_url: card.image_url_back }]
+    : [card]);
 
   const prev = loadExisting();
   if (prev) console.log(`resuming: ${prev.vecs.size} embeddings already built`);

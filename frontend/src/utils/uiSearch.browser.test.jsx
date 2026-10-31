@@ -304,3 +304,77 @@ export async function runUiSearchRegressions() {
     window.history.replaceState(originalHistory, '', originalUrl);
   }
 }
+
+export async function runPreconRequestOwnershipRegressions() {
+  const assert = (value, message) => { if (!value) throw new Error(message); };
+  const saved = { fetch: window.fetch, act: globalThis.IS_REACT_ACT_ENVIRONMENT };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const requests = [];
+  const toasts = [];
+  const decks = [{ fileName: 'first', name: 'First deck' }, { fileName: 'second', name: 'Second deck' }];
+  window.fetch = (url, options = {}) => new Promise(resolve => {
+    requests.push({ url, signal: options.signal, resolve: (body, status = 200) => resolve({ ok: status < 300, json: async () => body }) });
+  });
+  const change = value => act(async () => {
+    const input = host.querySelector('input[type="search"]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const enter = () => act(async () => host.querySelector('input[type="search"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  const search = () => host.querySelector('.mtg-deck-import > div:nth-of-type(2) button');
+  const detailButton = index => host.querySelectorAll('.mtg-deck-import-result')[index].querySelector('button');
+  try {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    await act(async () => root.render(<MtgDeckImport showToast={(...args) => toasts.push(args)} />));
+    await change('first');
+    await act(async () => search().click());
+    await change('second');
+    assert(requests[0].signal.aborted, 'editing a query cancels its previous request immediately');
+    await enter();
+    await act(async () => requests[1].resolve(decks));
+    await act(async () => requests[0].resolve([{ fileName: 'stale', name: 'Stale result' }]));
+    assert(host.textContent.includes('Second deck') && !host.textContent.includes('Stale result'), 'old search cannot replace latest keyboard search results');
+
+    await enter();
+    await enter();
+    assert(requests[2].signal.aborted && search().disabled, 'repeated Enter shares request ownership and keeps latest search busy');
+    await act(async () => requests[2].resolve({ error: 'Stale search error' }, 500));
+    assert(search().disabled && !toasts.length, 'old search errors and finally cannot clear latest loading state');
+    await act(async () => requests[3].resolve(decks));
+    await act(async () => detailButton(0).click());
+    await act(async () => detailButton(1).click());
+    assert(requests[4].signal.aborted, 'latest details selection cancels previous details');
+    await act(async () => requests[5].resolve({ creatures: [{ name: 'Latest creature', count: 1 }] }));
+    await act(async () => requests[4].resolve({ creatures: [{ name: 'Stale creature', count: 1 }] }));
+    assert(host.textContent.includes('Latest creature') && !host.textContent.includes('Stale creature'), 'deferred details cannot overwrite latest selection');
+
+    await act(async () => detailButton(0).click());
+    await change('replacement');
+    assert(requests[6].signal.aborted && !host.querySelector('.mtg-deck-import-result'), 'query editing cancels details and clears mismatched results');
+    await act(async () => requests[6].resolve({ error: 'Stale details error' }, 500));
+    assert(!toasts.length, 'query-cancelled details cannot announce stale errors');
+    await enter();
+    await act(async () => root.render(null));
+    assert(requests[7].signal.aborted, 'unmount cancels pending search');
+    await act(async () => requests[7].resolve({ error: 'Unmounted search error' }, 500));
+    assert(!toasts.length, 'unmounted search cannot publish a notification');
+
+    await act(async () => root.render(<MtgDeckImport showToast={(...args) => toasts.push(args)} />));
+    await change('details');
+    await enter();
+    await act(async () => requests[8].resolve(decks));
+    await act(async () => detailButton(0).click());
+    await act(async () => root.render(null));
+    assert(requests[9].signal.aborted, 'unmount cancels pending details');
+    await act(async () => requests[9].resolve({ error: 'Unmounted details error' }, 500));
+    assert(!toasts.length, 'unmounted details cannot publish a notification');
+    return { passed: ['latest keyboard/button search wins', 'stale search preserves loading/error ownership', 'latest details wins', 'query change cancels details', 'unmount cancels both request types'] };
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    window.fetch = saved.fetch;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = saved.act;
+  }
+}

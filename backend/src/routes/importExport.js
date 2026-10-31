@@ -79,7 +79,7 @@ async function parseCompleteBackup(data) {
       || new Set(backup.card_cache.map(row => row.id)).size !== backup.card_cache.length) {
     throw new Error('Invalid backup card IDs');
   }
-  if (backup.collection.some(card => !validImportQuantity(card.quantity))
+  if (backup.collection.some(card => !Number.isSafeInteger(card.quantity) || card.quantity < 1)
       || backup.deck_cards.some(card => !card || (card.quantity !== 0 && !validImportQuantity(card.quantity)))) {
     throw new Error('Invalid backup quantities');
   }

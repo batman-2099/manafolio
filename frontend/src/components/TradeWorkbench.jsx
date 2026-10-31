@@ -7,9 +7,11 @@ import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
 
 async function api(path, body, signal) {
   const response = await fetch(`/api/${path}`, { signal, ...(body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
-  const data = await response.json();
-  if (!response.ok) throw Object.assign(new Error(data.error), { status: response.status });
-  return data;
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw Object.assign(new Error(data?.error || response.statusText), { status: response.status });
+  }
+  return response.json();
 }
 const identity = card => `${card.printed_name || card.name} · ${card.set_name || card.set_id} #${card.number} · ${card.language}`;
 // getRandomValues also works on self-hosted HTTP LAN sites.
@@ -17,25 +19,25 @@ const newTradeId = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), 
 const PAGE_SIZE = 60;
 const MAX_ROWS = 100;
 
-export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
+export default function TradeWorkbench({ onUpdate, navigationGuardRef, recovery, onRecovery }) {
   const { t } = useT();
   const { requestReverse, reversePrompt } = useReverseTokenPrompt();
   const [entries, setEntries] = useState([]);
-  const [giving, setGiving] = useState([]);
-  const [receiving, setReceiving] = useState([]);
+  const [giving, setGiving] = useState(() => recovery?.giving.map(card => ({ ...card, available: card.quantity })) || []);
+  const [receiving, setReceiving] = useState(() => recovery?.receiving.map(card => ({ ...card, id: card.card_id || card.id })) || []);
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
   const [language, setLanguage] = useState('English');
   const [results, setResults] = useState(null);
-  const [review, setReview] = useState(null);
+  const [review, setReview] = useState(recovery || null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(recovery ? t('trade.retry') : '');
   const [entriesError, setEntriesError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [uncertain, setUncertain] = useState(false);
-  const tradeId = useRef(null);
+  const [uncertain, setUncertain] = useState(!!recovery);
+  const tradeId = useRef(recovery?.request.trade_id || null);
   if (tradeId.current === null) tradeId.current = newTradeId();
   const heading = useRef(null);
   const givingHeading = useRef(null);
@@ -130,7 +132,7 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
     <h2 id="trade-title" ref={heading} tabIndex={-1}>{t('trade.title')}</h2>
     <p>{t('trade.intro')}</p>
     </header>
-    {error && <p role="alert" className="trade-error">{error} {uncertain && t('trade.retry')}</p>}
+    {error && <p role="alert" className="trade-error">{error} {uncertain && error !== t('trade.retry') && t('trade.retry')}</p>}
     {success && <p role="status">{t('trade.success', success)}</p>}
     {review ? <>
       <h3>{t('trade.review')}</h3>
@@ -151,9 +153,15 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef }) {
         <button className="btn btn-secondary" disabled={busy || uncertain} onClick={() => { setReview(null); setError(''); }}>{t('common.back')}</button>
         <button className="btn btn-primary" disabled={busy} onClick={() => run(async signal => {
           setUncertain(true);
+          onRecovery?.(review);
           let result;
           try { result = await api('trades/confirm', review.request, signal); }
-          catch (err) { if (err.status) setUncertain(false); throw err; }
+          catch (err) {
+            if (err.status >= 400 && err.status < 500) { setUncertain(false); onRecovery?.(null); }
+            throw err;
+          }
+          onRecovery?.(null);
+          if (signal.aborted) return;
           reset(); setSuccess(result); onUpdate(); await load(signal); heading.current?.focus();
         })}>{busy ? t('common.loading') : t('trade.confirm')}</button>
       </div>

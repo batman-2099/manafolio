@@ -95,7 +95,7 @@ On narrow screens, use **More** for navigation items that are not shown in the b
 - **Printing** means the particular set and collector number, not merely the card name. Finish, language, condition, and grading can distinguish your copies further.
 - **Unassigned Pile / Unsorted** means physical copies without a storage assignment. It is not an extra purchase list.
 - **Missing** retains the record but identifies a copy you cannot currently locate. Do not assume every stored record is available for play.
-- **Checked out** means a Physical deck has reserved copies. It is not another inventory and does not erase their storage positions.
+- **In Deck** means a Physical deck has reserved copies. It is not another inventory and does not erase their storage positions.
 - **Archive** retains records outside owned supply. **Delete** is not an archive operation and should not be used when you intend to restore a card later.
 
 **Example:** Owning four paper Lightning Bolts does not supply four Arena copies. Wishlisting another copy does not make a fifth available. If a Physical deck reserves the available copies, another deck may still describe the same cards but cannot check out those same copies simultaneously.
@@ -160,6 +160,8 @@ Pressing **Enter** in the quick-add form submits to the selected Physical or Are
 Changing the language in an add form can resolve a different printing, rather than merely relabeling the same card. Recheck the artwork and identification after changing it. Finish and condition are choices you make; the application does not inspect a card to determine them.
 
 For **Bulk Add**, enter a positive whole-number quantity. While the request is pending, selection and entry controls stay locked. If some cards fail, successful cards are added once and failures remain selected with their errors; retry adds only those retained cards. Arena additions do not change Physical-owned counts.
+
+An add request can create at most **10,000 individual collection rows**, including the combined copies in a bulk add, precon import, or Scan review confirmation. Split larger requests into smaller batches. This limit counts newly expanded rows, not the quantity stored in an existing stack; it does not reduce existing entries. A rejected Scan review confirmation leaves its drafts intact.
 
 **If you cannot find a card:** check the language, set code, collector number, and result filters. Use a broader name search if a tightly scoped search fails. A **Card API Unavailable** message concerns the upstream card service; retry later rather than adding a similar-looking printing as a substitute.
 
@@ -746,6 +748,8 @@ Available Giving entries are paged in groups of 60; changing pages does not clea
 
 If a card changed or became unavailable, no side is changed: go back, remove the stale selection, **Refresh available cards**, select again, and review. If a connection drops during confirmation, keep the page open and retry the **same confirmation**: its completed trade ID prevents a second inventory mutation. Do not create another trade to retry an uncertain result. Success reports the given/received quantities. Complete account backups retain private completed-ID receipts (ID, request fingerprint, counts, and time), not a negotiator or price history; restoring an older backup preserves already-known receipt IDs to prevent replay. The static demo explicitly rejects trade operations.
 
+Session expiry signs you out even when a draft has a leave warning. If a confirmation's outcome is uncertain, keep the app open, sign back into the **same account**, and reopen **Trade workbench** to retry the original confirmation explicitly. Other accounts cannot see or retry it. This recovery is held only in memory: reloading or closing the tab loses it. If that happens, check your inventory before creating another trade. A definitive rejection, including an expired-session response, clears the uncertain confirmation rather than replaying it.
+
 If available entries fail to load, use **Retry**. Previously loaded entries remain visible; an unavailable request is not reported as an empty inventory. Refreshing available entries does not clear an unrelated trade-confirmation error.
 
 ## Build and manage decks
@@ -764,7 +768,7 @@ In Table view, **Color Identity** shows card-copy counts for white, blue, black,
 
 **Missing cards** appears in red in both Grid and Table view when required copies are unavailable, even if the deck has reached its target size. Physical decks exclude archived copies and other decks' reservations; Arena decks use Arena ownership only; Graveyard decks use archived copies only. A checked-out Physical deck keeps its Return action and reservations, but archived or missing reserved copies still show **Missing cards**. Use the matching status filter to find affected decks; the target-reached filter excludes them.
 
-An open deck keeps **Save** and its play/return action prominent. **More deck actions** groups properties, history, sharing, simulation, AI, import/export, and container creation; it starts expanded on desktop and collapsed on narrow screens. On desktop, Description, analytics, commander, private Notes, sleeves, card back, and wins/losses appear above **Add Cards to Deck**, **Deck Cards**, and **Tokens**. On narrow screens, card editing comes first and the overview follows below; its sections remain visible rather than hidden in collapsible panels. Some charts appear only when the deck contains relevant cards.
+An open deck keeps **Save** and its play/return action prominent, with the other deck actions always visible beside the deck name. On both desktop and mobile, the deck overview follows the name and action toolbar, before **Add Cards to Deck**, **Deck Cards**, and **Tokens**. Statistics, Description, commander, private Notes, sleeves, card back, and wins/losses remain available without collapsible panels. Some charts appear only when the deck contains relevant cards.
 
 Below Description, the summary panel groups **Supertype Breakdown**, **Color & Land Distribution**, **Containers needed**, and **Deck Health & Rules**. Labeled, color-coded bars show exact counts relative to the deck's total card count; multicolor cards can contribute to more than one color. The panel stacks on phones. For Physical decks, **Containers needed** lists source containers, Unassigned Pile, and unavailable-copy counts from the saved pull-list plan (reserved locations when checked out). Save draft changes to refresh it; Arena decks have no physical-container list.
 
@@ -934,7 +938,7 @@ Estimates use cached nonfoil prices for all Needed copies, including copies alre
 4. Mark each row or highlighted card complete as you gather it. **Select all** is available per group and for the whole checklist.
 5. When every listed entry is marked complete, select **Done**.
 
-**Expected result:** the deck is **Checked out**, and its quantities are reserved against other Physical decks. The reservation is made before the guide opens. Checkout does not erase or change the recorded storage slots; those slots remain the return addresses.
+**Expected result:** the deck is **In Deck**, and its quantities are reserved against other Physical decks. The reservation is made before the guide opens. Checkout does not erase or change the recorded storage slots; those slots remain the return addresses.
 
 In a binder with stacking enabled, the highlighted shared pocket acts on a requested physical entry, not an unrelated first copy in that pocket. Use the individual checklist rows when gathering multiple requested entries from the same pocket.
 

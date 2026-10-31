@@ -168,6 +168,101 @@ async function main() {
     { location_id: null, compartment_id: null, position: 0 });
   assert.deepStrictEqual(await db.all('SELECT * FROM collection WHERE id != ? ORDER BY id', [accepted]),
     beforeDelete.filter(row => row.id !== accepted), 'deleting a container must preserve all other entries');
+
+  const beforeTransfer = await db.all('SELECT * FROM collection ORDER BY id');
+  for (const value of ['arena', 'wishlist', 'graveyard']) {
+    assert.strictEqual((await request('POST', '/collection/bulk', {
+      entry_ids: [second, first, foreignEntry], action: 'list_type', value
+    })).status, 409, `reserved copies cannot move to ${value}`);
+    assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), beforeTransfer);
+    assert.deepStrictEqual(await db.all('SELECT * FROM deck_card_allocations'), reservation);
+  }
+  assert.strictEqual((await request('POST', '/collection/bulk', {
+    entry_ids: [first], action: 'list_type', value: 'collection'
+  })).status, 200, 'a reserved no-op transfer remains valid');
+  assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), beforeTransfer);
+
+  const filing = await location(user, 'Atomic filing');
+  const beforeFiling = await db.all('SELECT * FROM collection ORDER BY id');
+  await db.run(`CREATE TRIGGER reject_batch_filing BEFORE UPDATE OF compartment_id ON collection
+    WHEN OLD.id = ${second} BEGIN SELECT RAISE(ABORT, 'injected later filing failure'); END`);
+  for (const [route, body] of [
+    ['/collection/bulk', { entry_ids: [first, second], action: 'move', value: filing.id }],
+    [`/locations/${filing.id}/apply-all`, { entry_ids: [first, second] }],
+    ['/collection/bulk', { entry_ids: [first, second], action: 'move', value: null }],
+  ]) {
+    assert.strictEqual((await request('POST', route, body)).status, 500);
+    assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), beforeFiling,
+      `${route}: a later filing failure rolls back earlier moves`);
+  }
+  await db.run('DROP TRIGGER reject_batch_filing');
+  assert.strictEqual((await request('POST', `/locations/${filing.id}/apply-all`, { entry_ids: [first, second] })).body.filed, 2);
+  assert.strictEqual((await request('POST', '/collection/bulk', {
+    entry_ids: [first, second], action: 'move', value: null
+  })).body.affected, 2);
+
+  const collectionRouter = require('../src/routes/collection');
+  const prepared = await db.get("SELECT * FROM card_cache WHERE id = 'a'");
+  const beforeOversize = await db.all('SELECT * FROM collection ORDER BY id');
+  await db.run(`CREATE TRIGGER reject_add_attempt BEFORE INSERT ON collection
+    BEGIN SELECT RAISE(ABORT, 'oversize request attempted a write'); END`);
+  for (const [route, body] of [
+    ['/collection', { card_id: 'a', quantity: 10001 }],
+    ['/collection/bulk-add', { card_ids: ['a', 'b'], quantity: 6000 }],
+    ['/collection/bulk-add', { card_ids: ['a', 'b'], quantity: 6000, stackable: true, grader: 'PSA' }],
+  ]) {
+    assert.strictEqual((await request('POST', route, body)).status, 400, 'expansion is rejected before any insert');
+  }
+  await assert.rejects(db.withTransaction(() => collectionRouter.addCardToCollection(
+    { id: user }, { card_id: 'a', quantity: 10001 }, prepared, true
+  )), error => error.status === 400, 'prepared/inTransaction callers cannot bypass the row limit');
+
+  const draftIds = [];
+  for (let i = 0; i < 41; i++) {
+    draftIds.push((await db.run('INSERT INTO scan_drafts (user_id, card_id, quantity) VALUES (?, ?, 250)', [user, 'a'])).lastID);
+  }
+  assert.strictEqual((await request('POST', '/scan-drafts/commit', { draft_ids: draftIds })).status, 400);
+  assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM scan_drafts WHERE user_id = ?', [user])).count, 41,
+    'an oversized draft batch retains every draft');
+  const mtgjsonApi = require('../src/mtgjsonApi');
+  const originalGetDeck = mtgjsonApi.getDeck;
+  try {
+    mtgjsonApi.getDeck = async () => ({ name: 'Oversized product', mainBoard: [
+      { name: 'Card A', setCode: 'test', number: '1', count: 6000 },
+      { name: 'Card B', setCode: 'test', number: '2', count: 6000 },
+    ] });
+    const beforeContainers = await db.all('SELECT * FROM locations ORDER BY id');
+    assert.strictEqual((await request('POST', '/mtg-decks/oversize/import', { create_container: true })).status, 400);
+    assert.deepStrictEqual(await db.all('SELECT * FROM locations ORDER BY id'), beforeContainers);
+  } finally {
+    mtgjsonApi.getDeck = originalGetDeck;
+  }
+  assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), beforeOversize);
+  await db.run('DROP TRIGGER reject_add_attempt');
+  const stacked = await collectionRouter.addCardToCollection(
+    { id: user }, { card_id: 'a', quantity: 2147483648, stackable: true }, prepared
+  );
+  assert.strictEqual((await db.get('SELECT quantity FROM collection WHERE id = ?', [stacked.id])).quantity, 2147483648,
+    'large stored quantities do not expand into individual rows');
+
+  assert.strictEqual((await request('POST', '/collection/bulk', {
+    entry_ids: [first], action: 'move', value: filing.id
+  })).status, 200);
+  assert.strictEqual((await request('POST', `/locations/${filing.id}/transfer`, {
+    inventory_type: 'graveyard'
+  })).status, 200, 'whole-container archival may retain checked-out copies');
+  const archived = await db.get('SELECT * FROM collection WHERE id = ?', [first]);
+  assert.strictEqual(archived.list_type, 'graveyard');
+  assert.strictEqual((await request('POST', '/collection/bulk', {
+    entry_ids: [first], action: 'list_type', value: 'graveyard'
+  })).status, 200, 'archived reserved copies also allow a no-op transfer');
+  for (const value of ['collection', 'arena', 'wishlist']) {
+    assert.strictEqual((await request('POST', '/collection/bulk', {
+      entry_ids: [first], action: 'list_type', value
+    })).status, 409, 'archived reservations cannot be detached from their inventory');
+  }
+  assert.deepStrictEqual(await db.get('SELECT * FROM collection WHERE id = ?', [first]), archived);
+  assert.deepStrictEqual(await db.all('SELECT * FROM deck_card_allocations'), reservation);
   console.log('inventorymutations.test.js passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {

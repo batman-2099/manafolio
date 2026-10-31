@@ -25,11 +25,11 @@ ort.InferenceSession.create = async () => {
   if (behavior === 'init-fail') throw new Error('invalid model protobuf');
   let released = false;
   return {
-    run: async () => {
+    run: async ({ image }) => {
       calls++;
       if (behavior === 'cancel' && calls === 1) catalog.stop();
       if (behavior === 'fail') throw new Error('inference failed');
-      return { embedding: { data: new Float32Array([1, 0]) } };
+      return { embedding: { data: new Float32Array(behavior === 'faces' && image.data[0] > 0 ? [0, 1] : [1, 0]) } };
     },
     release: async () => {
       assert.strictEqual(released, false, 'each owned session is released once');
@@ -63,6 +63,8 @@ const snapshot = () => {
   const image = `data:image/png;base64,${png.toString('base64')}`;
   const ids = Array.from({ length: 12 }, (_, i) => `mtg-${String(i).padStart(2, '0')}`);
   for (const id of ids) await db.run(`INSERT INTO card_cache (id, name, game, language, image_url, set_id) VALUES (?, ?, 'mtg', 'English', ?, 'tst')`, [id, id, image]);
+  await db.run(`UPDATE card_cache SET supertype = 'Token' WHERE id IN (?, ?)`, [ids[1], ids[2]]);
+  await db.run('INSERT INTO collection (card_id, reverse_card_id, user_id) VALUES (?, ?, 1)', [ids[1], ids[2]]);
   fs.writeFileSync(metaFile, JSON.stringify({ dim: 2, ids, model: 'milo1', srcs: {} }));
   fs.writeFileSync(catalog.binPath('mtg'), Buffer.from(new Float32Array(24).fill(0.5).buffer));
   fs.writeFileSync(path.join(models, 'milo.onnx'), 'fixture');
@@ -137,6 +139,51 @@ const snapshot = () => {
   assert.strictEqual((await build()).phase, 'done');
   assert.strictEqual(calls, 0, 'unchanged committed images can be reused');
   assert(!fs.existsSync(path.join(models, oldBinary)), 'successful replacement retires previous generation');
+  const backPng = await sharp({ create: { width: 16, height: 24, channels: 3, background: '#fff' } }).png().toBuffer();
+  const backImage = `data:image/png;base64,${backPng.toString('base64')}`;
+  const backId = `${ids[0]}_back`;
+  await db.run(`UPDATE card_cache SET image_url_back = ?, set_id = 'mtg-dfc' WHERE id = ?`, [backImage, ids[0]]);
+  assert.deepStrictEqual((await catalog.setCounts('mtg')).sets.dfc, { cached: 1, embedded: 0 },
+    'legacy front-only coverage must flag the missing reverse');
+  behavior = 'faces';
+  assert.strictEqual((await build({ sets: ['DFC'] })).phase, 'done');
+  assert.strictEqual(calls, 1, 'adding a native reverse reuses the unchanged front');
+  const faces = readCatalog(metaFile);
+  assert.deepStrictEqual(faces.meta.ids.slice().sort(), [...ids, backId].sort());
+  assert.strictEqual(faces.meta.srcs[backId], backImage);
+  const reverseIndex = faces.meta.ids.indexOf(backId);
+  assert.strictEqual(faces.bin.readFloatLE(reverseIndex * 8 + 4), 1);
+  assert.strictEqual((await catalog.list())[0].built.rows, 12, 'coverage counts printings, not faces');
+  assert.deepStrictEqual((await catalog.setCounts('mtg')).sets.dfc, { cached: 1, embedded: 1 });
+  for (const face of [png, backPng]) {
+    const match = await cv.match(face, 'mtg', 8, { cropped: true, sets: ['dfc'] });
+    assert.strictEqual(match.candidates.length, 1, 'both faces deduplicate to one printing');
+    assert.strictEqual(match.candidates[0].cardId, ids[0]);
+    assert.strictEqual(match.candidates[0].score, 1);
+    assert.strictEqual(match.context.setFallback, false, 'reverse IDs retain the base printing set');
+    const scored = await cv.scoreCards(face, 'mtg', [{ id: ids[1] }, { id: ids[0] }], { cropped: true });
+    assert.strictEqual(scored.find(card => card.id === ids[0]).score, 1);
+  }
+  const tokens = await cv.match(png, 'mtg', 12, { cropped: true, sets: ['tst'] });
+  assert.ok([ids[1], ids[2]].every(id => tokens.candidates.some(card => card.cardId === id)),
+    'owned paired token faces retain their separate provider identities');
+  assert.strictEqual((await build({ sets: ['tst'] })).phase, 'done');
+  assert.strictEqual(calls, 0);
+  assert.deepStrictEqual(readCatalog(metaFile).meta.srcs, faces.meta.srcs, 'another set preserves both face sources');
+  assert.deepStrictEqual(readCatalog(metaFile).meta.ids.slice().sort(), faces.meta.ids.slice().sort(),
+    'another set carries both native face vectors forward');
+  assert.strictEqual((await build({ sets: ['mtg-dfc'] })).phase, 'done');
+  assert.strictEqual(calls, 0, 'scoped resume reuses both native faces');
+  await db.run('UPDATE card_cache SET image_url_back = ? WHERE id = ?', [image, ids[0]]);
+  assert.strictEqual((await build({ sets: ['dfc'] })).phase, 'done');
+  assert.strictEqual(calls, 1, 'only changed reverse artwork is re-embedded');
+  assert.strictEqual(readCatalog(metaFile).meta.srcs[backId], image);
+  await db.run('UPDATE card_cache SET image_url_back = NULL WHERE id = ?', [ids[0]]);
+  assert.strictEqual((await build({ sets: ['dfc'] })).phase, 'done');
+  assert.strictEqual(readCatalog(metaFile).meta.ids.includes(backId), false, 'removed native faces are not carried forward');
+  await db.run('UPDATE card_cache SET image_url_back = ? WHERE id = ?', [backImage, ids[0]]);
+  assert.strictEqual((await build()).phase, 'done');
+  assert.strictEqual(calls, 1, 'full resume restores the reverse without rebuilding unchanged fronts');
   const stable = snapshot();
   api.client.get = async url => {
     if (new URL(url).pathname === '/sets') return { data: { data: [{ code: 'tst', card_count: 12 }] } };
@@ -159,7 +206,9 @@ const snapshot = () => {
   const output = path.join(dir, 'experiment.json');
   let result = cli(['--limit', '1', '--views', '1', '--concurrency', '1', '--output', output]);
   assert.strictEqual(result.status, 0, result.stderr);
-  assert.strictEqual(readCatalog(output).meta.ids.length, 1);
+  assert.deepStrictEqual(readCatalog(output).meta.ids.slice().sort(), [ids[0], backId].sort(),
+    'experimental printing limits include both native faces');
+  assert.strictEqual(readCatalog(output).meta.srcs[backId], backImage);
   result = cli(['--limit', '1', '--views', '2', '--concurrency', '1', '--output', output]);
   assert.strictEqual(result.status, 0, result.stderr);
   const experiment = readCatalog(output);

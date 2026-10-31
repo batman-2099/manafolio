@@ -113,41 +113,11 @@ function App() {
 
   const [serverUnavailable, setServerUnavailable] = useState(!navigator.onLine);
   const [snapshotUserId, setSnapshotUserId] = useState(null);
-  useEffect(() => {
-    let revision = 0;
-    const load = async () => {
-      const current = ++revision;
-      setSnapshotUserId(null);
-      try {
-        const snapshot = await readSnapshot();
-        if (revision === current) setSnapshotUserId(snapshot?.user_id ?? null);
-      } catch { /* Settings reports storage errors; this optional shortcut stays hidden. */ }
-    };
-    const unavailable = () => setServerUnavailable(true);
-    const available = () => setServerUnavailable(false);
-    const storage = event => {
-      load();
-      if (event.key && !['manafolio_token', 'manafolio_user'].includes(event.key)) return;
-      setToken(localStorage.getItem('manafolio_token'));
-      try { setUser(JSON.parse(localStorage.getItem('manafolio_user') || 'null')); }
-      catch { setUser(null); }
-    };
-    load();
-    window.addEventListener(OFFLINE_EVENT, load);
-    window.addEventListener('storage', storage);
-    window.addEventListener('offline', unavailable);
-    window.addEventListener('manafolio_server_unavailable', unavailable);
-    window.addEventListener('manafolio_server_available', available);
-    return () => {
-      revision++;
-      window.removeEventListener(OFFLINE_EVENT, load);
-      window.removeEventListener('storage', storage);
-      window.removeEventListener('offline', unavailable);
-      window.removeEventListener('manafolio_server_unavailable', unavailable);
-      window.removeEventListener('manafolio_server_available', available);
-    };
-  }, [token, user?.id]);
   const sessionRevision = useRef(0);
+  const [sessionEpoch, setSessionEpoch] = useState(0);
+  const sessionIdentity = useRef({ token, userId: user?.id, epoch: 0 });
+  // Only an uncertain confirmation survives reauthentication, never an editable draft.
+  const pendingTrades = useRef(new Map());
   const [pendingContainer, setPendingContainer] = useState(pendingContainerLink);
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -181,6 +151,69 @@ function App() {
   const tabGuardRef = useRef(null);
   const navigationGuardRef = useRef(null);
 
+  const replaceSession = useCallback((nextToken, nextUser) => {
+    const previous = sessionIdentity.current;
+    if (previous.token !== nextToken || previous.userId !== nextUser?.id) {
+      sessionRevision.current += 1;
+      sessionIdentity.current = { token: nextToken, userId: nextUser?.id, epoch: previous.epoch + 1 };
+      setSessionEpoch(previous.epoch + 1);
+      navigationGuardRef.current = null;
+      tabGuardRef.current = null;
+      setActiveTab('dashboard');
+      setSettingsSection(null);
+      setMoreOpen(false);
+      setShowSetup(false);
+      setSetupProbe('idle');
+      setSetupRetry(0);
+      setSelectedLocationId(null);
+      setFocusEntryId(null);
+      setStorageViewKey(0);
+      setStorageInventoryType('collection');
+      setDeckViewKey(0);
+      setSelectedCardFilter('');
+      setStatsTrigger(0);
+      setToast(null);
+      setServerUnavailable(!navigator.onLine);
+    }
+    setToken(nextToken);
+    setUser(nextUser);
+  }, []);
+  useEffect(() => {
+    let revision = 0;
+    const load = async () => {
+      const current = ++revision;
+      setSnapshotUserId(null);
+      try {
+        const snapshot = await readSnapshot();
+        if (revision === current) setSnapshotUserId(snapshot?.user_id ?? null);
+      } catch { /* Settings reports storage errors; this optional shortcut stays hidden. */ }
+    };
+    const unavailable = () => setServerUnavailable(true);
+    const available = () => setServerUnavailable(false);
+    const storage = event => {
+      load();
+      if (event.key && !['manafolio_token', 'manafolio_user'].includes(event.key)) return;
+      let nextUser = null;
+      try { nextUser = JSON.parse(localStorage.getItem('manafolio_user') || 'null'); }
+      catch { /* Invalid stored profiles are unauthenticated. */ }
+      replaceSession(localStorage.getItem('manafolio_token'), nextUser);
+    };
+    load();
+    window.addEventListener(OFFLINE_EVENT, load);
+    window.addEventListener('storage', storage);
+    window.addEventListener('offline', unavailable);
+    window.addEventListener('manafolio_server_unavailable', unavailable);
+    window.addEventListener('manafolio_server_available', available);
+    return () => {
+      revision++;
+      window.removeEventListener(OFFLINE_EVENT, load);
+      window.removeEventListener('storage', storage);
+      window.removeEventListener('offline', unavailable);
+      window.removeEventListener('manafolio_server_unavailable', unavailable);
+      window.removeEventListener('manafolio_server_available', available);
+    };
+  }, [token, user?.id, replaceSession]);
+
   // Navigate tabs through here so each change pushes a history entry: a back
   // gesture then returns to the PREVIOUS tab (not always dashboard), and modals
   // stack their own guards on top. We never dispose the old tab guard — each
@@ -188,6 +221,7 @@ function App() {
   // Disposing with history.back() would race during rapid switches and navigate
   // the browser past the app origin into about:blank.
   const goTab = (tab, inventoryType = 'collection') => {
+    if (sessionIdentity.current.epoch !== sessionEpoch) return false;
     if (tab !== activeTab && navigationGuardRef.current?.() === false) return false;
     if (moreOpen) moreTriggerRef.current?.focus();
     setMoreOpen(false);
@@ -197,6 +231,7 @@ function App() {
     const prev = activeTab;
     const prevStorageInventoryType = storageInventoryType;
     tabGuardRef.current = pushBackGuard(() => {
+      if (sessionIdentity.current.epoch !== sessionEpoch) return;
       if (navigationGuardRef.current?.() === false) return false;
       setMoreOpen(false);
       tabGuardRef.current = null;
@@ -253,17 +288,18 @@ function App() {
       .then(res => res.ok ? res.json() : Promise.reject(new Error('Failed to fetch profile')))
       .then(data => {
         if (cancelled || revision !== sessionRevision.current || token !== localStorage.getItem('manafolio_token')) return;
-        setUser(data.user);
+        replaceSession(token, data.user);
         setServerUnavailable(false);
         localStorage.setItem('manafolio_user', JSON.stringify(data.user));
       })
       .catch(err => { if (!cancelled) console.error('Session refresh failed:', err); });
     return () => { cancelled = true; };
-  }, [token, shareToken, deckShareToken]);
+  }, [token, shareToken, deckShareToken, replaceSession]);
 
   const showToast = useCallback((message, kind = 'status') => {
+    if (sessionIdentity.current.epoch !== sessionEpoch) return;
     setToast({ id: ++toastIdRef.current, message, kind });
-  }, []);
+  }, [sessionEpoch]);
 
   useEffect(() => {
     if (!pendingContainer || !token || !user?.id || shareToken || deckShareToken) return;
@@ -316,13 +352,10 @@ function App() {
             if (data.user && revision === sessionRevision.current && !localStorage.getItem('manafolio_token')) {
               await clearSnapshot();
               if (revision !== sessionRevision.current || localStorage.getItem('manafolio_token')) return;
-              sessionRevision.current += 1;
-              setToken(oidcToken);
-              setUser(data.user);
+              replaceSession(oidcToken, data.user);
               localStorage.setItem('manafolio_token', oidcToken);
               localStorage.setItem('manafolio_user', JSON.stringify(data.user));
-              showToast(t('toast.welcomeBack', { name: data.user.username }), 'success');
-              setActiveTab('dashboard');
+              setToast({ id: ++toastIdRef.current, message: t('toast.welcomeBack', { name: data.user.username }), kind: 'success' });
             }
           })
           .catch(err => {
@@ -331,7 +364,7 @@ function App() {
           });
       }
     } catch { /* ignore URL parse error */ }
-  }, [t, token, showToast]);
+  }, [t, token, showToast, replaceSession]);
 
   useEffect(() => {
     if (!toast) return;
@@ -418,30 +451,25 @@ function App() {
   useEffect(() => {
     const handleAutoLogout = () => {
       clearSnapshot().catch(() => showToast(t('offline.storageError'), 'error'));
-      if (navigationGuardRef.current?.() === false) return;
-      sessionRevision.current += 1;
-      setToken(null);
-      setUser(null);
+      replaceSession(null, null);
       localStorage.removeItem('manafolio_token');
       localStorage.removeItem('manafolio_user');
-      showToast(t('toast.sessionExpired'), 'error');
+      setToast({ id: ++toastIdRef.current, message: t('toast.sessionExpired'), kind: 'error' });
     };
     window.addEventListener('manafolio_logout', handleAutoLogout);
     return () => window.removeEventListener('manafolio_logout', handleAutoLogout);
-  }, [t, showToast]);
+  }, [t, showToast, replaceSession]);
 
 
   const handleLoginSuccess = async (newToken, newUser) => {
+    const revision = sessionRevision.current;
     try { await clearSnapshot(); }
     catch { showToast(t('offline.storageError'), 'error'); return; }
-    setServerUnavailable(false);
-    sessionRevision.current += 1;
-    setToken(newToken);
-    setUser(newUser);
+    if (revision !== sessionRevision.current) return;
+    replaceSession(newToken, newUser);
     localStorage.setItem('manafolio_token', newToken);
     localStorage.setItem('manafolio_user', JSON.stringify(newUser));
-    showToast(t('toast.welcomeBack', { name: newUser.username }), 'success');
-    setActiveTab('dashboard');
+    setToast({ id: ++toastIdRef.current, message: t('toast.welcomeBack', { name: newUser.username }), kind: 'success' });
   };
 
   const handleLogout = () => {
@@ -450,16 +478,14 @@ function App() {
     // Revoke token on server asynchronously
     fetch('/api/auth/logout', { method: 'POST' }).catch(err => console.error(err));
 
-    sessionRevision.current += 1;
-    setToken(null);
-    setUser(null);
+    replaceSession(null, null);
     localStorage.removeItem('manafolio_token');
     localStorage.removeItem('manafolio_user');
-    showToast(t('toast.loggedOut'), 'success');
+    setToast({ id: ++toastIdRef.current, message: t('toast.loggedOut'), kind: 'success' });
   };
 
   const handleUpdateUser = (changes) => {
-    if (!token || token !== localStorage.getItem('manafolio_token')) return;
+    if (sessionIdentity.current.epoch !== sessionEpoch || !token || token !== localStorage.getItem('manafolio_token')) return;
     sessionRevision.current += 1;
     setUser(current => {
       if (!current || current.id !== user.id) return current;
@@ -483,6 +509,7 @@ function App() {
   };
 
   const triggerRefresh = () => {
+    if (sessionIdentity.current.epoch !== sessionEpoch) return;
     setStatsTrigger(prev => prev + 1);
   };
 
@@ -535,7 +562,6 @@ function App() {
             statsTrigger={statsTrigger} 
             onUpdate={triggerRefresh} 
             showToast={showToast} 
-            token={token} 
             selectedCardFilter={selectedCardFilter}
             setSelectedCardFilter={setSelectedCardFilter}
             onNavigate={goTab}
@@ -565,7 +591,9 @@ function App() {
       case 'deckbuilder':
         return <DeckBuilder key={deckViewKey} showToast={showToast} navigationGuardRef={navigationGuardRef} onOpenAiSettings={() => { if (goTab('settings')) setSettingsSection('codex-settings-title'); }} />;
       case 'trades':
-        return <TradeWorkbench onUpdate={triggerRefresh} navigationGuardRef={navigationGuardRef} />;
+        return <TradeWorkbench onUpdate={triggerRefresh} navigationGuardRef={navigationGuardRef}
+          recovery={pendingTrades.current.get(user.id)}
+          onRecovery={review => { if (review) pendingTrades.current.set(user.id, review); else pendingTrades.current.delete(user.id); }} />;
       case 'howto':
         return <HowTo />;
       case 'settings':
@@ -578,7 +606,7 @@ function App() {
   };
 
   return (
-    <div className="app-container">
+    <div className="app-container" key={sessionEpoch}>
       <a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); mainRef.current?.focus(); }}>{t('nav.skipContent')}</a>
       {showSetup && (
         <Suspense fallback={null}>

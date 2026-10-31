@@ -3,6 +3,7 @@
 const assert = require('assert');
 const crypto = require('crypto');
 const http = require('http');
+const express = require('express');
 const oidc = require('../src/utils/oidc');
 
 function testPkce() {
@@ -21,19 +22,18 @@ function testPkce() {
 }
 
 function testStateTokens() {
-  const testData = { cv: 'verifier-123', n: 'nonce-456', ru: 'http://localhost/callback' };
+  const testData = { n: 'nonce-456', ru: 'http://localhost/callback' };
   const token = oidc.createStateToken(testData);
   assert(token && token.includes('.'), 'token must have signature part');
 
   const verified = oidc.verifyStateToken(token);
   assert(verified, 'valid state token must verify');
-  assert.strictEqual(verified.cv, testData.cv);
   assert.strictEqual(verified.n, testData.n);
   assert.strictEqual(verified.ru, testData.ru);
 
   // Tampered payload
   const [b64, sig] = token.split('.');
-  const tamperedB64 = Buffer.from(JSON.stringify({ ...testData, cv: 'evil' })).toString('base64url');
+  const tamperedB64 = Buffer.from(JSON.stringify({ ...testData, n: 'evil' })).toString('base64url');
   assert.strictEqual(oidc.verifyStateToken(`${tamperedB64}.${sig}`), null, 'tampered payload must fail verification');
 
   // Tampered signature
@@ -149,6 +149,54 @@ function testIdTokenValidation() {
   console.log('PASS: ID token iss/aud/exp/nonce validation');
 }
 
+async function testRedirectPolicy() {
+  const savedEnv = { OIDC_REDIRECT_URI: process.env.OIDC_REDIRECT_URI, PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL };
+  delete process.env.OIDC_REDIRECT_URI;
+  delete process.env.PUBLIC_BASE_URL;
+  const app = express();
+  app.get('/login', async (req, res, next) => {
+    try { res.redirect(await oidc.buildAuthorizationUrl(req, res)); } catch (error) { next(error); }
+  });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  try {
+    const check = async expected => {
+      const response = await new Promise((resolve, reject) => {
+        http.get(`http://127.0.0.1:${server.address().port}/login`, {
+          headers: { Host: 'direct.example:3001', 'X-Forwarded-Host': 'public.example:8443, other.example', 'X-Forwarded-Proto': 'https, http' },
+        }, res => {
+          res.on('error', reject);
+          res.on('end', () => resolve(res));
+          res.resume();
+        }).on('error', reject);
+      });
+      assert.strictEqual(response.statusCode, 302);
+      assert.strictEqual(new URL(response.headers.location).searchParams.get('redirect_uri'), expected);
+      assert.strictEqual(/;\s*Secure(?:;|$)/i.test(response.headers['set-cookie'][0]), expected.startsWith('https:'));
+    };
+    for (const policy of [false, '192.0.2.0/24']) {
+      app.set('trust proxy', policy);
+      await check('http://direct.example:3001/api/auth/oidc/callback');
+    }
+    for (const policy of [true, 1, 'loopback']) {
+      app.set('trust proxy', policy);
+      await check('https://public.example:8443/api/auth/oidc/callback');
+    }
+    app.set('trust proxy', false);
+    process.env.PUBLIC_BASE_URL = 'https://configured.example/';
+    await check('https://configured.example/api/auth/oidc/callback');
+    process.env.OIDC_REDIRECT_URI = 'http://explicit.example/custom-callback';
+    await check('http://explicit.example/custom-callback');
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+    for (const [key, value] of Object.entries(savedEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
 async function testMockOidcFlow() {
   // Start temporary mock OIDC server
   let authCodeReceived = null;
@@ -238,8 +286,12 @@ async function testMockOidcFlow() {
   oidc._resetDiscoveryCache();
 
   try {
+    await testRedirectPolicy();
     const begin = async () => {
-      const req = { protocol: 'https', headers: {}, get: () => 'manafolio.example.test' };
+      const req = {
+        protocol: 'https', headers: {}, get: () => 'manafolio.example.test',
+        app: { get: () => () => false }, socket: { remoteAddress: '127.0.0.1' },
+      };
       const authUrl = await oidc.buildAuthorizationUrl(req, {
         cookie(name, value, options) {
           assert.strictEqual(options.httpOnly, true);
@@ -261,6 +313,8 @@ async function testMockOidcFlow() {
 
     const stateToken = parsedAuth.searchParams.get('state');
     assert(stateToken, 'state param must be set');
+    const publicState = JSON.parse(Buffer.from(stateToken.split('.')[0], 'base64url').toString());
+    assert.strictEqual(publicState.cv, undefined, 'public state must not disclose the PKCE verifier');
     currentNonce = parsedAuth.searchParams.get('nonce');
     assert(currentNonce, 'nonce param must be set');
 
@@ -277,6 +331,7 @@ async function testMockOidcFlow() {
 
     assert.strictEqual(authCodeReceived, 'test-auth-code-xyz', 'token endpoint must receive authorization code');
     assert(codeVerifierReceived, 'token endpoint must receive PKCE code_verifier');
+    assert(!JSON.stringify(publicState).includes(codeVerifierReceived), 'the verifier stays server-side');
     assert.strictEqual(crypto.createHash('sha256').update(codeVerifierReceived).digest('base64url'),
       parsedAuth.searchParams.get('code_challenge'), 'the original PKCE challenge must still be enforced');
     assert.strictEqual(exchangeResult.extracted.sub, 'auth-user-999');

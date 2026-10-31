@@ -20,12 +20,6 @@ const { isMtgToken, validateReverseCard } = require('../utils/tokenPairing');
 const router = express.Router();
 const LIST_TYPES = ['collection', 'wishlist', 'arena', 'graveyard'];
 
-async function assertArchivable(userId, entryIds) {
-  const allocated = await checkedOutAllocation(userId);
-  if (entryIds.some(id => allocated.get(Number(id)) > 0)) {
-    throw new AddCardError(409, 'Check in the deck before archiving its checked-out cards.');
-  }
-}
 
 // Stamp each result with how many copies the user already owns, so browsing a
 // set shows what is already in the binder instead of inviting duplicate adds.
@@ -617,6 +611,21 @@ function collectionQuantity(value = 1) {
   return quantity;
 }
 
+const MAX_ADD_ROWS = 10000;
+
+function assertAddRowLimit(bodies, copies = 1) {
+  let rows = 0;
+  for (const body of bodies) {
+    const quantity = collectionQuantity(body.quantity);
+    const graded = body.grader !== undefined && body.grader !== 'Raw';
+    const certified = graded && body.cert_number && String(body.cert_number).trim();
+    rows += (certified || (body.stackable && !graded) ? 1 : quantity) * copies;
+    if (rows > MAX_ADD_ROWS) {
+      throw new AddCardError(400, `Cannot create more than ${MAX_ADD_ROWS} collection rows at once.`);
+    }
+  }
+}
+
 // Mirrors the collection.grader CHECK constraint in db.js. 'Raw' is the default
 // and means an ungraded card, not a missing value.
 const GRADERS = ['Raw', 'PSA', 'BGS', 'CGC', 'SGC', 'TAG'];
@@ -642,6 +651,7 @@ async function addCardToCollection(user, body, preparedCard = null, inTransactio
   } = body;
   const req = { user, body };
   const requestedQuantity = collectionQuantity(quantity);
+  assertAddRowLimit([body]);
 
   if (!card_id) {
     throw new AddCardError(400, 'card_id is required');
@@ -949,6 +959,7 @@ router.post('/scan-drafts/commit', async (req, res) => {
     const result = await db.withTransaction(async () => {
       const drafts = [];
       for (const id of ids) drafts.push(await getScanDraft(req.user.id, id));
+      assertAddRowLimit(drafts);
       let added = 0;
       for (const draft of drafts) {
         // Reviewed printings are cached; committing never needs the provider.
@@ -1118,7 +1129,10 @@ router.post('/collection/bulk-add', async (req, res) => {
     return res.status(400).json({ error: 'A certification number applies to a single card. Add graded cards one at a time.' });
   }
   let qty;
-  try { qty = collectionQuantity(shared.quantity); }
+  try {
+    qty = collectionQuantity(shared.quantity);
+    assertAddRowLimit([shared], card_ids.length);
+  }
   catch (error) { return res.status(error.status).json({ error: error.message }); }
   // Sequential on purpose: placement resolves against the rows already inserted,
   // so adds must not race each other for the same compartment slot.
@@ -1231,6 +1245,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
 
     const rows = mtgjsonApi.deckCardRows(deck);
     if (!rows.length) return res.status(422).json({ error: 'This MTGJSON deck has no importable cards' });
+    assertAddRowLimit(rows);
     const total = rows.reduce((sum, row) => sum + row.quantity, 0);
     const deckTotal = rows.reduce((sum, row) => sum + (row.isToken ? 0 : row.quantity), 0);
     const reverseRows = rows.filter(row => row.reverse_card_id).map(row => ({ id: row.reverse_card_id, reverseOnly: true }));
@@ -1668,7 +1683,13 @@ router.post('/collection/bulk', async (req, res) => {
     if (action === 'list_type') {
       if (!LIST_TYPES.includes(value)) return res.status(400).json({ error: 'Invalid list_type' });
       const result = await db.withTransaction(async () => {
-        if (value === 'graveyard') await assertArchivable(req.user.id, ids);
+        const changing = await db.all(`SELECT id FROM collection
+          WHERE id IN (${placeholders}) AND user_id = ? AND COALESCE(list_type, 'collection') != ?`,
+        [...ids, req.user.id, value]);
+        const allocated = await checkedOutAllocation(req.user.id);
+        if (changing.some(entry => allocated.get(entry.id) > 0)) {
+          throw new AddCardError(409, 'Check in the deck before changing its checked-out cards.');
+        }
         if (value === 'arena' && await db.get(`SELECT id FROM collection WHERE id IN (${placeholders}) AND user_id = ? AND reverse_card_id IS NOT NULL`, [...ids, req.user.id])) {
           throw new AddCardError(400, 'Double-sided physical tokens cannot move to Arena');
         }
@@ -1723,9 +1744,10 @@ router.post('/collection/bulk', async (req, res) => {
     }
 
     const locationId = value ? parseInt(value, 10) : null;
+    const result = await db.withTransaction(async () => {
     if (locationId) {
       const loc = await db.get(`SELECT id, inventory_type FROM locations WHERE id = ? AND user_id = ?`, [locationId, req.user.id]);
-      if (!loc) return res.status(400).json({ error: 'Invalid location ID' });
+      if (!loc) throw new AddCardError(400, 'Invalid location ID');
       const entries = await db.all(`SELECT list_type FROM collection WHERE id IN (${placeholders}) AND user_id = ?`, [...ids, req.user.id]);
       for (const entry of entries) assertStorageInventory(loc, entry.list_type);
     }
@@ -1752,7 +1774,9 @@ router.post('/collection/bulk', async (req, res) => {
       const rbLoc = await db.get(`SELECT sort_order, foil_sorting FROM locations WHERE id = ? AND user_id = ?`, [locId, req.user.id]);
       if (rbLoc) await rebalanceCompartmentByScheme(db, compId, rbLoc.sort_order, rbLoc.foil_sorting);
     }
-    return res.json({ message: `Moved ${moved} card(s)`, affected: moved });
+    return { message: `Moved ${moved} card(s)`, affected: moved };
+    });
+    return res.json(result);
   } catch (error) {
     if (error.status) return res.status(error.status).json({ error: error.message });
     console.error(error);

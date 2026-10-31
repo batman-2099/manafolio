@@ -168,21 +168,12 @@ app.use(cors({
     }
   }
 }));
-// Two endpoints legitimately carry megabytes, and only two. An import wraps its
-// payload in a JSON string field, which added escaping overhead pushed a ~90-card
-// collection past the 100kb default already; a scan carries a photo base64'd into
-// JSON, which costs a third again on top of the image.
-//
-// Everything else is ids and short strings, so the global ceiling stays small.
-// Applying 15mb to every route means an UNAUTHENTICATED POST /api/auth/login can
-// hand the process 15 MB, which is a free memory amplifier for anyone who can
-// reach the port. body-parser skips a request whose body is already parsed, so
-// registering these first and the small default after is all the scoping needed.
+// Import and scan/search requests carry large JSON payloads. All other routes
+// use the small default below; card-art parses uploads after its own auth gate.
 const bigJson = express.json({ limit: '15mb' });
 app.use('/api/import', bigJson);
 app.use('/api/scan-match', bigJson);
 app.use('/api/search', bigJson);
-app.use(express.json({ limit: '1mb' }));
 
 // Rebuild any catalog that has fallen behind, right after the weekly set refresh
 // discovers new releases.
@@ -330,6 +321,11 @@ app.use((req, res, next) => {
 // worse, a stall that looks like a hang.
 app.use(compression());
 
+// Ahead of the bare '/api' mounts so nothing shadows it. Its reads are
+// deliberately unauthenticated — a public shared collection renders card art too.
+app.use('/api/card-art', cardArtRoutes);
+app.use(express.json({ limit: '1mb' }));
+
 // --- PUBLIC API ROUTES ---
 // Everything mounted above the gate below is reachable without a session, and
 // each one is deliberate: login/register, a public shared collection, and the
@@ -339,9 +335,6 @@ app.use('/api/shared', sharedRoutes);
 // Admin carries its own authenticateToken + requireAdmin, so it sits above the
 // gate rather than being authenticated twice.
 app.use('/api/admin', adminRoutes);
-// Ahead of the bare '/api' mounts so nothing shadows it. Its reads are
-// deliberately unauthenticated — a public shared collection renders card art too.
-app.use('/api/card-art', cardArtRoutes);
 
 // --- AUTHENTICATION GATE ---
 // ONE gate for every remaining /api route, rather than a router.use in each file.

@@ -22,6 +22,13 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose, navig
   const importTrigger = useRef(null);
   const mounted = useRef(true);
   const reviewChoices = useRef({ key: null, ids: {} });
+  const searchController = useRef(null);
+  const detailsController = useRef(null);
+
+  useEffect(() => () => {
+    searchController.current?.abort();
+    detailsController.current?.abort();
+  }, []);
 
   useEffect(() => {
     if (!adding) {
@@ -54,22 +61,31 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose, navig
   const search = async (event) => {
     event?.preventDefault();
     if (importPending.current) return;
+    searchController.current?.abort();
+    detailsController.current?.abort();
+    const controller = new AbortController();
+    searchController.current = controller;
+    setDetails(null);
+    setDetailsLoading(null);
+    setLoading(false);
     const q = query.trim();
     setDecks([]);
     setSearched(false);
     if (q.length < 2) return;
     setLoading(true);
     try {
-      const response = await fetch(`/api/mtg-decks?q=${encodeURIComponent(q)}`);
+      const response = await fetch(`/api/mtg-decks?q=${encodeURIComponent(q)}`, { signal: controller.signal });
       const body = await response.json().catch(() => []);
+      if (controller.signal.aborted) return;
       if (!response.ok) return showToast?.(body.error || t('mtgDeck.errSearch'), 'error');
       setSearched(true);
       setDecks(body);
     } catch (error) {
+      if (controller.signal.aborted) return;
       console.error(error);
       showToast?.(t('mtgDeck.errSearch'), 'error');
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   };
 
@@ -110,11 +126,13 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose, navig
         }),
       });
       const body = await response.json().catch(() => null);
+      if (!mounted.current) return;
       if (!response.ok) return showToast?.(body?.error || t('mtgDeck.errAdd'), 'error');
       reviewChoices.current = { key: null, ids: {} };
       showToast?.(t('mtgDeck.added', { count: body.added, name: deck.name }), 'success');
       onAddSuccess?.();
     } catch (error) {
+      if (!mounted.current) return;
       console.error(error);
       showToast?.(t('mtgDeck.errAdd'), 'error');
     } finally {
@@ -125,18 +143,24 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose, navig
 
   const showDetails = async (deck) => {
     if (importPending.current) return;
+    detailsController.current?.abort();
+    const controller = new AbortController();
+    detailsController.current = controller;
+    setDetailsLoading(null);
     if (details?.fileName === deck.fileName) return setDetails(null);
     setDetailsLoading(deck.fileName);
     try {
-      const response = await fetch(`/api/mtg-decks/${encodeURIComponent(deck.fileName)}?token_edition=${encodeURIComponent(tokenEditions[deck.fileName] || '')}`);
+      const response = await fetch(`/api/mtg-decks/${encodeURIComponent(deck.fileName)}?token_edition=${encodeURIComponent(tokenEditions[deck.fileName] || '')}`, { signal: controller.signal });
       const body = await response.json().catch(() => null);
+      if (controller.signal.aborted) return;
       if (!response.ok) return showToast?.(body?.error || t('mtgDeck.errDetails'), 'error');
       setDetails({ ...body, fileName: deck.fileName });
     } catch (error) {
+      if (controller.signal.aborted) return;
       console.error(error);
       showToast?.(t('mtgDeck.errDetails'), 'error');
     } finally {
-      setDetailsLoading(null);
+      if (!controller.signal.aborted) setDetailsLoading(null);
     }
   };
 
@@ -153,7 +177,16 @@ export default function MtgDeckImport({ onAddSuccess, showToast, onChoose, navig
           className="input-control"
           disabled={!!adding}
           value={query}
-          onChange={event => { setQuery(event.target.value); setSearched(false); }}
+          onChange={event => {
+            searchController.current?.abort();
+            detailsController.current?.abort();
+            setQuery(event.target.value);
+            setDecks([]);
+            setDetails(null);
+            setDetailsLoading(null);
+            setLoading(false);
+            setSearched(false);
+          }}
           onKeyDown={event => {
             if (event.key === 'Enter') {
               event.preventDefault();

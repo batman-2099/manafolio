@@ -967,7 +967,7 @@
   "deck.tableView": "Table view",
   "deck.noMatches": "No decks match your filter",
   "deck.noMatchesHint": "Try adjusting your search query, game filter, or status filter.",
-  "deck.inPlay": "Checked out",
+  "deck.inPlay": "In Deck",
   "deck.cardCapacity": "Card Capacity",
   "deck.deleteDeck": "Delete Deck",
   "deck.colGameFormat": "Game & Format",
@@ -2405,7 +2405,7 @@
   "wizard.checkout.cancelFailed": "Cancellation failed. The deck is still checked out. Your checklist is preserved; retry cancellation or finish the guide.",
   "wizard.checkin.cancelFailed": "Cancellation failed. The deck is still returned to storage. Your checklist is preserved; retry cancellation or finish the guide.",
   "wizard.retryCancel": "Retry cancellation",
-  "cardDeck.checkedOut": "{count} of {total} checked out",
+  "cardDeck.checkedOut": "{count} of {total} In Deck",
   "cardDeck.inDecks": "{count} of {total} in decks",
   "cardDeck.outCompact": "{count}/{total} out",
   "cardDeck.allocation": "{name}: {count} ({status})"

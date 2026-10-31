@@ -972,11 +972,12 @@ router.post('/locations/:id/apply-all', async (req, res) => {
   const { id } = req.params;
   const { entry_ids = [] } = req.body;
   try {
-    const location = await db.get(`SELECT * FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
-    if (!location) return res.status(404).json({ error: 'Location not found' });
     if (!Array.isArray(entry_ids) || entry_ids.length === 0) {
       return res.status(400).json({ error: 'entry_ids is required' });
     }
+    const result = await db.withTransaction(async () => {
+    const location = await db.get(`SELECT * FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
+    if (!location) throw Object.assign(new Error('Location not found'), { status: 404 });
 
     let workingCompartments = await loadCompartments(db, id, req.user.id);
     let filed = 0;
@@ -1003,7 +1004,9 @@ router.post('/locations/:id/apply-all', async (req, res) => {
       filed++;
     }
 
-    res.json({ message: `Filed ${filed} of ${entry_ids.length} card(s).`, filed, total: entry_ids.length });
+    return { message: `Filed ${filed} of ${entry_ids.length} card(s).`, filed, total: entry_ids.length };
+    });
+    res.json(result);
   } catch (error) {
     if (error.status) return res.status(error.status).json({ error: error.message });
     console.error(error);

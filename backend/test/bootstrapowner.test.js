@@ -39,7 +39,8 @@ async function main() {
   const legacySchema = await db.all('SELECT * FROM sqlite_master ORDER BY name');
   await assert.rejects(db.initDb(), /Unsupported legacy storage migration.*preserved/);
   const legacyServer = spawnServer([path.join(__dirname, '../src/server.js')], {
-    env: { DB_PATH: tmpDb, CV_MODEL_DIR: `${tmpDb}.models`, DEFAULT_ADMIN_PASSWORD: '' }
+    modelDir: `${tmpDb}.models`,
+    env: { DB_PATH: tmpDb, DEFAULT_ADMIN_PASSWORD: '' }
   });
   try {
     await assert.rejects(waitForServer(legacyServer), /exited before readiness \(1\):[\s\S]*Unsupported legacy storage migration/);

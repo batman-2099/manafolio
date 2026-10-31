@@ -2,7 +2,7 @@
 # Manafolio Dockerfile
 # Stage 1: Build Frontend Assets
 # =========================================
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 # Copy frontend packages and lockfiles. Persist the download cache outside the
@@ -29,7 +29,7 @@ RUN npm run build
 # CLIP, so alpine may now be viable.
 # ponytail: not switched, because sqlite3 and sharp prebuilts have their own
 # glibc assumptions and proving that out is a separate job from removing CLIP.
-FROM node:20-slim AS production
+FROM node:22-slim AS production
 WORKDIR /app
 
 # Native build tools for SQLite3, gosu to drop root, healthcheck/HTTPS tools,

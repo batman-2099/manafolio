@@ -7,7 +7,7 @@ Release history starts with Manafolio 2.0.
 - Show allocated-copy counts beneath collection and container cards, keeping deck names in card details rather than list/gallery rows; use high-contrast, theme-colored status labels and compact binder and box badges instead of darkening checked-out artwork. Reserve the red outer border for missing cards, including stacks containing a missing entry, rather than checkout status. Emphasize fully allocated cards with heavier label text.
 - Show exact per-deck quantities in card details, including stacked entries and dashboard cards. Keep Pulled checklist flags distinct from reserved checkout copies, and do not label unallocated copies or saved-only decklists as checked out.
 - Place Last verified above the checkout status in container card details.
-- Label a single checked-out copy “Checked out” without a fraction; retain counts for multi-copy stacks and keep Pulled status separate.
+- Rename the Checked out status to “In Deck”; show a single reserved copy without a fraction, retain counts for multi-copy stacks, and keep Pulled status separate.
 - Center checkout labels beneath cards and compact badges at the bottom of artwork, including their icon and text.
 - Place the Missing tag in the centered status area below Last verified, using a dark red background and white text, including stacks with a missing copy.
 - Remove redundant Open buttons from Deck Builder cards and rows; keep card/row activation and keyboard-accessible deck names.
@@ -17,6 +17,13 @@ Release history starts with Manafolio 2.0.
 - Remove the deck editor's Jump to cards and Jump to add cards buttons.
 - Remove icons from checked-out deck status labels and the checked-out banner; retain action-button icons.
 - Remove the Checked out tag and Checked out since timestamp from the open deck's name area; retain the checkout banner and Return to Storage action.
+- Keep the deck stats and overview below the name/action toolbar and above card editing on mobile as well as desktop.
+- Apply reserved-copy inventory guards consistently to bulk changes, make batch filing/moves atomic, reject adds above 10,000 expanded rows before insertion, and restore positive safe-integer quantities from account backups.
+- Reset account-owned screens on session replacement, enforce expired-session sign-out independently of draft warnings, and retain uncertain trade confirmations only in account-bound page memory for explicit receipt-safe retries.
+- Keep OIDC PKCE verifiers server-side and derive callbacks using configured proxy trust; authenticate artwork uploads before parsing and allow the existing 8 MiB image limit through the JSON transport.
+- Include native reverse artwork in local scan catalogs, bound stalled browser model downloads before contour fallback, and prevent stale precon search/detail requests from replacing newer results.
+- Launch the bundled native Codex executable directly instead of treating a packaged server as Node; move production packaging and supported source runtimes to Node 22+, and allow two minutes for Compose shutdown.
+- Isolate E2E model directories, exercise real IndexedDB persistence and invalidation in browser tests, and test registered desktop shutdown handlers rather than source-text slices.
 
 ## 2.4.5 — 2026-10-29
 

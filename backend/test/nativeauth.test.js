@@ -120,12 +120,15 @@ async function begin({ browser = false, sub = 'owner-sub', username = 'collector
   assert.notStrictEqual(url.searchParams.get('code_challenge'), challenge, 'upstream and app PKCE are independent');
   const state = url.searchParams.get('state');
   assert.notStrictEqual(state, clientState, 'app state is not upstream browser correlation');
+  const publicState = JSON.parse(Buffer.from(state.split('.')[0], 'base64url').toString());
+  assert.strictEqual(publicState.cv, undefined, 'neither browser nor native state discloses upstream PKCE');
+  assert(!JSON.stringify(publicState).includes(verifier), 'native verifier never enters upstream state');
   const cookie = result.headers.get('set-cookie');
   assert.match(cookie, /HttpOnly/i);
   assert.match(cookie, /SameSite=Lax/i);
   assert.match(cookie, /Path=\/api\/auth\/oidc/i);
   const code = `provider-code-${requestNumber}`;
-  authorizations.set(code, { sub, username, fail, nonce: url.searchParams.get('nonce'), challenge: url.searchParams.get('code_challenge') });
+  authorizations.set(code, { sub, username, fail, state: publicState, nonce: url.searchParams.get('nonce'), challenge: url.searchParams.get('code_challenge') });
   return { code, state, cookie: cookie.split(';')[0] };
 }
 
@@ -168,6 +171,8 @@ async function startServers() {
         assert(auth, 'only fixture-issued authorization codes may be exchanged');
         assert.strictEqual(req.headers.authorization, `Basic ${Buffer.from('native-auth-test:server-only-secret').toString('base64')}`);
         assert.strictEqual(params.get('redirect_uri'), `${base}/api/auth/oidc/callback`);
+        assert.notStrictEqual(params.get('code_verifier'), verifier, 'upstream verifier is not the native app verifier');
+        assert(!JSON.stringify(auth.state).includes(params.get('code_verifier')), 'upstream verifier stays out of public state');
         assert.strictEqual(crypto.createHash('sha256').update(params.get('code_verifier')).digest('base64url'), auth.challenge);
         res.setHeader('Content-Type', 'application/json');
         if (auth.fail) {

@@ -110,13 +110,6 @@ function ManaCounts({ deck }) {
 
 function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
   const { t } = useT();
-  const [compactEditor, setCompactEditor] = useState(() => window.matchMedia('(max-width: 768px)').matches);
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 768px)');
-    const update = () => setCompactEditor(media.matches);
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
   const [decks, setDecks] = useState([]);
   const [activeDeck, setActiveDeck] = useState(null);
   const [savedEditorState, setSavedEditorState] = useState(null);
@@ -2147,7 +2140,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
             </div>
           )}
 
-          {!compactEditor && deckSummary}
+          {deckSummary}
           <div className="deck-editing-workspace">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
               
@@ -2454,7 +2447,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
 
             </div>
           </div>
-          {compactEditor && deckSummary}
         </div>
       )}
 

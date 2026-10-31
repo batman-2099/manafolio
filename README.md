@@ -163,7 +163,7 @@ Contributions are welcome through pull requests. Read the [contributor guide](AG
 
 ### Development
 
-Use Node 20.19+ within Node 20, or Node 22.12+ (including newer major versions), and npm 9+. Prefer a currently supported LTS release; these minimums match the locked Vite toolchain and SQLite dependency. Shared JSON uses native import attributes.
+Use a currently supported Node LTS release, at least Node 22.12, and npm 9+. Docker, desktop server packaging, and CI use Node 22. Node 20 is no longer supported. Shared JSON uses native import attributes.
 
 ```bash
 npm run install:all

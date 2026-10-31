@@ -92,6 +92,8 @@ async function main() {
   const previousDb = require.cache[dbModule];
   require.cache[dbModule] = { id: dbModule, filename: dbModule, loaded: true, exports: { dbPath: path.join(dir, 'test.db') } };
   const spawn = childProcess.spawn;
+  const execPath = process.execPath;
+  process.execPath = path.join(dir, 'manafolio-server');
   const originalTimeout = global.setTimeout;
   const originalInterval = global.setInterval;
   const originalClearInterval = global.clearInterval;
@@ -108,8 +110,19 @@ async function main() {
   const children = [];
   const runtimes = [];
   childProcess.spawn = (executable, args, options) => {
-    assert.strictEqual(executable, process.execPath);
-    const child = spawn(process.execPath, ['-e', `(${fakeServer.toString()})();`], options);
+    const nativeRoot = path.dirname(require.resolve(`@openai/codex-${process.platform}-${process.arch}/package.json`));
+    assert.ok(executable.startsWith(`${nativeRoot}${path.sep}vendor${path.sep}`));
+    assert.strictEqual(path.basename(executable), 'codex');
+    assert.notStrictEqual(executable, process.execPath, 'SEA executable must never be used as a JavaScript interpreter');
+    assert.deepStrictEqual(args.slice(0, 4), ['app-server', '--listen', 'stdio://', '--strict-config']);
+    const config = args.slice(4).filter((_, index) => index % 2 === 1);
+    for (const setting of [
+      'approval_policy="never"', 'sandbox_mode="read-only"', 'web_search="disabled"',
+      'shell_environment_policy.inherit="none"', 'features.shell_tool=false',
+      'features.code_mode=false', 'features.apps=false', 'features.plugins=false',
+    ]) assert.ok(config.includes(setting), `Missing security setting: ${setting}`);
+    assert.strictEqual(options.detached, true, 'cleanup must own the process group');
+    const child = spawn(execPath, ['-e', `(${fakeServer.toString()})();`], options);
     children.push(child);
     runtimes.push(path.dirname(options.cwd));
     return child;
@@ -126,6 +139,13 @@ async function main() {
     },
   };
   try {
+    const nativePackage = require(`@openai/codex-${process.platform}-${process.arch}/package.json`);
+    const nativeVersion = nativePackage.version;
+    try {
+      nativePackage.version = '0.0.0-unreviewed';
+      await assert.rejects(client.account(1), error => error.status === 503);
+      assert.strictEqual(children.length, 0, 'unreviewed native versions must not start');
+    } finally { nativePackage.version = nativeVersion; }
     assert.deepStrictEqual(await client.account(1), { connected: false });
     const login = await client.login(1);
     assert.deepStrictEqual(Object.keys(login).sort(), ['userCode', 'verificationUrl']);
@@ -274,6 +294,7 @@ async function main() {
     global.setInterval = originalInterval;
     global.clearInterval = originalClearInterval;
     childProcess.spawn = spawn;
+    process.execPath = execPath;
     if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = originalKey;
     if (previousDb) require.cache[dbModule] = previousDb;

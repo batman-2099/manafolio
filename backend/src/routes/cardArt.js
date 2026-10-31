@@ -35,7 +35,8 @@ router.get('/:cardId.png', (req, res) => {
 router.use(authenticateToken);
 
 // Upload art for a card. Body: { image: "data:image/png;base64,..." }.
-router.post('/:cardId', async (req, res) => {
+// 8 MiB of decoded image needs roughly 11 MiB in base64, plus JSON overhead.
+router.post('/:cardId', express.json({ limit: '12mb' }), async (req, res) => {
   const { cardId } = req.params;
   if (!cardArt.isValidId(cardId)) {
     return res.status(400).json({ error: 'Invalid card id' });

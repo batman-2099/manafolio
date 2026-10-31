@@ -1,16 +1,35 @@
 const { spawn } = require('child_process');
 const { setTimeout: delay } = require('timers/promises');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 function spawnServer(args, options = {}) {
-  const child = spawn(process.execPath, args, {
-    ...options,
-    env: { ...process.env, ...options.env, PORT: '0', HTTPS_PORT: '' },
-    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-  });
+  // Explicit fixtures are caller-owned; inherited CV_MODEL_DIR is never safe for tests.
+  const { modelDir, ...spawnOptions } = options;
+  const ownedModelDir = modelDir ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'manafolio-e2e-models-'));
+  const cleanup = () => {
+    if (ownedModelDir) fs.rmSync(ownedModelDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  };
+  let child;
+  try {
+    child = spawn(process.execPath, args, {
+      ...spawnOptions,
+      env: { ...process.env, ...options.env, PORT: '0', HTTPS_PORT: '', CV_MODEL_DIR: modelDir || ownedModelDir },
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+    });
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
   let stderr = '';
   child.stdout.resume();
   child.stderr.on('data', data => { stderr = (stderr + data).slice(-8192); });
-  child.closed = new Promise(resolve => child.once('close', resolve));
+  child.closed = new Promise((resolve, reject) => child.once('close', code => {
+    try { cleanup(); resolve(code); }
+    catch (error) { reject(error); }
+  }));
+  child.closed.catch(() => {});
   child.ready = new Promise((resolve, reject) => {
     const controller = new AbortController();
     const finish = (error, port) => {

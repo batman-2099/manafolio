@@ -70,7 +70,7 @@ async function getSession() {
   if (!sessionPromise) {
     sessionPromise = (async () => {
       console.log('[detectWorker] Fetching model /models/cornelius.onnx...');
-      const res = await fetch('/models/cornelius.onnx');
+      const res = await fetch('/models/cornelius.onnx', { signal: AbortSignal.timeout(30000) });
       const type = res.headers.get('content-type') || '';
       if (!res.ok || type.includes('text/html')) {
         throw new Error(`cornelius.onnx not served (${res.status} ${type || 'no type'})`);

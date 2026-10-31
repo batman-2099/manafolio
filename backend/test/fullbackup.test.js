@@ -133,7 +133,7 @@ async function testFullBackup() {
     const backupTables = ['card_cache', 'collection', 'locations', 'compartments', 'compartment_assignments', 'decks', 'deck_cards', 'deck_card_allocations'];
     const beforeInvalidSleeves = await Promise.all(backupTables.map(table => db.all(`SELECT * FROM ${table}`)));
     for (const table of ['collection', 'deck_cards']) {
-      for (const quantity of [-1, 0.5, '2', null, true, 2147483648, ...(table === 'collection' ? [0] : [])]) {
+      for (const quantity of [-1, 0.5, '2', null, true, ...(table === 'collection' ? [0, Number.MAX_SAFE_INTEGER + 1] : [2147483648])]) {
         const invalid = structuredClone(res.body);
         invalid[table][0].quantity = quantity;
         invalidRes.statusCode = 200;
@@ -257,6 +257,21 @@ async function testFullBackup() {
     await importBackup({ body: { format: 'backup', data: zeroBackup }, user: { id: 1 } }, restoreRes);
     assert.strictEqual(restoreRes.statusCode, 200, 'zero-quantity saved deck rows remain valid backups');
     assert.strictEqual((await db.get('SELECT quantity FROM deck_cards')).quantity, 0);
+
+    const collectionRouter = require('../src/routes/collection');
+    const updateCollection = collectionRouter.stack.find(layer =>
+      layer.route?.path === '/collection/:id' && layer.route.methods.put).route.stack.at(-1).handle;
+    for (const quantity of [2147483648, Number.MAX_SAFE_INTEGER]) {
+      const entry = await db.get('SELECT id FROM collection WHERE user_id = 1');
+      restoreRes.statusCode = 200;
+      await updateCollection({ params: { id: entry.id }, body: { quantity }, user: { id: 1 } }, restoreRes);
+      assert.strictEqual(restoreRes.statusCode, 200, 'stored safe-integer quantities remain valid updates');
+      await exportBackup({ query: { format: 'backup' }, user: { id: 1 } }, res);
+      assert.strictEqual(res.body.collection[0].quantity, quantity);
+      await importBackup({ body: { format: 'backup', data: res.body }, user: { id: 1 } }, restoreRes);
+      assert.strictEqual(restoreRes.statusCode, 200, 'every supported stored quantity must survive backup restore');
+      assert.strictEqual((await db.get('SELECT quantity FROM collection WHERE user_id = 1')).quantity, quantity);
+    }
   } finally {
     try { db.dbConnection.close(); } catch { /* already closed */ }
     for (const suffix of ['', '-wal', '-shm']) {

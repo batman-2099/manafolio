@@ -108,36 +108,92 @@ async function backendDrain(mode) {
 
 async function desktopDeadline(isWindows) {
   const source = fs.readFileSync(path.join(__dirname, '../../desktop/electron/main.cjs'), 'utf8');
-  const start = source.indexOf('  function stop() {');
-  const end = source.indexOf("  app.on('before-quit'", start);
-  assert.ok(start >= 0 && end > start);
   const server = Object.assign(new EventEmitter(), { pid: 123, exitCode: null, signalCode: null, connected: true });
   const signals = [], messages = [], timers = [], exits = [], dialogs = [], records = [], errors = [];
   let response = 0;
   server.kill = signal => { signals.push(signal); return true; };
   server.send = (message, callback) => { messages.push(message); callback(null); };
-  const context = {
-    server, isWindows, stopping: false, failed: false, startupTimer: undefined, promptWindow: undefined,
-    logPath: '/private/desktop.log', record: text => records.push(text),
-    app: { exit: code => exits.push(code) },
-    dialog: { showMessageBox: async options => { dialogs.push(options); return { response }; }, showErrorBox: (...args) => errors.push(args) },
+  const app = Object.assign(new EventEmitter(), {
+    setName() {}, setAppUserModelId() {}, enableSandbox() {}, setPath() {},
+    requestSingleInstanceLock: () => true, whenReady: () => Promise.resolve(),
+    getAppPath: () => '/fixture/desktop/resources/app',
+    commandLine: { hasSwitch: () => false }, exit: code => exits.push(code),
+  });
+  class BrowserWindow extends EventEmitter {
+    constructor() {
+      super();
+      this.webContents = Object.assign(new EventEmitter(), {
+        setWindowOpenHandler() {},
+        session: Object.assign(new EventEmitter(), { setPermissionCheckHandler() {}, setPermissionRequestHandler() {} }),
+      });
+    }
+    setTitle() {}
+    async loadURL() {}
+  }
+  const lines = new EventEmitter();
+  server.stdout = new EventEmitter();
+  server.stderr = new EventEmitter();
+  const mocks = {
+    electron: {
+      app, BrowserWindow, Menu: { setApplicationMenu() {}, buildFromTemplate: value => value },
+      ipcMain: new EventEmitter(), shell: {},
+      dialog: { showMessageBox: async (...args) => { dialogs.push(args.at(-1)); return { response }; }, showErrorBox: (...args) => errors.push(args) },
+    },
+    'node:fs': {
+      mkdirSync() {}, chmodSync() {}, openSync: () => 1, fchmodSync() {},
+      writeSync: (_fd, bytes, offset, length) => { records.push(bytes.toString()); return length; },
+    },
+    'node:child_process': { spawn: () => server },
+    'node:readline': { createInterface: () => lines },
+    'node:http': { get: (_url, _options, callback) => {
+      callback({ statusCode: 200, headers: { 'x-app-name': 'Manafolio' }, resume() {} });
+      return new EventEmitter();
+    } },
+  };
+  vm.runInNewContext(source, {
+    require: name => mocks[name] || require(name),
+    __filename: '/fixture/desktop/resources/app/main.cjs', Buffer, URL,
+    process: Object.assign(new EventEmitter(), {
+      platform: isWindows ? 'win32' : 'linux', env: { LOCALAPPDATA: '/fixture', XDG_DATA_HOME: '/fixture' },
+      umask() {}, getuid: () => 1000,
+    }),
     setTimeout: (callback, milliseconds) => { const timer = { callback, milliseconds }; timers.push(timer); return timer; },
     clearTimeout: timer => { if (timer) timer.cleared = true; },
-  };
-  vm.runInNewContext(source.slice(start, end) + '\nstop(); stop();', context);
+  });
+  await Promise.resolve();
+  if (isWindows) server.emit('message', { type: 'listening', port: 3001 });
+  else lines.emit('line', 'MANAFOLIO_READY:3001');
+  await Promise.resolve();
+  assert.equal(timers.shift().cleared, true, 'healthy startup clears its deadline');
+  const [quit] = app.listeners('before-quit');
+  assert.equal(typeof quit, 'function', 'entrypoint registers the quit handler');
+  let prevented = 0;
+  const event = { preventDefault: () => prevented++ };
+  await quit(event);
+  assert.equal(timers.length, 0, 'Cancel must leave the server running');
+  assert.equal(signals.length + messages.length, 0);
+  response = 1;
+  const confirmedQuit = quit(event);
+  await quit(event);
+  await confirmedQuit;
+  await quit(event);
+  assert.equal(prevented, 4, 'all quit attempts are intercepted');
+  assert.equal(dialogs.length, 2, 'concurrent and repeated quits do not duplicate confirmation');
+  dialogs.length = 0;
+  response = 0;
   assert.equal(timers.length, 1, 'repeated quit requests share the same deadline');
   assert.equal(timers[0].milliseconds, 30000);
   assert.equal(messages.length, isWindows ? 1 : 0);
   assert.deepEqual(signals, isWindows ? [] : ['SIGTERM']);
   await timers[0].callback();
   assert.equal(dialogs.length, 1, 'both desktop platforms surface stalled shutdown');
-  assert.match(dialogs[0].detail, /Force quit may lose data/);
+  assert.equal(dialogs[0].defaultId, 0, 'waiting is the safe default');
+  assert.equal(dialogs[0].cancelId, 0, 'closing the dialog must keep waiting');
   assert.equal(timers.length, 2, 'Keep waiting schedules another visible deadline');
   assert.ok(!signals.includes('SIGKILL'), 'waiting never silently kills writes');
   response = 1;
   await timers[1].callback();
   assert.equal(signals.at(-1), 'SIGKILL', 'only explicit force quit kills the child');
-  assert.ok(records.some(text => text.includes('User chose to force quit')));
   server.exitCode = null;
   server.signalCode = 'SIGKILL';
   server.emit('exit', null, 'SIGKILL');

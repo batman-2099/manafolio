@@ -3,7 +3,7 @@
   "private": true,
   "description": "Monorepo for Manafolio Magic: The Gathering collection, storage, and deck manager",
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend",

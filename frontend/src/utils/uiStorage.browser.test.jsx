@@ -100,7 +100,7 @@ export async function runUiStorageRegressions({ pressKey, dragCard } = {}) {
     const allocations = [...host.querySelectorAll('[role="listitem"]')];
     assert(allocations.length === 2 && allocations[0].textContent.includes('Boros, skies') && allocations[1].textContent.includes('Draft deck'),
       'stack details must identify both assigned decks');
-    assert(allocations[0].textContent.includes('Checked out') && allocations[1].textContent.includes('Pulled'),
+    assert(allocations[0].textContent.includes(en['deck.inPlay']) && allocations[1].textContent.includes(en['deck.pulled']),
       'pulled checklist copies must not be presented as reservations');
     await act(async () => render(<CardDeckStatus card={{ ...reserved, quantity: 8, stack_entries: [reserved, { ...reserved, entry_id: 3 }] }} details />));
     assert(host.querySelectorAll('[role="listitem"]').length === 1

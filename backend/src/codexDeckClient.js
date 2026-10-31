@@ -87,7 +87,14 @@ async function createSession(key) {
   const pkgPath = require.resolve('@openai/codex/package.json');
   const pkg = require(pkgPath);
   if (pkg.version !== VERSION) throw failure(503, 'The installed Codex version needs a security review.');
-  const executable = path.resolve(path.dirname(pkgPath), pkg.bin.codex);
+  const architecture = { x64: 'x86_64', arm64: 'aarch64' }[process.arch];
+  const target = { linux: 'unknown-linux-musl', darwin: 'apple-darwin' }[process.platform];
+  if (!architecture || !target) throw failure(503, 'Unsupported Codex server platform.');
+  const nativePackage = require.resolve(`@openai/codex-${process.platform}-${process.arch}/package.json`);
+  if (require(nativePackage).version !== `${VERSION}-${process.platform}-${process.arch}`) {
+    throw failure(503, 'The installed Codex version needs a security review.');
+  }
+  const executable = path.join(path.dirname(nativePackage), 'vendor', `${architecture}-${target}`, 'bin', 'codex');
   const home = userHome(key);
   const root = path.dirname(home);
   await privateDirectory(root);
@@ -99,8 +106,8 @@ async function createSession(key) {
   try {
     await fs.chmod(runtime, 0o700);
     for (const name of ['home', 'work', 'tmp']) await privateDirectory(path.join(runtime, name));
-    child = childProcess.spawn(process.execPath, [
-      executable, 'app-server', '--listen', 'stdio://', '--strict-config',
+    child = childProcess.spawn(executable, [
+      'app-server', '--listen', 'stdio://', '--strict-config',
       ...CONFIG.flatMap(value => ['-c', value]),
     ], {
       cwd: path.join(runtime, 'work'),
@@ -163,8 +170,8 @@ async function createSession(key) {
       turn = null;
     }
     child.stdin.destroy();
-    // Own detached process group includes the npm launcher, native server, and
-    // Code Mode host. Killing only the launcher can leave credentials in memory.
+    // Own detached process group includes the native server and Code Mode host.
+    // Killing only the server can leave credentials in descendant processes.
     try { process.kill(-child.pid, 'SIGKILL'); } catch (_) { child.kill('SIGKILL'); }
     return closed;
   }
