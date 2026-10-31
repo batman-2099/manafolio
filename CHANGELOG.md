@@ -2,6 +2,10 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Display available, searched, selected, and reviewed Trade workbench cards in responsive artwork grids instead of horizontal lists.
+
 ## 2.5.0 — 2026-10-31
 
 - Show allocated-copy counts beneath collection and container cards, keeping deck names in card details rather than list/gallery rows; use high-contrast, theme-colored status labels and compact binder and box badges instead of darkening checked-out artwork. Reserve the red outer border for missing cards, including stacks containing a missing entry, rather than checkout status. Emphasize fully allocated cards with heavier label text.

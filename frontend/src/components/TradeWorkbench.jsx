@@ -139,8 +139,8 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef, recovery,
       <p>{t('trade.estimates')}</p>
       <div className="trade-columns">{['giving', 'receiving'].map(side => <section key={side}>
         <h3 className="trade-subtotal"><span>{t(`trade.${side}`)}</span><span>{total(review[side])}</span></h3>
-        <ul className="trade-list">{review[side].map((card, index) => <li key={index} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-          <CardImage card={card} loading="lazy" style={{ width: '72px', aspectRatio: '5 / 7', objectFit: 'contain', borderRadius: '4px', flexShrink: 0 }} />
+        <ul className="scan-review-list">{review[side].map((card, index) => <li className="scan-review-card" key={index}>
+          <CardImage card={card} loading="lazy" />
           <div style={{ minWidth: 0 }}>
           <strong>{card.quantity} × {identity(card)}</strong><p>{card.printing} · {card.condition}{card.entry_id ? ` · #${card.entry_id} · ${card.location_name || t('trade.unassigned')}` : ` · ${t('trade.unassigned')}`}</p>
           <p>{card.estimate === null ? t('trade.unknown') : `${money(card.estimate * card.quantity, card.currency)} ${card.currency}`} {card.quoted_at && ` · ${card.quoted_at}`}</p>
