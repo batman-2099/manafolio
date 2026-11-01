@@ -400,6 +400,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
               {locationsError && <p role="alert">{locationsError} <button type="button" className="btn btn-secondary" onClick={() => setLocationsRevision(value => value + 1)}>{t('aiDeck.retry')}</button></p>}
             </div>
           )}
+          <div style={rowStyle}>
           {inventoryType === 'collection' && (
             <div className="form-group">
               <button
@@ -418,6 +419,24 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
               </button>
             </div>
           )}
+            <div className="form-group">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={useAllAvailableLands}
+                aria-describedby="ai-all-lands-hint"
+                disabled={inventoryLoading || !!inventoryError}
+                className="btn btn-secondary"
+                style={useAllAvailableLands ? { background: 'var(--accent-green)', borderColor: 'var(--accent-green)', color: 'var(--bg-primary)' } : undefined}
+                onClick={() => { clearDraft(); setUseAllAvailableLands(current => !current); }}
+              >
+                {t('aiDeck.useAllAvailableLands')}
+                <span aria-hidden="true" style={{ width: 28, height: 16, borderRadius: 999, background: useAllAvailableLands ? 'var(--text-on-accent)' : 'var(--text-muted)', position: 'relative', flexShrink: 0 }}>
+                  <span style={{ position: 'absolute', top: 2, left: useAllAvailableLands ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: useAllAvailableLands ? 'var(--accent-green)' : 'var(--bg-primary)' }} />
+                </span>
+              </button>
+            </div>
+          </div>
           <fieldset disabled={inventoryLoading || !!inventoryError} style={fieldsetStyle} aria-describedby="ai-filter-hint">
             <div style={{ ...rowStyle, alignItems: 'start' }}>
               <div className="form-group" style={{ flex: '1 1 180px', minWidth: 0 }}>
@@ -450,12 +469,6 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
                 </p>
               </div>
             </div>
-            <label style={{ ...rowStyle, minHeight: 44, cursor: 'pointer' }}>
-              <input type="checkbox" role="switch" checked={useAllAvailableLands} aria-describedby="ai-all-lands-hint"
-                onChange={event => { clearDraft(); setUseAllAvailableLands(event.target.checked); }} />
-              {t('aiDeck.useAllAvailableLands')}
-            </label>
-            <p id="ai-all-lands-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.useAllAvailableLandsHint')}</p>
           </fieldset>
             </div>
           </section>
@@ -467,6 +480,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
             {inventoryType === 'collection' && (
               <p id="ai-checked-out-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.includeCheckedOutHint')}</p>
             )}
+            <p id="ai-all-lands-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.useAllAvailableLandsHint')}</p>
           </div>
           <section className="ai-deck-guidance">
             <h3>{t('aiDeck.eligibilityDetails')}</h3>
