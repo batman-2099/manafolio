@@ -994,7 +994,7 @@ Partial availability still creates the box and reports shortages. Use a differen
 ### Simulate opening hands
 
 1. Open a nonempty deck and select **Draw Simulator**.
-2. In **Opening Hand Simulator**, inspect the opening hand; select a card to preview its artwork.
+2. In **Opening Hand Simulator**, inspect the opening hand; select a card to preview its artwork. Seven cards fit across on wide screens; smaller screens wrap the hand above the controls.
 3. Select **Draw 1 Card** to extend the hand.
 4. Select **Mulligan (Draw …)** to reshuffle and draw a smaller hand, or **Reshuffle & Restart** to reset to the initial draw.
 5. Close the simulator when finished.
