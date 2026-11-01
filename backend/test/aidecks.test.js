@@ -501,6 +501,7 @@ async function main() {
     assert.deepStrictEqual(filtered.request.colors, ['Red', 'Blue']);
     assert.deepStrictEqual(filtered.request.sets, ['tst', 'alt']);
     assert.deepStrictEqual(filtered.request.excluded_sets, [], 'omitted exclusions default to an empty list');
+    assert.strictEqual(filtered.request.use_all_available_lands, false, 'the land set override defaults to disabled');
     assert.deepStrictEqual(filtered.catalog.map(row => row[0]).sort(), [ids.bolt, ids.reprint, ids.island, ids.multicolor].sort(),
       'colors OR together, sets OR together, and both filters intersect after rules enrichment');
     assert.strictEqual(filtered.catalog.find(row => row[0] === ids.bolt)[2], 3, 'physical checkout reduces available copies');
@@ -557,6 +558,47 @@ async function main() {
       ...excludeOnly, current_draft: draft({ target_size: 1, cards: [{ card_id: ids.bolt, quantity: 1 }] }),
     }, 16)).status, 400, 'a current draft cannot reintroduce an explicitly excluded printing');
     assert.strictEqual(calls.length, callsBeforeExcludedValidation, 'invalid exclusions and excluded drafts never invoke the model');
+
+    const { filterInventory } = require('../src/utils/aiDecks');
+    for (const metadata of [{ subtypes: ['Land'] }, { type_line: 'Land — Forest Island' }]) {
+      const land = { ...metadata, id: 'nonbasic-land', set_id: 'out', color_identity: ['Green'], available_qty: 1 };
+      assert.deepStrictEqual(filterInventory([land], { sets: ['tst'], excluded_sets: ['out'], use_all_available_lands: true }), [land],
+        'cached or enriched land types qualify, including nonbasic lands');
+      assert.deepStrictEqual(filterInventory([land], { sets: ['tst'] }), [], 'cached and enriched lands obey set filters by default');
+    }
+    await db.run("INSERT INTO users (id, username, password_hash, share_token) VALUES (17, 'land-filter-user', 'not-a-real-password', 'land-filter-share')");
+    for (const [card, quantity, type, missing] of [
+      [ids.forest, 3, 'collection', 0], [ids.forest, 2, 'collection', 1],
+      [ids.island, 3, 'arena', 0], [ids.bolt, 2, 'collection', 0], [ids.reprint, 2, 'collection', 0],
+    ]) {
+      await db.run("INSERT INTO collection (card_id, quantity, user_id, list_type, missing, game) VALUES (?, ?, 17, ?, ?, 'mtg')",
+        [card, quantity, type, missing]);
+    }
+    const landCheckout = await db.run("INSERT INTO decks (user_id, name, game, inventory_type, checked_out) VALUES (17, 'Reserved forest', 'mtg', 'collection', 1)");
+    await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, 1)', [landCheckout.lastID, ids.forest]);
+    const landRequest = { ...requestBody, target_size: 1, sets: ['alt'], excluded_sets: ['tst'] };
+    for (const option of [{}, { use_all_available_lands: false }, { use_all_available_lands: true }]) {
+      const result = await request('POST', '/ai/suggest', { ...landRequest, ...option }, 17);
+      assert.strictEqual(result.status, 200, JSON.stringify(result.body));
+      assert.deepStrictEqual(lastPayload().catalog.map(row => [row[0], row[2]]).sort(),
+        (option.use_all_available_lands ? [[ids.forest, 2], [ids.reprint, 2]] : [[ids.reprint, 2]]).sort(),
+        'only lands bypass included and excluded sets; missing, reserved, Arena and other users’ copies remain excluded');
+      assert.ok(!Object.hasOwn(result.body.draft, 'use_all_available_lands'), 'the override is not a saved-draft field');
+    }
+    const allLands = { ...landRequest, use_all_available_lands: true };
+    assert.strictEqual((await request('POST', '/ai/suggest', { ...allLands, colors: ['Red'] }, 17)).status, 200);
+    assert.deepStrictEqual(lastPayload().catalog.map(row => row[0]), [ids.reprint], 'lands still obey color filters');
+    assert.strictEqual((await request('POST', '/ai/suggest', { ...allLands, inventory_type: 'arena', excluded_sets: ['alt'] }, 17)).status, 200);
+    assert.deepStrictEqual(lastPayload().catalog.map(row => [row[0], row[2]]), [[ids.island, 3]], 'Arena never borrows physical lands');
+    const currentLandDraft = draft({ target_size: 1, cards: [{ card_id: ids.forest, quantity: 1 }] });
+    assert.strictEqual((await request('POST', '/ai/suggest', { ...allLands, current_draft: currentLandDraft }, 17)).status, 200,
+      'current drafts use the same land override as provider inventory and output validation');
+    const beforeInvalidLandRequests = calls.length;
+    assert.strictEqual((await request('POST', '/ai/suggest', { ...landRequest, current_draft: currentLandDraft }, 17)).status, 400);
+    for (const use_all_available_lands of ['true', 1, null, [], {}]) {
+      assert.strictEqual((await request('POST', '/ai/suggest', { ...landRequest, use_all_available_lands }, 17)).status, 400);
+    }
+    assert.strictEqual(calls.length, beforeInvalidLandRequests, 'invalid land options and excluded current drafts never invoke the model');
 
     for (const filters of [{ colors: ['Black'] }, { sets: ['none'] }]) {
       const discussion = await request('POST', '/ai/suggest', { ...filteredBody, ...filters }, 3);

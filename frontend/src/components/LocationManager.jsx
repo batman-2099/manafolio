@@ -186,7 +186,7 @@ function ContainerImportReview({ report, onClose, onMove, movingItem, expanded, 
   );
 }
 
-function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId, setSelectedLocationId, focusEntryId, inventoryType = 'collection', onInventoryTypeChange }) {
+function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId, setSelectedLocationId, focusEntryId, inventoryType = 'collection', onInventoryTypeChange, onOpenDeck }) {
   const { t, locale } = useT();
   const isArchive = inventoryType === 'graveyard';
   const [locationData, setLocationData] = useState({ inventoryType: null, items: [] });
@@ -3184,6 +3184,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       )}
 
       <CardInspectorModal
+        onOpenDeck={onOpenDeck}
         card={inspectorCard}
         cards={inspectorCards}
         onNavigate={setInspectorCard}

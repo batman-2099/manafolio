@@ -27,7 +27,7 @@ const TYPE_COLORS = {
   'Land': COLORS[2]
 };
 
-function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEntryId, onUpdate, showToast }) {
+function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId, setFocusEntryId, onUpdate, showToast }) {
   const { t, locale } = useT();
   // Money and dates follow the interface language, not the browser's: a user who
   // picked German sees 1.234,56 and 3.8.2026 even on an en-US browser.
@@ -535,6 +535,7 @@ function Dashboard({ statsTrigger, onNavigate, setSelectedLocationId, setFocusEn
 
       {/* Card Inspector Modal Overlay */}
       <CardInspectorModal
+        onOpenDeck={onOpenDeck}
         card={inspectorCard}
         cards={inspectorList === 'recent' ? recentAdditions : topValuable}
         onNavigate={setInspectorCard}

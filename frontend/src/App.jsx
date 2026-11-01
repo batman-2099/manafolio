@@ -142,6 +142,7 @@ function App() {
   const [storageViewKey, setStorageViewKey] = useState(0);
   const [storageInventoryType, setStorageInventoryType] = useState('collection');
   const [deckViewKey, setDeckViewKey] = useState(0);
+  const [initialDeckId, setInitialDeckId] = useState(null);
   const [selectedCardFilter, setSelectedCardFilter] = useState('');
   const [toast, setToast] = useState(null);
   const toastIdRef = useRef(0);
@@ -223,6 +224,7 @@ function App() {
   const goTab = (tab, inventoryType = 'collection') => {
     if (sessionIdentity.current.epoch !== sessionEpoch) return false;
     if (tab !== activeTab && navigationGuardRef.current?.() === false) return false;
+    setInitialDeckId(null);
     if (moreOpen) moreTriggerRef.current?.focus();
     setMoreOpen(false);
     setSettingsSection(null);
@@ -240,6 +242,12 @@ function App() {
     });
     setActiveTab(tab);
     return true;
+  };
+
+  const openDeck = id => {
+    if (!goTab('deckbuilder')) return;
+    setInitialDeckId(id);
+    setDeckViewKey(key => key + 1);
   };
 
   // Detect public share route on load
@@ -553,7 +561,7 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard statsTrigger={statsTrigger} onNavigate={goTab} setSelectedLocationId={setSelectedLocationId} setFocusEntryId={setFocusEntryId} onUpdate={triggerRefresh} showToast={showToast} />;
+        return <Dashboard statsTrigger={statsTrigger} onNavigate={goTab} onOpenDeck={openDeck} setSelectedLocationId={setSelectedLocationId} setFocusEntryId={setFocusEntryId} onUpdate={triggerRefresh} showToast={showToast} />;
       case 'add-cards':
         return <AddCards onAddSuccess={triggerRefresh} showToast={showToast} setActiveTab={goTab} navigationGuardRef={navigationGuardRef} />;
       case 'collection':
@@ -565,6 +573,7 @@ function App() {
             selectedCardFilter={selectedCardFilter}
             setSelectedCardFilter={setSelectedCardFilter}
             onNavigate={goTab}
+            onOpenDeck={openDeck}
             setSelectedLocationId={setSelectedLocationId}
             setFocusEntryId={setFocusEntryId}
           />
@@ -572,6 +581,7 @@ function App() {
       case 'storage':
         return (
           <LocationManager
+            onOpenDeck={openDeck}
             key={`${storageViewKey}-${storageInventoryType}`}
             inventoryType={storageInventoryType}
             onInventoryTypeChange={(inventoryType) => {
@@ -589,7 +599,7 @@ function App() {
           />
         );
       case 'deckbuilder':
-        return <DeckBuilder key={deckViewKey} showToast={showToast} navigationGuardRef={navigationGuardRef} onOpenAiSettings={() => { if (goTab('settings')) setSettingsSection('codex-settings-title'); }} />;
+        return <DeckBuilder key={deckViewKey} initialDeckId={initialDeckId} showToast={showToast} navigationGuardRef={navigationGuardRef} onOpenAiSettings={() => { if (goTab('settings')) setSettingsSection('codex-settings-title'); }} />;
       case 'trades':
         return <TradeWorkbench onUpdate={triggerRefresh} navigationGuardRef={navigationGuardRef}
           recovery={pendingTrades.current.get(user.id)}
@@ -601,7 +611,7 @@ function App() {
       case 'admin':
         return <AdminPanel user={user} onUpdateUser={handleUpdateUser} showToast={showToast} />;
       default:
-        return <Dashboard statsTrigger={statsTrigger} onNavigate={goTab} setSelectedLocationId={setSelectedLocationId} setFocusEntryId={setFocusEntryId} onUpdate={triggerRefresh} showToast={showToast} />;
+        return <Dashboard statsTrigger={statsTrigger} onNavigate={goTab} onOpenDeck={openDeck} setSelectedLocationId={setSelectedLocationId} setFocusEntryId={setFocusEntryId} onUpdate={triggerRefresh} showToast={showToast} />;
     }
   };
 

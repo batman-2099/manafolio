@@ -41,7 +41,7 @@ function Field({ label, id, children }) {
   );
 }
 
-function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter, setSelectedCardFilter, onNavigate, setSelectedLocationId, setFocusEntryId }) {
+function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter, setSelectedCardFilter, onNavigate, onOpenDeck, setSelectedLocationId, setFocusEntryId }) {
   const { t } = useT();
   const deckStatusId = useId();
   const [collectionState, setCollectionState] = useState(null);
@@ -957,6 +957,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
       {/* Card Detail Inspector Modal (Private Authorized View) */}
       <CardInspectorModal
+        onOpenDeck={onOpenDeck}
         card={inspectorCard}
         cards={displayCards}
         onNavigate={card => { setInspectorCard(card); setInspectorStartEdit(false); }}

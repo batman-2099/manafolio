@@ -47,6 +47,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   const [colors, setColors] = useState([]);
   const [sets, setSets] = useState([]);
   const [excludedSets, setExcludedSets] = useState([]);
+  const [useAllAvailableLands, setUseAllAvailableLands] = useState(false);
   const [setSymbols, setSetSymbols] = useState({});
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [inventoryError, setInventoryError] = useState('');
@@ -68,7 +69,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   const logId = useRef(0);
   const timeFormat = useMemo(() => new Intl.DateTimeFormat(locale, { timeStyle: 'medium' }), [locale]);
   const lifetime = useRef(null);
-  const configuration = JSON.stringify({ inventoryType, includeCheckedOut, containerIds, colors, sets, excludedSets, format, deckType, powerLevel, targetSize });
+  const configuration = JSON.stringify({ inventoryType, includeCheckedOut, containerIds, colors, sets, excludedSets, useAllAvailableLands, format, deckType, powerLevel, targetSize });
   const initialConfiguration = useRef(configuration);
   const dirty = !!draft || messages.length > 0 || !!prompt.trim() || configuration !== initialConfiguration.current;
   useLayoutEffect(() => {
@@ -179,13 +180,14 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
     value: location.id, label: location.name,
   })).sort((a, b) => a.label.localeCompare(b.label, locale)), [locations, locale]);
   const filteredInventory = useMemo(() => inventory.flatMap(card => {
-    const matchesFilters = !excludedSets.includes(card.set_id) && (sets.length === 0 || sets.includes(card.set_id))
+    const landSetOverride = useAllAvailableLands && ((card.subtypes || []).includes('Land') || /\bLand\b/.test((card.type_line || '').split(' — ')[0]));
+    const matchesFilters = (landSetOverride || (!excludedSets.includes(card.set_id) && (sets.length === 0 || sets.includes(card.set_id))))
       && (colors.length === 0 || colors.some(color => color === 'Colorless'
         ? card.color_identity_known && card.color_identity.length === 0
         : card.color_identity.includes(color)));
     if (matchesFilters) return [card];
     return card.source_qty > 0 ? [{ ...card, available_qty: Math.min(card.available_qty, card.source_qty) }] : [];
-  }), [inventory, colors, sets, excludedSets]);
+  }), [inventory, colors, sets, excludedSets, useAllAvailableLands]);
   const cardById = useMemo(() => new Map(filteredInventory.map(card => [String(card.id), card])), [filteredInventory]);
   const counts = useMemo(() => filteredInventory.reduce((sum, card) => ({
     owned: sum.owned + card.owned_qty, available: sum.available + card.available_qty, locked: sum.locked + card.locked_qty,
@@ -235,6 +237,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
         body: JSON.stringify({
           inventory_type: inventoryType, format, target_size: targetSize, prompt: content, colors, sets, excluded_sets: excludedSets,
           deck_type: deckType, power_level: powerLevel,
+          use_all_available_lands: useAllAvailableLands,
           messages,
           current_draft: draft ? {
             name: draft.name, description: draft.description, strategy: draft.strategy, commander_card_id: draft.commander_card_id,
@@ -447,6 +450,12 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
                 </p>
               </div>
             </div>
+            <label style={{ ...rowStyle, minHeight: 44, cursor: 'pointer' }}>
+              <input type="checkbox" role="switch" checked={useAllAvailableLands} aria-describedby="ai-all-lands-hint"
+                onChange={event => { clearDraft(); setUseAllAvailableLands(event.target.checked); }} />
+              {t('aiDeck.useAllAvailableLands')}
+            </label>
+            <p id="ai-all-lands-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.useAllAvailableLandsHint')}</p>
           </fieldset>
             </div>
           </section>

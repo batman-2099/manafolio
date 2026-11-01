@@ -291,6 +291,8 @@
   "aiDeck.includeCheckedOutHint": "Nur zur Planung: Ausgecheckte Exemplare werden bei verfügbaren Mengen und im Entwurf berücksichtigt. Bestehende Reservierungen bleiben unverändert. Gib diese Karten aus anderen Decks zurück, bevor du dieses Deck zum Spielen auscheckst.",
   "aiDeck.matchingCounts": "Passender Bestand: {owned} vorhanden · {available} verfügbar · {locked} ausgecheckt",
   "aiDeck.filterHint": "Ohne Auswahl ist alles enthalten. Zusätzliche Karten müssen eine gewählte Farbidentität und ein gewähltes Set erfüllen; bei mehrfarbigen Karten genügt eine gewählte Farbe. Wähle Farblos separat für bekannte leere, nicht unbekannte Farbidentitäten. „Mit KI verbessern“ bezieht auch zulässige Originalkarten bis zu ihrer Menge im Originaldeck ein. Filteränderungen verwerfen Entwurf und Gespräch.",
+  "aiDeck.useAllAvailableLands": "Alle verfügbaren Länder verwenden",
+  "aiDeck.useAllAvailableLandsHint": "Länder ignorieren einbezogene und ausgeschlossene Sets. Regeln für Bestand, Behälter, Farben, Verfügbarkeit und Format gelten weiterhin.",
   "aiDeck.emptyFilters": "Keine verfügbaren Karten passen zu diesen Filtern. Du kannst trotzdem Fragen stellen oder die Auswahl ändern, um ein Deck zu bauen.",
   "aiDeck.retry": "Erneut versuchen",
   "aiDeck.emptyInventory": "Keine verfügbaren MTG-Karten in diesem Bestand. Du kannst trotzdem Fragen stellen; füge eigene Karten hinzu, um ein Deck zu bauen.",

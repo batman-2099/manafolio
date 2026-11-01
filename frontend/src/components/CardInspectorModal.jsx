@@ -30,7 +30,7 @@ const MTG_COLOR_BG = {
 // Self-contained: owns its edit form (PUT) and delete (DELETE) so every screen
 // gets the same rich view + edit without duplicating the form. onUpdate() lets
 // the parent refetch after a change. onViewStorage is optional (hidden if absent).
-function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, onViewStorage, startInEdit = false, previousCard, nextCard, onNavigate, returnFocusRef, closeHandlerRef }) {
+function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, onViewStorage, onOpenDeck, startInEdit = false, previousCard, nextCard, onNavigate, returnFocusRef, closeHandlerRef }) {
   const { t } = useT();
   const { requestReverse, reversePrompt } = useReverseTokenPrompt();
   const [mode, setMode] = useState(startInEdit ? 'edit' : 'view');
@@ -420,6 +420,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
       setDeckListVersion(version => version + 1);
       setStatus(t('deck.created'));
       showToast?.(t('deck.created'), 'success');
+      onOpenDeck?.(data.id);
     } catch (error) {
       console.error(error);
       setMutationError(t('deck.errCreateGeneric'));

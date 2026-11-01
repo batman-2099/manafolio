@@ -1,6 +1,7 @@
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import CardInspectorModal from '../components/CardInspectorModal';
+import DeckBuilder from '../components/DeckBuilder';
 import en from '../locales/en.json';
 
 // Run on an isolated Vite page; all requests use sample data.
@@ -21,7 +22,13 @@ export async function runInspectorNavigationRegressions() {
   let settle;
   let updates = 0;
   let deckLookupFails = true;
+  let creationFails = true;
+  const commander = { ...cards[1], name: 'Sample commander', subtypes: ['Legendary', 'Creature'], list_type: 'arena' };
+  const createdDeck = { id: 42, name: commander.name, game: 'mtg', inventory_type: 'arena', format: 'Commander / EDH', target_size: 100, commander_card_id: commander.id, cards: [{ ...commander, quantity: 1 }], total_cards: 1 };
   window.fetch = async (url, options = {}) => {
+    if (url === '/api/decks' && options.method === 'POST') return { ok: !creationFails, json: async () => creationFails ? { error: 'Sample creation failure' } : { id: createdDeck.id } };
+    if (url === '/api/decks/42') return { ok: true, json: async () => createdDeck };
+    if (url === '/api/sets') return { ok: true, json: async () => [] };
     if (options.method === 'PUT') return new Promise(resolve => { settle = () => resolve({ ok: true }); });
     if (url.startsWith('/api/collection?')) return { ok: !deckLookupFails, json: async () => cards.map((card, index) => ({
       ...card, checked_out_qty: index === 0 ? 1 : 0, in_deck_qty: index < 2 ? 1 : 0,
@@ -35,6 +42,12 @@ export async function runInspectorNavigationRegressions() {
   function Preview() {
     const [card, setCard] = useState(cards[0]);
     return <CardInspectorModal card={card} cards={cards} onNavigate={setCard} onClose={() => setCard(null)} onUpdate={() => { updates++; }} />;
+  }
+  function CommanderPreview() {
+    const [deckId, setDeckId] = useState(null);
+    return deckId
+      ? <DeckBuilder initialDeckId={deckId} showToast={() => {}} />
+      : <CardInspectorModal card={commander} onClose={() => {}} onOpenDeck={setDeckId} />;
   }
   const button = text => [...host.querySelectorAll('button')].find(node => node.textContent.trim() === text || node.getAttribute('aria-label') === text);
   const click = async node => { assert(node, 'expected button exists'); await act(async () => node.click()); };
@@ -105,6 +118,13 @@ export async function runInspectorNavigationRegressions() {
     assert(nativeZoom.querySelector('img').getAttribute('src') === '/logo.svg?native-back', 'native reverse zoom uses back artwork, not the front');
     await act(async () => nativeZoom.dispatchEvent(new Event('cancel', { cancelable: true })));
     await new Promise(resolve => setTimeout(resolve, 40));
+    await act(async () => root.render(<CommanderPreview />));
+    await click(button(en['inspector.createCommanderDeck']));
+    assert(host.querySelector('dialog[open]') && host.textContent.includes('Sample creation failure'), 'failed commander creation retains the inspector and error');
+    creationFails = false;
+    await click(button(en['inspector.createCommanderDeck']));
+    assert(!host.querySelector('dialog[open]') && button(en['deck.backToDecks']) && host.textContent.includes(commander.name),
+      'successful commander creation opens the new deck detail rather than the gallery');
     return { passed: ['paired token face order and independent zoom', 'entry-identity ordering and boundaries', 'edit preservation and reset', 'pending write guard', 'parent refresh', 'aggregate member safety', 'original focus restoration'] };
   } finally {
     await act(async () => root.unmount());

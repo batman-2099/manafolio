@@ -108,7 +108,7 @@ function ManaCounts({ deck }) {
   );
 }
 
-function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
+function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialDeckId }) {
   const { t } = useT();
   const [decks, setDecks] = useState([]);
   const [activeDeck, setActiveDeck] = useState(null);
@@ -449,6 +449,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings }) {
     const requests = decksRequest;
     const detailRequests = deckDetailsRequest;
     fetchDecks();
+    if (initialDeckId) loadDeckDetails(initialDeckId);
     return () => { requests.current++; detailRequests.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
