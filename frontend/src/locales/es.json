@@ -141,7 +141,6 @@
   "scan.setSearch": "Buscar nombre o id del set",
   "aiDeck.saveCurrent": "Guardar mazo",
   "aiDeck.saveNew": "Guardar como nuevo mazo",
-  "aiDeck.returnBeforeSave": "Devuelve este mazo al almacenamiento antes de reemplazarlo. Puedes guardar la propuesta como un nuevo mazo sin modificar el original ni sus reservas de cartas retiradas.",
   "aiDeck.saved": "¡Mazo guardado correctamente!",
   "importLog.local-lookup": "Buscando {total} filas en el catálogo local de Scryfall.",
   "importLog.local-resolved": "Catálogo local: {matched} encontradas, {unmatched} requieren la API.",

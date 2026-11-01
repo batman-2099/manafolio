@@ -215,9 +215,10 @@ const saveDeck = endpoint(async (req, res) => {
     const id = await db.withTransaction(async () => {
       const source = await sourceDeck(req.user.id, draft.source_deck_id, draft);
       let notes = draft.strategy;
+      let wasCheckedOut = false;
       if (replacementId !== undefined) {
         const current = await db.get('SELECT checked_out, notes FROM decks WHERE id = ? AND user_id = ?', [replacementId, req.user.id]);
-        if (current.checked_out) fail('Return this deck before replacing it with an AI draft. You can still save it as a new deck.', 409);
+        wasCheckedOut = !!current.checked_out;
         const existingNotes = current.notes || '';
         notes = !draft.strategy || existingNotes.endsWith(draft.strategy)
           ? existingNotes : existingNotes ? `${existingNotes}\n\n${draft.strategy}` : draft.strategy;
@@ -228,10 +229,12 @@ const saveDeck = endpoint(async (req, res) => {
       let deckId = replacementId;
       let saved;
       if (replacementId !== undefined) {
-        saved = new Map((await db.all('SELECT card_id, checked_out, source_entry_id FROM deck_cards WHERE deck_id = ?', [deckId]))
+        saved = new Map((await db.all('SELECT card_id, quantity, checked_out, source_entry_id FROM deck_cards WHERE deck_id = ?', [deckId]))
           .map(card => [card.card_id, card]));
         await db.run('UPDATE decks SET name = ?, description = ?, commander_card_id = ?, notes = ? WHERE id = ?',
           [draft.name, draft.description, draft.commander_card_id, notes, deckId]);
+        // Check in atomically with the replacement; failures restore checkout and reservations.
+        if (wasCheckedOut) await db.run('UPDATE decks SET checked_out = 0, checked_out_at = NULL WHERE id = ?', [deckId]);
         await db.run('DELETE FROM deck_cards WHERE deck_id = ?', [deckId]);
       } else {
         const created = await db.run(`INSERT INTO decks
@@ -245,8 +248,10 @@ const saveDeck = endpoint(async (req, res) => {
         if (!check.ok) fail(check.error);
         const sourceEntryId = saved?.get(card.card_id)?.source_entry_id ?? null;
         await validateDeckSource(req.user.id, deckId, card.card_id, card.quantity, sourceEntryId);
+        const previous = saved?.get(card.card_id);
+        const pulled = previous && (wasCheckedOut || (card.quantity <= previous.quantity && previous.checked_out));
         await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out, source_entry_id) VALUES (?, ?, ?, ?, ?)',
-          [deckId, card.card_id, card.quantity, saved?.get(card.card_id)?.checked_out || 0, sourceEntryId]);
+          [deckId, card.card_id, card.quantity, pulled ? 1 : 0, sourceEntryId]);
       }
       return deckId;
     });

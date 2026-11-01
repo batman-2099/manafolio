@@ -141,7 +141,6 @@
   "scan.setSearch": "搜尋系列名稱或 id",
   "aiDeck.saveCurrent": "儲存套牌",
   "aiDeck.saveNew": "另存為新套牌",
-  "aiDeck.returnBeforeSave": "請先將這副套牌放回存放處，再替換它。你仍可將建議另存為新套牌，不會變更原套牌或已取出卡牌的預留狀態。",
   "aiDeck.saved": "套牌儲存成功！",
   "importLog.local-lookup": "正在本機 Scryfall 目錄中查找 {total} 行。",
   "importLog.local-resolved": "本機目錄：符合 {matched} 行，{unmatched} 行需要查詢 API。",

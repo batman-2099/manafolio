@@ -141,7 +141,6 @@
   "scan.setSearch": "Buscar nome ou id da edição",
   "aiDeck.saveCurrent": "Salvar deck",
   "aiDeck.saveNew": "Salvar como novo deck",
-  "aiDeck.returnBeforeSave": "Devolva este deck ao armazenamento antes de substituí-lo. Você ainda pode salvar a sugestão como um novo deck sem alterar o original nem suas reservas de cartas retiradas.",
   "aiDeck.saved": "Deck salvo com sucesso!",
   "importLog.local-lookup": "Buscando {total} linhas no catálogo local do Scryfall.",
   "importLog.local-resolved": "Catálogo local: {matched} encontradas, {unmatched} precisam da API.",

@@ -277,7 +277,6 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
     event.preventDefault();
     if (saveInFlight.current || saveDisabled || inventoryController.current?.signal.aborted || !event.currentTarget.checkValidity()) return;
     const replace = !!sourceDeck && event.nativeEvent.submitter?.value === 'replace';
-    if (replace && sourceDeck.checked_out) { setError(t('aiDeck.returnBeforeSave')); return; }
     saveInFlight.current = true;
     setBusy('save');
     setError('');
@@ -558,7 +557,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
             <RelatedTokens cardIds={draft.cards.map(card => card.card_id)} title={t('tokens.title')} inventoryType={inventoryType} commanderCardId={isCommander ? draft.commander_card_id : undefined} />
             <div style={{ ...rowStyle, marginTop: '1rem' }}>
               {sourceDeck && (
-                <button type="submit" value="replace" className="btn btn-primary" disabled={saveDisabled || !!sourceDeck.checked_out} aria-describedby={sourceDeck.checked_out ? 'ai-return-before-save' : undefined}>
+                <button type="submit" value="replace" className="btn btn-primary" disabled={saveDisabled}>
                   {t(busy === 'save' ? 'aiDeck.saving' : 'aiDeck.saveCurrent')}
                 </button>
               )}
@@ -566,7 +565,6 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
                 {t(busy === 'save' ? 'aiDeck.saving' : sourceDeck ? 'aiDeck.saveNew' : 'aiDeck.save')}
               </button>
             </div>
-            {sourceDeck?.checked_out && <p id="ai-return-before-save" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.returnBeforeSave')}</p>}
           </fieldset>
         </form>
       )}

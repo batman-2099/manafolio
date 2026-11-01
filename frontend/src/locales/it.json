@@ -141,7 +141,6 @@
   "scan.setSearch": "Cerca nome o id dell’espansione",
   "aiDeck.saveCurrent": "Salva mazzo",
   "aiDeck.saveNew": "Salva come nuovo mazzo",
-  "aiDeck.returnBeforeSave": "Rimetti questo mazzo in archivio prima di sostituirlo. Puoi comunque salvare la proposta come nuovo mazzo senza modificare l’originale o le sue prenotazioni delle carte prelevate.",
   "aiDeck.saved": "Mazzo salvato correttamente!",
   "importLog.local-lookup": "Ricerca di {total} righe nel catalogo Scryfall locale.",
   "importLog.local-resolved": "Catalogo locale: {matched} trovate, {unmatched} richiedono l’API.",

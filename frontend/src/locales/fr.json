@@ -141,7 +141,6 @@
   "scan.setSearch": "Rechercher un nom ou identifiant d’édition",
   "aiDeck.saveCurrent": "Enregistrer le deck",
   "aiDeck.saveNew": "Enregistrer comme nouveau deck",
-  "aiDeck.returnBeforeSave": "Remets ce deck au rangement avant de le remplacer. Tu peux toujours enregistrer la proposition comme nouveau deck sans modifier l’original ni ses réservations de cartes sorties.",
   "aiDeck.saved": "Deck enregistré !",
   "importLog.local-lookup": "Recherche de {total} lignes dans le catalogue Scryfall local.",
   "importLog.local-resolved": "Catalogue local : {matched} trouvées, {unmatched} nécessitent l’API.",

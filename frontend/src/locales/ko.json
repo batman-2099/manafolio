@@ -141,7 +141,6 @@
   "scan.setSearch": "세트 이름 또는 ID 검색",
   "aiDeck.saveCurrent": "덱 저장",
   "aiDeck.saveNew": "새 덱으로 저장",
-  "aiDeck.returnBeforeSave": "이 덱을 교체하려면 먼저 보관함으로 반납하세요. 원본 덱이나 대출된 카드의 예약을 변경하지 않고 제안을 새 덱으로 저장할 수 있습니다.",
   "aiDeck.saved": "덱을 저장했습니다!",
   "importLog.local-lookup": "로컬 Scryfall 카탈로그에서 {total}개 행을 검색 중입니다.",
   "importLog.local-resolved": "로컬 카탈로그: {matched}개 일치, {unmatched}개는 API 검색이 필요합니다.",

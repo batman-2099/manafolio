@@ -820,7 +820,7 @@ The selection is anchored to an existing collection copy and follows its current
 
 Ordinary additions cannot exceed owned printing quantities, and nonbasic cards are constrained by the editor's four-copy check across same-name printings; basic lands are exempt. This is not a full format validator. Red availability warnings identify quantities beyond currently available copies, including reservations in other decks. Inventory ownership and play availability are different: a copy you own may already be reserved.
 
-Return a checked-out deck before changing its card composition or inventory type. **Save** is also required before checkout, return, or **Improve with AI** when there are unsaved changes.
+Return a checked-out deck before manually changing its card composition or inventory type. **Improve with AI** can update its composition while keeping it checked out. **Save** is also required before checkout, return, or **Improve with AI** when there are unsaved changes.
 
 ### Compare and restore deck revisions
 
@@ -1116,7 +1116,7 @@ If no eligible cards match, adjust filters or ask questions without generating a
    - **Save Deck** to replace the original's name, description, cards, and commander while retaining its identity, results, and settings. The reviewed strategy is appended to existing Notes without overwriting them; an identical strategy already at the end is not repeated.
    - **Save as New Deck** to keep the original and create a separate unchecked-out deck with the reviewed strategy in its Notes.
 
-**Expected result:** only the explicitly selected save action persists the draft. **Save Deck is a replacement, not a merge**; return a checked-out source before replacing it. Eligible source-deck copies remain usable for planning despite its own reservation or the filters, up to the source quantities. Reservations from other decks still apply unless included for planning. Neither save action moves cards or shares/releases existing reservations.
+**Expected result:** only the explicitly selected save action persists the draft. **Save Deck is a replacement, not a merge**. Saving a checked-out source checks it in and releases all its reservations. Cards retained from the original are marked **Pulled**, even if their quantities increase; newly added cards remain unpulled. Put removed cards back and collect any additional copies yourself; saving does not move storage locations. Eligible source-deck copies remain usable for planning despite its own reservation or the filters, up to the source quantities. Other decks' reservations can be included for planning but cannot be shared at checkout. **Save as New Deck** leaves the original's reservations unchanged; return those copies before checking out the new deck with them.
 
 ## Settings and preferences
 

@@ -797,19 +797,18 @@ async function main() {
 
     const replacement = draft({ source_deck_id: source.lastID, name: 'Replace original', description: 'Improved in place',
       cards: [{ card_id: ids.reprint, quantity: 4 }, { card_id: ids.forest, quantity: 55 }, { card_id: ids.island, quantity: 1 }] });
-    for (const include_checked_out of [false, true]) {
-      const checkedOutReplacement = await request('PUT', `/ai/${source.lastID}`, { ...replacement, include_checked_out }, 5);
-      assert.strictEqual(checkedOutReplacement.status, 409);
-      assert.match(checkedOutReplacement.body.error, /return.*deck/i);
-    }
-    assert.deepStrictEqual(await db.get('SELECT * FROM decks WHERE id = ?', [source.lastID]), sourceBefore);
-    assert.deepStrictEqual(await db.all('SELECT * FROM deck_cards WHERE deck_id = ? ORDER BY card_id', [source.lastID]), sourceCardsBefore);
-    assert.strictEqual((await request('PUT', `/decks/${source.lastID}/return`, {}, 5)).status, 200);
     await db.run("UPDATE decks SET wins = 7, losses = 3, accent_color = '#123456', created_at = '2020-01-02' WHERE id = ?", [source.lastID]);
     await db.run('UPDATE deck_cards SET checked_out = 1 WHERE deck_id = ? AND card_id = ?', [source.lastID, ids.forest]);
+    const { checkedOutSources } = require('../src/utils/collectionHelpers');
+    const originalSources = await checkedOutSources(5);
+    for (const allocation of originalSources.filter(row => row.deck_id === source.lastID)) {
+      await db.run('INSERT INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)',
+        [allocation.deck_id, allocation.card_id, allocation.entry_id, allocation.quantity]);
+    }
     const replacementState = async () => ({
       deck: await db.get('SELECT * FROM decks WHERE id = ?', [source.lastID]),
       cards: await db.all('SELECT * FROM deck_cards WHERE deck_id = ? ORDER BY card_id', [source.lastID]),
+      allocations: await db.all('SELECT * FROM deck_card_allocations WHERE deck_id = ? ORDER BY card_id, entry_id', [source.lastID]),
     });
     const beforeReplacement = await replacementState();
     const countBeforeReplacement = await db.get('SELECT COUNT(*) AS count FROM decks');
@@ -847,13 +846,18 @@ async function main() {
     const replaced = await request('PUT', `/ai/${source.lastID}`, replacement, 5);
     assert.deepStrictEqual(replaced, { status: 200, body: { id: source.lastID } }, 'replacement retains its ID and releases the lock after rollback');
     assert.deepStrictEqual(await db.get('SELECT COUNT(*) AS count FROM decks'), countBeforeReplacement);
+    assert.deepStrictEqual(await db.get('SELECT checked_out, checked_out_at FROM decks WHERE id = ?', [source.lastID]),
+      { checked_out: 0, checked_out_at: null }, 'saving an improvement checks the deck in');
+    assert.deepStrictEqual(await db.all('SELECT * FROM deck_card_allocations WHERE deck_id = ?', [source.lastID]), [],
+      'checking in releases all original reservations without reserving additions');
     const afterReplacement = await replacementState();
     assert.deepStrictEqual(afterReplacement.deck, { ...beforeReplacement.deck, name: replacement.name, description: replacement.description,
-      commander_card_id: replacement.commander_card_id, notes: `${beforeReplacement.deck.notes}\n\n${replacement.strategy}` },
-    'existing notes, records, category, accent, timestamps and inventory settings survive without truncation');
+      commander_card_id: replacement.commander_card_id, notes: `${beforeReplacement.deck.notes}\n\n${replacement.strategy}`,
+      checked_out: 0, checked_out_at: null },
+    'existing notes, records, category, accent, creation time and inventory settings survive without truncation');
     assert.deepStrictEqual(afterReplacement.cards.map(({ card_id, quantity, checked_out }) => ({ card_id, quantity, checked_out })),
-      replacement.cards.map(card => ({ ...card, checked_out: card.card_id === ids.forest ? 1 : 0 }))
-        .sort((a, b) => a.card_id.localeCompare(b.card_id)), 'cards are fully replaced; retained pulls survive and new cards start unpulled');
+      replacement.cards.map(card => ({ ...card, checked_out: card.card_id === ids.island ? 0 : 1 }))
+        .sort((a, b) => a.card_id.localeCompare(b.card_id)), 'retained cards are pulled even when quantity increases; new cards start unpulled');
     assert.strictEqual((await request('PUT', `/ai/${source.lastID}`, replacement, 5)).status, 200);
     assert.deepStrictEqual(await replacementState(), afterReplacement, 'saving the same strategy again does not append it twice');
     const copiedReplacement = await request('POST', '/ai', replacement, 5);
