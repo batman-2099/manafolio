@@ -1064,6 +1064,8 @@ The official [Codex app-server](https://developers.openai.com/codex/app-server/)
 
 **Play style** defaults to **Any**, letting the AI select an archetype suited to your eligible cards and request. Choose a specific strategy from the dropdown if you prefer. Its explanation and pace appear below the selector.
 
+The **Choose a play style** link beneath the dropdown opens this section on GitHub in a new tab, keeping your AI draft open.
+
 | Play style | When to choose it |
 | --- | --- |
 | Any | Let the available cards and your request determine the archetype |

@@ -340,6 +340,7 @@
   "aiDeck.deckType": "Deck type",
   "aiDeck.deckTypeRequired": "required",
   "aiDeck.playStyle": "Play style",
+  "aiDeck.playStyleGuide": "Choose a play style (opens in a new tab)",
   "aiDeck.powerLevel": "Target power level",
   "aiDeck.pace": "Pace",
   "aiDeck.powerLevelHint": "Commander-oriented guidance, not a rating. The AI aims for this level using your owned cards and selected format rules, and explains any gaps. Turn counts are not guaranteed.",

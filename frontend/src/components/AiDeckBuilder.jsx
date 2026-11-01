@@ -347,6 +347,9 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
               <select id="ai-deck-type" name="deck_type" form="ai-conversation-form" className="input-control" required value={deckType} aria-describedby={deckType ? 'ai-deck-type-description ai-deck-type-style' : undefined} onChange={event => { clearDraft(); setDeckType(event.target.value); }}>
                 {DECK_TYPES.map(type => <option key={type.id} value={type.id}>{t(`aiDeckType.${type.id}.name`)}</option>)}
               </select>
+              <a href="https://github.com/batman-2099/manafolio/blob/main/docs/USER_GUIDE.md#choose-a-play-style" target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: '0.5rem', color: 'var(--accent-yellow)' }}>
+                {t('aiDeck.playStyleGuide')}
+              </a>
               {deckType && <section style={{ marginTop: '0.75rem', overflowWrap: 'anywhere' }}>
                 <p id="ai-deck-type-description">{t(`aiDeckType.${deckType}.description`)}</p>
                 <p id="ai-deck-type-style" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{t(`aiDeckType.${deckType}.style`)}</p>
