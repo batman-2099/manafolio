@@ -3,7 +3,7 @@ import './CatalogueWorkbench.css';
 import { Search, Plus, X, ShieldAlert, Check, MousePointerClick, Zap, Undo2, Maximize2, Download } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { priceText } from '../utils/formatPrice';
-import { resolveCardPrice } from '../utils/resolveCardPrice';
+import { resolveCardPrice, getPrintingPrice } from '../utils/resolveCardPrice';
 import CardEntryFields from './CardEntryFields';
 import SetCodeField from './SetCodeField';
 import CardImageZoom from './CardImageZoom';
@@ -126,7 +126,19 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   const [rapidMode, setRapidMode] = useState(false);
   const [rapidNumber, setRapidNumber] = useState('');
   const [rapidBusy, setRapidBusy] = useState(false);
+  // ponytail: keep all session receipts for totals; render only the latest 25.
   const [rapidLog, setRapidLog] = useState([]);
+  const rapidValue = useMemo(() => {
+    const totals = new Map();
+    let unpriced = false;
+    for (const entry of rapidLog) {
+      const price = getPrintingPrice(entry.card, entry.printing);
+      if (price === null) { unpriced = true; continue; }
+      const currency = entry.card.price_currency || 'USD';
+      totals.set(currency, (totals.get(currency) || 0) + Math.round(price * 100) * entry.qty);
+    }
+    return { totals: [...totals], unpriced };
+  }, [rapidLog]);
   const rapidEdits = useRef(new Set());
   const rapidInputRef = useRef(null);
   const rapidQuantityRef = useRef(null);
@@ -476,7 +488,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   // One card straight into the collection, no drawer. Stacked on purpose: one
   // Enter press becomes exactly one row, so undo removes exactly what it added
   // (an unstacked qty-3 add would leave two orphan copies behind).
-  const addCardNow = async (card, copies) => {
+  const addCardNow = async (card, copies, cardPrinting) => {
     const choice = await requestReverse(card, { inventoryType: addToArena ? 'arena' : 'collection' });
     if (!choice) return null;
     const response = await fetch('/api/collection', {
@@ -487,7 +499,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
         reverse_card_id: choice.reverseCard?.id || null,
         quantity: copies,
         condition,
-        printing,
+        printing: cardPrinting,
         language,
         purchase_price: parseFloat(purchasePrice) || 0,
         game,
@@ -505,8 +517,11 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   // One unambiguous match adds immediately; anything else falls back to the
   // normal result grid rather than guessing which printing was meant.
   const handleRapidAdd = async (criteria = null) => {
-    const submitted = criteria || { query: '', numberQuery: rapidNumber.trim(), setCodeQuery, game, searchLang };
-    const number = submitted.numberQuery;
+    const input = criteria || { query: '', numberQuery: rapidNumber.trim(), setCodeQuery, game, searchLang };
+    const foil = input.numberQuery.endsWith('.');
+    const number = foil ? input.numberQuery.slice(0, -1).trim() : input.numberQuery;
+    const rapidPrinting = foil ? 'Holofoil' : input.rapidPrinting || printing;
+    const submitted = { ...input, numberQuery: number, rapidPrinting };
     if (!number || rapidBusy || searchPending.current) return;
     const copies = Number(quantity);
     if (!Number.isInteger(copies) || copies < 1) {
@@ -561,14 +576,14 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
         return;
       }
 
-      const result = await addCardNow(hit, copies);
+      const result = await addCardNow(hit, copies, rapidPrinting);
       if (!result) return;
       if (!addToArena && defaultAddLocation) {
         showToast(result.placement
           ? t('search.addedToContainer', { name: displayName(hit), location: result.placement.label })
           : t('search.addedUnassigned', { name: displayName(hit) }), 'success');
       }
-      setRapidLog(prev => [{ entryId: result.id, card: hit, qty: copies, printing }, ...prev].slice(0, 25));
+      setRapidLog(prev => [{ entryId: result.id, card: hit, qty: copies, printing: rapidPrinting }, ...prev]);
       setRapidNumber('');
       // Keep the owned badge honest if the card is also on screen.
       if (!addToArena) {
@@ -686,7 +701,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
     // The card itself knows which printing it is, so the copy is recorded in that
     // language rather than defaulting to English and needing a manual correction.
     setLanguage(card.language || langName(searchLang));
-    setPrinting('Normal');
+    setPrinting(submittedSearch.current?.rapidPrinting || 'Normal');
 
 
     setIsDrawerOpen(true);
@@ -1098,7 +1113,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
               ref={rapidInputRef}
               id="rapid-card-number"
               type="text"
-              inputMode="numeric"
+              inputMode="decimal"
               className="input-control"
               placeholder={t('search.rapidNumberPlaceholder')}
               value={rapidNumber}
@@ -1141,6 +1156,12 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
             </div>
             {rapidBusy && <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('search.adding')}</span>}
           </div>
+          <div role="status" style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)' }}>
+            <strong>{t('search.sessionTotal', { total: rapidValue.totals.length
+              ? rapidValue.totals.map(([currency, cents]) => priceText(cents / 100, currency)).join(' + ')
+              : rapidValue.unpriced ? t('priceCheck.unavailable') : priceText(0) })}</strong>
+            {rapidValue.unpriced && <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{t('search.sessionUnpriced')}</div>}
+          </div>
 
           {rapidLog.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -1148,11 +1169,16 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                 {t('search.addedThisSession', { count: rapidLog.length })}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.75rem', maxHeight: '55vh', overflowY: 'auto' }}>
-              {rapidLog.map(entry => (
+              {rapidLog.slice(0, 25).map(entry => {
+                const price = getPrintingPrice(entry.card, entry.printing);
+                return (
                 <div key={entry.entryId} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 0, background: 'var(--surface-2)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
                   <CardImage card={entry.card} alt={displayName(entry.card)} style={{ width: '100%', aspectRatio: '0.718', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
                   <span title={`#${entry.card.number} ${displayName(entry.card)}`} style={{ fontSize: 'var(--text-sm)', color: 'var(--text-strong)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     #{entry.card.number} {displayName(entry.card)}{entry.qty > 1 ? ` ×${entry.qty}` : ''}
+                  </span>
+                  <span style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)' }}>
+                    {price === null ? t('priceCheck.unavailable') : `${priceText(price, entry.card.price_currency || 'USD')} ${t('dash.each')}`}
                   </span>
                   <button
                     type="button"
@@ -1174,7 +1200,8 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                     <Undo2 size={12} /> {t('search.undo')}
                   </button>
                 </div>
-              ))}
+                );
+              })}
               </div>
             </div>
           )}

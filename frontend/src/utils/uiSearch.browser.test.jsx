@@ -22,13 +22,17 @@ export async function runUiSearchRegressions() {
   const singleWrites = [];
   let lookupCount = 0;
   let tokenResults = null;
+  let rapidPriceCard = null;
+  let failRapidWrite = false;
+  let failRapidLookup = false;
+  let lastRapidNumber;
   const toasts = [];
   let refreshes = 0;
   let settle;
   const guard = { current: null };
   const response = (body, status = 200) => ({ ok: status < 300, status, headers: { get: () => '2' }, json: async () => body });
   const image = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="10" height="14"/%3E';
-  const front = { id: 'mtg-front', name: 'Goblin', game: 'mtg', language: 'English', set_id: 'tst', set_name: 'Fixture tokens', number: '1', subtypes: ['Token'], image_url: image };
+  const front = { id: 'mtg-front', name: 'Goblin', game: 'mtg', language: 'English', set_id: 'tst', set_name: 'Fixture tokens', number: '1', subtypes: ['Token'], image_url: image, price_normal: 2.5, price_holofoil: 5, price_currency: 'USD' };
   const back = { ...front, id: 'mtg-back', name: 'Soldier', number: '2' };
   const precon = { fileName: 'fixture-precon', name: 'Fixture precon', token_editions: [{ id: 'fixture-edition', label: 'Fixture edition' }] };
   const preconWrites = [];
@@ -53,13 +57,21 @@ export async function runUiSearchRegressions() {
     if (String(url).startsWith('/api/search?')) lookupCount++;
     if (url === '/api/card-art/index') return response([]);
     if (url === '/api/collection' && options.method === 'POST') {
+      if (failRapidWrite) return response({ error: 'Sample save failure' }, 500);
       singleWrites.push(JSON.parse(options.body));
       return response({ id: 100 + singleWrites.length });
+    }
+    if (/^\/api\/collection\/\d+$/.test(String(url)) && ['PUT', 'DELETE'].includes(options.method)) {
+      return response({}, failRapidWrite ? 500 : 200);
     }
     if (String(url).startsWith('/api/collection?')) return response([]);
     if (String(url).startsWith('/api/search?') && tokenResults) {
       const params = new URL(String(url), location.origin).searchParams;
-      return response(params.get('prints') === '1' ? [front, back] : params.get('number') ? [front] : tokenResults);
+      if (params.has('number')) {
+        lastRapidNumber = params.get('number');
+        if (failRapidLookup) return response({ error: 'Sample lookup failure' }, 503);
+      }
+      return response(params.get('prints') === '1' ? [front, back] : params.get('number') ? [rapidPriceCard || front] : tokenResults);
     }
     if (String(url).startsWith('/api/locations?') && tokenResults) return response([{ id: 7, name: 'Token box' }]);
     if (url === '/api/collection/bulk-add') {
@@ -229,9 +241,71 @@ export async function runUiSearchRegressions() {
     await closeOverlay(async () => quickSubmit().click());
     assert(!prompt() && singleWrites.length === 3 && singleWrites[2].reverse_card_id === back.id, 'an explicitly selected Quick Add reverse skips the prompt');
     await change(host.querySelector('#search-destination'), 'arena');
+    await change(host.querySelector('#rapid-quantity'), '2');
     await change(host.querySelector('#rapid-card-number'), '1');
     await rapidSubmit();
     assert(!prompt() && singleWrites.length === 4 && singleWrites[3].list_type === 'arena' && singleWrites[3].reverse_card_id === null, 'Arena token addition skips physical reverse prompting');
+    const sessionTotal = () => host.querySelector('.search-rapid [role="status"]').textContent;
+    const receiptButton = label => [...host.querySelectorAll('.search-rapid button')].find(node => node.textContent.trim() === label);
+    assert(sessionTotal().includes('$10.00') && host.querySelector('.search-rapid').textContent.includes('$2.50 ea'),
+      'rapid receipts show the unit price and the session total includes quantities');
+    await click(receiptButton(en['search.foil']));
+    assert(sessionTotal().includes('$15.00'), 'successful foil change reprices all copies in that receipt');
+    failRapidWrite = true;
+    await click(receiptButton(en['search.foil']));
+    await click(receiptButton(en['search.undo']));
+    assert(sessionTotal().includes('$15.00'), 'failed finish changes and undo preserve session value');
+    failRapidWrite = false;
+    await click(receiptButton(en['search.undo']));
+    assert(sessionTotal().includes('$5.00'), 'successful undo removes that receipt value');
+    rapidPriceCard = { ...front, id: 'priced-sample', name: 'Priced sample', subtypes: [], price_normal: 1 };
+    await change(host.querySelector('#rapid-quantity'), '1');
+    for (let index = 0; index < 25; index++) {
+      await change(host.querySelector('#rapid-card-number'), '1');
+      await rapidSubmit();
+    }
+    assert(sessionTotal().includes('$30.00'), 'session total includes receipts older than the latest 25');
+    rapidPriceCard = { ...rapidPriceCard, price_normal: 2, price_currency: 'EUR' };
+    await change(host.querySelector('#rapid-card-number'), '1');
+    await rapidSubmit();
+    assert(sessionTotal().includes('$30.00 + €2.00') || sessionTotal().includes('€2.00 + $30.00'),
+      'different currencies are subtotaled separately without conversion');
+    rapidPriceCard = { ...rapidPriceCard, price_normal: null, price_trend: 99 };
+    await change(host.querySelector('#rapid-card-number'), '1');
+    await rapidSubmit();
+    assert(sessionTotal().includes(en['search.sessionUnpriced']) && !sessionTotal().includes('99'),
+      'missing finish quotes are excluded, not replaced by another finish’s trend');
+    assert(host.querySelector('.search-rapid').textContent.includes(en['priceCheck.unavailable']), 'unpriced receipt is explicit');
+    const totalBeforeFailure = sessionTotal();
+    failRapidWrite = true;
+    await change(host.querySelector('#rapid-card-number'), '1');
+    await rapidSubmit();
+    assert(sessionTotal() === totalBeforeFailure, 'failed additions do not change the session total');
+    failRapidWrite = false;
+    rapidPriceCard = { ...front, id: 'foil-shortcut', name: 'Foil shortcut', number: '123a', subtypes: [] };
+    await change(host.querySelector('#rapid-quantity'), '2');
+    const lookupsBeforeDot = lookupCount;
+    await change(host.querySelector('#rapid-card-number'), '.');
+    await rapidSubmit();
+    assert(lookupCount === lookupsBeforeDot, 'a bare dot does not look up or add a card');
+    await change(host.querySelector('#rapid-card-number'), '123a. ');
+    await rapidSubmit();
+    assert(lastRapidNumber === '123a' && singleWrites.at(-1).printing === 'Holofoil' && singleWrites.at(-1).quantity === 2,
+      'a trailing dot selects foil for all copies and is stripped from the collector-number lookup');
+    assert(receiptButton(en['search.foil']).getAttribute('aria-pressed') === 'true' && sessionTotal().includes('$40.00'),
+      'foil shortcut is reflected in the receipt and running total');
+    assert(host.querySelector('#rapid-printing').value === 'Normal', 'foil shortcut does not change the default finish');
+    await change(host.querySelector('#rapid-card-number'), '123a');
+    await rapidSubmit();
+    assert(singleWrites.at(-1).printing === 'Normal', 'the next unsuffixed number uses the selected default finish');
+    failRapidLookup = true;
+    await change(host.querySelector('#rapid-card-number'), '123a.');
+    await rapidSubmit();
+    failRapidLookup = false;
+    await change(host.querySelector('#rapid-card-number'), '999');
+    await click(button(en['common.retry']));
+    assert(lastRapidNumber === '123a' && singleWrites.at(-1).printing === 'Holofoil',
+      'retry preserves the submitted collector number and foil choice');
 
     window.confirm = () => true;
     await click(button(en['addCards.deck']));
