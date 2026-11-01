@@ -103,6 +103,16 @@ async function seed() {
         const record = { object: 'card', id: cardId, name: card.name, set: card.set || 'tst', collector_number: card.id.slice(-2), lang: 'en',
           type_line: card.subtypes.join(' '), color_identity: card.color, oracle_text: `Rules for ${card.name}.`,
           legalities: card.legalities || { standard: 'legal', commander: 'legal', brawl: 'legal', vintage: 'legal' } };
+        if (card.id === ids.commander) Object.assign(record, { power: '*', toughness: '1+*', colors: ['G'], color_indicator: ['G'] });
+        if (card.id === ids.restricted) Object.assign(record, { type_line: 'Artifact — Vehicle', power: '0', toughness: '4', oracle_text: 'Crew 2', colors: [] });
+        if (card.id === ids.forest) record.colors = [];
+        if (card.id === ids.outsideSet) {
+          delete record.oracle_text;
+          record.card_faces = [
+            { name: 'Sample front', type_line: 'Creature', mana_cost: '{R}', oracle_text: 'Transform this creature.', power: '1', toughness: '2', colors: ['R'] },
+            { name: 'Sample back', type_line: 'Creature', oracle_text: 'Trample', power: '5', toughness: '6', colors: [], color_indicator: [] },
+          ];
+        }
         await sql('INSERT INTO cards VALUES (?, ?)', [cardId, JSON.stringify(record)]);
         await sql('INSERT INTO names VALUES (?, ?)', [card.name.toLowerCase(), cardId]);
       }
@@ -226,6 +236,28 @@ async function main() {
     assert.ok(!Object.hasOwn(sent.request, 'power_level'), 'existing requests can omit a power target');
     assert.ok([ids.tenant, ids.wishlist, ids.unsupported, ids.locked, ids.missing, ids.banned].every(cardId => !sent.catalog.some(card => card[0] === cardId)));
     assert.deepStrictEqual(sent.catalog.map(card => card[0]).sort(), physical.body.cards.filter(card => card.available_qty > 0 && card.id !== ids.banned).map(card => card.id).sort(), 'every eligible owned printing is sent');
+    assert.deepStrictEqual(sent.catalog.find(row => row[0] === ids.commander).slice(9, 12), ['*', '1+*', []],
+      'provider receives variable creature stats without numeric coercion');
+    const vehicle = sent.catalog.find(row => row[0] === ids.restricted);
+    assert.strictEqual(vehicle[3], 'Artifact — Vehicle');
+    assert.strictEqual(vehicle[7], 'Crew 2');
+    assert.deepStrictEqual(vehicle.slice(9, 12), ['0', '4', []], 'zero power is a known Vehicle stat');
+    assert.deepStrictEqual(sent.catalog.find(row => row[0] === ids.outsideSet).slice(9, 12), ['1', '2', [
+      ['Sample front', 'Creature', '{R}', 'Transform this creature.', '1', '2', ['R'], null],
+      ['Sample back', 'Creature', '', 'Trample', '5', '6', [], []],
+    ]], 'multi-faced cards keep each face’s identity, rules and distinct combat stats');
+    for (const cardId of [ids.forest, ids.unknown]) {
+      assert.deepStrictEqual(sent.catalog.find(row => row[0] === cardId).slice(9, 12), [null, null, []],
+        'inapplicable or uncached stats remain unknown instead of fabricated zeroes');
+    }
+    const colorMetadata = cardId => sent.catalog.find(row => row[0] === cardId).slice(12);
+    assert.deepStrictEqual(colorMetadata(ids.forest), [[], null, true], 'a green-identity land is actually colorless');
+    assert.notDeepStrictEqual(sent.catalog.find(row => row[0] === ids.forest)[6], [], 'actual color must not replace color identity');
+    assert.deepStrictEqual(colorMetadata(ids.commander), [['G'], ['G'], true], 'actual colors and indicators are sent independently');
+    assert.deepStrictEqual(colorMetadata(ids.restricted), [[], null, true], 'confirmed colorless identity is marked known');
+    assert.deepStrictEqual(colorMetadata(ids.unknownColor), [null, null, false], 'unknown identity and actual colors are not confirmed colorless');
+    assert.deepStrictEqual(colorMetadata(ids.unknown), [null, null, true], 'cached identity remains known without bulk actual-color metadata');
+    assert.deepStrictEqual(colorMetadata(ids.outsideSet), [null, null, true], 'multi-face colors do not masquerade as top-level colors');
     assert.ok(!calls[0].prompt.includes('PRIVATE STORAGE NOTE'));
     const largeInventory = Array.from({ length: 2000 }, (_, i) => ({
       id: `mtg-printing-${i}`, name: `Card ${i}`, available_qty: 4,

@@ -281,6 +281,15 @@ async function cardRules(cards) {
       ...card, type_line: raw.type_line || face?.type_line || '',
       oracle_text: raw.oracle_text || raw.card_faces?.map(part => part.oracle_text || '').join('\n') || '',
       mana_cost: raw.mana_cost || face?.mana_cost || '', legalities: raw.legalities || {},
+      power: raw.power ?? face?.power ?? null, toughness: raw.toughness ?? face?.toughness ?? null,
+      colors: Array.isArray(raw.colors) ? raw.colors : null,
+      color_indicator: Array.isArray(raw.color_indicator) ? raw.color_indicator : null,
+      card_faces: raw.card_faces?.map(part => ({
+        name: part.name, type_line: part.type_line || '', mana_cost: part.mana_cost || '',
+        oracle_text: part.oracle_text || '', power: part.power ?? null, toughness: part.toughness ?? null,
+        colors: Array.isArray(part.colors) ? part.colors : null,
+        color_indicator: Array.isArray(part.color_indicator) ? part.color_indicator : null,
+      })) || [],
       color_identity: Array.isArray(raw.color_identity) ? normalizeMtgColorIdentity(raw.color_identity) : card.color_identity,
       color_identity_known: Array.isArray(raw.color_identity) || card.color_identity_known,
     };
@@ -365,6 +374,10 @@ function modelRequest(request, cards, sourceDeck) {
     card.type_line || (card.subtypes || []).join(' '),
     card.mana_cost || '', card.cmc ?? null, card.color_identity || [],
     card.oracle_text || '', (format && card.legalities?.[format]) || 'unknown',
+    card.power ?? null, card.toughness ?? null,
+    (card.card_faces || []).map(face => [face.name, face.type_line, face.mana_cost, face.oracle_text, face.power, face.toughness,
+      face.colors ?? null, face.color_indicator ?? null]),
+    card.colors ?? null, card.color_indicator ?? null, card.color_identity_known === true,
   ]);
   const pairedSources = new Map(eligible.flatMap(card => (card[PHYSICAL_SOURCES] || [])
     .filter(entry => entry.reverse_card_id).map(entry => [entry.entry_id, entry])));
@@ -380,7 +393,7 @@ function modelRequest(request, cards, sourceDeck) {
     + `The sum of quantities must equal target_size, including the commander. Never exceed available_qty. Aggregate copies by name across printings: maximum 4, or 1 for Commander/Brawl, except basic lands. Restricted cards permit only 1 copy.\n`
     + `Commander and Brawl require exactly 100 cards, a single eligible commander in the cards list, singleton nonbasics and its color identity. A legendary creature or a card with explicit commander rules is eligible; Brawl also permits planeswalkers. Other formats require commander_card_id=null. Use cached legality where present; warn when metadata is incomplete. Do not claim guaranteed tournament legality.\n`
     + `If no valid deck is possible or more information is needed, return draft=null and explain or ask in message; never invent cards or quantities.\n`
-    + `Catalog rows are [id,name,available_qty,type_line,mana_cost,mana_value,color_identity,oracle_text,format_legality]. Empty rules text means unavailable metadata, not a card without abilities. Exact IDs distinguish printings; never merge their available quantities.\n`
+    + `Catalog rows are [id,name,available_qty,type_line,mana_cost,mana_value,color_identity,oracle_text,format_legality,power,toughness,faces,colors,color_indicator,color_identity_known]. Each face is [name,type_line,mana_cost,oracle_text,power,toughness,colors,color_indicator]. Actual colors and color indicators use W/U/B/R/G and are distinct from Commander color identity. An empty colors array means known colorless; null means unavailable at that level, so consult the individual faces when supplied. A null color_indicator means no indicator was supplied, not that the card is colorless. When color_identity_known is false, color_identity is incomplete or unknown, even if its array is empty; do not treat it as confirmed colorless identity. Power and toughness are printed values for creatures and Vehicles, including expressions such as * or 1+*; interpret them using the relevant rules text. Null stats mean unavailable or not applicable, never zero. Face stats and colors belong only to that face; do not combine faces or assume a Vehicle is always a creature. Empty rules text means unavailable metadata, not a card without abilities. Exact IDs distinguish printings; never merge their available quantities.\n`
     + (sharedTokens.length ? `shared_token_copies rows are [front_id,reverse_id,quantity]. These quantities overlap the catalog counts, not additional copies. Each physical copy supplies either face, never both simultaneously.\n` : '')
     + (sourceDeck ? `When there is no current_draft, improve source_deck rather than building an unrelated deck. The eligible catalog already includes its owned, nonmissing cards up to source quantities even outside selected colors, sets or containers or within excluded_sets, without counting copies twice. Its own checkout is allowed for planning; other decks' reservations remain excluded unless explicitly included. Source context never grants copies missing from the catalog or overrides format legality. The original saved deck and checkout state are retained.\n` : '')
     + JSON.stringify({ request: modelSettings, catalog, ...(sharedTokens.length ? { shared_token_copies: sharedTokens } : {}), ...(sourceDeck ? { source_deck: sourceContext } : {}) });
