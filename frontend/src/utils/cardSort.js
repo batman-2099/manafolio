@@ -43,7 +43,7 @@ export function colorCategory(types) {
   return t[0] || 'Colorless';
 }
 
-function getColorCategory(card) {
+export function getColorCategory(card) {
   let identity = card.color_identity;
   if (typeof identity === 'string') {
     try { identity = JSON.parse(identity); } catch { identity = [identity]; }

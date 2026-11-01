@@ -13,6 +13,7 @@ test('filing color order groups multicolor identities after mono-green', async (
   });
   try {
     const { sortCardsByOrder } = await server.ssrLoadModule('/src/utils/cardSort.js');
+    const { getSortCategories } = await server.ssrLoadModule('/src/components/CompartmentView.jsx');
     const cards = [
       { name: 'Gold Z', color_identity: ['W', 'U'] },
       { name: 'Colorless', color_identity: [] },
@@ -25,6 +26,12 @@ test('filing color order groups multicolor identities after mono-green', async (
         ['White', 'Green', 'Gold A', 'Gold Z', 'Colorless']);
       assert.deepEqual(sortCardsByOrder([...cards], [{ by, dir: 'desc' }, { by: 'name' }]).map(card => card.name),
         ['Colorless', 'Gold A', 'Gold Z', 'Green', 'White']);
+      for (const [identity, expected] of [
+        [['B', 'W'], 'Multicolor'], ['["Black","White"]', 'Multicolor'],
+        [['B'], 'Black'], ['["W"]', 'White'], [[], 'Colorless'], [null, 'Colorless'],
+      ]) {
+        assert.equal(getSortCategories({ color_identity: identity }, [{ by, divider: true }])[0].label, expected);
+      }
     }
   } finally {
     await server.close();
