@@ -1435,7 +1435,7 @@
   "sort.addRule": "Añadir regla de ordenación",
   "sort.by.added_at": "Fecha en que se añadió",
   "sort.by.cmc": "Valor de maná (CMC)",
-  "sort.by.color": "Identidad de color",
+  "sort.by.color": "Color de la carta",
   "sort.by.entry_id": "Orden de entrada",
   "sort.by.favorite": "Favorita (con estrella)",
   "sort.by.language": "Idioma",

@@ -53,15 +53,15 @@ async function runTests() {
   // F2-TC3: Verify that MTG cards are sorted in WUBRG sequence
   try {
     const cards = [
-      { name: 'Mountain', color_identity: ['Red'], game: 'mtg' },
-      { name: 'Forest', color_identity: ['Green'], game: 'mtg' },
-      { name: 'Island', color_identity: ['Blue'], game: 'mtg' },
-      { name: 'Plains', color_identity: ['White'], game: 'mtg' },
-      { name: 'Swamp', color_identity: ['Black'], game: 'mtg' }
+      { name: 'Red Card', types: ['Red'], game: 'mtg' },
+      { name: 'Green Card', types: ['Green'], game: 'mtg' },
+      { name: 'Blue Card', types: ['Blue'], game: 'mtg' },
+      { name: 'White Card', types: ['White'], game: 'mtg' },
+      { name: 'Black Card', types: ['Black'], game: 'mtg' }
     ];
     // WUBRG: White -> Blue -> Black -> Red -> Green
     const sorted = compartmentSort.sortCards(cards, [{ by: 'color' }, { by: 'name' }], 'normals_first');
-    const colorsSorted = sorted.map(c => c.color_identity[0]);
+    const colorsSorted = sorted.map(c => c.types[0]);
     assert.deepStrictEqual(colorsSorted, ['White', 'Blue', 'Black', 'Red', 'Green'], 'MTG cards must sort in WUBRG order');
     console.log('PASS: F2-TC3');
   } catch (err) {
@@ -145,15 +145,15 @@ async function runTests() {
   // F2-TC7: Verify multicolor cards sorting order
   try {
     const cards = [
-      { name: 'Azorius Card', color_identity: ['White', 'Blue'], game: 'mtg' },
-      { name: 'Island', color_identity: ['Blue'], game: 'mtg' },
-      { name: 'Boros Card', color_identity: ['Red', 'White'], game: 'mtg' },
-      { name: 'Plains', color_identity: ['White'], game: 'mtg' }
+      { name: 'Azorius Card', types: ['White', 'Blue'], game: 'mtg' },
+      { name: 'Blue Card', types: ['Blue'], game: 'mtg' },
+      { name: 'Boros Card', types: ['Red', 'White'], game: 'mtg' },
+      { name: 'White Card', types: ['White'], game: 'mtg' }
     ];
     const sorted = compartmentSort.sortCards(cards, [{ by: 'color' }, { by: 'name' }], 'normals_first');
-    // Expected order: Plains (White) -> Island (Blue) -> Azorius Card (Multicolor) -> Boros Card (Multicolor)
-    assert.strictEqual(sorted[0].name, 'Plains');
-    assert.strictEqual(sorted[1].name, 'Island');
+    // Expected order: White -> Blue -> Azorius Card (Multicolor) -> Boros Card (Multicolor)
+    assert.strictEqual(sorted[0].name, 'White Card');
+    assert.strictEqual(sorted[1].name, 'Blue Card');
     assert.strictEqual(sorted[2].name, 'Azorius Card');
     assert.strictEqual(sorted[3].name, 'Boros Card');
     console.log('PASS: F2-TC7');

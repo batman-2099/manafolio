@@ -1435,7 +1435,7 @@
   "sort.addRule": "Ajouter une règle de tri",
   "sort.by.added_at": "Date d'ajout",
   "sort.by.cmc": "Valeur de mana (CMC)",
-  "sort.by.color": "Identité de couleur",
+  "sort.by.color": "Couleur de la carte",
   "sort.by.entry_id": "Ordre de saisie",
   "sort.by.favorite": "Favorite (étoilée)",
   "sort.by.language": "Langue",

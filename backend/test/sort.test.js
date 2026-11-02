@@ -52,11 +52,14 @@ function testFavoriteScheme() {
 }
 
 function testMtgContainerFilters() {
-  const land = { game: 'mtg', types: ['White'], subtypes: ['Land', 'Plains'], color_identity: ['White'] };
+  const land = { game: 'mtg', types: [], subtypes: ['Land', 'Plains'], color_identity: ['White'] };
   assert.strictEqual(locationAcceptsCard({ game: 'mtg', rule_type: 'compound', rule_config: { rules: [
     { action: 'include', field: 'types', operator: 'equals', value: 'Land' },
     { action: 'include', field: 'color_identity', operator: 'equals', value: 'W' }
-  ] } }, land), true, 'a white land must match Type and Color Identity rules');
+  ] } }, land), true, 'a colorless Plains must still match Land and white Color Identity rules');
+  assert.strictEqual(locationAcceptsCard({ game: 'mtg', rule_type: 'compound', rule_config: { rules: [
+    { action: 'include', field: 'color_identity', operator: 'equals', value: 'Colorless' }
+  ] } }, land), false, 'actual colorlessness must not override a colored identity filter');
   assert.strictEqual(locationAcceptsCard({ game: 'mtg', rule_type: 'compound', rule_config: { rules: [
     { action: 'include', field: 'color_identity', operator: 'equals', value: 'Colorless' }
   ] } }, { ...land, color_identity: [] }), true, 'colorless cards must match the Colorless identity rule');

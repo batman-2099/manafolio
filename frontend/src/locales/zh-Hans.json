@@ -1389,7 +1389,7 @@
   "sort.addRule": "添加排序规则",
   "sort.by.added_at": "添加日期",
   "sort.by.cmc": "法术力值（CMC）",
-  "sort.by.color": "颜色标识",
+  "sort.by.color": "卡牌颜色",
   "sort.by.entry_id": "录入顺序",
   "sort.by.favorite": "收藏（带星）",
   "sort.by.language": "语言",

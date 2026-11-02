@@ -1389,7 +1389,7 @@
   "sort.addRule": "並び替えルールを追加",
   "sort.by.added_at": "追加日",
   "sort.by.cmc": "マナ総量（CMC）",
-  "sort.by.color": "カラーアイデンティティ",
+  "sort.by.color": "カードの色",
   "sort.by.entry_id": "登録順",
   "sort.by.favorite": "お気に入り（星付き）",
   "sort.by.language": "言語",

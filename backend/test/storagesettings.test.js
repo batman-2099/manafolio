@@ -293,11 +293,15 @@ async function main() {
   console.log('PASS: resort persists alphabetical rules atomically and subsequent filing preserves physical order');
 
   // Adding a card must use the same color/mana-value metadata as a full resort.
-  for (const [key, name, color, cmc] of [
-    ['white', 'Zebra', 'W', 1], ['red', 'Alpha', 'R', 3], ['blue', 'Middle', 'U', 2]
+  for (const [key, name, colors, identity, cmc] of [
+    ['white', 'Nick Fury, Director of S.H.I.E.L.D.', ['White'], ['W', 'U', 'B', 'R', 'G'], 1],
+    ['red', 'Alpha', ['Red'], ['R'], 3],
+    ['blue', 'Middle', ['Blue'], ['U'], 2],
+    ['multicolor', 'Azorius Card', ['White', 'Blue'], ['W', 'U'], 4],
+    ['land', 'Shattered Sanctum', [], ['W', 'B'], 0],
   ]) {
-    await db.run(`INSERT INTO card_cache (id, name, game, color_identity, cmc)
-      VALUES (?, ?, 'mtg', ?, ?)`, [`order-${key}`, name, JSON.stringify([color]), cmc]);
+    await db.run(`INSERT INTO card_cache (id, name, game, types, color_identity, cmc)
+      VALUES (?, ?, 'mtg', ?, ?, ?)`, [`order-${key}`, name, JSON.stringify(colors), JSON.stringify(identity), cmc]);
   }
   for (const by of ['color_identity', 'color', 'cmc']) {
     const order = JSON.stringify([{ by, dir: 'asc' }, { by: 'name', dir: 'asc' }]);
@@ -309,6 +313,9 @@ async function main() {
       await db.run(`INSERT INTO collection (card_id, user_id, location_id, compartment_id, position)
         VALUES (?, ?, ?, ?, ?)`, [`order-${key}`, userId, container.lastID, row.lastID, (index + 1) * 1000]);
     }
+    const recommendation = await save(`/locations/${container.lastID}/recommend`, 'POST', { card_id: 'order-blue' });
+    assert.strictEqual(recommendation.status, 200);
+    assert.strictEqual((await recommendation.json()).position, 2000, `${by} recommendations must use cached metadata`);
     const added = await save('/collection', 'POST', { card_id: 'order-blue', location_id: container.lastID });
     assert.strictEqual(added.status, 200);
     const positions = await db.all(`SELECT card_id, position FROM collection
@@ -318,6 +325,29 @@ async function main() {
       { card_id: 'order-blue', position: 2000 },
       { card_id: 'order-red', position: 3000 },
     ], `adding a card must preserve ${by} ordering instead of falling back to name`);
+    if (by === 'cmc') continue;
+    const entryIds = [];
+    for (const key of ['multicolor', 'land']) {
+      const entry = await db.run('INSERT INTO collection (card_id, user_id) VALUES (?, ?)', [`order-${key}`, userId]);
+      entryIds.push(entry.lastID);
+    }
+    const batch = await save(`/locations/${container.lastID}/recommend-batch`, 'POST', { entry_ids: entryIds });
+    assert.strictEqual(batch.status, 200);
+    assert.deepStrictEqual((await batch.json()).map(item => item.recommended.position), [4000, 5000],
+      `${by} batch recommendations must use actual multicolor and colorless categories`);
+    const applied = await save(`/locations/${container.lastID}/apply-all`, 'POST', { entry_ids: entryIds });
+    assert.strictEqual(applied.status, 200);
+    assert.strictEqual((await applied.json()).filed, 2);
+    const filed = await db.all('SELECT card_id, position FROM collection WHERE location_id = ? ORDER BY position, id', [container.lastID]);
+    assert.deepStrictEqual(filed, [
+      ...positions,
+      { card_id: 'order-multicolor', position: 4000 },
+      { card_id: 'order-land', position: 5000 },
+    ], `${by} apply-all must retain actual-color placement`);
+    const resorted = await save(`/locations/${container.lastID}/resort`, 'POST', {});
+    assert.strictEqual(resorted.status, 200);
+    assert.deepStrictEqual(await db.all('SELECT card_id, position FROM collection WHERE location_id = ? ORDER BY position, id', [container.lastID]),
+      filed, `${by} resort must preserve the same actual-color order`);
   }
   console.log('PASS: adding cards preserves color and mana-value storage order');
 }

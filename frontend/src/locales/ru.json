@@ -1458,7 +1458,7 @@
   "sort.addRule": "Добавить правило сортировки",
   "sort.by.added_at": "Дата добавления",
   "sort.by.cmc": "Мана-стоимость (CMC)",
-  "sort.by.color": "Цветовая идентичность",
+  "sort.by.color": "Цвет карты",
   "sort.by.entry_id": "Порядок ввода",
   "sort.by.favorite": "Избранное (со звездой)",
   "sort.by.language": "Язык",

@@ -1389,7 +1389,7 @@
   "sort.addRule": "정렬 규칙 추가",
   "sort.by.added_at": "추가한 날짜",
   "sort.by.cmc": "마나 값(CMC)",
-  "sort.by.color": "색 정체성",
+  "sort.by.color": "카드 색",
   "sort.by.entry_id": "입력 순서",
   "sort.by.favorite": "즐겨찾기(별표)",
   "sort.by.language": "언어",

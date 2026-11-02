@@ -122,17 +122,11 @@ function typeCategory(subtypes) {
 
 
 function getColorCategory(card) {
-  if (!card) return 'Colorless';
-  let ci = [];
-  if (typeof card.color_identity === 'string') {
-    try { ci = JSON.parse(card.color_identity); } catch(e){ if (card.color_identity) ci = [card.color_identity]; }
-  } else if (Array.isArray(card.color_identity)) {
-    ci = card.color_identity;
-  }
-  if (!ci || ci.length === 0) return 'Colorless';
-  if (ci.length > 1) return 'Multicolor';
-  const names = { 'W': 'White', 'U': 'Blue', 'B': 'Black', 'R': 'Red', 'G': 'Green' };
-  return names[ci[0]] || ci[0] || 'Colorless';
+  let colors = safeJsonParse(card?.types, card?.types || []);
+  if (typeof colors === 'string') colors = colors ? [colors] : [];
+  if (!Array.isArray(colors) || colors.length === 0) return 'Colorless';
+  if (colors.length > 1) return 'Multicolor';
+  return colorIdentityName(colors[0]) || 'Colorless';
 }
 
 const RARITY_RANK = [
@@ -510,7 +504,7 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
       const parsed = JSON.parse(scheme);
       if (Array.isArray(parsed)) {
         const prettyLabels = {
-          'color_identity': 'Color Identity',
+          'color_identity': 'Color',
           'color': 'Color',
           'type': 'Type',
           'name': 'Name',

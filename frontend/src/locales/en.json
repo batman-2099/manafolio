@@ -818,7 +818,7 @@
   "sort.by.type": "Card type",
   "sort.dir.type.asc": "Standard order",
   "sort.dir.type.desc": "Reversed",
-  "sort.by.color": "Color Identity",
+  "sort.by.color": "Card color",
   "sort.dir.color.asc": "W → U → B → R → G",
   "sort.dir.color.desc": "G → R → B → U → W",
   "sort.by.cmc": "Mana Value (CMC)",

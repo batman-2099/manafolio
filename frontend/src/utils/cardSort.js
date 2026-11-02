@@ -44,14 +44,14 @@ export function colorCategory(types) {
 }
 
 export function getColorCategory(card) {
-  let identity = card.color_identity;
-  if (typeof identity === 'string') {
-    try { identity = JSON.parse(identity); } catch { identity = [identity]; }
+  let colors = card.types;
+  if (typeof colors === 'string') {
+    try { colors = JSON.parse(colors); } catch { colors = [colors]; }
   }
-  if (!identity || identity.length === 0) return 'Colorless';
-  if (identity.length > 1) return 'Multicolor';
+  if (!colors || colors.length === 0) return 'Colorless';
+  if (colors.length > 1) return 'Multicolor';
   const names = { W: 'White', U: 'Blue', B: 'Black', R: 'Red', G: 'Green' };
-  return names[identity[0]] || identity[0] || 'Colorless';
+  return names[colors[0]] || colors[0] || 'Colorless';
 }
 
 

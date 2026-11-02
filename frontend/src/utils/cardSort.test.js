@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
-test('filing color order groups multicolor identities after mono-green', async () => {
+test('filing and dividers use card colors, not Commander color identity', async () => {
   const server = await createServer({
     root: fileURLToPath(new URL('../../', import.meta.url)),
     configFile: false,
@@ -15,22 +15,24 @@ test('filing color order groups multicolor identities after mono-green', async (
     const { sortCardsByOrder } = await server.ssrLoadModule('/src/utils/cardSort.js');
     const { getSortCategories } = await server.ssrLoadModule('/src/components/CompartmentView.jsx');
     const cards = [
-      { name: 'Gold Z', color_identity: ['W', 'U'] },
-      { name: 'Colorless', color_identity: [] },
-      { name: 'Green', color_identity: '["G"]' },
-      { name: 'Gold A', color_identity: '["B","R"]' },
-      { name: 'White', color_identity: 'W' },
+      { name: 'Gold Z', types: ['W', 'U'], color_identity: ['W', 'U'] },
+      { name: 'Shattered Sanctum', types: [], color_identity: ['W', 'B'] },
+      { name: 'Green', types: '["G"]', color_identity: ['G'] },
+      { name: 'Gold A', types: '["B","R"]', color_identity: ['B', 'R'] },
+      { name: 'Nick Fury', types: ['White'], color_identity: ['W', 'U', 'B', 'R', 'G'] },
     ];
     for (const by of ['color', 'color_identity']) {
       assert.deepEqual(sortCardsByOrder([...cards], [{ by }, { by: 'name' }]).map(card => card.name),
-        ['White', 'Green', 'Gold A', 'Gold Z', 'Colorless']);
+        ['Nick Fury', 'Green', 'Gold A', 'Gold Z', 'Shattered Sanctum']);
       assert.deepEqual(sortCardsByOrder([...cards], [{ by, dir: 'desc' }, { by: 'name' }]).map(card => card.name),
-        ['Colorless', 'Gold A', 'Gold Z', 'Green', 'White']);
-      for (const [identity, expected] of [
+        ['Shattered Sanctum', 'Gold A', 'Gold Z', 'Green', 'Nick Fury']);
+      assert.equal(getSortCategories(cards[4], [{ by, divider: true }])[0].label, 'White');
+      assert.equal(getSortCategories(cards[1], [{ by, divider: true }])[0].label, 'Colorless');
+      for (const [colors, expected] of [
         [['B', 'W'], 'Multicolor'], ['["Black","White"]', 'Multicolor'],
         [['B'], 'Black'], ['["W"]', 'White'], [[], 'Colorless'], [null, 'Colorless'],
       ]) {
-        assert.equal(getSortCategories({ color_identity: identity }, [{ by, divider: true }])[0].label, expected);
+        assert.equal(getSortCategories({ types: colors, color_identity: ['W', 'U', 'B', 'R', 'G'] }, [{ by, divider: true }])[0].label, expected);
       }
     }
   } finally {
