@@ -384,59 +384,6 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
           <section aria-labelledby="ai-pool-title">
             <h3 id="ai-pool-title">{t('aiDeck.poolTitle')}</h3>
             <div style={{ paddingBlock: '0.75rem' }}>
-          {inventoryType === 'collection' && (
-            <div className="form-group">
-              <fieldset disabled={locationsLoading || !!locationsError} style={fieldsetStyle}>
-                <label>{t('aiDeck.containers')}</label>
-                <MultiSelectDropdown
-                  label={t('aiDeck.containers')}
-                  allLabel={t('aiDeck.allContainers')}
-                  value={containerIds}
-                  options={containerOptions}
-                  onChange={value => { if (!busy) { clearInventory(); setContainerIds(value); } }}
-                />
-              </fieldset>
-              {locationsLoading && <p role="status">{t('common.loading')}</p>}
-              {locationsError && <p role="alert">{locationsError} <button type="button" className="btn btn-secondary" onClick={() => setLocationsRevision(value => value + 1)}>{t('aiDeck.retry')}</button></p>}
-            </div>
-          )}
-          <div style={rowStyle}>
-          {inventoryType === 'collection' && (
-            <div className="form-group">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={includeCheckedOut}
-                aria-describedby="ai-checked-out-hint"
-                className="btn btn-secondary"
-                style={includeCheckedOut ? { background: 'var(--accent-green)', borderColor: 'var(--accent-green)', color: 'var(--bg-primary)' } : undefined}
-                onClick={() => { clearInventory(); setIncludeCheckedOut(current => !current); }}
-              >
-                {t('aiDeck.includeCheckedOut')}
-                <span aria-hidden="true" style={{ width: 28, height: 16, borderRadius: 999, background: includeCheckedOut ? 'var(--text-on-accent)' : 'var(--text-muted)', position: 'relative', flexShrink: 0 }}>
-                  <span style={{ position: 'absolute', top: 2, left: includeCheckedOut ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: includeCheckedOut ? 'var(--accent-green)' : 'var(--bg-primary)' }} />
-                </span>
-              </button>
-            </div>
-          )}
-            <div className="form-group">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={useAllAvailableLands}
-                aria-describedby="ai-all-lands-hint"
-                disabled={inventoryLoading || !!inventoryError}
-                className="btn btn-secondary"
-                style={useAllAvailableLands ? { background: 'var(--accent-green)', borderColor: 'var(--accent-green)', color: 'var(--bg-primary)' } : undefined}
-                onClick={() => { clearDraft(); setUseAllAvailableLands(current => !current); }}
-              >
-                {t('aiDeck.useAllAvailableLands')}
-                <span aria-hidden="true" style={{ width: 28, height: 16, borderRadius: 999, background: useAllAvailableLands ? 'var(--text-on-accent)' : 'var(--text-muted)', position: 'relative', flexShrink: 0 }}>
-                  <span style={{ position: 'absolute', top: 2, left: useAllAvailableLands ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: useAllAvailableLands ? 'var(--accent-green)' : 'var(--bg-primary)' }} />
-                </span>
-              </button>
-            </div>
-          </div>
           <fieldset disabled={inventoryLoading || !!inventoryError} style={fieldsetStyle}>
             <div style={{ ...rowStyle, alignItems: 'start' }}>
               <div className="form-group" style={{ flex: '1 1 180px', minWidth: 0 }}>
@@ -470,17 +417,64 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
               </div>
             </div>
           </fieldset>
+          {inventoryType === 'collection' && (
+            <div className="form-group">
+              <fieldset disabled={locationsLoading || !!locationsError} style={fieldsetStyle}>
+                <label>{t('aiDeck.containers')}</label>
+                <MultiSelectDropdown
+                  label={t('aiDeck.containers')}
+                  allLabel={t('aiDeck.allContainers')}
+                  value={containerIds}
+                  options={[{ value: 'unassigned', label: t('bulk.unassignedPile') }, ...containerOptions]}
+                  onChange={value => { if (!busy) { clearInventory(); setContainerIds(value); } }}
+                />
+              </fieldset>
+              {locationsLoading && <p role="status">{t('common.loading')}</p>}
+              {locationsError && <p role="alert">{locationsError} <button type="button" className="btn btn-secondary" onClick={() => setLocationsRevision(value => value + 1)}>{t('aiDeck.retry')}</button></p>}
             </div>
-          </section>
+          )}
+          <div style={rowStyle}>
+          {inventoryType === 'collection' && (
+            <div className="form-group">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={includeCheckedOut}
+                className="btn btn-secondary"
+                style={includeCheckedOut ? { background: 'var(--accent-green)', borderColor: 'var(--accent-green)', color: 'var(--bg-primary)' } : undefined}
+                onClick={() => { clearInventory(); setIncludeCheckedOut(current => !current); }}
+              >
+                {t('aiDeck.includeCheckedOut')}
+                <span aria-hidden="true" style={{ width: 28, height: 16, borderRadius: 999, background: includeCheckedOut ? 'var(--text-on-accent)' : 'var(--text-muted)', position: 'relative', flexShrink: 0 }}>
+                  <span style={{ position: 'absolute', top: 2, left: includeCheckedOut ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: includeCheckedOut ? 'var(--accent-green)' : 'var(--bg-primary)' }} />
+                </span>
+              </button>
+            </div>
+          )}
+            <div className="form-group">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={useAllAvailableLands}
+                disabled={inventoryLoading || !!inventoryError}
+                className="btn btn-secondary"
+                style={useAllAvailableLands ? { background: 'var(--accent-green)', borderColor: 'var(--accent-green)', color: 'var(--bg-primary)' } : undefined}
+                onClick={() => { clearDraft(); setUseAllAvailableLands(current => !current); }}
+              >
+                {t('aiDeck.useAllAvailableLands')}
+                <span aria-hidden="true" style={{ width: 28, height: 16, borderRadius: 999, background: useAllAvailableLands ? 'var(--text-on-accent)' : 'var(--text-muted)', position: 'relative', flexShrink: 0 }}>
+                  <span style={{ position: 'absolute', top: 2, left: useAllAvailableLands ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: useAllAvailableLands ? 'var(--accent-green)' : 'var(--bg-primary)' }} />
+                </span>
+              </button>
+            </div>
           </div>
           <div>
-          <p role="status">{inventoryLoading ? t('common.loading') : t('aiDeck.matchingCounts', counts)}</p>
+          <p role="status" style={{ margin: 0, padding: 'var(--space-4)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', color: 'var(--text-strong)', fontWeight: 600 }}>{inventoryLoading ? t('common.loading') : t('aiDeck.matchingCounts', counts)}</p>
           {inventoryError && <p role="alert">{inventoryError} <button type="button" className="btn btn-secondary" onClick={() => { clearInventory(); setInventoryRevision(value => value + 1); }}>{t('aiDeck.retry')}</button></p>}
           {!inventoryLoading && !inventoryError && counts.available === 0 && <p>{t(colors.length || sets.length || excludedSets.length || containerIds.length ? 'aiDeck.emptyFilters' : 'aiDeck.emptyInventory')}</p>}
-            {inventoryType === 'collection' && (
-              <p id="ai-checked-out-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.includeCheckedOutHint')}</p>
-            )}
-            <p id="ai-all-lands-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.useAllAvailableLandsHint')}</p>
+          </div>
+            </div>
+          </section>
           </div>
           {sourceDeck && <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.improveContainerHint')}</p>}
         </fieldset>

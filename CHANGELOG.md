@@ -5,7 +5,9 @@ Release history starts with Manafolio 2.0.
 ## Unreleased
 
 - Record saved AI improvements in Deck history, preserving the previous composition and saving revisions atomically with the deck. Unchanged saves do not add duplicate revisions.
-- Remove the general card eligibility and filter explanation block from the AI deck window without changing filtering or generation rules.
+- Remove general eligibility/filter explanations and the checked-out-copy and land-filter helper text from the AI deck window without changing filtering or generation rules.
+- Order AI card pool controls as Color and Set, Containers, then the two toggles, with matching-inventory counts in a bordered summary at the bottom.
+- Allow Unassigned Pile in the AI container selector, alone or combined with named containers, while preserving inventory and reservation rules.
 
 ## 2.6.0 — 2026-11-02
 

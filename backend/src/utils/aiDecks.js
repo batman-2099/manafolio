@@ -42,14 +42,14 @@ function inventoryType(value) {
 
 function containerIds(value = [], type, query = false) {
   if (query && value !== undefined) {
-    if (typeof value !== 'string' || !/^[1-9]\d*(,[1-9]\d*)*$/.test(value)) {
-      fail('Container IDs must be comma-separated positive integers.');
+    if (typeof value !== 'string' || !/^(?:[1-9]\d*|unassigned)(?:,(?:[1-9]\d*|unassigned))*$/.test(value)) {
+      fail('Container IDs must be comma-separated positive integers or unassigned.');
     }
-    value = value.split(',').map(Number);
+    value = value.split(',').map(id => id === 'unassigned' ? id : Number(id));
   }
   if (!Array.isArray(value) || value.length > 1000
-    || value.some(id => !Number.isSafeInteger(id) || id < 1) || new Set(value).size !== value.length) {
-    fail('Container IDs must be a list of at most 1000 unique positive safe integers.');
+    || value.some(id => id !== 'unassigned' && (!Number.isSafeInteger(id) || id < 1)) || new Set(value).size !== value.length) {
+    fail('Container IDs must be a list of at most 1000 unique positive safe integers or unassigned.');
   }
   if (type === 'arena' && value.length) fail('Arena inventory does not have physical containers.');
   return value;
@@ -204,9 +204,11 @@ function suggestionResponse(output) {
 async function inventory(userId, type, { include_checked_out = false, container_ids = [], sourceDeck: source } = {}) {
   inventoryType(type);
   containerIds(container_ids, type);
-  if (container_ids.length) {
-    const locations = await db.all(`SELECT id FROM locations WHERE user_id = ? AND id IN (${container_ids.map(() => '?').join(',')}) AND inventory_type = 'collection'`, [userId, ...container_ids]);
-    if (locations.length !== container_ids.length) fail('Container not found.', 404);
+  const locationIds = container_ids.filter(id => id !== 'unassigned');
+  const selectedLocations = new Set(container_ids.map(id => id === 'unassigned' ? null : id));
+  if (locationIds.length) {
+    const locations = await db.all(`SELECT id FROM locations WHERE user_id = ? AND id IN (${locationIds.map(() => '?').join(',')}) AND inventory_type = 'collection'`, [userId, ...locationIds]);
+    if (locations.length !== locationIds.length) fail('Container not found.', 404);
   }
   const entries = await db.all(`SELECT id AS entry_id, card_id, reverse_card_id, quantity, missing,
     location_id, compartment_id, game FROM collection
@@ -227,14 +229,14 @@ async function inventory(userId, type, { include_checked_out = false, container_
     for (const [id, quantity] of plan) sourceEntries.set(id, (sourceEntries.get(id) || 0) + quantity);
   }
   const eligibleEntries = availableEntries.map(entry => ({
-    ...entry, quantity: !container_ids.length || container_ids.includes(entry.location_id)
+    ...entry, quantity: !container_ids.length || selectedLocations.has(entry.location_id)
       ? entry.quantity : sourceEntries.get(entry.entry_id) || 0,
   })).filter(entry => entry.quantity > 0);
   const sourceQuantities = new Map(source?.cards.map(card => [card.card_id, card.quantity]));
   const rows = await db.all(`SELECT DISTINCT cc.* FROM card_cache cc JOIN collection c
     ON (cc.id = c.card_id OR cc.id = c.reverse_card_id)
     WHERE c.user_id = ? AND c.game = 'mtg' AND cc.game = 'mtg' AND c.list_type = ? AND c.quantity > 0
-      ${container_ids.length ? `AND (c.location_id IN (${container_ids.map(() => '?').join(',')})
+      ${container_ids.length ? `AND (c.location_id IN (${container_ids.map(() => '?').join(',')})${selectedLocations.has(null) ? ' OR c.location_id IS NULL' : ''}
         OR cc.id IN (SELECT card_id FROM deck_cards WHERE deck_id = ?))` : ''}
     ORDER BY cc.name, cc.id LIMIT ?`,
   [userId, type, ...(container_ids.length ? [...container_ids, source?.id ?? null] : []), MAX_INVENTORY + 1]);
@@ -242,7 +244,7 @@ async function inventory(userId, type, { include_checked_out = false, container_
   for (const row of rows) {
     const matches = entry => entry.card_id === row.id || entry.reverse_card_id === row.id;
     const ownedEntries = entries.filter(matches);
-    const selected = container_ids.length ? ownedEntries.filter(entry => container_ids.includes(entry.location_id)) : ownedEntries;
+    const selected = container_ids.length ? ownedEntries.filter(entry => selectedLocations.has(entry.location_id)) : ownedEntries;
     const source_qty = sourceQuantities.get(row.id) || 0;
     if (container_ids.length && !selected.length && !source_qty) continue;
     const sum = (values, predicate) => values.reduce((total, entry) => total + (predicate(entry) ? entry.quantity : 0), 0);
@@ -255,7 +257,7 @@ async function inventory(userId, type, { include_checked_out = false, container_
     const globalAvailable = Math.max(0, globalOwned - Math.max(reservedByFace.get(row.id) || 0,
       ownedEntries.reduce((sum, entry) => sum + (allocated.get(entry.entry_id) || 0), 0)));
     const selectedAvailable = availableEntries.filter(entry => matches(entry)
-      && (!container_ids.length || container_ids.includes(entry.location_id)))
+      && (!container_ids.length || selectedLocations.has(entry.location_id)))
       .reduce((sum, entry) => sum + entry.quantity, 0);
     const available_qty = Math.min(globalAvailable, Math.max(selectedAvailable, Math.min(globalAvailable, source_qty)));
     const card = parseCardRow(row);

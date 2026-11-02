@@ -1110,20 +1110,30 @@ async function main() {
       [ids.forest, 13, 8, 0], [ids.bolt, 5, 4, 0], [ids.reprint, 1, 1, 0],
       [ids.locked, 3, 1, 3], [ids.island, 3, 3, 0], [ids.missing, 0, 0, 2], [ids.unknown, 2, 2, 0],
     ].sort(), 'omitting the filter retains all physical inventory, including unassigned cards');
+    const unassignedInventory = await containerInventory('&container_ids=unassigned');
+    assert.strictEqual(unassignedInventory.status, 200);
+    assert.deepStrictEqual(quantities(unassignedInventory), [
+      [ids.forest, 3, 3, 0], [ids.unknown, 2, 2, 0],
+    ].sort(), 'Unassigned Pile selects only physical copies without a location');
+    assert.deepStrictEqual(quantities(await containerInventory(`&container_ids=unassigned,${boxB}`)), [
+      [ids.forest, 7, 3, 0], [ids.bolt, 2, 1, 0], [ids.island, 3, 3, 0], [ids.unknown, 2, 2, 0],
+    ].sort(), 'Unassigned Pile and containers form a union without releasing reservations');
     const beforeInvalidContainers = calls.length + ollamaCalls.length + otherOllamaCalls.length;
-    for (const container_ids of [null, {}, '1', [0], [-1], [1.5], ['1'], [Number.MAX_SAFE_INTEGER + 1], [boxA, boxA], Array.from({ length: 1001 }, (_, i) => i + 1)]) {
+    for (const container_ids of [null, {}, '1', [0], [-1], [1.5], ['1'], ['Unassigned'], ['unassigned', 'unassigned'], [Number.MAX_SAFE_INTEGER + 1], [boxA, boxA], Array.from({ length: 1001 }, (_, i) => i + 1)]) {
       assert.strictEqual((await request('POST', '/ai/suggest', { ...requestBody, container_ids }, 9)).status, 400);
     }
-    for (const query of ['', '0', '-1', '1.5', '1e2', '1,', '1,,2', '01', '%201', '9007199254740992', `${boxA},${boxA}`, `${boxA}&container_ids=${boxB}`]) {
+    for (const query of ['', '0', '-1', '1.5', '1e2', '1,', '1,,2', '01', '%201', 'Unassigned', 'unassigned,unassigned', 'unassigned,0', '9007199254740992', `${boxA},${boxA}`, `${boxA}&container_ids=${boxB}`]) {
       assert.strictEqual((await containerInventory(`&container_ids=${query}`)).status, 400, `invalid query: ${query}`);
     }
     assert.strictEqual((await containerInventory(`&container_ids=${Array.from({ length: 1001 }, (_, i) => i + 1).join(',')}`)).status, 400);
-    for (const container_ids of [[foreignBox], [Number.MAX_SAFE_INTEGER], [boxA, foreignBox]]) {
+    for (const container_ids of [[foreignBox], [Number.MAX_SAFE_INTEGER], [boxA, foreignBox], ['unassigned', foreignBox]]) {
       assert.strictEqual((await containerInventory(`&container_ids=${container_ids.join(',')}`)).status, 404);
       assert.strictEqual((await request('POST', '/ai/suggest', { ...requestBody, container_ids }, 7)).status, 404);
     }
     assert.strictEqual((await request('GET', `/ai/inventory?inventory_type=arena&container_ids=${boxA}`, undefined, 7)).status, 400);
     assert.strictEqual((await request('POST', '/ai/suggest', { ...requestBody, inventory_type: 'arena', container_ids: [boxA] }, 9)).status, 400);
+    assert.strictEqual((await request('GET', '/ai/inventory?inventory_type=arena&container_ids=unassigned', undefined, 7)).status, 400);
+    assert.strictEqual((await request('POST', '/ai/suggest', { ...requestBody, inventory_type: 'arena', container_ids: ['unassigned'] }, 9)).status, 400);
     assert.strictEqual(calls.length + ollamaCalls.length + otherOllamaCalls.length, beforeInvalidContainers);
 
     const scopedRequest = { ...requestBody, target_size: 6, container_ids: [boxA] };
@@ -1148,6 +1158,13 @@ async function main() {
     assert.strictEqual(emptyContainerDiscussion.status, 200);
     assert.strictEqual(emptyContainerDiscussion.body.draft, null);
     assert.deepStrictEqual(lastPayload().catalog, []);
+    const unassignedDraft = draft({ target_size: 3, cards: [{ card_id: ids.forest, quantity: 3 }] });
+    model = async () => ({ message: 'Use the unassigned copies.', draft: { ...unassignedDraft, warnings: [] } });
+    assert.strictEqual((await request('POST', '/ai/suggest', { ...requestBody, target_size: 3, container_ids: ['unassigned'] }, 7)).status, 200);
+    assert.deepStrictEqual(lastPayload().catalog.map(row => [row[0], row[2]]).sort(),
+      [[ids.forest, 3], [ids.unknown, 2]].sort(), 'generation uses the same unassigned pool as the inventory preview');
+    assert.ok(!Object.hasOwn(lastPayload().request, 'container_ids'), 'unassigned selection stays private from the provider');
+    assert.strictEqual((await request('POST', '/ai', unassignedDraft, 7)).status, 201, 'the reviewed unassigned draft can be saved');
     model = async () => ({ message: 'Here is the revised deck.', draft: { ...scopedDraft, warnings: [] } });
     const containerSource = await db.run(`INSERT INTO decks (user_id, name, game, inventory_type, format, target_size)
       VALUES (7, 'Source outside selected container', 'mtg', 'collection', 'Standard', 6)`);
@@ -1161,6 +1178,10 @@ async function main() {
     const scopedSourceInventory = await containerInventory(`&container_ids=${boxA}&source_deck_id=${containerSource.lastID}`);
     assert.strictEqual(scopedSourceInventory.body.cards.find(card => card.id === ids.island).available_qty, 2);
     assert.strictEqual(scopedSourceInventory.body.cards.find(card => card.id === ids.forest).available_qty, 5, 'source and normal pool overlap uses max, not sum');
+    const unassignedSource = await containerInventory(`&container_ids=unassigned&source_deck_id=${containerSource.lastID}`);
+    assert.deepStrictEqual(quantities(unassignedSource), [
+      [ids.forest, 4, 4, 0], [ids.island, 2, 2, 0], [ids.unknown, 2, 2, 0],
+    ].sort(), 'AI Improve retains eligible source copies without double-counting the unassigned pool');
     model = async () => ({ message: 'Here is the revised deck.', draft: { ...draft({ target_size: 6, cards: [{ card_id: ids.island, quantity: 2 }, { card_id: ids.forest, quantity: 4 }] }), warnings: [] } });
     assert.strictEqual((await request('POST', '/ai/suggest', { ...scopedImprove, colors: ['Red'], sets: ['tst'] }, 7)).status, 200);
     assert.strictEqual(lastPayload().catalog.find(row => row[0] === ids.forest)[2], 4, 'off-color source cards are capped even if the normal container has more');
