@@ -2017,32 +2017,24 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
             </div>
 
             <div className="deck-tools">
-              <button className="btn btn-secondary" disabled={editorBusy || savingRecord} onClick={() => setShowHistory(true)}>{t('history.title')}</button>
-              {activeDeck.game === 'mtg' && (
-                <button className="btn btn-secondary" disabled={editorBusy || savingRecord} onClick={event => {
-                  shareTriggerRef.current = event.currentTarget;
-                  setShowShareModal(true);
-                }}>
-                  <Share2 size={14} aria-hidden="true" /> {t('deck.share')}
-                </button>
+              {['collection', 'graveyard'].includes(activeDeck.inventory_type) && (
+                <div>
+                  <button
+                    className="btn btn-secondary"
+                    disabled={editorBusy || savingRecord || searching || hasUnsavedChanges || !!deckDraft || !activeDeck.cards.length}
+                    aria-describedby={hasUnsavedChanges ? 'deck-container-save-first' : undefined}
+                    onClick={() => setShowDeckContainerModal(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minHeight: '44px' }}
+                  >
+                    <FolderPlus size={14} aria-hidden="true" /> {t('deck.createContainer')}
+                  </button>
+                  {hasUnsavedChanges && <p id="deck-container-save-first" style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>{t('deck.saveFirst')}</p>}
+                </div>
               )}
+              <button className="btn btn-secondary" disabled={editorBusy || savingRecord} onClick={() => setShowHistory(true)}>{t('history.title')}</button>
                 <button className="btn btn-secondary" onClick={startSimulator} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <Play size={14} /> Draw Simulator
                 </button>
-              {activeDeck.game === 'mtg' && activeDeck.inventory_type !== 'graveyard' && (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    if (hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
-                    setAiSourceDeck(activeDeck);
-                    setShowAiBuilder(true);
-                  }}
-                  disabled={editorBusy || savingRecord}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                >
-                  <Zap size={14} /> {t('aiDeck.improve')}
-                </button>
-              )}
               <button
                 className="btn btn-secondary"
                 disabled={editorBusy || searching}
@@ -2076,19 +2068,27 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
               >
                 <Download size={14} /> Import
               </button>
-              {['collection', 'graveyard'].includes(activeDeck.inventory_type) && (
-                <div>
-                  <button
-                    className="btn btn-secondary"
-                    disabled={editorBusy || savingRecord || searching || hasUnsavedChanges || !!deckDraft || !activeDeck.cards.length}
-                    aria-describedby={hasUnsavedChanges ? 'deck-container-save-first' : undefined}
-                    onClick={() => setShowDeckContainerModal(true)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minHeight: '44px' }}
-                  >
-                    <FolderPlus size={14} aria-hidden="true" /> {t('deck.createContainer')}
-                  </button>
-                  {hasUnsavedChanges && <p id="deck-container-save-first" style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>{t('deck.saveFirst')}</p>}
-                </div>
+              {activeDeck.game === 'mtg' && activeDeck.inventory_type !== 'graveyard' && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    if (hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
+                    setAiSourceDeck(activeDeck);
+                    setShowAiBuilder(true);
+                  }}
+                  disabled={editorBusy || savingRecord}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Zap size={14} /> {t('aiDeck.improve')}
+                </button>
+              )}
+              {activeDeck.game === 'mtg' && (
+                <button className="btn btn-secondary" disabled={editorBusy || savingRecord} onClick={event => {
+                  shareTriggerRef.current = event.currentTarget;
+                  setShowShareModal(true);
+                }}>
+                  <Share2 size={14} aria-hidden="true" /> {t('deck.share')}
+                </button>
               )}
             </div>
             <div className="deck-primary-actions">
