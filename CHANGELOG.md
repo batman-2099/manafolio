@@ -2,7 +2,7 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.6.0 — 2026-11-02
 
 - Display available, searched, selected, and reviewed Trade workbench cards in responsive artwork grids instead of horizontal lists.
 - Alphabetize Deck Builder's left-hand toolbar actions by English label; keep Check Out / Return and Save in their existing group.
