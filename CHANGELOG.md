@@ -6,6 +6,9 @@ Release history starts with Manafolio 2.0.
 
 - Display available, searched, selected, and reviewed Trade workbench cards in responsive artwork grids instead of horizontal lists.
 - Alphabetize Deck Builder's left-hand toolbar actions by English label; keep Check Out / Return and Save in their existing group.
+- Add `front//back` Rapid Add entry for physical tokens from the pinned set, including the trailing-dot foil shortcut; resolve both faces before saving one paired stack and retain failed entries for correction or retry.
+- Add **AI Explain** beside **Replace art** in card details when the selected AI provider is connected. Send the card image and public metadata on demand, with cancel/retry support and no collection notes or inventory changes.
+- Add Regular frame, Borderless, Extended art, Showcase, Retro frame, and Full-art to Collection's Printing filter. Combine treatments with Foil/Nonfoil and resolve missing printing metadata on demand without changing owned copies.
 
 ## 2.5.0 — 2026-10-31
 

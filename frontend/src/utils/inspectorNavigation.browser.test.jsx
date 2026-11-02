@@ -26,6 +26,7 @@ export async function runInspectorNavigationRegressions() {
   const commander = { ...cards[1], name: 'Sample commander', subtypes: ['Legendary', 'Creature'], list_type: 'arena' };
   const createdDeck = { id: 42, name: commander.name, game: 'mtg', inventory_type: 'arena', format: 'Commander / EDH', target_size: 100, commander_card_id: commander.id, cards: [{ ...commander, quantity: 1 }], total_cards: 1 };
   window.fetch = async (url, options = {}) => {
+    if (url === '/api/ai-decks/account') return { ok: true, json: async () => ({ connected: false }) };
     if (url === '/api/decks' && options.method === 'POST') return { ok: !creationFails, json: async () => creationFails ? { error: 'Sample creation failure' } : { id: createdDeck.id } };
     if (url === '/api/decks/42') return { ok: true, json: async () => createdDeck };
     if (url === '/api/sets') return { ok: true, json: async () => [] };

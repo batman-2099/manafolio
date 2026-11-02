@@ -24,7 +24,7 @@ function resolveCardPrice(card) {
 }
 
 // Hydrate a raw card_cache row: its array columns are stored as JSON strings,
-// so parse them back to arrays. Missing columns become []; the raw row is untouched.
+// so parse them back to arrays. Unknown printing treatments remain null.
 function parseCardRow(row) {
   if (!row) return row;
   return {
@@ -32,6 +32,7 @@ function parseCardRow(row) {
     subtypes: JSON.parse(row.subtypes || '[]'),
     types: JSON.parse(row.types || '[]'),
     color_identity: JSON.parse(row.color_identity || '[]'),
+    ...(Object.hasOwn(row, 'printing_treatments') ? { printing_treatments: JSON.parse(row.printing_treatments || 'null') } : {}),
   };
 }
 

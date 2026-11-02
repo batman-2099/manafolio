@@ -232,6 +232,7 @@ async function initDb() {
       price_source TEXT,
       cmc REAL,
       color_identity TEXT,
+      printing_treatments TEXT,
       game TEXT DEFAULT 'mtg',
       language TEXT DEFAULT 'English',
       printed_name TEXT,
@@ -467,6 +468,9 @@ async function initDb() {
   }
   if (!cardCacheCols.some(c => c.name === 'printed_name')) {
     await run(`ALTER TABLE card_cache ADD COLUMN printed_name TEXT`);
+  }
+  if (!cardCacheCols.some(c => c.name === 'printing_treatments')) {
+    await run(`ALTER TABLE card_cache ADD COLUMN printing_treatments TEXT`);
   }
   // Store provider artwork and marketplace URLs without guessing them.
   for (const col of ['tcgplayer_url', 'cardmarket_url', 'image_url_back', 'name_back']) {

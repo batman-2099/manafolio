@@ -26,6 +26,8 @@ export async function runUiSearchRegressions() {
   let failRapidWrite = false;
   let failRapidLookup = false;
   let lastRapidNumber;
+  let rapidPairResults = null;
+  const rapidDeletes = [];
   const toasts = [];
   let refreshes = 0;
   let settle;
@@ -62,6 +64,7 @@ export async function runUiSearchRegressions() {
       return response({ id: 100 + singleWrites.length });
     }
     if (/^\/api\/collection\/\d+$/.test(String(url)) && ['PUT', 'DELETE'].includes(options.method)) {
+      if (options.method === 'DELETE' && !failRapidWrite) rapidDeletes.push(String(url));
       return response({}, failRapidWrite ? 500 : 200);
     }
     if (String(url).startsWith('/api/collection?')) return response([]);
@@ -70,6 +73,10 @@ export async function runUiSearchRegressions() {
       if (params.has('number')) {
         lastRapidNumber = params.get('number');
         if (failRapidLookup) return response({ error: 'Sample lookup failure' }, 503);
+      }
+      if (params.has('number') && rapidPairResults) {
+        const result = rapidPairResults[params.get('number').replace(/^0+(?=\d)/, '')] ?? [];
+        return result === 'failure' ? response({ error: 'Sample reverse lookup failure' }, 503) : response(result);
       }
       return response(params.get('prints') === '1' ? [front, back] : params.get('number') ? [rapidPriceCard || front] : tokenResults);
     }
@@ -306,6 +313,57 @@ export async function runUiSearchRegressions() {
     await click(button(en['common.retry']));
     assert(lastRapidNumber === '123a' && singleWrites.at(-1).printing === 'Holofoil',
       'retry preserves the submitted collector number and foil choice');
+
+    await change(host.querySelector('#search-destination'), 'collection');
+    rapidPairResults = {
+      '1': [front], '2': [back], '1a': [{ ...front, id: 'mtg-suffix', number: '1a' }],
+      '3': [{ ...back, subtypes: [], set_name: 'Ordinary Set', number: '3' }],
+      '4': [back, { ...back, id: 'ambiguous-back' }],
+      '5': [{ ...front, number: '5' }], '6': [{ ...back, number: '6a' }],
+    };
+    const beforePairs = singleWrites.length;
+    for (const invalid of ['1//', '//2', '1/2', '1///2', '1//2//3', '1//999', '999//2', '1//3', '3//2', '1//4', '4//2', '1//5', '1//6']) {
+      await change(host.querySelector('#rapid-card-number'), invalid);
+      await rapidSubmit();
+      assert(singleWrites.length === beforePairs && !prompt() && host.querySelector('#rapid-card-number').value === invalid,
+        `invalid or unresolved pair ${invalid} saves neither face and retains the input`);
+      assert(toasts.at(-1)[1] === 'error', 'invalid pair gives error feedback');
+    }
+    await change(host.querySelector('#search-destination'), 'arena');
+    await change(host.querySelector('#rapid-card-number'), '1//2');
+    await rapidSubmit();
+    assert(singleWrites.length === beforePairs, 'Arena cannot silently discard an explicit reverse');
+    await change(host.querySelector('#search-destination'), 'collection');
+    rapidPairResults['2'] = 'failure';
+    await change(host.querySelector('#rapid-card-number'), '001 // 002.');
+    await rapidSubmit();
+    assert(singleWrites.length === beforePairs && host.querySelector('[role="alert"]'), 'reverse lookup failure saves neither face and offers retry');
+    rapidPairResults['2'] = [back];
+    await change(host.querySelector('#rapid-card-number'), '999');
+    await click(button(en['common.retry']));
+    assert(singleWrites.length === beforePairs + 1 && !prompt(), 'retry resolves the original pair without asking for its reverse again');
+    assert(singleWrites.at(-1).card_id === front.id && singleWrites.at(-1).reverse_card_id === back.id
+      && singleWrites.at(-1).quantity === 2 && singleWrites.at(-1).stackable && singleWrites.at(-1).printing === 'Holofoil',
+    'padded pair with foil shortcut saves one physical stack with both faces and the chosen quantity');
+    assert(host.querySelector('.search-rapid').textContent.includes('#1//2 Goblin // Soldier'), 'receipt identifies both token faces');
+    const pairedEntry = 100 + singleWrites.length;
+    await click(receiptButton(en['search.undo']));
+    assert(rapidDeletes.at(-1) === `/api/collection/${pairedEntry}` && !host.querySelector('.search-rapid').textContent.includes('#1//2'),
+      'Undo deletes the paired physical entry and removes its receipt');
+    failRapidWrite = true;
+    await change(host.querySelector('#rapid-card-number'), '1a//2');
+    await rapidSubmit();
+    assert(singleWrites.length === beforePairs + 1 && host.querySelector('#rapid-card-number').value === '1a//2', 'failed paired save preserves the input');
+    failRapidWrite = false;
+    await act(async () => {
+      const input = host.querySelector('#rapid-card-number');
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    assert(singleWrites.length === beforePairs + 2 && singleWrites.at(-1).card_id === 'mtg-suffix'
+      && singleWrites.at(-1).reverse_card_id === back.id && singleWrites.at(-1).printing === 'Normal',
+    'suffixes remain distinct and repeated Enter saves the pair only once');
+    rapidPairResults = null;
 
     window.confirm = () => true;
     await click(button(en['addCards.deck']));

@@ -79,6 +79,19 @@ async function parseCompleteBackup(data) {
       || new Set(backup.card_cache.map(row => row.id)).size !== backup.card_cache.length) {
     throw new Error('Invalid backup card IDs');
   }
+  for (const card of backup.card_cache) {
+    if (card.printing_treatments == null) continue;
+    let treatments;
+    try {
+      treatments = typeof card.printing_treatments === 'string' ? JSON.parse(card.printing_treatments) : null;
+    } catch {
+      throw new Error('Invalid backup printing treatments');
+    }
+    if (!Array.isArray(treatments) || treatments.some(value =>
+      !['regular', 'borderless', 'extendedart', 'showcase', 'retro', 'fullart'].includes(value))) {
+      throw new Error('Invalid backup printing treatments');
+    }
+  }
   if (backup.collection.some(card => !Number.isSafeInteger(card.quantity) || card.quantity < 1)
       || backup.deck_cards.some(card => !card || (card.quantity !== 0 && !validImportQuantity(card.quantity)))) {
     throw new Error('Invalid backup quantities');
@@ -269,19 +282,20 @@ async function restoreCompleteBackup(backup, userId) {
 
     for (const card of backup.card_cache) {
       await db.run(`
-        INSERT OR IGNORE INTO card_cache (
+        INSERT INTO card_cache (
           id, name, supertype, subtypes, types, rarity, set_id, set_name, number, image_url,
           price_trend, price_normal, price_holofoil, price_avg1, price_avg7,
           price_avg30, price_currency, price_source, cmc, color_identity, game,
           language, printed_name, tcgplayer_product_id, last_updated, image_url_back, name_back,
-          tcgplayer_url, cardmarket_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          tcgplayer_url, cardmarket_url, printing_treatments
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET printing_treatments = COALESCE(card_cache.printing_treatments, excluded.printing_treatments)
       `, [
         card.id, card.name, card.supertype, card.subtypes, card.types, card.rarity, card.set_id, card.set_name, card.number, card.image_url,
         card.price_trend, card.price_normal, card.price_holofoil, card.price_avg1, card.price_avg7,
         card.price_avg30, card.price_currency, card.price_source, card.cmc, card.color_identity, card.game,
         card.language, card.printed_name, card.tcgplayer_product_id, card.last_updated, card.image_url_back ?? null, card.name_back ?? null,
-        card.tcgplayer_url ?? null, card.cardmarket_url ?? null
+        card.tcgplayer_url ?? null, card.cardmarket_url ?? null, card.printing_treatments ?? null
       ]);
     }
 

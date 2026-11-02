@@ -19,6 +19,7 @@ import { readProgressStream } from '../utils/importStream';
 import { downloadBlob } from '../utils/downloadBlob';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
+import { isMtgToken, pairedCardName } from '../utils/tokenFaces';
 
 const CSV_FIELDS = [
   ['name', 'csvMapping.name', ['name', 'card name', 'card']],
@@ -488,8 +489,8 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
   // One card straight into the collection, no drawer. Stacked on purpose: one
   // Enter press becomes exactly one row, so undo removes exactly what it added
   // (an unstacked qty-3 add would leave two orphan copies behind).
-  const addCardNow = async (card, copies, cardPrinting) => {
-    const choice = await requestReverse(card, { inventoryType: addToArena ? 'arena' : 'collection' });
+  const addCardNow = async (card, copies, cardPrinting, reverseCard = null) => {
+    const choice = await requestReverse(card, { inventoryType: addToArena ? 'arena' : 'collection', reverseCard });
     if (!choice) return null;
     const response = await fetch('/api/collection', {
       method: 'POST',
@@ -523,6 +524,12 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
     const rapidPrinting = foil ? 'Holofoil' : input.rapidPrinting || printing;
     const submitted = { ...input, numberQuery: number, rapidPrinting };
     if (!number || rapidBusy || searchPending.current) return;
+    const numbers = number.split('//').map(part => part.trim());
+    const paired = numbers.length > 1;
+    if (number.includes('/') && (!paired || numbers.length !== 2 || numbers.some(part => !part || part.includes('/')) || addToArena)) {
+      showToast(t('search.rapidPairError'), 'error');
+      return;
+    }
     const copies = Number(quantity);
     if (!Number.isInteger(copies) || copies < 1) {
       rapidQuantityRef.current?.focus();
@@ -545,38 +552,51 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
     };
     setRapidBusy(true);
     try {
-      const params = new URLSearchParams({
-        number, set: submitted.setCodeQuery, scope: 'internet', game: submitted.game, lang: submitted.searchLang, page: '1', limit: '10'
-      });
-      const res = await fetch(`/api/search?${params.toString()}`);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        failLookup(res.status === 429 || err.error === 'Rate limit exceeded' ? 'rate-limit' : res.status === 503 ? 'upstream' : 'request', err.error);
-        showToast(err.error || t('search.errLookup'), 'error');
-        return;
-      }
-      const matches = await res.json();
-      lookupComplete = true;
-      const exact = matches.filter(c => String(c.number) === number || parseInt(c.number, 10) === parseInt(number, 10));
-      const hit = exact.length === 1 ? exact[0] : (matches.length === 1 ? matches[0] : null);
-
-      if (!hit) {
-        if (matches.length === 0) {
-          showToast(t('search.errNoSuchNumber', { number, set: submitted.setCodeQuery.toUpperCase() }), 'error');
-        } else {
-          // Ambiguous: show them and let the user pick, keeping the number typed.
-          submittedSearch.current = submitted;
-          setHasMore(false);
-          setTotal(null);
-          setPage(1);
-          setCards(matches);
-          setSearching(true);
-          showToast(t('search.pickPrinting', { count: matches.length, number }), 'status');
+      const faces = [];
+      for (const faceNumber of numbers) {
+        const params = new URLSearchParams({
+          number: faceNumber, set: submitted.setCodeQuery, scope: 'internet', game: submitted.game, lang: submitted.searchLang, page: '1', limit: '10'
+        });
+        const res = await fetch(`/api/search?${params.toString()}`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          failLookup(res.status === 429 || err.error === 'Rate limit exceeded' ? 'rate-limit' : res.status === 503 ? 'upstream' : 'request', err.error);
+          showToast(err.error || t('search.errLookup'), 'error');
+          return;
         }
-        return;
-      }
+        const matches = await res.json();
+        const exact = matches.filter(c => paired
+          ? String(c.number).replace(/^0+(?=\d)/, '') === faceNumber.replace(/^0+(?=\d)/, '')
+          : String(c.number) === faceNumber || parseInt(c.number, 10) === parseInt(faceNumber, 10));
+        const hit = exact.length === 1 ? exact[0] : (!paired && matches.length === 1 ? matches[0] : null);
 
-      const result = await addCardNow(hit, copies, rapidPrinting);
+        if (paired && (!hit || !isMtgToken(hit) || faces.some(face => face.id === hit.id))) {
+          showToast(t('search.rapidPairError'), 'error');
+          return;
+        }
+        if (!hit) {
+          if (matches.length === 0) {
+            showToast(t('search.errNoSuchNumber', { number: faceNumber, set: submitted.setCodeQuery.toUpperCase() }), 'error');
+          } else {
+            // Ambiguous single numbers stay in the normal result grid.
+            submittedSearch.current = submitted;
+            setHasMore(false);
+            setTotal(null);
+            setPage(1);
+            setCards(matches);
+            setSearching(true);
+            showToast(t('search.pickPrinting', { count: matches.length, number: faceNumber }), 'status');
+          }
+          return;
+        }
+        faces.push(hit);
+      }
+      lookupComplete = true;
+      const [front, reverse] = faces;
+      const hit = reverse ? { ...front, reverse_card_id: reverse.id, reverse_name: reverse.name,
+        reverse_printed_name: reverse.printed_name, reverse_image_url: reverse.image_url,
+        reverse_set_name: reverse.set_name, reverse_number: reverse.number } : front;
+      const result = await addCardNow(hit, copies, rapidPrinting, reverse);
       if (!result) return;
       if (!addToArena && defaultAddLocation) {
         showToast(result.placement
@@ -587,7 +607,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
       setRapidNumber('');
       // Keep the owned badge honest if the card is also on screen.
       if (!addToArena) {
-        setCards(prev => prev.map(c => (c.id === hit.id
+        setCards(prev => prev.map(c => ([hit.id, reverse?.id].includes(c.id)
           ? { ...c, owned_qty: (c.owned_qty || 0) + copies }
           : c)));
       }
@@ -634,10 +654,10 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
       const res = await fetch(`/api/collection/${entry.entryId}`, { method: 'DELETE' });
       if (!res.ok) { showToast(t('search.errUndo'), 'error'); return; }
       setRapidLog(prev => prev.filter(e => e.entryId !== entry.entryId));
-      setCards(prev => prev.map(c => (c.id === entry.card.id
+      setCards(prev => prev.map(c => (c.id === entry.card.id || c.id === entry.card.reverse_card_id
         ? { ...c, owned_qty: Math.max(0, (c.owned_qty || 0) - entry.qty) }
         : c)));
-      showToast(t('search.removed', { name: displayName(entry.card) }), 'success');
+      showToast(t('search.removed', { name: pairedCardName(entry.card) }), 'success');
       onAddSuccess();
     } catch (err) {
       console.error(err);
@@ -1113,7 +1133,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
               ref={rapidInputRef}
               id="rapid-card-number"
               type="text"
-              inputMode="decimal"
+              inputMode="text"
               className="input-control"
               placeholder={t('search.rapidNumberPlaceholder')}
               value={rapidNumber}
@@ -1173,9 +1193,9 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                 const price = getPrintingPrice(entry.card, entry.printing);
                 return (
                 <div key={entry.entryId} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 0, background: 'var(--surface-2)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)' }}>
-                  <CardImage card={entry.card} alt={displayName(entry.card)} style={{ width: '100%', aspectRatio: '0.718', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
-                  <span title={`#${entry.card.number} ${displayName(entry.card)}`} style={{ fontSize: 'var(--text-sm)', color: 'var(--text-strong)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    #{entry.card.number} {displayName(entry.card)}{entry.qty > 1 ? ` ×${entry.qty}` : ''}
+                  <CardImage card={entry.card} alt={pairedCardName(entry.card)} style={{ width: '100%', aspectRatio: '0.718', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
+                  <span title={`#${entry.card.number} ${pairedCardName(entry.card)}`} style={{ fontSize: 'var(--text-sm)', color: 'var(--text-strong)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    #{entry.card.number}{entry.card.reverse_number ? `//${entry.card.reverse_number}` : ''} {pairedCardName(entry.card)}{entry.qty > 1 ? ` ×${entry.qty}` : ''}
                   </span>
                   <span style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)' }}>
                     {price === null ? t('priceCheck.unavailable') : `${priceText(price, entry.card.price_currency || 'USD')} ${t('dash.each')}`}

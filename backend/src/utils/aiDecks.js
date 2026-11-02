@@ -283,11 +283,13 @@ async function cardRules(cards) {
       oracle_text: raw.oracle_text || raw.card_faces?.map(part => part.oracle_text || '').join('\n') || '',
       mana_cost: raw.mana_cost || face?.mana_cost || '', legalities: raw.legalities || {},
       power: raw.power ?? face?.power ?? null, toughness: raw.toughness ?? face?.toughness ?? null,
+      loyalty: raw.loyalty ?? face?.loyalty ?? null, defense: raw.defense ?? face?.defense ?? null,
       colors: Array.isArray(raw.colors) ? raw.colors : null,
       color_indicator: Array.isArray(raw.color_indicator) ? raw.color_indicator : null,
       card_faces: raw.card_faces?.map(part => ({
         name: part.name, type_line: part.type_line || '', mana_cost: part.mana_cost || '',
         oracle_text: part.oracle_text || '', power: part.power ?? null, toughness: part.toughness ?? null,
+        loyalty: part.loyalty ?? null, defense: part.defense ?? null,
         colors: Array.isArray(part.colors) ? part.colors : null,
         color_indicator: Array.isArray(part.color_indicator) ? part.color_indicator : null,
       })) || [],

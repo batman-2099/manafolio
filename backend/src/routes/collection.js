@@ -380,6 +380,10 @@ router.post('/scan-match', searchLimiter, async (req, res) => {
 // 2. Get User's Collection
 router.get('/collection', async (req, res) => {
   if (req.query?.game !== undefined && req.query.game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
+  const includeTreatments = req.query.include_treatments;
+  if (includeTreatments !== undefined && !['true', 'false'].includes(includeTreatments)) {
+    return res.status(400).json({ error: 'Invalid include_treatments' });
+  }
   try {
     const listType = req.query.list_type || 'collection';
     if (!LIST_TYPES.includes(listType)) return res.status(400).json({ error: 'Invalid list_type' });
@@ -443,6 +447,7 @@ router.get('/collection', async (req, res) => {
         cc.cmc,
         cc.color_identity,
         cc.rarity,
+        cc.printing_treatments,
         cc.set_id,
         cc.set_name,
         cc.number,
@@ -474,6 +479,31 @@ router.get('/collection', async (req, res) => {
       ORDER BY c.added_at DESC
     `;
     const rows = await db.all(query, filterParams);
+    if (includeTreatments === 'true') {
+      const missingIds = [...new Set(rows
+        .filter(row => row.printing_treatments == null && scryfallApi.scryfallUuid(row.card_id))
+        .map(row => row.card_id))];
+      const resolved = new Map();
+      // Bound each lookup to one Scryfall collection batch; never guess legacy IDs by name.
+      for (let offset = 0; offset < missingIds.length; offset += 75) {
+        const batch = missingIds.slice(offset, offset + 75).map(id => ({ id }));
+        try {
+          const { pairs } = await scryfallApi.bulkFetchByIdentifier(batch, undefined, { localFirst: true });
+          for (const { row, card } of pairs) {
+            if (card.id !== row.id || card.printing_treatments == null) continue;
+            const treatments = JSON.stringify(card.printing_treatments);
+            await db.run('UPDATE card_cache SET printing_treatments = ? WHERE id = ? AND printing_treatments IS NULL',
+              [treatments, row.id]);
+            resolved.set(row.id, treatments);
+          }
+        } catch (error) {
+          console.warn('Collection printing treatment lookup failed:', error.message);
+        }
+      }
+      for (const row of rows) {
+        if (resolved.has(row.card_id)) row.printing_treatments = resolved.get(row.card_id);
+      }
+    }
 
     const alloc = new Map();
     const deckAllocations = new Map();

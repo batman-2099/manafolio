@@ -17,6 +17,7 @@ async function testFullBackup() {
   try {
     await db.initDb();
     await db.run(`INSERT INTO card_cache (id, name, game, tcgplayer_url, cardmarket_url) VALUES ('backup-card', 'Backup Card', 'mtg', 'https://www.tcgplayer.com/product/123', 'https://www.cardmarket.com/en/Magic/Products/Singles/Test/Card')`);
+    await db.run("UPDATE card_cache SET printing_treatments = ? WHERE id = 'backup-card'", [JSON.stringify(['borderless', 'fullart'])]);
     const location = await db.run(`INSERT INTO locations (name, type, user_id, sleeved) VALUES ('Backup Box', 'Box', 1, 3)`);
     const compartment = await db.run(`INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 100)`, [location.lastID]);
     await db.run(`INSERT INTO compartment_assignments (compartment_id, filter_value) VALUES (?, 'mtg')`, [compartment.lastID]);
@@ -51,7 +52,8 @@ async function testFullBackup() {
     assert.deepStrictEqual(res.body.decks.map(deck => deck.notes), ['Private plans\nKeep all whitespace  ', '']);
     assert.deepStrictEqual(res.body.deck_cards.map(card => [card.card_id, card.quantity, card.checked_out]), [['backup-card', 2, 1]]);
     assert.deepStrictEqual(res.body.card_cache.map(card => card.id), ['backup-card']);
-    // Restore without the source cache row so INSERT OR IGNORE cannot mask lost fields.
+    assert.strictEqual(res.body.card_cache[0].printing_treatments, '["borderless","fullart"]');
+    // Restore without the source cache row so an existing cache cannot mask lost fields.
     await db.run("DELETE FROM collection WHERE card_id = 'backup-card'");
     await db.run('DELETE FROM decks WHERE id = ?', [deck.lastID]);
     await db.run("DELETE FROM card_cache WHERE id = 'backup-card'");
@@ -78,6 +80,8 @@ async function testFullBackup() {
       tcgplayer_url: res.body.card_cache[0].tcgplayer_url,
       cardmarket_url: res.body.card_cache[0].cardmarket_url
     }, 'fresh-cache restore preserves marketplace links');
+    assert.strictEqual((await db.get("SELECT printing_treatments FROM card_cache WHERE id = 'backup-card'")).printing_treatments,
+      '["borderless","fullart"]', 'fresh-cache restore preserves printing treatments');
     assert.deepStrictEqual(await db.all(`SELECT card_id, position FROM collection WHERE user_id = 1 ORDER BY id`), [{ card_id: 'backup-card', position: 1000 }]);
     assert.strictEqual((await db.get(`SELECT COUNT(*) AS count FROM locations WHERE user_id = 1 AND name = 'Discard Box'`)).count, 0);
     assert.strictEqual((await db.get("SELECT sleeved FROM locations WHERE user_id = 1 AND name = 'Backup Box'")).sleeved, 3);
@@ -132,6 +136,15 @@ async function testFullBackup() {
     }
     const backupTables = ['card_cache', 'collection', 'locations', 'compartments', 'compartment_assignments', 'decks', 'deck_cards', 'deck_card_allocations'];
     const beforeInvalidSleeves = await Promise.all(backupTables.map(table => db.all(`SELECT * FROM ${table}`)));
+    for (const printing_treatments of ['not-json', '{}', '["foil"]', ['regular'], 1]) {
+      const invalid = structuredClone(res.body);
+      invalid.card_cache[0].printing_treatments = printing_treatments;
+      invalidRes.statusCode = 200;
+      await importBackup({ body: { format: 'backup', data: invalid }, user: { id: 1 } }, invalidRes);
+      assert.strictEqual(invalidRes.statusCode, 400);
+      assert.deepStrictEqual(await Promise.all(backupTables.map(table => db.all(`SELECT * FROM ${table}`))),
+        beforeInvalidSleeves, 'invalid treatments must not replace account data');
+    }
     for (const table of ['collection', 'deck_cards']) {
       for (const quantity of [-1, 0.5, '2', null, true, ...(table === 'collection' ? [0, Number.MAX_SAFE_INTEGER + 1] : [2147483648])]) {
         const invalid = structuredClone(res.body);
@@ -201,11 +214,14 @@ async function testFullBackup() {
 
     // Backups made before commander support remain valid.
     delete res.body.decks[0].commander_card_id;
+    delete res.body.card_cache[0].printing_treatments;
     for (const location of res.body.locations) {
       delete location.inventory_type;
       delete location.sleeved;
     }
     await importBackup({ body: { format: 'backup', data: res.body }, user: { id: 1 } }, restoreRes);
+    assert.strictEqual((await db.get("SELECT printing_treatments FROM card_cache WHERE id = 'backup-card'")).printing_treatments,
+      '["borderless","fullart"]', 'older backups do not erase known treatments');
     assert.strictEqual(restoreRes.statusCode, 200);
     assert.strictEqual((await db.get(`SELECT commander_card_id FROM decks WHERE user_id = 1`)).commander_card_id, null);
     assert.ok((await db.all('SELECT inventory_type FROM locations WHERE user_id = 1')).every(row => row.inventory_type === 'collection'));

@@ -190,7 +190,7 @@ File names in this table are under `backend/src/routes/`. The table groups actua
 | `/api` | `notes.js` | `/notes` CRUD |
 | `/api/sets` | `sets.js` | Magic set catalog |
 | `/api/decks` | `decks.js` | CRUD, from-container, complete editor save, records, commander, duplicate, cards/Pulled, checkout/return, locations, per-deck share-link management |
-| `/api/ai-decks` | `aiDecks.js` | AI connection/preferences/models, eligible inventory, streamed suggestions, validated create/replace |
+| `/api/ai-decks` | `aiDecks.js` | AI connection/preferences/models, eligible inventory, streamed suggestions, read-only card explanations, validated create/replace |
 | `/api/settings` | `settings.js` | Effective settings/version, administrator changes and Scryfall bulk download |
 | `/api/trades` | `trades.js` | Eligible exact Physical entries, read-only review, atomic confirmation with account-scoped completed-ID retry receipts |
 
@@ -406,6 +406,8 @@ Ollama uses the selected HTTP(S) address or `OLLAMA_BASE_URL`, defaults to serve
 Gemini and OpenRouter use fixed official API endpoints and per-user/provider keys stored in the users table. Browser-session-only credential endpoints never return keys; account JSON exports omit them, while SQLite/volume backups include them. Users explicitly select a model; hosted requests do not fall back to a different model/provider. Structured responses still pass the shared inventory and draft validation before review or saving.
 
 Requests contain eligible card metadata/counts, conversation, and the current draft, including editable descriptions and strategies. Keep storage identities, saved private notes, other users' records, and saved source-deck descriptions out of provider context. Model drafts require a nonempty `strategy` of at most 8,000 characters. Saving a new draft writes strategy to `decks.notes`; replacement appends it transactionally without overwriting existing notes or repeating an identical suffix. Suggestions are limited by cached rule data and provider output quality; invalid/incomplete or oversized requests are rejected, not silently trimmed into a different deck. See [the AI workflow and security instructions](docs/USER_GUIDE.md#optional-ai-deck-help).
+
+`POST /api/ai-decks/explain` is browser-session-only and accepts `{card_id, locale}`. The server resolves public card metadata and artwork; the caller cannot supply image URLs or collection context. The selected per-user AI client receives actual image bytes and a bounded explanation schema through the existing generation transport. Custom/bundled artwork precedes trusted provider artwork. Explanations are read-only and ephemeral; provider/model/image failures are explicit, not text-only fallbacks. The shared card inspector shows **AI Explain** beside **Replace art** only after the saved provider reports a connected account.
 
 ## Frontend and Arcane Blue
 

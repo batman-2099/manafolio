@@ -178,6 +178,8 @@ Rapid add is useful when you have a pile from one known set and do not want to r
 7. Review **Added this session** as you work. Each receipt has a **Foil** toggle before **Undo**. Toggle it to change that addition between foil and nonfoil; it affects all copies in that receipt, not the finish for future additions. Both controls are disabled while a change saves. A failed change keeps the previous finish and can be retried. **Undo** removes that addition; check Collection after correcting an addition, especially when you entered multiple copies.
 8. Each receipt shows the per-card market estimate for its finish. **Session total (market estimate)** includes quantities from every successful rapid addition, including receipts older than the latest 25 shown. Successful foil changes and undo update the total; failed changes do not. Missing prices are flagged and excluded, and different currencies are totaled separately without conversion. This is an estimate, not your purchase cost. The session resets when you leave Search & Add or reload the page.
 
+For a double-sided physical token, enter `123//456`: the first number is the front, the second is the back, both from the pinned set. Use `123//456.` for foil. Both numbers must uniquely identify distinct tokens; otherwise nothing is added and the input stays available to correct. A successful pair skips the reverse picker and creates one physical stack with the selected quantity, finish, and container. Its receipt names both faces; **Undo** removes the whole addition. Arena does not accept paired tokens. To choose a reverse from another set, enter just the front number and use the reverse-token picker.
+
 **Warning:** Enter is a save action, not just a search. Verify the set and copy count before the first number, and update the set before starting a different pile.
 
 **If it refuses to add:** **Enter a set code first** means the pinned set is missing. **No card #… in …** means the number was not found in that set; check suffixes, alternate treatments, and whether the card belongs to a supplemental set.
@@ -399,6 +401,21 @@ The server loads every provider page before showing progress and caches normaliz
 
 **If a card appears to be missing:** check the inventory, search term, and filters first. **Clear filters** also clears the search. A card may be unassigned, archived, on the Wishlist, or recorded in Arena rather than physical Collection. If a display stack hides the individual copy you need, turn off **Stack Duplicates**.
 
+The **Printing** filter includes **Nonfoil / Foil** and these artwork/frame treatments:
+
+| Treatment | Meaning |
+| --- | --- |
+| Regular frame | Standard modern frame, without the special treatments below. |
+| Borderless | Artwork extends to the card edges. |
+| Extended art | Main artwork extends into the side borders. |
+| Showcase | A special frame or art style associated with a set. |
+| Retro frame | The original or updated classic Magic frame, including older originals and retro reprints. |
+| Full-art | Artwork covers more of the card, especially common on basic lands. |
+
+Choose several treatments to match **any** of them. Finish and treatment combine: **Foil + Borderless** shows only foil borderless cards. Treatments can overlap, such as Borderless and Full-art. These choices filter the printing's [Scryfall metadata](https://scryfall.com/docs/api/frames); they do not change an owned card's finish or identity.
+
+Selecting a treatment fills missing metadata from the local Scryfall catalog first, then requests unresolved printing IDs from Scryfall if needed. Unknown treatments are excluded rather than assumed to be Regular frame. An incomplete-metadata notice offers **Retry**; already identified matches remain visible. Ordinary browsing and finish-only filtering use the cached collection without this lookup.
+
 ### Display stacks are not physical pockets
 
 **Filters → Stack Duplicates** combines duplicate printings into a display card with a summed quantity. **Split by Condition** and **Split by Holo/Printing** determine whether those differences remain separate in the display.
@@ -429,6 +446,7 @@ Useful inspector actions include:
 - **Archive to Graveyard**, or the explicit physical/Arena restore actions on an archived entry.
 - **Duplicate card**, when available for an eligible raw card, to record one additional copy. It is not a “copy to clipboard” action.
 - **Delete Card** to remove the record; use archival instead when you want to retain its history and metadata.
+- **AI Explain**, immediately to the right of **Replace art**, appears when your selected AI provider is connected. It sends the card image (including replacement artwork, if present) and public printing/rules metadata to that provider and explains costs, abilities, timing, and an example in your interface language. Collection notes, quantities, and storage details are not sent. Configure the provider and an image-capable model in **Settings → AI connection & preferences** first. Missing artwork, unsupported models, or provider failures show an error with **Retry** rather than silently omitting the image. Closing the explanation cancels the request; explanations are not saved to the card. AI can be wrong—check official card text and rulings.
 
 **Prices are estimates.** Purchase price is your acquisition record, not the live market estimate. **Value for this copy** lets you supply a positive per-copy valuation instead of the provider's raw market price; leave it empty to use the card's price. Raw Near Mint prices should not be mistaken for a condition-adjusted or graded-slab appraisal. Switching a graded entry back to raw clears its grade and certification number.
 

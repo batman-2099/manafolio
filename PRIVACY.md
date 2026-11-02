@@ -81,6 +81,8 @@ External services receive the network information needed to serve a request, suc
 
 Manafolio's provider integrations support Magic only. Previously stored records can still contain external artwork URLs, which a browser may request when those records are displayed. Customized deployments may use additional services and need corresponding disclosures. The table above is not a promise that every deployment contacts only a fixed list of hosts.
 
+Collection's artwork/frame treatment filters may resolve missing metadata by sending the relevant printing IDs to Scryfall when they are absent from the local catalog. Quantities, notes, and storage locations are not sent. The metadata is cached; ordinary browsing and finish-only filters do not trigger this lookup.
+
 The application does not include an advertising or third-party tracking analytics integration. Its collection dashboard analytics are calculations about your saved cards and decks, not a telemetry service. This does not prevent external resource providers, your hosting provider, or your administrator from logging the requests they receive.
 
 ## Optional AI
@@ -93,6 +95,8 @@ Collection, storage, and deck management do not require AI. If you use the AI bu
 - When improving a saved deck, its inventory/format/size, commander, and card list. The source deck's saved description and private notes are not included automatically.
 
 Container filtering is applied on the server. The generated payload excludes container names/IDs, storage locations, saved private notes, and other users' collections. Anything you type or paste into a prompt or draft is still sent: do not enter secrets or personal information you do not want the provider to process.
+
+**AI Explain** in card details is a separate, explicit request. It sends the selected printing's image and public card metadata to your configured provider, with your interface language for the response. Server-stored replacement artwork takes precedence over provider artwork; this means custom images are sent too. Collection notes, owned quantities, storage locations, prices paid, and other account records are not included. Opening card details only checks connection status; it does not request an explanation. Explanations are displayed temporarily and are not saved as card notes or a Manafolio chat history. Closing cancels the pending request but cannot retract information already received by the provider; provider retention and operator logging policies still apply.
 
 **ChatGPT/Codex:** Connecting uses your OpenAI account's device-verification flow. AI requests go to OpenAI and use that account's Codex access and limits. The integration disables model access to host files, commands, and external tools, but this does not make the submitted prompt private from OpenAI. Provider retention and account policies remain applicable.
 

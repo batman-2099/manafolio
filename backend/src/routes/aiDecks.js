@@ -4,6 +4,7 @@ const db = require('../db');
 const codex = require('../codexDeckClient');
 const ollama = require('../ollamaDeckClient');
 const hosted = require('../hostedDeckClient');
+const cardExplanation = require('../utils/cardExplanation');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { validateDeckSource } = require('../utils/collectionHelpers');
 const {
@@ -117,6 +118,32 @@ router.get('/inventory', endpoint(async (req, res) => {
   const include_checked_out = req.query.include_checked_out === 'true';
   res.json({ inventory_type: type, cards: await cardRules(await inventory(req.user.id, type, { container_ids, include_checked_out, sourceDeck: source })) });
 }));
+router.post('/explain', sessionOnly, suggestionLimit, endpoint(async (req, res) => {
+  const request = cardExplanation.validate(req.body);
+  if (suggesting.has(req.user.id)) fail('An AI request is already running for your account.', 429);
+  suggesting.add(req.user.id);
+  const controller = new AbortController();
+  const disconnect = () => controller.abort();
+  res.once('close', disconnect);
+  try {
+    const preferences = await db.get('SELECT ai_provider, ai_model, ai_reasoning_effort, ai_ollama_url FROM users WHERE id = ?', [req.user.id]);
+    const provider = client(preferences.ai_provider);
+    const options = { model: preferences.ai_model ?? undefined, reasoning_effort: preferences.ai_reasoning_effort ?? undefined,
+      baseUrl: preferences.ai_ollama_url, signal: controller.signal };
+    if (!(await provider.account(req.user.id, options)).connected) fail('Connect your AI account in Settings first.', 409);
+    const { prompt, schema, images } = await cardExplanation.request(request, controller.signal);
+    const output = await provider.suggest(req.user.id, prompt, schema, { ...options, images });
+    if (!controller.signal.aborted) res.json(cardExplanation.response(output));
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    if (error.status === 502) fail('Unable to explain this card. The selected AI model must support image input and structured output. Please try again or check your AI settings.', 502);
+    throw error;
+  } finally {
+    res.removeListener('close', disconnect);
+    suggesting.delete(req.user.id);
+  }
+}));
+
 router.post('/suggest', sessionOnly, suggestionLimit, endpoint(async (req, res) => {
   const { source_deck_id, ...request } = suggestionRequest(req.body);
   const source = await sourceDeck(req.user.id, source_deck_id, request);

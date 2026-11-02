@@ -35,6 +35,7 @@ function fakeServer() {
         const entry = (model, isDefault, efforts, hidden = false) => ({
           id: `picker-${model}`, model, displayName: model, isDefault, hidden,
           defaultReasoningEffort: efforts[0],
+          inputModalities: model === 'precise-2' ? ['text'] : ['text', 'image'],
           supportedReasoningEfforts: efforts.map(reasoningEffort => ({ reasoningEffort, description: reasoningEffort })),
         });
         if (params.cursor === null) {
@@ -66,6 +67,9 @@ function fakeServer() {
         if (text === 'selected' && (threadModel !== `precise-${user}` || params.effort !== 'xhigh')) return process.exit(9);
         if (text === 'effort-only' && (threadModel !== `default-${user}` || params.effort !== 'low')) return process.exit(9);
         if (text === 'model-only' && (threadModel !== `precise-${user}` || Object.hasOwn(params, 'effort'))) return process.exit(9);
+        if (text === 'explain' && (params.input.length !== 2 || params.input[1].type !== 'image'
+          || params.input[1].url !== 'data:image/jpeg;base64,Y2FyZC1pbWFnZQ=='
+          || params.outputSchema.required[0] !== 'explanation')) return process.exit(9);
         if (['first', 'second'].includes(text) && (threadModel !== undefined || Object.hasOwn(params, 'effort'))) return process.exit(9);
         reply({ turn: { id: `turn-${user}`, status: 'inProgress' } });
         if (text === 'timeout') return;
@@ -77,7 +81,7 @@ function fakeServer() {
           notify('item/completed', { threadId: `thread-${user}`, item: { type: 'agentMessage', phase: 'commentary', text: 'fixture-private-commentary' } });
           // Unrelated thread events must not become the returned deck draft.
           notify('item/completed', { threadId: 'unrelated', turnId: `turn-${user}`, item: { type: 'agentMessage', text: '{"owner":"other"}' } });
-          notify('item/completed', { threadId: `thread-${user}`, turnId: `turn-${user}`, item: { type: 'agentMessage', phase: 'final_answer', text: text === 'invalid-json' ? '```json\n{}\n```' : JSON.stringify({ message: 'Response', draft: text === 'discussion' ? null : { owner: user } }) } });
+          notify('item/completed', { threadId: `thread-${user}`, turnId: `turn-${user}`, item: { type: 'agentMessage', phase: 'final_answer', text: text === 'invalid-json' ? '```json\n{}\n```' : JSON.stringify(text === 'explain' ? { explanation: 'Card explanation' } : { message: 'Response', draft: text === 'discussion' ? null : { owner: user } }) } });
           notify('turn/completed', { threadId: `thread-${user}`, turn: { id: `turn-${user}`, status: 'completed' } });
         }, user === '1' ? 20 : 1);
       }
@@ -187,6 +191,13 @@ async function main() {
     const drafts = await Promise.all([client.suggest(1, 'first', schema), client.suggest(2, 'second', schema)]);
     assert.deepStrictEqual(drafts, [{ message: 'Response', draft: { owner: '1' } }, { message: 'Response', draft: { owner: '2' } }]);
     assert.deepStrictEqual(await client.suggest(1, 'discussion', schema), { message: 'Response', draft: null });
+    assert.deepStrictEqual(await client.suggest(1, 'explain', {
+      type: 'object', additionalProperties: false, required: ['explanation'], properties: { explanation: { type: 'string' } },
+    }, { model: 'precise-1', images: [{ mimeType: 'image/jpeg', data: Buffer.from('card-image').toString('base64') }] }),
+    { explanation: 'Card explanation' }, 'Codex receives native image input with the explanation schema');
+    await assert.rejects(client.suggest(2, 'explain', schema, {
+      model: 'precise-2', images: [{ mimeType: 'image/jpeg', data: Buffer.from('card-image').toString('base64') }],
+    }), error => error.status === 400 && /image input/.test(error.message));
     assert.deepStrictEqual(await client.account(1), { connected: true, email: '1@example.test' }, 'credentials persist across process restarts');
     await client.logout(1);
     assert.deepStrictEqual(await client.account(1), { connected: false });

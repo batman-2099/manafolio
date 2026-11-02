@@ -9,6 +9,7 @@ const COLUMNS = [
   'color_identity', 'game', 'language', 'printed_name',
   'tcgplayer_url', 'cardmarket_url', 'tcgplayer_product_id',
   'price_currency', 'price_source',
+  'printing_treatments',
 ];
 
 // A page of results can be 250 cards and one round trip per card cost more than
@@ -21,7 +22,9 @@ const num = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : Nu
 // Upsert without deleting referenced card rows or resetting unrelated columns.
 const SET_CLAUSE = COLUMNS
   .filter(c => c !== 'id')
-  .map(c => `${c} = excluded.${c}`)
+  .map(c => c === 'printing_treatments'
+    ? `${c} = COALESCE(excluded.${c}, card_cache.${c})`
+    : `${c} = excluded.${c}`)
   .join(', ');
 
 
@@ -54,6 +57,7 @@ async function cacheNormalizedCards(cards, game) {
         c.tcgplayer_url || null, c.cardmarket_url || null,
         num(c.tcgplayer_product_id),
         c.price_currency || 'USD', c.price_source || null,
+        c.printing_treatments == null ? null : JSON.stringify(c.printing_treatments),
       );
     }
     await db.run(

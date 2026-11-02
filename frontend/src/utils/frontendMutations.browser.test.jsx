@@ -29,6 +29,7 @@ export async function runFrontendMutationRegressions() {
   // leaving a select without its fetched options when the test changes it.
   const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
   window.fetch = async (url, options = {}) => {
+    if (url === '/api/ai-decks/account') return response({ connected: false });
     if (url === '/api/collection/bulk') {
       requests.push(JSON.parse(options.body));
       return new Promise(resolve => { settleBulk = (status = 200) => resolve(response({ message: 'Saved', error: 'Rejected' }, status)); });

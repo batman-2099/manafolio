@@ -24,6 +24,7 @@ import SetCompletion from './SetCompletion';
 const labelStyle = { fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text-secondary)' };
 const PAGE_SIZE = 60;
 const EMPTY_COLLECTION = [];
+const PRINTING_TREATMENTS = ['regular', 'borderless', 'extendedart', 'showcase', 'retro', 'fullart'];
 
 const SORT_CRITERIA = {
   ...COLLECTION_SORT_CRITERIA,
@@ -88,11 +89,13 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [notCheckedOutOnly, setNotCheckedOutOnly] = useState(false);
 
-  const collectionScope = `${subTab}:${tradeOnly}`;
+  const includeTreatments = printingFilter.some(value => value.startsWith('treatment:'));
+  const collectionScope = `${subTab}:${tradeOnly}:${includeTreatments}`;
   const hasCollection = collectionState?.scope === collectionScope && collectionState.data !== null;
   const collection = hasCollection ? collectionState.data : EMPTY_COLLECTION;
   const loading = collectionState?.scope !== collectionScope || collectionState.loading;
   const error = collectionState?.scope === collectionScope && collectionState.error;
+  const incompleteTreatments = includeTreatments && collection.some(item => !Array.isArray(item.printing_treatments));
 
   // Stacking state (default to stacked)
   const [stackCards, setStackCards] = useState(true);
@@ -120,6 +123,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
         const listType = subTab === 'unsorted' ? 'collection' : subTab;
         const params = new URLSearchParams({ list_type: listType });
         if (tradeOnly) params.set('is_trade', '1');
+        if (includeTreatments) params.set('include_treatments', 'true');
         const response = await fetch(`/api/collection?${params}`, { signal: controller.signal });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
@@ -130,7 +134,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
     };
     load();
     return () => controller.abort();
-  }, [statsTrigger, collectionRefresh, subTab, tradeOnly, collectionScope]);
+  }, [statsTrigger, collectionRefresh, subTab, tradeOnly, includeTreatments, collectionScope]);
 
   useEffect(() => {
     fetchSets();
@@ -262,6 +266,8 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   const filteredCollection = useMemo(() => {
     // Search both the English name and the localized printed name.
     const rawSearch = searchFilter.toLowerCase();
+    const finishes = printingFilter.filter(value => !value.startsWith('treatment:'));
+    const treatments = printingFilter.filter(value => value.startsWith('treatment:')).map(value => value.slice('treatment:'.length));
     const result = collection.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(rawSearch) ||
                             (item.printed_name || '').toLowerCase().includes(rawSearch) ||
@@ -276,7 +282,8 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       const matchesGame = gameFilter === '' ? isGameEnabled(itemGame) : itemGame === gameFilter;
       const matchesRarity = rarityFilter.length === 0 ? true : rarityFilter.includes(item.rarity);
       const matchesCondition = conditionFilter.length === 0 ? true : conditionFilter.includes(item.condition);
-      const matchesPrinting = printingFilter.length === 0 ? true : printingFilter.includes(item.printing);
+      const matchesPrinting = (finishes.length === 0 || finishes.includes(item.printing)) &&
+        (treatments.length === 0 || (Array.isArray(item.printing_treatments) && treatments.some(value => item.printing_treatments.includes(value))));
       const matchesSet = setFilter.length === 0 ? true : setFilter.includes(item.set_name);
       const matchesType = typeFilter.length === 0 ? true : typeFilter.some(t => (item.subtypes || []).includes(t));
       const matchesColor = colorFilter.length === 0 ? true : colorFilter.some(c => (item.color_identity || []).includes(c));
@@ -524,8 +531,18 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                   allLabel={t('collection.allPrintings')}
                   value={printingFilter}
                   onChange={setPrintingFilter}
-                  options={getPrintings()}
+                  options={[...getPrintings(), ...PRINTING_TREATMENTS.map(value => ({ value: `treatment:${value}`, label: t(`collection.treatment.${value}`) }))]}
                 />
+                <details style={{ marginTop: '0.35rem', fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
+                  <summary style={{ cursor: 'pointer' }}>{t('collection.treatmentHelp')}</summary>
+                  <p>{t('collection.treatmentMatching')}</p>
+                  <dl>
+                    {PRINTING_TREATMENTS.map(value => <div key={value}>
+                      <dt style={{ fontWeight: 600 }}>{t(`collection.treatment.${value}`)}</dt>
+                      <dd style={{ marginInlineStart: 0, marginBottom: '0.5rem' }}>{t(`collection.treatmentDescription.${value}`)}</dd>
+                    </div>)}
+                  </dl>
+                </details>
               </Field>
 
               {/* 'Any graded' earns its own entry above the per-company options:
@@ -731,6 +748,12 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
           <p>{t(hasCollection ? 'common.refreshing' : 'common.loading')}</p>
         </div>
       )}
+      {incompleteTreatments && !loading && !error && (
+        <div className="read-state">
+          <p role="status">{t('collection.treatmentsIncomplete')}</p>
+          <button type="button" className="btn btn-secondary" onClick={() => setCollectionRefresh(value => value + 1)}>{t('dash.retry')}</button>
+        </div>
+      )}
 
       {/* Bulk action bar */}
       {selectMode && (
@@ -799,7 +822,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       )}
 
 
-      {!hasCollection ? null : displayCards.length === 0 ? (
+      {!hasCollection || (includeTreatments && displayCards.length === 0 && (loading || error || incompleteTreatments)) ? null : displayCards.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem 0' }}>
           <p>{t(hasUserFilters ? 'collection.noMatches' : 'collection.emptyInventory')}</p>
           {hasUserFilters ? (

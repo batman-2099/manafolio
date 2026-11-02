@@ -37,7 +37,7 @@ async function request(provider, apiKey, path, data, signal) {
     response = await axios({
       url: `${base}${path}`, method: data ? 'POST' : 'GET', data, signal: controller.signal,
       headers: provider === 'gemini' ? { 'x-goog-api-key': apiKey } : { Authorization: `Bearer ${apiKey}` },
-      maxRedirects: 0, proxy: false, maxContentLength: MAX_RESPONSE_BYTES, maxBodyLength: MAX_PROMPT_BYTES + 65536,
+      maxRedirects: 0, proxy: false, maxContentLength: MAX_RESPONSE_BYTES, maxBodyLength: MAX_PROMPT_BYTES + 3 * 1024 * 1024,
       responseType: 'text', transformResponse: [],
     });
   } catch (error) {
@@ -66,7 +66,7 @@ async function request(provider, apiKey, path, data, signal) {
   return result;
 }
 
-async function listModels(provider, apiKey, signal) {
+async function listModels(provider, apiKey, signal, requireImages = false) {
   let rows;
   if (provider === 'gemini') {
     rows = [];
@@ -92,7 +92,8 @@ async function listModels(provider, apiKey, signal) {
     const result = await request(provider, apiKey, 'models?supported_parameters=structured_outputs&output_modalities=text', undefined, signal);
     if (!Array.isArray(result.data)) throw failure(502, 'OpenRouter returned an invalid model list.');
     rows = result.data.filter(model => Array.isArray(model?.supported_parameters) && model.supported_parameters.includes('structured_outputs')
-      && model.architecture?.input_modalities?.includes('text') && model.architecture?.output_modalities?.includes('text'));
+      && model.architecture?.input_modalities?.includes('text') && model.architecture?.output_modalities?.includes('text')
+      && (!requireImages || model.architecture.input_modalities.includes('image')));
   }
   if (rows.some(model => typeof model.id !== 'string' || !model.id.trim() || model.id.length > 200
     || typeof model.name !== 'string' || !model.name.trim())) {
@@ -162,7 +163,7 @@ function client(provider) {
     await validateKey(provider, apiKey, signal);
     return { connected: true };
   }
-  async function suggest(userId, prompt, outputSchema, { model, reasoning_effort, signal } = {}, onProgress) {
+  async function suggest(userId, prompt, outputSchema, { model, reasoning_effort, signal, images = [] } = {}, onProgress) {
     if (typeof prompt !== 'string' || !prompt.trim()) throw failure(400, 'A recommendation request is required.');
     if (Buffer.byteLength(prompt) > MAX_PROMPT_BYTES) throw failure(413, 'The owned inventory is too large for one AI request. No cards were sent.');
     if (!outputSchema || outputSchema.type !== 'object' || outputSchema.additionalProperties !== false) {
@@ -178,9 +179,9 @@ function client(provider) {
     progress({ stage: 'connecting' });
     const apiKey = await savedKey(userId, provider);
     if (!apiKey) throw failure(409, `Connect ${name} with your API key in Settings first.`);
-    const available = await listModels(provider, apiKey, signal);
+    const available = await listModels(provider, apiKey, signal, images.length > 0);
     if (!available.models.some(item => item.id === model)) {
-      throw failure(400, `The selected ${name} model is unavailable or does not support structured output. Refresh the model list in Settings.`);
+      throw failure(400, `The selected ${name} model is unavailable or does not support ${images.length ? 'image input and ' : ''}structured output. Refresh the model list in Settings.`);
     }
     progress({ stage: 'model_ready', model });
     const startedAt = Date.now();
@@ -193,8 +194,9 @@ function client(provider) {
       let content;
       if (provider === 'gemini') {
         const result = await request(provider, apiKey, `models/${encodeURIComponent(model)}:generateContent`, {
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json', responseJsonSchema: geminiSchema(outputSchema) },
+          contents: [{ role: 'user', parts: [{ text: prompt }, ...images.map(image => ({ inlineData: image }))] }],
+          generationConfig: { responseMimeType: 'application/json', responseJsonSchema: geminiSchema(outputSchema),
+            ...(images.length ? { maxOutputTokens: 4096 } : {}) },
         }, signal);
         const candidate = result.candidates?.[0];
         const parts = candidate?.content?.parts;
@@ -207,8 +209,11 @@ function client(provider) {
         content = parts.filter(part => part.thought !== true).map(part => part.text).join('');
       } else {
         const result = await request(provider, apiKey, 'chat/completions', {
-          model, stream: false, messages: [{ role: 'user', content: prompt }],
-          response_format: { type: 'json_schema', json_schema: { name: 'deck_suggestion', strict: true, schema: outputSchema } },
+          model, stream: false, messages: [{ role: 'user', content: images.length
+            ? [{ type: 'text', text: prompt }, ...images.map(image => ({ type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.data}` } }))]
+            : prompt }],
+          ...(images.length ? { max_tokens: 4096 } : {}),
+          response_format: { type: 'json_schema', json_schema: { name: images.length ? 'card_explanation' : 'deck_suggestion', strict: true, schema: outputSchema } },
           provider: { require_parameters: true, allow_fallbacks: false },
         }, signal);
         const choice = result.choices?.[0];

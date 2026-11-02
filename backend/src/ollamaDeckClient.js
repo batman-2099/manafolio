@@ -80,7 +80,7 @@ async function account(userId, options) {
   return { connected: true };
 }
 
-async function suggest(userId, prompt, outputSchema, { model, reasoning_effort, signal, baseUrl } = {}, onProgress) {
+async function suggest(userId, prompt, outputSchema, { model, reasoning_effort, signal, baseUrl, images = [] } = {}, onProgress) {
   if (typeof prompt !== 'string' || !prompt.trim()) throw failure(400, 'A recommendation request is required.');
   if (Buffer.byteLength(prompt) > MAX_PROMPT_BYTES) throw failure(413, 'The owned inventory is too large for one AI request. No cards were sent.');
   if (!outputSchema || outputSchema.type !== 'object' || outputSchema.additionalProperties !== false) {
@@ -98,6 +98,12 @@ async function suggest(userId, prompt, outputSchema, { model, reasoning_effort, 
   if (!available.models.some(item => item.id === model)) {
     throw failure(400, 'The selected Ollama model is unavailable. Refresh the model list in Settings and try again.');
   }
+  if (images.length) {
+    const details = await request('show', { model }, signal, baseUrl);
+    if (!details?.capabilities?.includes('vision')) {
+      throw failure(400, 'The selected Ollama model does not support image input. Choose a vision model in Settings.');
+    }
+  }
   progress({ stage: 'model_ready', model });
   const startedAt = Date.now();
   const waiting = typeof onProgress === 'function' ? setInterval(() => {
@@ -108,9 +114,10 @@ async function suggest(userId, prompt, outputSchema, { model, reasoning_effort, 
     progress({ stage: 'generating' });
     const result = await request('chat', {
       model, format: outputSchema, stream: false,
+      ...(images.length ? { options: { num_predict: 4096 } } : {}),
       messages: [
         { role: 'system', content: `Return only JSON matching this schema, no markdown:\n${JSON.stringify(outputSchema)}` },
-        { role: 'user', content: prompt },
+        { role: 'user', content: prompt, ...(images.length ? { images: images.map(image => image.data) } : {}) },
       ],
     }, signal, baseUrl);
     if (result?.done_reason === 'length') {

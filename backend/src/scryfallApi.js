@@ -209,6 +209,22 @@ function normalizeCard(raw, lang) {
   const cmc = raw.cmc != null ? parseFloat(raw.cmc) : null;
   const colorIdentity = normalizeMtgColorIdentity(raw.color_identity || face.color_identity, typeLine, raw.name || face.name);
 
+  // Missing metadata stays unknown; ordinary legendary crowns are still regular.
+  let printingTreatments = null;
+  if (typeof raw.frame === 'string' && raw.frame
+      && ['black', 'white', 'borderless', 'silver', 'gold', 'yellow'].includes(raw.border_color)
+      && typeof raw.full_art === 'boolean') {
+    const effects = Array.isArray(raw.frame_effects) ? raw.frame_effects : [];
+    const treatments = [];
+    if (raw.border_color === 'borderless') treatments.push('borderless');
+    if (effects.includes('extendedart')) treatments.push('extendedart');
+    if (effects.includes('showcase')) treatments.push('showcase');
+    if (['1993', '1997'].includes(raw.frame)) treatments.push('retro');
+    if (raw.full_art) treatments.push('fullart');
+    printingTreatments = treatments.length ? treatments
+      : ['2003', '2015'].includes(raw.frame) ? ['regular'] : null;
+  }
+
   return {
     id: `mtg-${raw.id}`,
     name: face.name || raw.name || '',
@@ -232,6 +248,7 @@ function normalizeCard(raw, lang) {
     price_avg30: null,
     cmc: cmc,
     color_identity: colorIdentity,
+    printing_treatments: printingTreatments,
     game: 'mtg',
     // Which printing this row IS. The quick-add form defaults the copy's language
     // to it, so adding a Japanese card no longer files it as English.
@@ -904,4 +921,4 @@ async function getRelatedTokens(cardIds) {
 }
 
 // Export the client and fetchWindow for adapter-based tests.
-module.exports = { searchCards, normalizeCard, cacheCards, getCardsBySet, getSetChecklist, fetchAndCacheSets, updateCollectionPrices, getCardById, getRelatedTokens, getPrintingInLang, scryGetRetried, bulkFetchByIdentifier, client, fetchWindow };
+module.exports = { searchCards, normalizeCard, cacheCards, getCardsBySet, getSetChecklist, fetchAndCacheSets, updateCollectionPrices, getCardById, getRelatedTokens, getPrintingInLang, scryGetRetried, bulkFetchByIdentifier, scryfallUuid, client, fetchWindow };

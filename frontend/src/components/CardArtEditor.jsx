@@ -3,6 +3,7 @@ import { ImagePlus, Upload, Trash2, Share2 } from 'lucide-react';
 import { artUrl, noteArtChanged, useCardArtIndex } from '../utils/cardArt';
 import { getRepoUrl, issueUrl } from '../utils/repo';
 import { useT } from '../utils/i18n';
+import CardAiExplain from './CardAiExplain';
 
 // The controls under the inspector's card image for supplying art the upstream
 // APIs do not have, and for passing that art back so everyone else gets it too.
@@ -17,7 +18,7 @@ const MAX_BYTES = 8 * 1024 * 1024; // matches backend/src/cardArt.js
 const btn = { padding: '0.3rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' };
 
 export default function CardArtEditor({ card, hasProviderArt, showToast, onChanged, onBusyChange }) {
-  const { t } = useT();
+  const { locale, t } = useT();
   const index = useCardArtIndex();
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);
@@ -162,6 +163,7 @@ export default function CardArtEditor({ card, hasProviderArt, showToast, onChang
             differently to somebody staring at a blank back. */}
         {hasCustom || hasProviderArt ? t('art.replace') : t('art.add')}
       </button>
+      <CardAiExplain key={`${cardId}:${locale}`} cardId={cardId} disabled={busy} style={btn} />
 
       {hasCustom && (
         <>
