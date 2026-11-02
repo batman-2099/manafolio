@@ -78,6 +78,7 @@ See the [installation guide](docs/INSTALLATION.md) for updates, configuration, H
 - **Import, export, and recovery:** Review collection imports, export filtered views or decklists, and create complete account backups and server snapshots.
 - **Scanning and price checks:** Identify printing candidates with local models and OCR. Review scans before adding inventory, or check prices without adding cards. Requires [server scan setup](docs/INSTALLATION.md#card-scanning).
 - **Optional AI:** Use your own ChatGPT/Codex account, Gemini or OpenRouter key, or Ollama service; review and edit suggestions before saving.
+- **[AI Explain](docs/USER_GUIDE.md#use-the-card-inspector):** Open card details and choose **AI Explain** beside **Replace art** for an explanation of costs, abilities, timing, and a play example in your interface language. Requires a connected AI provider and an image-capable model configured in **Settings → AI connection & preferences**. Sends the card image—including replacement artwork—and public card metadata, not collection notes or inventory details. AI can be wrong; check official card text and rulings.
 - **Your own server:** Multi-user accounts, invite-only registration by default, read-only API keys, opt-in public shares, account themes, translated interfaces, and opt-in text-only offline collection lookup.
 
 <details>
