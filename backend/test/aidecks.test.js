@@ -883,6 +883,7 @@ async function main() {
       deck: await db.get('SELECT * FROM decks WHERE id = ?', [source.lastID]),
       cards: await db.all('SELECT * FROM deck_cards WHERE deck_id = ? ORDER BY card_id', [source.lastID]),
       allocations: await db.all('SELECT * FROM deck_card_allocations WHERE deck_id = ? ORDER BY card_id, entry_id', [source.lastID]),
+      revisions: (await request('GET', `/decks/${source.lastID}/revisions`, undefined, 5)).body.revisions,
     });
     const beforeReplacement = await replacementState();
     const countBeforeReplacement = await db.get('SELECT COUNT(*) AS count FROM decks');
@@ -917,6 +918,16 @@ async function main() {
     } finally {
       await db.run('DROP TRIGGER reject_ai_replacement');
     }
+    await db.run(`CREATE TRIGGER reject_ai_history BEFORE INSERT ON deck_revisions
+      WHEN NEW.deck_id = ${source.lastID} AND NEW.kind = 'save'
+      BEGIN SELECT RAISE(ABORT, 'deliberate history failure'); END`);
+    try {
+      assert.strictEqual((await request('PUT', `/ai/${source.lastID}`, replacement, 5)).status, 500);
+      assert.deepStrictEqual(await replacementState(), beforeReplacement,
+        'history failure rolls back the baseline, composition, checkout and reservations together');
+    } finally {
+      await db.run('DROP TRIGGER reject_ai_history');
+    }
     const replaced = await request('PUT', `/ai/${source.lastID}`, replacement, 5);
     assert.deepStrictEqual(replaced, { status: 200, body: { id: source.lastID } }, 'replacement retains its ID and releases the lock after rollback');
     assert.deepStrictEqual(await db.get('SELECT COUNT(*) AS count FROM decks'), countBeforeReplacement);
@@ -925,6 +936,16 @@ async function main() {
     assert.deepStrictEqual(await db.all('SELECT * FROM deck_card_allocations WHERE deck_id = ?', [source.lastID]), [],
       'checking in releases all original reservations without reserving additions');
     const afterReplacement = await replacementState();
+    assert.deepStrictEqual(afterReplacement.revisions.map(row => row.kind), ['save', 'baseline'],
+      'saving an AI improvement records the original and improved compositions');
+    for (const [revision, state] of [[afterReplacement.revisions[0], afterReplacement], [afterReplacement.revisions[1], beforeReplacement]]) {
+      assert.deepStrictEqual(revision.snapshot, {
+        format: state.deck.format, target_size: state.deck.target_size, inventory_type: state.deck.inventory_type,
+        commander_card_id: state.deck.commander_card_id,
+        cards: state.cards.filter(card => card.quantity > 0).map(({ card_id, quantity, source_entry_id }) => ({ card_id, quantity, source_entry_id }))
+          .sort((a, b) => a.card_id.localeCompare(b.card_id)),
+      });
+    }
     assert.deepStrictEqual(afterReplacement.deck, { ...beforeReplacement.deck, name: replacement.name, description: replacement.description,
       commander_card_id: replacement.commander_card_id, notes: `${beforeReplacement.deck.notes}\n\n${replacement.strategy}`,
       checked_out: 0, checked_out_at: null },

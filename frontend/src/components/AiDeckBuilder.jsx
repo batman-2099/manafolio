@@ -370,7 +370,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
                 step="1"
                 value={powerLevel}
                 aria-valuetext={`${powerLevel}: ${powerLevelName}`}
-                aria-describedby="ai-power-description ai-power-pace ai-power-hint"
+                aria-describedby="ai-power-description ai-power-pace"
                 onChange={event => { clearDraft(); setPowerLevel(Number(event.target.value)); }}
                 style={{ display: 'block', width: '100%', minHeight: 44, margin: 0, accentColor: 'var(--accent-green)' }}
               />
@@ -386,7 +386,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
             <div style={{ paddingBlock: '0.75rem' }}>
           {inventoryType === 'collection' && (
             <div className="form-group">
-              <fieldset disabled={locationsLoading || !!locationsError} style={fieldsetStyle} aria-describedby="ai-container-hint">
+              <fieldset disabled={locationsLoading || !!locationsError} style={fieldsetStyle}>
                 <label>{t('aiDeck.containers')}</label>
                 <MultiSelectDropdown
                   label={t('aiDeck.containers')}
@@ -437,7 +437,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
               </button>
             </div>
           </div>
-          <fieldset disabled={inventoryLoading || !!inventoryError} style={fieldsetStyle} aria-describedby="ai-filter-hint">
+          <fieldset disabled={inventoryLoading || !!inventoryError} style={fieldsetStyle}>
             <div style={{ ...rowStyle, alignItems: 'start' }}>
               <div className="form-group" style={{ flex: '1 1 180px', minWidth: 0 }}>
                 <label>{t('collection.fColor')}</label>
@@ -482,16 +482,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
             )}
             <p id="ai-all-lands-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.useAllAvailableLandsHint')}</p>
           </div>
-          <section className="ai-deck-guidance">
-            <h3>{t('aiDeck.eligibilityDetails')}</h3>
-            <div className="deck-details-content">
-            <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.inventoryHint')}</p>
-              <p id="ai-container-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.containerHint')}</p>
-              {sourceDeck && <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.improveContainerHint')}</p>}
-          <p id="ai-filter-hint" style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.filterHint')}</p>
-              <p id="ai-power-hint" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{t('aiDeck.powerLevelHint')}</p>
-            </div>
-          </section>
+          {sourceDeck && <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.improveContainerHint')}</p>}
         </fieldset>
       </div>
       <div className="ai-deck-results">

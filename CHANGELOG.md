@@ -2,6 +2,11 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Record saved AI improvements in Deck history, preserving the previous composition and saving revisions atomically with the deck. Unchanged saves do not add duplicate revisions.
+- Remove the general card eligibility and filter explanation block from the AI deck window without changing filtering or generation rules.
+
 ## 2.6.0 — 2026-11-02
 
 - Display available, searched, selected, and reviewed Trade workbench cards in responsive artwork grids instead of horizontal lists.

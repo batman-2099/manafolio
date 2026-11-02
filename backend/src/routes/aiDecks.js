@@ -7,6 +7,7 @@ const hosted = require('../hostedDeckClient');
 const cardExplanation = require('../utils/cardExplanation');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { validateDeckSource } = require('../utils/collectionHelpers');
+const { composition, recordRevision } = require('../utils/deckRevisions');
 const {
   FORMATS, REVIEW_WARNING, fail, inventoryType, containerIds, sourceDeckId, sourceDeck, preferencesRequest, suggestionRequest, suggestionResponse, draftRequest,
   inventory, cardRules, filterInventory, validateDraft, modelRequest,
@@ -279,6 +280,10 @@ const saveDeck = endpoint(async (req, res) => {
         const pulled = previous && (wasCheckedOut || (card.quantity <= previous.quantity && previous.checked_out));
         await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out, source_entry_id) VALUES (?, ?, ?, ?, ?)',
           [deckId, card.card_id, card.quantity, pulled ? 1 : 0, sourceEntryId]);
+      }
+      if (replacementId !== undefined) {
+        const updatedCards = await db.all('SELECT card_id, quantity, source_entry_id FROM deck_cards WHERE deck_id = ? AND quantity > 0', [deckId]);
+        await recordRevision(deckId, composition(source, [...saved.values()].filter(card => card.quantity > 0)), composition(draft, updatedCards));
       }
       return deckId;
     });
