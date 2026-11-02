@@ -9,6 +9,8 @@ Release history starts with Manafolio 2.0.
 - Add `front//back` Rapid Add entry for physical tokens from the pinned set, including the trailing-dot foil shortcut; resolve both faces before saving one paired stack and retain failed entries for correction or retry.
 - Add **AI Explain** beside **Replace art** in card details when the selected AI provider is connected. Send the card image and public metadata on demand, with cancel/retry support and no collection notes or inventory changes.
 - Add Regular frame, Borderless, Extended art, Showcase, Retro frame, and Full-art to Collection's Printing filter. Combine treatments with Foil/Nonfoil and resolve missing printing metadata on demand without changing owned copies.
+- Remove the expandable “About printing filters” help section; printing filter options and matching remain unchanged.
+- Show an animated loading icon while AI Explain is working; respect reduced-motion preferences.
 
 ## 2.5.0 — 2026-10-31
 

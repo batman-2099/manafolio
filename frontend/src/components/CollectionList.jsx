@@ -533,16 +533,6 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                   onChange={setPrintingFilter}
                   options={[...getPrintings(), ...PRINTING_TREATMENTS.map(value => ({ value: `treatment:${value}`, label: t(`collection.treatment.${value}`) }))]}
                 />
-                <details style={{ marginTop: '0.35rem', fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
-                  <summary style={{ cursor: 'pointer' }}>{t('collection.treatmentHelp')}</summary>
-                  <p>{t('collection.treatmentMatching')}</p>
-                  <dl>
-                    {PRINTING_TREATMENTS.map(value => <div key={value}>
-                      <dt style={{ fontWeight: 600 }}>{t(`collection.treatment.${value}`)}</dt>
-                      <dd style={{ marginInlineStart: 0, marginBottom: '0.5rem' }}>{t(`collection.treatmentDescription.${value}`)}</dd>
-                    </div>)}
-                  </dl>
-                </details>
               </Field>
 
               {/* 'Any graded' earns its own entry above the per-company options:

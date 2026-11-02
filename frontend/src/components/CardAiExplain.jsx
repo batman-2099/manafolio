@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { LoaderCircle } from 'lucide-react';
 import Modal from './Modal';
 import { useBackGuard } from '../utils/useBackGuard';
 import { useT } from '../utils/i18n';
@@ -73,7 +74,10 @@ export default function CardAiExplain({ cardId, disabled, style }) {
           <button type="button" className="btn btn-secondary" onClick={close}>{t('common.close')}</button>
         </div>
         <p style={{ margin: 0, color: 'var(--text-secondary)' }}>{t('aiExplain.notice')}</p>
-        {loading && <p role="status" style={{ margin: 0 }}>{t('aiExplain.loading')}</p>}
+        {loading && <p role="status" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <LoaderCircle size={24} className="spin-animation ai-waiting-icon" aria-hidden="true" />
+          {t('aiExplain.loading')}
+        </p>}
         {error && <div>
           <p role="alert" style={{ color: 'var(--accent-red)' }}>{error}</p>
           <button type="button" className="btn btn-secondary" onClick={explain} disabled={disabled}>{t('common.retry')}</button>
