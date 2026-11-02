@@ -8,6 +8,7 @@ Release history starts with Manafolio 2.0.
 - Remove general eligibility/filter explanations and the checked-out-copy and land-filter helper text from the AI deck window without changing filtering or generation rules.
 - Order AI card pool controls as Color and Set, Containers, then the two toggles, with matching-inventory counts in a bordered summary at the bottom.
 - Allow Unassigned Pile in the AI container selector, alone or combined with named containers, while preserving inventory and reservation rules.
+- Widen the container Take Stock verification dialog on desktop while keeping it within the viewport on smaller screens.
 
 ## 2.6.0 — 2026-11-02
 
