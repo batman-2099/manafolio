@@ -5,6 +5,7 @@ import CardImage from './CardImage';
 import CardImageZoom from './CardImageZoom';
 import { useT } from '../utils/i18n';
 import { displayName } from '../utils/languages';
+import { getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
 import { useBackGuard } from '../utils/useBackGuard';
 import './LocationManager.css';
 
@@ -101,7 +102,7 @@ export default function StocktakeDialog({ location, onClose, onApplied }) {
             <button type="button" className="stocktake-image" aria-label={`${t('inspector.zoomHint')}: ${name}`} aria-haspopup="dialog" onClick={() => setZoomCard(entry)}>
               <CardImage card={entry} loading="lazy" />
             </button>
-            <strong>{name}</strong>
+            <strong>{name} {getPrintingBadgeLabel(entry.printing) && <span style={{ ...getPrintingBadgeStyle(entry.printing), display: 'inline-block', fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px' }}>{getPrintingBadgeLabel(entry.printing)}</span>}</strong>
             <span className="stocktake-meta">{t('stocktake.lastVerified', { date: entry.last_verified_at ? new Date(entry.last_verified_at).toLocaleDateString(locale) : t('stocktake.never') })}</span>
             {copyIndex < entry.reserved_quantity && <span className="stocktake-meta">{t('loc.inPlay')}</span>}
             {entry.quantity > 1 && <span className="stocktake-meta">{t('stocktake.copy', { number: copyIndex + 1, total: entry.quantity })}</span>}
