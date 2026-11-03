@@ -9,6 +9,7 @@ const { FORMATS } = require('../utils/aiDecks');
 const scryfallApi = require('../scryfallApi');
 const { parseManaboxText } = require('../utils/csvMappers');
 const mtgjsonApi = require('../mtgjsonApi');
+const archidektApi = require('../archidektApi');
 const { normalizeCardBack } = require('../utils/cardBack');
 const { acquisitionPlan, acquisitionDeckNeeds } = require('../utils/acquisitionPlanner');
 const { composition, recordRevision } = require('../utils/deckRevisions');
@@ -181,6 +182,15 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.post('/archidekt/preview', async (req, res) => {
+  try {
+    const { name, description, card_count, commander } = await archidektApi.getDeck(req.body?.url);
+    res.json({ name, description, card_count, commander });
+  } catch (error) {
+    res.status(error.status || 502).json({ error: error.status ? error.message : 'Unable to load the Archidekt deck.' });
+  }
+});
+
 // Create Deck
 router.post('/', async (req, res) => {
   const { 
@@ -194,6 +204,7 @@ router.post('/', async (req, res) => {
     decklist_text = '',
     decklist_format = 'plain',
     precon_file = '',
+    archidekt_url = '',
     inventory_type = 'collection',
     commander_card_id
   } = req.body;
@@ -208,6 +219,12 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Invalid deck inventory type' });
   }
   const inventoryType = inventory_type;
+  if (archidekt_url !== '' && (typeof archidekt_url !== 'string' || !archidekt_url.trim())) {
+    return res.status(400).json({ error: 'archidekt_url must be a non-empty string' });
+  }
+  if (archidekt_url && (precon_file || decklist_text || commander_card_id !== undefined)) {
+    return res.status(400).json({ error: 'Archidekt import cannot be combined with another deck import or commander selection' });
+  }
 
   if (commander_card_id !== undefined) {
     if (typeof commander_card_id !== 'string' || !commander_card_id.trim()) {
@@ -224,7 +241,16 @@ router.post('/', async (req, res) => {
   let newDeckId;
   try {
     let preconPairs = null;
-    if (precon_file) {
+    if (archidekt_url) {
+      const { rows } = await archidektApi.getDeck(archidekt_url);
+      const { cards, pairs } = await scryfallApi.bulkFetchByIdentifier(rows, undefined, { localFirst: true });
+      if (new Set(pairs.map(({ row }) => row)).size !== rows.length
+        || pairs.some(({ row, card }) => scryfallApi.scryfallUuid(card.id)?.toLowerCase() !== row.id.toLowerCase())) {
+        return res.status(422).json({ error: 'Every Archidekt card must resolve to its exact printing before creating the deck.' });
+      }
+      await scryfallApi.cacheCards(cards);
+      preconPairs = pairs;
+    } else if (precon_file) {
       const precon = await mtgjsonApi.getDeck(precon_file);
       if (!precon) return res.status(404).json({ error: 'MTGJSON deck not found' });
       const rows = mtgjsonApi.deckCardRows(precon).filter(row => !row.isToken);

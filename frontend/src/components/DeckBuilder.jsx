@@ -158,6 +158,12 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
   const [showImportDecklistArea, setShowImportDecklistArea] = useState(false);
   const [newDeckPreconFile, setNewDeckPreconFile] = useState('');
   const [showPreconPicker, setShowPreconPicker] = useState(false);
+  const [newDeckArchidekt, setNewDeckArchidekt] = useState(null);
+  const [showArchidektModal, setShowArchidektModal] = useState(false);
+  const [archidektUrl, setArchidektUrl] = useState('');
+  const [archidektLoading, setArchidektLoading] = useState(false);
+  const [archidektError, setArchidektError] = useState('');
+  const archidektRequest = useRef(null);
   const [deckDraft, setDeckDraft] = useState(null);
   const [savingDeck, setSavingDeck] = useState(false);
   const [saveDeckError, setSaveDeckError] = useState(null);
@@ -418,6 +424,55 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [hasUnsavedChanges, savingDeck, showAiBuilder, aiGuardState]);
 
+  useEffect(() => () => archidektRequest.current?.abort(), []);
+
+  const closeArchidektModal = () => {
+    archidektRequest.current?.abort();
+    setShowArchidektModal(false);
+    setArchidektUrl('');
+    setArchidektError('');
+    setArchidektLoading(false);
+  };
+
+  const handleArchidektPreview = async (event) => {
+    event.preventDefault();
+    if (archidektLoading) return;
+    const controller = new AbortController();
+    archidektRequest.current = controller;
+    setArchidektLoading(true);
+    setArchidektError('');
+    try {
+      const url = archidektUrl.trim();
+      const response = await fetch('/api/decks/archidekt/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+        signal: controller.signal
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || t('deck.archidektError'));
+      if (controller.signal.aborted) return;
+      setNewDeckArchidekt({ url, card_count: data.card_count });
+      setNewDeckName(data.name);
+      setNewDeckDesc(data.description || '');
+      if (data.commander) {
+        setNewDeckFormat('Commander / EDH');
+        setNewDeckTargetSize('100');
+      }
+      setNewDeckPreconFile('');
+      setNewDeckImportText('');
+      setNewDeckImportFormat('plain');
+      setShowPreconPicker(false);
+      setShowImportDecklistArea(false);
+      setCreateDeckError(null);
+      closeArchidektModal();
+    } catch (error) {
+      if (!controller.signal.aborted) setArchidektError(error.message || t('deck.archidektError'));
+    } finally {
+      if (!controller.signal.aborted) setArchidektLoading(false);
+    }
+  };
+
   const closeCreateModal = () => {
     setCreateDeckError(null);
     setNewDeckName('');
@@ -428,6 +483,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
     setNewDeckImportText('');
     setNewDeckImportFormat('plain');
     setNewDeckPreconFile('');
+    setNewDeckArchidekt(null);
+    closeArchidektModal();
     setNewDeckInventoryType('collection');
     setShowPreconPicker(false);
     setShowImportDecklistArea(false);
@@ -436,6 +493,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
 
   useBackGuard(viewMode === 'detail' && !!activeDeck, leaveDeck);
   useBackGuard(showCreateModal, () => creatingDeck ? false : closeCreateModal());
+  useBackGuard(showArchidektModal, closeArchidektModal);
   useBackGuard(showSimulator, () => setShowSimulator(false));
   useBackGuard(!!deckDraft, () => refreshingInventory ? false : setDeckDraft(null));
   useBackGuard(showImportModal, () => closeImportModal());
@@ -496,7 +554,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
           decklist_text: newDeckImportText,
           decklist_format: newDeckImportFormat,
           inventory_type: newDeckInventoryType,
-          precon_file: newDeckPreconFile
+          precon_file: newDeckPreconFile,
+          archidekt_url: newDeckArchidekt?.url
         })
       });
 
@@ -525,6 +584,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
       setNewDeckImportText(await file.text());
       setNewDeckImportFormat('manabox');
       setNewDeckPreconFile('');
+      setNewDeckArchidekt(null);
     } catch {
       showToast(t('settings.errReadFile'), 'error');
     }
@@ -2609,6 +2669,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
                       showToast={showToast}
                       onChoose={(deck) => {
                         setNewDeckPreconFile(deck.fileName);
+                        setNewDeckArchidekt(null);
                         setNewDeckName(deck.name);
                         const preset = preconFormat(deck.type);
                         setNewDeckFormat(preset.format);
@@ -2647,6 +2708,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
                           const format = e.target.value;
                           setNewDeckImportFormat(format);
                           setNewDeckPreconFile('');
+                          setNewDeckArchidekt(null);
                           if (format === 'manabox') {
                             setNewDeckFormat('Commander / EDH');
                             setNewDeckTargetSize('100');
@@ -2675,6 +2737,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
                       onChange={(e) => {
                         setNewDeckImportText(e.target.value);
                         setNewDeckPreconFile('');
+                        setNewDeckArchidekt(null);
                       }}
                     />
                     <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
@@ -2682,6 +2745,18 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
                     </span>
                   </div>
                 )}
+              </div>
+              <div>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => { setArchidektUrl(newDeckArchidekt?.url || ''); setShowArchidektModal(true); }}
+                  style={{ width: '100%', minHeight: '48px', justifyContent: 'flex-start', fontSize: 'var(--text-md)', borderColor: 'var(--accent-yellow)', color: 'var(--accent-yellow)' }}
+                >
+                  <Download size={20} aria-hidden="true" style={{ flexShrink: 0 }} />
+                  {t('deck.importArchidekt')}
+                </button>
+                {newDeckArchidekt && <p role="status" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{t('deck.archidektSelected', { count: newDeckArchidekt.card_count })}</p>}
               </div>
 
               </div>
@@ -2693,6 +2768,28 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
               </fieldset>
             </form>
           </div>
+        </Modal>
+      )}
+
+      {showArchidektModal && (
+        <Modal onClose={closeArchidektModal} aria-labelledby="deck-archidekt-title" aria-describedby="deck-archidekt-hint">
+          <form onSubmit={handleArchidektPreview} className="glass-panel deck-share-panel">
+            <h2 id="deck-archidekt-title">{t('deck.importArchidekt')}</h2>
+            <p id="deck-archidekt-hint">{t('deck.archidektHint')}</p>
+            <div className="form-group">
+              <label htmlFor="deck-archidekt-url">{t('deck.archidektUrl')}</label>
+              <input id="deck-archidekt-url" name="archidekt_url" className="input-control" type="url" required
+                placeholder="https://archidekt.com/decks/24321624/spellslinger"
+                value={archidektUrl} onChange={event => setArchidektUrl(event.target.value)}
+                disabled={archidektLoading} aria-describedby={archidektError ? 'deck-archidekt-error' : undefined} />
+            </div>
+            {archidektError && <p id="deck-archidekt-error" role="alert" className="deck-source-error">{archidektError}</p>}
+            {archidektLoading && <p role="status">{t('common.loading')}…</p>}
+            <div className="deck-share-actions">
+              <button type="button" className="btn btn-secondary" onClick={closeArchidektModal}>{t('common.cancel')}</button>
+              <button type="submit" className="btn btn-primary" disabled={archidektLoading}>{t(archidektError ? 'common.retry' : 'deck.archidektLoad')}</button>
+            </div>
+          </form>
         </Modal>
       )}
 

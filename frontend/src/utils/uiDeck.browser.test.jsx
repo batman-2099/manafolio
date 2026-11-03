@@ -29,6 +29,11 @@ export async function runUiDeckRegressions() {
   const mutations = { checkout: 0, return: 0 };
   let locationRequests = 0;
   let detailRequests = 0;
+  let settleArchidekt;
+  let archidektSignal;
+  let previewBody;
+  let createdBody;
+  let createFails = true;
   const response = (body, status = 200) => ({ ok: status < 400, status, headers: new Headers(), json: async () => body });
   const card = { id: 'fixture', name: 'Fixture card', game: 'mtg', quantity: 2, owned_qty: 0, types: [], subtypes: [], number: '1' };
   const deck = { id: 7, name: 'Fixture deck', game: 'mtg', inventory_type: 'arena', format: 'Casual', target_size: 60, cards: [card], total_cards: 2 };
@@ -53,6 +58,15 @@ export async function runUiDeckRegressions() {
   window.confirm = () => { confirms++; return false; };
   window.open = () => { opened++; return null; };
   window.fetch = async (url, options = {}) => {
+    if (url === '/api/decks/archidekt/preview') {
+      archidektSignal = options.signal;
+      previewBody = JSON.parse(options.body);
+      return new Promise(resolve => { settleArchidekt = (body, status = 200) => resolve(response(body, status)); });
+    }
+    if (url === '/api/decks' && options.method === 'POST') {
+      createdBody = JSON.parse(options.body);
+      return response(createFails ? { error: 'Fixture creation failure' } : { id: 7 }, createFails ? 503 : 200);
+    }
     if (url === '/api/decks') return response([deck]);
     if (url === '/api/decks/7') { detailRequests++; return response(deck); }
     if (url === '/api/decks/7/locations') {
@@ -209,8 +223,44 @@ export async function runUiDeckRegressions() {
     assert(!host.querySelector('dialog') && deck.checked_out === 1, 'return cancellation retry restores checkout and closes guide');
 
     await click(button('deck.createDeck'));
+    const archidektUrl = 'https://archidekt.com/decks/24321624/spellslinger';
+    const archidektDeck = { name: 'Archidekt fixture', description: 'Imported description', card_count: 100, commander: true };
+    const loadArchidekt = async () => {
+      await click(button('deck.importArchidekt'));
+      await change(host.querySelector('#deck-archidekt-url'), archidektUrl);
+      await click(button('deck.archidektLoad'));
+    };
+    const archidektSelected = () => host.querySelector('.deck-create-body [role="status"]');
+    await loadArchidekt();
+    assert(previewBody.url === archidektUrl && !createdBody && button('deck.archidektLoad').disabled, 'preview sends URL, reports loading, and never creates a deck');
+    await act(async () => { settleArchidekt({ error: 'Fixture preview failure' }, 503); });
+    assert(host.querySelector('#deck-archidekt-error')?.textContent === 'Fixture preview failure' && host.querySelector('#deck-archidekt-url').value === archidektUrl, 'preview failure stays inline and retains URL');
+    await click(button('common.retry'));
+    await act(async () => { settleArchidekt(archidektDeck); });
+    assert(!host.querySelector('#deck-archidekt-url') && document.activeElement === button('deck.importArchidekt'), 'successful preview returns focus to creation form');
+    assert(host.querySelector('#new-deck-name').value === archidektDeck.name && [...host.querySelectorAll('textarea')].some(el => el.value === archidektDeck.description), 'preview fills editable name and description');
+    assert(host.querySelector('#new-deck-format').value === 'Commander / EDH' && host.querySelector('#new-deck-size').value === '100' && archidektSelected()?.textContent.includes('100'), 'commander preview sets format/size and announces selected count');
+    await click(host.querySelector('.deck-create-footer button[type="submit"]'));
+    assert(createdBody.archidekt_url === archidektUrl && !createdBody.precon_file && !createdBody.decklist_text && archidektSelected(), 'creation failure preserves exclusive Archidekt selection for retry');
+    createFails = false;
+    await click(host.querySelector('.deck-create-footer button[type="submit"]'));
+    assert(!host.querySelector('#deck-create-title') && button('deck.backToDecks'), 'Create Deck saves Archidekt through the existing flow and opens the saved deck');
+    await click(button('deck.backToDecks'));
+    await click(button('deck.createDeck'));
+    assert(!archidektSelected(), 'successful creation resets Archidekt selection');
+    await change(host.querySelector('#new-deck-format'), 'Modern');
+    await change(host.querySelector('#new-deck-size'), '75');
+    await loadArchidekt();
+    await act(async () => { settleArchidekt({ ...archidektDeck, commander: false }); });
+    assert(host.querySelector('#new-deck-format').value === 'Modern' && host.querySelector('#new-deck-size').value === '75', 'noncommander preview preserves chosen format and size');
+    await click(button('deck.showQuickImport'));
+    await change(host.querySelector('textarea[aria-label="' + en['deck.showQuickImport'] + '"]'), '1 Fixture card');
+    assert(!archidektSelected(), 'typing a decklist clears Archidekt selection');
+    await loadArchidekt();
+    await act(async () => { settleArchidekt(archidektDeck); });
     await click(button('deck.showQuickImport'));
     await change(host.querySelector('select[aria-label="' + en['deck.format'] + '"]'), 'manabox');
+    assert(!archidektSelected(), 'switching to ManaBox clears Archidekt selection');
     const fileButton = button('deck.chooseManaBoxFile');
     assert(fileButton?.tagName === 'BUTTON' && fileButton.type === 'button', 'ManaBox picker uses a keyboard-operable native button');
     const fileInput = host.querySelector('input[type="file"]');
@@ -226,8 +276,21 @@ export async function runUiDeckRegressions() {
       await act(async () => new Promise(resolve => setTimeout(resolve, 16)));
     }
     assert([...host.querySelectorAll('textarea')].some(el => el.value === '2 Fixture card'), 'ManaBox file contents still populate import text');
+    await loadArchidekt();
+    await act(async () => { settleArchidekt(archidektDeck); });
+    await loadArchidekt();
+    const canceledSignal = archidektSignal;
+    await act(async () => { host.querySelector('dialog[aria-labelledby="deck-archidekt-title"]').dispatchEvent(new Event('cancel', { cancelable: true })); });
+    assert(canceledSignal.aborted && !host.querySelector('#deck-archidekt-url') && archidektSelected(), 'Escape aborts pending preview without dropping prior selection or closing creation');
+    await act(async () => { settleArchidekt({ ...archidektDeck, name: 'Stale preview' }); });
+    assert(host.querySelector('#new-deck-name').value === archidektDeck.name, 'late canceled response cannot overwrite creation fields');
     await cancelDialog();
-    return ['AI dirty/busy navigation, unload, settings, Back, save failure/retry/success', 'mobile/desktop ordering and always-visible deck actions', 'native export focus/cancel and clipboard failure/recovery', 'pending import dismissal and long summary scroll', 'checkout/return locations failure and safe retry', 'cancel failure/progress retention, Back/Escape veto and duplicate-mutation guards', 'native ManaBox picker and file import'];
+    await click(button('deck.createDeck'));
+    assert(!archidektSelected() && host.querySelector('#new-deck-name').value === '', 'canceling creation resets Archidekt and form fields');
+    await loadArchidekt();
+    await act(async () => { root.render(null); });
+    assert(archidektSignal.aborted, 'unmount aborts pending Archidekt preview');
+    return ['AI dirty/busy navigation, unload, settings, Back, save failure/retry/success', 'mobile/desktop ordering and always-visible deck actions', 'native export focus/cancel and clipboard failure/recovery', 'pending import dismissal and long summary scroll', 'checkout/return locations failure and safe retry', 'cancel failure/progress retention, Back/Escape veto and duplicate-mutation guards', 'native ManaBox picker and file import', 'Archidekt preview recovery, commander defaults, exclusive sources, create retry/save, Escape/unmount abort and stale response guard'];
   } finally {
     await act(async () => { root.unmount(); });
     host.remove();

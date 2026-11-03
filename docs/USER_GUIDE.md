@@ -892,7 +892,7 @@ For a custom back, upload a PNG, JPEG, or WebP, or enter a direct **Image URL** 
 
 ### Import while creating a deck
 
-Use this path when starting a deck definition from text or a published precon.
+Use this path when starting a deck definition from text, Archidekt, or a published precon.
 
 1. Select **Create Deck** and complete the deck type, name, format, and target size.
 2. Open **+ Quick Import Decklist**.
@@ -903,6 +903,15 @@ Use this path when starting a deck definition from text or a published precon.
 5. The saved deck opens automatically. Compare its names, quantities, printings, total, and commander against your original list.
 
 **Expected result:** a saved definition containing the resolved cards, not newly owned inventory. Physical, Arena, and Graveyard creation can describe cards you do not own. Unavailable Physical copies must be resolved before checkout. Save your source list until you have reviewed the result.
+
+For a public Archidekt deck:
+
+1. In **Create New Deck**, choose **Import from Archidekt** below **+ Quick Import Decklist**.
+2. Paste its URL, for example `https://archidekt.com/decks/24321624/spellslinger`, and choose **Load deck**.
+3. Review the imported name, description, and card count. A designated commander selects **Commander / EDH** and a 100-card target; otherwise check the format and target yourself.
+4. Choose **Create Deck** to save and open the deck. Loading the URL alone does not save it.
+
+The server extracts the numeric deck ID and fetches Archidekt's public JSON API. Import preserves exact printings and quantities, excludes tokens and categories marked outside the deck, and designates the first listed commander; additional commanders remain ordinary deck entries. Private/unavailable decks or unresolved printings produce an error rather than a partial saved deck. Creation fetches the list again, so edits made on Archidekt since loading are included. This creates a deck definition only—not owned copies, storage, or reservations. Selecting another import source replaces the Archidekt selection.
 
 For a published precon instead:
 

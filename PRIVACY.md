@@ -1,6 +1,6 @@
 # Manafolio privacy
 
-**Effective date:** October 5, 2026
+**Effective date:** November 3, 2026
 
 Manafolio is a self-hosted Magic: The Gathering collection, storage, and deck manager. Your chosen server holds your account and collection; this repository does not provide a central Manafolio account or hosted collection service. Installing the application does not give its maintainers access to your server.
 
@@ -73,6 +73,7 @@ External services receive the network information needed to serve a request, suc
 | Custom deck-back imports | Choosing a Dragon Shield or Ultra PRO sleeve downloads its selected image directly from the shop's image CDN (`cdn.shopify.com`); a manual image URL contacts its supplied host. These browser downloads omit credentials and referrer headers but expose the client's IP address and requested image. Ultimate Guard previews are bundled with Manafolio and loaded from your server, not from Ultimate Guard at runtime; following an official-shop link contacts that supplier's website. Saving stores a resized copy with the deck; later displays use that saved copy without another source download. |
 | Interface fonts | The page loads Google Fonts stylesheets and font files from `fonts.googleapis.com` and `fonts.gstatic.com`, including on the login screen. These are external requests even if you never enable AI or sharing. |
 | Preconstructed decks | The server downloads deck catalog/list data from MTGJSON (`mtgjson.com`). |
+| Archidekt deck import | On **Load deck** and **Create Deck**, the server requests the numeric deck ID from Archidekt (`archidekt.com/api/decks/`). The deck must be publicly accessible; no Archidekt credentials or your collection records are sent. Exact card identities are resolved through the existing Scryfall integration. |
 | Scan models and supplied catalogs | Installation/admin download actions contact Hugging Face (`huggingface.co`) and its download infrastructure. These download assets, not your camera frames. |
 | Optional PSA certification lookup | The server sends the certificate number and configured PSA API token to `api.psacard.com`; returned card information may be used in provider searches. |
 | Optional SSO | The browser visits the configured OpenID Connect provider; the server exchanges authorization codes and receives identity claims according to that provider and the administrator's configured scopes. The default scopes are `openid profile email`. |
