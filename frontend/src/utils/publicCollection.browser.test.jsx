@@ -140,8 +140,14 @@ export async function runCollectionPrintingRegressions() {
       const missing = ['Missing treatment', 'Treatment regular'].includes(card.getAttribute('aria-label'));
       const badge = card.querySelector('.card-missing-status');
       assert(Boolean(badge) === missing, 'only missing cards and stacks containing a missing copy show a badge');
-      if (missing) assert(badge.textContent === en['inspector.missing'] && card.getAttribute('aria-describedby').split(' ').includes(badge.id), 'missing status is visible and describes the card');
+      if (missing) {
+        const expected = card.getAttribute('aria-label') === 'Treatment regular' ? '2 of 3 Missing' : en['inspector.missing'];
+        assert(badge.textContent === expected && card.getAttribute('aria-describedby').split(' ').includes(badge.id), 'missing status counts copies in a stack and describes the card');
+      }
     }
+    await click(host.querySelector(`button[title="${en['collection.listView']}"]`));
+    assert([...host.querySelectorAll('.collection-table .card-missing-status')].some(badge => badge.textContent === '2 of 3 Missing'), 'list view shows the same missing-copy count');
+    await click(host.querySelector(`button[title="${en['collection.galleryView']}"]`));
     await openFilters();
     assert(group().querySelectorAll('input').length === 8, 'Printing offers both finishes and all six treatments');
     await toggle('Foil');

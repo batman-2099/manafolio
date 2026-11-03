@@ -45,6 +45,12 @@ function Field({ label, id, children }) {
 function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter, setSelectedCardFilter, onNavigate, onOpenDeck, setSelectedLocationId, setFocusEntryId }) {
   const { t } = useT();
   const deckStatusId = useId();
+  const missingLabel = card => card.quantity > 1
+    ? t('inspector.missingCount', {
+      count: (card.stack_entries || [card]).reduce((sum, entry) => sum + (entry.missing ? entry.quantity : 0), 0),
+      total: card.quantity,
+    })
+    : t('inspector.missing');
   const [collectionState, setCollectionState] = useState(null);
   const [collectionRefresh, setCollectionRefresh] = useState(0);
   const [locations, setLocations] = useState([]);
@@ -864,7 +870,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                   <span className="tcg-card-name">{pairedCardName(item)}</span>
                   <CardDeckStatus card={item} id={`${deckStatusId}-${item.entry_id}`} />
                   {(item.missing || item.stack_entries?.some(entry => entry.missing)) && (
-                    <span id={`${deckStatusId}-missing-${item.entry_id}`} className="card-missing-status">{t('inspector.missing')}</span>
+                    <span id={`${deckStatusId}-missing-${item.entry_id}`} className="card-missing-status">{missingLabel(item)}</span>
                   )}
                   <span className="tcg-card-meta">
                     <span>{item.set_name} • #{item.number}</span>
@@ -945,7 +951,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                           </div>
                           <CardDeckStatus card={item} />
                           {(item.missing || item.stack_entries?.some(entry => entry.missing)) && (
-                            <span className="card-missing-status">{t('inspector.missing')}</span>
+                            <span className="card-missing-status">{missingLabel(item)}</span>
                           )}
                           {!selectMode && (
                             <div style={{ display: 'flex', gap: '0.35rem', marginTop: '2px' }}>

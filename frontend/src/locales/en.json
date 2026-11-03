@@ -1785,6 +1785,7 @@
   "inspector.errAddDeckGeneric": "Error adding to deck.",
   "inspector.markMissing": "Mark as missing",
   "inspector.missing": "Missing",
+  "inspector.missingCount": "{count} of {total} Missing",
   "inspector.markFound": "Mark as found",
   "split.totalPaid": "Total paid",
   "split.byValue": "By value",

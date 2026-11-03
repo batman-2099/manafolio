@@ -4,7 +4,7 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
-- Replace the red missing-card outline with a red Missing badge with white text in Collection gallery and list views, including stacks containing a missing copy, alongside existing deck statuses.
+- Replace the red missing-card outline with a red Missing badge with white text in Collection gallery and list views, alongside existing deck statuses. Stacks show missing-copy counts, such as “2 of 3 Missing”; single copies show “Missing”.
 - Separate AI Deck Builder's Deck setup and Card pool sections with a theme-colored divider: vertical on desktop and horizontal on mobile.
 - Record saved AI improvements in Deck history, preserving the previous composition and saving revisions atomically with the deck. Unchanged saves do not add duplicate revisions.
 - Remove general eligibility/filter explanations and the checked-out-copy and land-filter helper text from the AI deck window without changing filtering or generation rules.
