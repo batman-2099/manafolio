@@ -79,6 +79,11 @@
   min-width: 0;
 }
 
+.ai-deck-setup > section + section {
+  border-top: 1px solid var(--border-glass);
+  padding-top: var(--space-6);
+}
+
 .deck-card-previews {
   display: grid;
   align-content: start;
@@ -341,6 +346,13 @@
 
   .ai-deck-setup {
     grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  }
+
+  .ai-deck-setup > section + section {
+    border-top: 0;
+    padding-top: 0;
+    border-inline-start: 1px solid var(--border-glass);
+    padding-inline-start: var(--space-6);
   }
 
   .deck-history-selectors {

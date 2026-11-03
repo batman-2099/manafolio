@@ -84,8 +84,8 @@ export async function runCollectionPrintingRegressions() {
     { ...base, entry_id: 8, card_id: 'foil-regular', name: 'Foil regular', printing: 'Holofoil', printing_treatments: ['regular'] },
     { ...base, entry_id: 9, card_id: 'foil-showcase', name: 'Foil showcase', printing: 'Holofoil', printing_treatments: ['showcase'] },
     { ...base, entry_id: 10, card_id: 'unknown', name: 'Unknown treatment', printing_treatments: null },
-    { ...base, entry_id: 11, card_id: 'missing', name: 'Missing treatment' },
-    { ...cards[0], entry_id: 12, quantity: 2 },
+    { ...base, entry_id: 11, card_id: 'missing', name: 'Missing treatment', missing: 1 },
+    { ...cards[0], entry_id: 12, quantity: 2, missing: 1 },
   );
   const requests = [];
   let hold = false;
@@ -136,6 +136,12 @@ export async function runCollectionPrintingRegressions() {
     localStorage.setItem('default_game', 'mtg');
     await act(async () => root.render(<I18nProvider><CollectionList statsTrigger={0} /></I18nProvider>));
     assert(requests.length === 1 && !requests[0].params.has('include_treatments') && requests[0].params.get('list_type') === 'collection', 'ordinary collection reads do not hydrate metadata');
+    for (const card of host.querySelectorAll('.card-grid .tcg-card')) {
+      const missing = ['Missing treatment', 'Treatment regular'].includes(card.getAttribute('aria-label'));
+      const badge = card.querySelector('.card-missing-status');
+      assert(Boolean(badge) === missing, 'only missing cards and stacks containing a missing copy show a badge');
+      if (missing) assert(badge.textContent === en['inspector.missing'] && card.getAttribute('aria-describedby').split(' ').includes(badge.id), 'missing status is visible and describes the card');
+    }
     await openFilters();
     assert(group().querySelectorAll('input').length === 8, 'Printing offers both finishes and all six treatments');
     await toggle('Foil');

@@ -835,10 +835,12 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                 type="button"
                 key={item.entry_id}
                 className="tcg-card"
-                data-missing={Boolean(item.missing || item.stack_entries?.some(entry => entry.missing))}
                 style={{ cursor: 'pointer', touchAction: 'pan-y' }}
                 aria-label={pairedCardName(item)}
-                aria-describedby={item.in_deck_qty > 0 || item.stack_entries?.some(entry => entry.in_deck_qty > 0) ? `${deckStatusId}-${item.entry_id}` : undefined}
+                aria-describedby={[
+                  item.in_deck_qty > 0 || item.stack_entries?.some(entry => entry.in_deck_qty > 0) ? `${deckStatusId}-${item.entry_id}` : '',
+                  item.missing || item.stack_entries?.some(entry => entry.missing) ? `${deckStatusId}-missing-${item.entry_id}` : '',
+                ].filter(Boolean).join(' ') || undefined}
                 aria-pressed={selectMode ? selected : undefined}
                 disabled={bulkPending}
                 aria-haspopup={selectMode ? undefined : 'dialog'}
@@ -861,6 +863,9 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                 <span className="tcg-card-info">
                   <span className="tcg-card-name">{pairedCardName(item)}</span>
                   <CardDeckStatus card={item} id={`${deckStatusId}-${item.entry_id}`} />
+                  {(item.missing || item.stack_entries?.some(entry => entry.missing)) && (
+                    <span id={`${deckStatusId}-missing-${item.entry_id}`} className="card-missing-status">{t('inspector.missing')}</span>
+                  )}
                   <span className="tcg-card-meta">
                     <span>{item.set_name} • #{item.number}</span>
                   </span>
@@ -898,7 +903,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                 {pageCards.map((item) => {
                   const selected = selectedIds.has(item.entry_id);
                   return (
-                  <tr key={item.entry_id} data-missing={Boolean(item.missing || item.stack_entries?.some(entry => entry.missing))} style={selected ? { background: 'var(--surface-2)' } : undefined}>
+                  <tr key={item.entry_id} style={selected ? { background: 'var(--surface-2)' } : undefined}>
                     <td>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         {selectMode && (
@@ -939,6 +944,9 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                             {item.printing} • {item.condition}
                           </div>
                           <CardDeckStatus card={item} />
+                          {(item.missing || item.stack_entries?.some(entry => entry.missing)) && (
+                            <span className="card-missing-status">{t('inspector.missing')}</span>
+                          )}
                           {!selectMode && (
                             <div style={{ display: 'flex', gap: '0.35rem', marginTop: '2px' }}>
                               <button className="btn btn-secondary btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => openEdit(item)} title={t('common.edit')} aria-label={t('common.edit')}>
