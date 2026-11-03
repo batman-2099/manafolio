@@ -8,6 +8,8 @@
 
 [Install](#install) · [User guide](docs/USER_GUIDE.md) · [Screenshots](#screenshots) · [Documentation](#documentation) · [Get help](#help-and-contributing)
 
+**[Support Manafolio on Patreon](https://www.patreon.com/cw/Batman2099)**
+
 </div>
 
 Manafolio is a self-hosted, multi-user collection, storage, and deck manager for **Magic: The Gathering**. Track exact printings, find the box holding a copy, and prepare decks for play without mixing physical ownership with Arena inventory.
