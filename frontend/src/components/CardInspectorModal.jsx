@@ -1013,6 +1013,11 @@ function CardInspectorSelection(props) {
               <span>{[entry.storage_unit_name, entry.location_name || (entry.location_id ? t('inspector.currentStorage') : t('bulk.unassignedPile')), entry.compartment_name, entry.position != null && getSlotNumber(entry) != null ? t('stocktake.slot', { slot: getSlotNumber(entry) }) : null].filter(Boolean).join(' · ')}</span>
               <span>{t('inspector.entryIdentifier', { id: entry.entry_id || entry.id })}</span>
               <CardDeckStatus card={entry} details />
+              {!!entry.missing && (
+                <span className="card-missing-status">{entry.quantity > 1
+                  ? t('inspector.missingCount', { count: entry.quantity, total: entry.quantity })
+                  : t('inspector.missing')}</span>
+              )}
             </button>
           ))}
         </div>

@@ -18,7 +18,7 @@ export async function runInspectorNavigationRegressions() {
   const root = createRoot(host);
   const cards = [1, 2, 3].map(entry_id => ({ entry_id, id: 'sample-printing', card_id: 'sample-printing', name: `Sample ${entry_id}`, quantity: entry_id, game: 'mtg', list_type: 'collection', printing: 'Normal', set_id: `set${entry_id}`, set_name: `Sample Set ${entry_id}` }));
   cards[0] = { ...cards[0], subtypes: ['Token'], image_url: '/logo.svg?front', reverse_card_id: 'sample-reverse', reverse_name: 'Sample reverse', reverse_image_url: '/logo.svg?reverse' };
-  cards[2] = { ...cards[2], stack_entries: [{ ...cards[2] }, { ...cards[2], entry_id: 4, quantity: 1 }] };
+  cards[2] = { ...cards[2], stack_entries: [{ ...cards[2], missing: 1 }, { ...cards[2], entry_id: 4, quantity: 1 }, { ...cards[2], entry_id: 5, quantity: 1, missing: 1 }] };
   let settle;
   let updates = 0;
   let deckLookupFails = true;
@@ -101,6 +101,10 @@ export async function runInspectorNavigationRegressions() {
     await click(next());
     assert(updates === 1, 'successful quick changes refresh parent before navigating');
     assert(host.textContent.includes(en['inspector.chooseEntry']), 'next aggregate still requires explicit member choice');
+    const entryButton = id => [...host.querySelectorAll('button')].find(node => node.textContent.includes(`#${id}`));
+    assert(entryButton(3).querySelector('.card-missing-status')?.textContent === '3 of 3 Missing', 'missing entry counts all its copies');
+    assert(!entryButton(4).querySelector('.card-missing-status'), 'available entry has no missing tag');
+    assert(entryButton(5).querySelector('.card-missing-status')?.textContent === en['inspector.missing'], 'single missing entry shows the missing tag');
     await click([...host.querySelectorAll('button')].find(node => node.textContent.includes('#4')));
     assert(next().disabled && !previous().disabled, 'last aggregate member retains list boundary');
     await click(previous());
