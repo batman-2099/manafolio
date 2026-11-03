@@ -74,6 +74,7 @@
 
 .ai-deck-setup {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-8);
   min-width: 0;
 }
@@ -1010,6 +1011,7 @@
 
 .ai-deck-builder {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   gap: var(--space-6);
 }

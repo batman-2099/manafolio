@@ -1,4 +1,5 @@
 {
+  "aiDeck.colorTheme": "Tema de cores",
   "token.reverse": "Ficha no verso (opcional)",
   "token.pairHint": "Escolha a ficha impressa no verso desta carta física. Ambas as faces compartilham quantidade e localização; nenhuma combinação é automática.",
   "token.promptTitle": "O que há no verso?",

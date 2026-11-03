@@ -1,4 +1,5 @@
 {
+  "aiDeck.colorTheme": "顏色主題",
   "token.reverse": "背面衍生物（選填）",
   "token.pairHint": "選擇這張實體牌背面印製的衍生物。兩面共用數量和存放位置，不會自動推斷配對。",
   "token.promptTitle": "背面是什麼？",

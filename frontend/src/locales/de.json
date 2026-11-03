@@ -1,4 +1,5 @@
 {
+  "aiDeck.colorTheme": "Farbthema",
   "token.reverse": "Rückseitiger Spielstein (optional)",
   "token.pairHint": "Wähle den Spielstein auf der Rückseite dieser physischen Karte. Beide Seiten teilen sich Menge und Lagerort; die Paarung wird nicht automatisch bestimmt.",
   "token.promptTitle": "Was ist auf der Rückseite?",

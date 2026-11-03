@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import DeckBuilder from '../components/DeckBuilder';
 import en from '../locales/en.json';
 import { I18nProvider } from './i18n';
+import COLOR_THEMES from '../../../shared/aiDeckColorThemes.json';
 
 // Isolated Vite page only; every fetch is mocked, including AI generation/save.
 export async function runUiDeckRegressions() {
@@ -17,6 +18,7 @@ export async function runUiDeckRegressions() {
   const guard = { current: null };
   const toasts = [];
   let settleSuggest;
+  let suggestBody;
   let settleSave;
   let settleCompare;
   let holdCompare = false;
@@ -38,6 +40,13 @@ export async function runUiDeckRegressions() {
   const card = { id: 'fixture', name: 'Fixture card', game: 'mtg', quantity: 2, owned_qty: 0, types: [], subtypes: [], number: '1' };
   const deck = { id: 7, name: 'Fixture deck', game: 'mtg', inventory_type: 'arena', format: 'Casual', target_size: 60, cards: [card], total_cards: 2 };
   const aiCard = { ...card, id: 'mtg-fixture', game: 'mtg', owned_qty: 1, available_qty: 1, locked_qty: 0, color_identity: [], color_identity_known: true };
+  const aiInventory = [
+    aiCard,
+    { ...aiCard, id: 'white', color_identity: ['White'] },
+    { ...aiCard, id: 'azorius', color_identity: ['White', 'Blue'] },
+    { ...aiCard, id: 'off-theme-source-land', color_identity: ['Red'], source_qty: 1, subtypes: ['Land'] },
+    { ...aiCard, id: 'unknown-source', color_identity_known: false, source_qty: 1 },
+  ];
   const locations = [{ card_id: card.id, missing: 0, locations: [1, 2].map(entry_id => ({ entry_id, card_name: `Physical copy ${entry_id}`, take: 1, location_name: 'Unassigned Pile' })) }];
   const button = key => [...host.querySelectorAll('button')].find(el => el.textContent.trim() === en[key] || el.getAttribute('aria-label') === en[key]);
   const click = async element => { assert(element, 'action must exist'); await act(async () => { element.focus(); element.click(); }); };
@@ -85,9 +94,9 @@ export async function runUiDeckRegressions() {
     if (url === '/api/sets') return response([]);
     if (String(url).startsWith('/api/collection?')) return holdCompare ? new Promise(resolve => { settleCompare = () => resolve(response([])); }) : response([]);
     if (url === '/api/ai-decks/account') return response({ connected: true });
-    if (String(url).startsWith('/api/ai-decks/inventory?')) return response({ cards: [aiCard] });
+    if (String(url).startsWith('/api/ai-decks/inventory?')) return response({ cards: aiInventory });
     if (url === '/api/sets?game=mtg' || url === '/api/locations') return response([]);
-    if (url === '/api/ai-decks/suggest') return new Promise(resolve => { settleSuggest = resolve; });
+    if (url === '/api/ai-decks/suggest') { suggestBody = JSON.parse(options.body); return new Promise(resolve => { settleSuggest = resolve; }); }
     if (url === '/api/ai-decks' && options.method === 'POST') return new Promise(resolve => { settleSave = resolve; });
     throw new Error(`Unexpected fixture request: ${url}`);
   };
@@ -105,6 +114,29 @@ export async function runUiDeckRegressions() {
     await click(button('deck.gridView'));
     await click(button('aiDeck.title'));
     assert(guard.current(), 'pristine AI builder must allow navigation');
+    const poolHas = count => host.textContent.includes(`Matching inventory: ${count} owned · ${count} available · 0 checked out`);
+    assert(poolHas(5), 'Any theme retains the complete inventory');
+    await click(button('aiDeck.colorTheme'));
+    const themeGroup = host.querySelector('[role="group"][aria-label="Color theme"]');
+    const themeChoices = [...themeGroup.querySelectorAll('label')];
+    assert(themeChoices.length === 25, 'all 25 named color themes are offered');
+    COLOR_THEMES.forEach((theme, index) => {
+      const choice = themeChoices[index];
+      assert(choice.textContent === theme.name, 'theme names retain the requested order');
+      assert([...choice.querySelectorAll('svg[role="img"]')].map(icon => icon.getAttribute('aria-label')).join() === theme.colors.join(), 'each choice exposes actual mana symbols with color names');
+      assert([...choice.querySelectorAll('[title]')].map(icon => icon.title).join() === theme.colors.join(), 'each mana symbol has its color on hover');
+    });
+    await click(themeChoices[0].querySelector('input'));
+    assert(poolHas(3) && guard.current() === false, 'theme filters unknown and off-theme source cards and marks setup dirty');
+    assert(button('aiDeck.colorTheme').querySelectorAll('svg[role="img"]').length === 2, 'selected trigger retains mana symbols');
+    await click(button('aiDeck.useAllAvailableLands'));
+    assert(poolHas(3), 'all-land override cannot reintroduce an off-theme source land');
+    await click(button('aiDeck.useAllAvailableLands'));
+    await change(host.querySelector('#ai-inventory'), 'arena');
+    assert(button('aiDeck.colorTheme').textContent === 'Any' && poolHas(5), 'inventory switch resets theme and restores full pool');
+    await change(host.querySelector('#ai-inventory'), 'collection');
+    await click(button('aiDeck.colorTheme'));
+    await click(host.querySelector('[role="group"][aria-label="Color theme"] input[type="radio"]'));
     await change(host.querySelector('#ai-format'), 'Casual');
     await change(host.querySelector('#ai-target'), '1');
     await change(host.querySelector('#ai-prompt'), 'Keep this prompt');
@@ -116,6 +148,7 @@ export async function runUiDeckRegressions() {
     window.dispatchEvent(unload);
     assert(unload.defaultPrevented, 'AI input must protect browser unload');
     await act(async () => { host.querySelector('#ai-conversation-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    assert(suggestBody.color_theme === 'azorius' && suggestBody.colors.length === 0, 'generation sends the theme separately from Colors');
     const beforeBusyConfirm = confirms;
     assert(guard.current() === false && confirms === beforeBusyConfirm, 'busy AI generation must block rather than offer discard');
     await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')); });
@@ -129,7 +162,15 @@ export async function runUiDeckRegressions() {
     assert(guard.current() === false && settleSave, 'pending AI save must block navigation');
     await act(async () => { settleSave(response({ error: 'Fixture save failure' }, 500)); });
     assert(host.textContent.includes('Fixture save failure') && guard.current() === false, 'failed save retains protected draft and recovery');
-    await act(async () => { saveForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    await click(button('aiDeck.colorTheme'));
+    await click([...host.querySelector('[role="group"][aria-label="Color theme"]').querySelectorAll('button')].find(el => el.textContent.trim() === en['bulk.clear']));
+    assert(poolHas(5) && !host.textContent.includes('Fixture save failure') && host.querySelectorAll('form').length === 1, 'clearing theme restores inventory and clears stale errors and draft');
+    await click(button('aiDeck.colorTheme'));
+    await act(async () => { host.querySelector('#ai-conversation-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    assert(suggestBody.color_theme === '' && suggestBody.messages.length === 0 && suggestBody.current_draft === null, 'theme reset starts a fresh unrestricted request');
+    await act(async () => { settleSuggest(new Response(JSON.stringify({ type: 'complete', data }) + '\n', { headers: { 'content-type': 'application/x-ndjson' } })); });
+    const recoveredSaveForm = [...host.querySelectorAll('form')].find(form => form.id !== 'ai-conversation-form');
+    await act(async () => { recoveredSaveForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
     const beforeSuccessConfirm = confirms;
     await act(async () => { settleSave(response({ id: 7 })); });
     assert(!host.querySelector('#ai-deck-title') && confirms === beforeSuccessConfirm, 'successful save bypasses discard confirmation and opens saved deck');

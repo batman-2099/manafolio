@@ -339,6 +339,7 @@
   "aiDeck.deckType": "Deck type",
   "aiDeck.deckTypeRequired": "required",
   "aiDeck.playStyle": "Play style",
+  "aiDeck.colorTheme": "Color theme",
   "aiDeck.playStyleGuide": "Choose a play style (opens in a new tab)",
   "aiDeck.powerLevel": "Target power level",
   "aiDeck.pace": "Pace",

@@ -1,4 +1,5 @@
 {
+  "aiDeck.colorTheme": "Tema di colori",
   "token.reverse": "Pedina sul retro (facoltativa)",
   "token.pairHint": "Scegli la pedina stampata sul retro di questa carta fisica. Entrambe le facce condividono quantità e posizione; l’abbinamento non è automatico.",
   "token.promptTitle": "Cosa c’è sul retro?",

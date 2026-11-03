@@ -1077,7 +1077,7 @@ The official [Codex app-server](https://developers.openai.com/codex/app-server/)
 ### Ask questions and create a suggested deck
 
 1. Open **Deck Builder → AI Deck Builder**.
-2. In **Deck setup**, choose **Owned inventory** (Physical or Arena), **Format**, and **Target Size**. Choose one required **Play style** and set **Target power level** before requesting a suggestion; see the option guides below. Wishlist and Graveyard cannot supply AI decks.
+2. In **Deck setup**, choose **Owned inventory** (Physical or Arena), **Format**, and **Target Size**. Choose one required **Play style**, optionally choose a **Color theme** beside it, and set **Target power level** before requesting a suggestion; see the option guides below. Wishlist and Graveyard cannot supply AI decks.
 3. In **Card pool & filters**, optionally select colors/sets and, for Physical inventory, **Containers**. All setup options and guidance remain visible without expanding sections. Empty filters include all eligible cards. Open **Set** and type in its search field to narrow the choices; searching preserves included and excluded sets even when they are hidden. Closing and reopening the dropdown clears only the search. Set options show their Magic set symbols alongside readable names. Missing Physical copies are excluded; Arena is separate.
    - Click a set once to **include** it (check mark), again to **exclude** it (X), and a third time to **clear** that set. Keyboard users can focus the set and press Space or Enter for the same cycle. **Clear** resets all included and excluded sets.
    - With no included sets, all sets are eligible except excluded ones. With included sets, additional cards must come from those sets; exclusions take precedence. Changing filters clears the draft and conversation. **Improve with AI** still retains eligible original-deck copies up to their source quantities, even outside the chosen set filters.
@@ -1087,6 +1087,14 @@ The official [Codex app-server](https://developers.openai.com/codex/app-server/)
 6. Read the conversation and any **Review and edit draft**. Edit the name, description, strategy, quantities, removals, and commander as needed. The strategy covers opening hands, the game plan, synergies, and win conditions; review it against the actual cards. Read warnings and check the total against the target.
 7. Ask follow-up questions or request revisions. Questions leave the draft unchanged; requests for changes use your current manual edits.
 8. Select **Add Deck** only when you want to save the reviewed draft.
+
+#### Choose a color theme
+
+**Color theme** defaults to **Any**. Choose one of the 25 named two-, three-, or four-color combinations, shown with its mana symbols. Search by name or color; hovering a symbol reveals its color name. **Clear** returns to Any.
+
+The theme restricts the card pool to known color identities entirely within that combination, including known colorless cards. For example, **Azorius** allows White, Blue, White–Blue, and colorless identities, but excludes a White–Red card. The existing **Color** filter remains a separate, additional filter. Unknown identities, off-theme lands, and off-theme copies from a deck being improved are excluded; **Use all available lands** does not override the theme.
+
+The AI receives the named combination and aims to use its full colors with your eligible inventory. If the pool cannot support it, it should explain the shortage rather than invent cards. Changing or clearing the theme resets the draft and conversation; switching inventory resets the theme to Any.
 
 #### Choose a play style
 
@@ -1134,7 +1142,7 @@ The reviewed strategy is saved to the new deck's **Notes**. You can edit it befo
 
 **Expected result:** a saved, unchecked-out deck after successful validation—not a collection mutation or automatic checkout. Until Add Deck, the conversation/draft is not a saved deck. Saving rechecks ownership, quantities, copy limits, and cached rules; a failed save does not partially replace account data.
 
-Changing inventory, format, target size, play style, target power level, checked-out inclusion, or selected filters clears the conversation and draft; typing in the Set dropdown's search field only narrows its choices. The selected play style and power level accompany every request, including follow-up questions and improvements, but do not change a saved deck's inventory or category. Navigation warns before discarding unsaved AI setup, prompts, conversation, or drafts, and is blocked while generation or saving is pending. A failed save retains the draft for retry. Forcing the browser closed can still interrupt observing a server request; check saved decks before retrying. **Clear conversation, keep draft** is the explicit way to reset the conversation without discarding the current draft. Each request permits up to 4,000 characters; the session limit is 40 messages. The request log records progress, not private model reasoning.
+Changing inventory, format, target size, play style, color theme, target power level, checked-out inclusion, or selected filters clears the conversation and draft; typing in the Set or Color theme dropdown's search field only narrows its choices. The selected play style, color theme, and power level accompany every request, including follow-up questions and improvements, but do not change a saved deck's inventory or category. Navigation warns before discarding unsaved AI setup, prompts, conversation, or drafts, and is blocked while generation or saving is pending. A failed save retains the draft for retry. Forcing the browser closed can still interrupt observing a server request; check saved decks before retrying. **Clear conversation, keep draft** is the explicit way to reset the conversation without discarding the current draft. Each request permits up to 4,000 characters; the session limit is 40 messages. The request log records progress, not private model reasoning.
 
 If no eligible cards match, adjust filters or ask questions without generating a deck. Oversized inventories and incomplete or invalid responses are rejected rather than silently trimmed or partially saved. Narrow the pool for oversized requests; Ollama may need a larger configured model context. Review every suggestion: cached rules may be missing or stale, and the AI is not a guarantee of tournament legality. Partner commanders and sideboards are not supported.
 
@@ -1142,12 +1150,12 @@ If no eligible cards match, adjust filters or ask questions without generating a
 
 1. Open the saved deck and save all local edits.
 2. Select **Improve with AI**.
-3. Choose a **Play style** (or keep **Any**) and a **Target power level**, then ask for advice or describe changes. Inventory, format, and target size stay fixed for this workflow. AI improvement is available for Physical and Arena decks, not Graveyard decks.
+3. Choose a **Play style**, optionally a **Color theme** (or keep **Any**), and a **Target power level**, then ask for advice or describe changes. Inventory, format, and target size stay fixed for this workflow. AI improvement is available for Physical and Arena decks, not Graveyard decks.
 4. Review/edit the returned draft and choose:
    - **Save Deck** to replace the original's name, description, cards, and commander while retaining its identity, results, and settings. Composition changes are recorded in **Deck history** so you can compare or restore the previous list; failed saves leave both the deck and history unchanged. The reviewed strategy is appended to existing Notes without overwriting them; an identical strategy already at the end is not repeated.
    - **Save as New Deck** to keep the original and create a separate unchecked-out deck with the reviewed strategy in its Notes.
 
-**Expected result:** only the explicitly selected save action persists the draft. **Save Deck is a replacement, not a merge**. Saving a checked-out source checks it in and releases all its reservations. Cards retained from the original are marked **Pulled**, even if their quantities increase; newly added cards remain unpulled. Put removed cards back and collect any additional copies yourself; saving does not move storage locations. Eligible source-deck copies remain usable for planning despite its own reservation or the filters, up to the source quantities. Other decks' reservations can be included for planning but cannot be shared at checkout. **Save as New Deck** leaves the original's reservations unchanged; return those copies before checking out the new deck with them.
+**Expected result:** only the explicitly selected save action persists the draft. **Save Deck is a replacement, not a merge**. Saving a checked-out source checks it in and releases all its reservations. Cards retained from the original are marked **Pulled**, even if their quantities increase; newly added cards remain unpulled. Put removed cards back and collect any additional copies yourself; saving does not move storage locations. Eligible source-deck copies remain usable for planning despite its own reservation or the filters, up to the source quantities, but must satisfy the selected Color theme. Other decks' reservations can be included for planning but cannot be shared at checkout. **Save as New Deck** leaves the original's reservations unchanged; return those copies before checking out the new deck with them.
 
 ## Settings and preferences
 

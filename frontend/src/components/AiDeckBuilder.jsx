@@ -7,6 +7,9 @@ import CardImage from './CardImage';
 import RelatedTokens from './RelatedTokens';
 import DECK_TYPES from '../../../shared/aiDeckTypes.json';
 import POWER_LEVELS from '../../../shared/aiDeckPowerLevels.json';
+import COLOR_THEMES from '../../../shared/aiDeckColorThemes.json';
+
+const MANA_X = { White: -475, Blue: -370, Black: -265, Red: -160, Green: -55 };
 
 const FORMATS = {
   collection: ['Commander / EDH', 'Standard', 'Modern', 'Pioneer', 'Legacy', 'Vintage', 'Pauper', 'Casual'],
@@ -45,6 +48,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   const inventoryController = useRef(null);
   const [inventory, setInventory] = useState([]);
   const [colors, setColors] = useState([]);
+  const [colorTheme, setColorTheme] = useState('');
   const [sets, setSets] = useState([]);
   const [excludedSets, setExcludedSets] = useState([]);
   const [useAllAvailableLands, setUseAllAvailableLands] = useState(false);
@@ -69,7 +73,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   const logId = useRef(0);
   const timeFormat = useMemo(() => new Intl.DateTimeFormat(locale, { timeStyle: 'medium' }), [locale]);
   const lifetime = useRef(null);
-  const configuration = JSON.stringify({ inventoryType, includeCheckedOut, containerIds, colors, sets, excludedSets, useAllAvailableLands, format, deckType, powerLevel, targetSize });
+  const configuration = JSON.stringify({ inventoryType, includeCheckedOut, containerIds, colors, colorTheme, sets, excludedSets, useAllAvailableLands, format, deckType, powerLevel, targetSize });
   const initialConfiguration = useRef(configuration);
   const dirty = !!draft || messages.length > 0 || !!prompt.trim() || configuration !== initialConfiguration.current;
   useLayoutEffect(() => {
@@ -163,6 +167,19 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   const colorOptions = useMemo(() => Array.from(new Set([...colors, ...inventory.flatMap(card =>
     card.color_identity.length ? card.color_identity : card.color_identity_known ? ['Colorless'] : []
   )])).sort().map(color => ({ value: color, label: color === 'Colorless' ? t('inspector.colorless') : color })), [inventory, colors, t]);
+  const colorThemeOptions = useMemo(() => COLOR_THEMES.map(theme => ({
+    value: theme.id,
+    searchText: `${theme.name} ${theme.colors.map(color => t(`dash.color.${color}`)).join(' ')}`,
+    label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+      {theme.name}
+      {theme.colors.map(color => <span key={color} title={t(`dash.color.${color}`)}>
+        <svg role="img" aria-label={t(`dash.color.${color}`)} width="20" height="20" viewBox={`${MANA_X[color] - 50} 0 100 100`}>
+          <image href={`${import.meta.env.BASE_URL}mana.svg`} x="-945" y="-210.002" width="1045" height="730.002" />
+        </svg>
+      </span>)}
+    </span>,
+  })), [t]);
+  const themeColors = COLOR_THEMES.find(theme => theme.id === colorTheme)?.colors;
   const setOptions = useMemo(() => Array.from(new Map([
     ...[...sets, ...excludedSets].map(id => [id, { value: id, label: id }]),
     ...inventory.filter(card => card.set_id).map(card => [
@@ -180,6 +197,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
     value: location.id, label: location.name,
   })).sort((a, b) => a.label.localeCompare(b.label, locale)), [locations, locale]);
   const filteredInventory = useMemo(() => inventory.flatMap(card => {
+    if (themeColors && (!card.color_identity_known || !card.color_identity.every(color => themeColors.includes(color)))) return [];
     const landSetOverride = useAllAvailableLands && ((card.subtypes || []).includes('Land') || /\bLand\b/.test((card.type_line || '').split(' — ')[0]));
     const matchesFilters = (landSetOverride || (!excludedSets.includes(card.set_id) && (sets.length === 0 || sets.includes(card.set_id))))
       && (colors.length === 0 || colors.some(color => color === 'Colorless'
@@ -187,7 +205,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
         : card.color_identity.includes(color)));
     if (matchesFilters) return [card];
     return card.source_qty > 0 ? [{ ...card, available_qty: Math.min(card.available_qty, card.source_qty) }] : [];
-  }), [inventory, colors, sets, excludedSets, useAllAvailableLands]);
+  }), [inventory, colors, themeColors, sets, excludedSets, useAllAvailableLands]);
   const cardById = useMemo(() => new Map(filteredInventory.map(card => [String(card.id), card])), [filteredInventory]);
   const counts = useMemo(() => filteredInventory.reduce((sum, card) => ({
     owned: sum.owned + card.owned_qty, available: sum.available + card.available_qty, locked: sum.locked + card.locked_qty,
@@ -236,7 +254,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' }, signal,
         body: JSON.stringify({
           inventory_type: inventoryType, format, target_size: targetSize, prompt: content, colors, sets, excluded_sets: excludedSets,
-          deck_type: deckType, power_level: powerLevel,
+          deck_type: deckType, color_theme: colorTheme, power_level: powerLevel,
           use_all_available_lands: useAllAvailableLands,
           messages,
           current_draft: draft ? {
@@ -329,7 +347,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
           <div style={{ ...rowStyle, alignItems: 'start' }}>
             <div className="form-group" style={{ flex: '1 1 180px' }}>
               <label htmlFor="ai-inventory">{t('aiDeck.inventory')}</label>
-              <select id="ai-inventory" className="input-control" disabled={!!sourceDeck} value={inventoryType} onChange={event => { clearInventory(); setContainerIds([]); setColors([]); setSets([]); setExcludedSets([]); setIncludeCheckedOut(false); setInventoryType(event.target.value); setFormat(event.target.value === 'arena' ? 'Standard' : 'Commander / EDH'); setTargetSize(event.target.value === 'arena' ? 60 : 100); }}>
+              <select id="ai-inventory" className="input-control" disabled={!!sourceDeck} value={inventoryType} onChange={event => { clearInventory(); setContainerIds([]); setColors([]); setColorTheme(''); setSets([]); setExcludedSets([]); setIncludeCheckedOut(false); setInventoryType(event.target.value); setFormat(event.target.value === 'arena' ? 'Standard' : 'Commander / EDH'); setTargetSize(event.target.value === 'arena' ? 60 : 100); }}>
                 <option value="collection">{t('aiDeck.physical')}</option><option value="arena">MTG Arena</option>
               </select>
             </div>
@@ -345,7 +363,8 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
               <input id="ai-target" form="ai-conversation-form" className="input-control" type="number" min="1" max="250" step="1" required readOnly={!!sourceDeck || isCommander} value={targetSize} onChange={event => { clearDraft(); setTargetSize(event.target.value === '' ? '' : Number(event.target.value)); }} />
             </div>
           </div>
-            <div className="form-group" style={{ marginTop: '1rem' }}>
+            <div style={{ ...rowStyle, alignItems: 'start', marginTop: '1rem' }}>
+            <div className="form-group" style={{ flex: '1 1 180px', minWidth: 0 }}>
               <label htmlFor="ai-deck-type">{t('aiDeck.playStyle')} ({t('aiDeck.deckTypeRequired')})</label>
               <select id="ai-deck-type" name="deck_type" form="ai-conversation-form" className="input-control" required value={deckType} aria-describedby={deckType ? 'ai-deck-type-description ai-deck-type-style' : undefined} onChange={event => { clearDraft(); setDeckType(event.target.value); }}>
                 {DECK_TYPES.map(type => <option key={type.id} value={type.id}>{t(`aiDeckType.${type.id}.name`)}</option>)}
@@ -357,6 +376,20 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
                 <p id="ai-deck-type-description">{t(`aiDeckType.${deckType}.description`)}</p>
                 <p id="ai-deck-type-style" style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{t(`aiDeckType.${deckType}.style`)}</p>
               </section>}
+            </div>
+            <div className="form-group" style={{ flex: '1 1 240px', minWidth: 0 }}>
+              <label>{t('aiDeck.colorTheme')}</label>
+              <MultiSelectDropdown
+                key={inventoryType}
+                label={t('aiDeck.colorTheme')}
+                allLabel={t('aiDeckType.any.name')}
+                singleSelect
+                searchable
+                value={colorTheme ? [colorTheme] : []}
+                options={colorThemeOptions}
+                onChange={value => { if (!busy) { clearDraft(); setColorTheme(value[0] || ''); } }}
+              />
+            </div>
             </div>
             <div className="form-group" style={{ marginTop: '1rem', minWidth: 0, overflowWrap: 'anywhere' }}>
               <label htmlFor="ai-power-level">{t('aiDeck.powerLevel')}: {powerLevel}: {powerLevelName}</label>
@@ -471,7 +504,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
           <div>
           <p role="status" style={{ margin: 0, padding: 'var(--space-4)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', color: 'var(--text-strong)', fontWeight: 600 }}>{inventoryLoading ? t('common.loading') : t('aiDeck.matchingCounts', counts)}</p>
           {inventoryError && <p role="alert">{inventoryError} <button type="button" className="btn btn-secondary" onClick={() => { clearInventory(); setInventoryRevision(value => value + 1); }}>{t('aiDeck.retry')}</button></p>}
-          {!inventoryLoading && !inventoryError && counts.available === 0 && <p>{t(colors.length || sets.length || excludedSets.length || containerIds.length ? 'aiDeck.emptyFilters' : 'aiDeck.emptyInventory')}</p>}
+          {!inventoryLoading && !inventoryError && counts.available === 0 && <p>{t(colors.length || colorTheme || sets.length || excludedSets.length || containerIds.length ? 'aiDeck.emptyFilters' : 'aiDeck.emptyInventory')}</p>}
           </div>
             </div>
           </section>

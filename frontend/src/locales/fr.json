@@ -1,4 +1,5 @@
 {
+  "aiDeck.colorTheme": "Thème de couleurs",
   "token.reverse": "Jeton au verso (facultatif)",
   "token.pairHint": "Choisissez le jeton imprimé au verso de cette carte physique. Les deux faces partagent la quantité et l’emplacement ; aucune association n’est automatique.",
   "token.promptTitle": "Qu’y a-t-il au verso ?",

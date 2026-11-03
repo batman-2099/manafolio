@@ -1,4 +1,5 @@
 {
+  "aiDeck.colorTheme": "Tema de colores",
   "token.reverse": "Ficha del reverso (opcional)",
   "token.pairHint": "Elige la ficha impresa al otro lado de esta carta física. Ambas caras comparten cantidad y ubicación; no se emparejan automáticamente.",
   "token.promptTitle": "¿Qué hay en el reverso?",
