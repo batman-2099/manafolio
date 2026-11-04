@@ -518,7 +518,7 @@ button, input, select, textarea {
 .dashboard-summary-value {
   color: var(--text-strong);
   font-size: var(--text-3xl);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
