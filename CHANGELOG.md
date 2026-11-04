@@ -4,6 +4,8 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Keep Dashboard inventory choices in a readable two-column layout on small phones, with wrapping labels and unchanged filtering.
+- Show all Settings section links in a wrapping two-column index on mobile and tablet; wrap long desktop labels instead of clipping them.
 - Replace the red missing-card outline with a red Missing badge with white text in Collection gallery and list views, alongside existing deck statuses. Stacks show missing-copy counts, such as “2 of 3 Missing”; single copies show “Missing”.
 - Show each missing entry's red Missing badge in the “Choose a stored entry” dialog, including its missing-copy count for multi-copy entries.
 - Separate AI Deck Builder's Deck setup and Card pool sections with a theme-colored divider: vertical on desktop and horizontal on mobile.

@@ -2,8 +2,8 @@
 .settings-page { display: flex; flex-direction: column; gap: var(--space-6); }
 .settings-layout { display: grid; grid-template-columns: 14rem minmax(0, 1fr); align-items: start; gap: var(--space-8); }
 .settings-sections { display: flex; flex-direction: column; position: sticky; top: var(--space-6); gap: var(--space-1); min-width: 0; overflow-x: auto; counter-reset: settings-index; }
-.settings-sections a { display: flex; gap: var(--space-3); align-items: baseline; min-height: 44px; padding: var(--space-2); color: var(--text-secondary); text-decoration: none; line-height: 1.5; font-size: var(--text-md); border-radius: var(--radius-sm); white-space: nowrap; }
-.settings-sections a::before { counter-increment: settings-index; content: counter(settings-index, decimal-leading-zero); color: var(--text-muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.settings-sections a { display: flex; gap: var(--space-3); align-items: baseline; min-height: 44px; padding: var(--space-2); color: var(--text-secondary); text-decoration: none; line-height: 1.5; font-size: var(--text-md); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+.settings-sections a::before { flex-shrink: 0; counter-increment: settings-index; content: counter(settings-index, decimal-leading-zero); color: var(--text-muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
 .settings-sections a:hover { color: var(--text-strong); background: var(--surface-2); }
 .settings-grid { display: grid; min-width: 0; gap: 0; }
 .settings-grid > :is(.view-section, .ai-settings) { display: grid; gap: var(--space-4); min-width: 0; padding: var(--space-6) 0 var(--space-8); border: 0; border-top: 1px solid var(--border-glass); border-radius: 0; background: none; box-shadow: none; }
@@ -28,8 +28,9 @@
 .ai-connection-error p { color: var(--text-negative); }
 @media (max-width: 900px) {
   .settings-layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
-  .settings-sections { position: static; flex-direction: row; gap: var(--space-4); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border-glass); }
-  .settings-sections a { flex: 0 0 auto; gap: var(--space-2); padding-inline: var(--space-1); }
+  .settings-sections { position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border-glass); }
+  .settings-sections a { gap: var(--space-2); padding-inline: var(--space-1); }
+  .settings-sections a::before { display: none; }
   .settings-grid h3[id] { scroll-margin-top: 7rem; }
 }
 @media (min-width: 1280px) {
