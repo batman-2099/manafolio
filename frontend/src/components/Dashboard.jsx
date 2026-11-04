@@ -453,9 +453,7 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
                     labelStyle={{ color: 'var(--text-primary)' }}
                     formatter={v => [formatMoney(v), t('dash.value')]}
                   />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                    {sets.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
-                  </Bar>
+                  <Bar dataKey="value" fill="var(--chart-series-1)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
               </div>
