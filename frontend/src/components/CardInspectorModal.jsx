@@ -1006,13 +1006,16 @@ function CardInspectorSelection(props) {
         <h2 id={titleId}>{t('inspector.chooseEntry')}</h2>
         <p>{getCardDisplayName(props.card.name, props.card.printed_name)}</p>
         <p id={descriptionId}>{t('inspector.chooseEntryHint')}</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', margin: '1rem 0' }}>
+        <div className="stored-entry-choices" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', margin: '1rem 0' }}>
           {entries.map(entry => (
             <button key={entry.entry_id || entry.id} type="button" className="btn btn-secondary" onClick={() => setSelectedEntry(entry)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', whiteSpace: 'normal', overflowWrap: 'anywhere', textAlign: 'start', padding: '0.75rem' }}>
               <span>{entry.printing || 'Normal'} · {entry.condition || 'Near Mint'} · {entry.language || 'English'} · ×{entry.quantity ?? 1}</span>
               <span>{[entry.storage_unit_name, entry.location_name || (entry.location_id ? t('inspector.currentStorage') : t('bulk.unassignedPile')), entry.compartment_name, entry.position != null && getSlotNumber(entry) != null ? t('stocktake.slot', { slot: getSlotNumber(entry) }) : null].filter(Boolean).join(' · ')}</span>
-              <span>{t('inspector.entryIdentifier', { id: entry.entry_id || entry.id })}</span>
-              <CardDeckStatus card={entry} details />
+              {entry.deck_allocations?.length ? entry.deck_allocations.map(deck => (
+                <span key={`${deck.deck_id}:${deck.checked_out}`} className="card-deck-status-summary">
+                  {t(deck.checked_out ? 'deck.inPlay' : 'deck.pulled')}: {deck.name}
+                </span>
+              )) : <CardDeckStatus card={entry} />}
               {!!entry.missing && (
                 <span className="card-missing-status">{entry.quantity > 1
                   ? t('inspector.missingCount', { count: entry.quantity, total: entry.quantity })

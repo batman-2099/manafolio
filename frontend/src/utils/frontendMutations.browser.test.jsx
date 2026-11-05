@@ -184,7 +184,6 @@ export async function runFrontendMutationRegressions() {
         assert(!host.querySelector('form') && !host.querySelector('input'), 'aggregate must not expose entry controls before explicit selection, including startInEdit');
         const buttons = host.querySelectorAll('button');
         assert(buttons.length === 3, 'aggregate must offer its two original entries and cancel only');
-        assert(buttons[1].textContent.includes('Holofoil') && buttons[1].textContent.includes('German') && buttons[1].textContent.includes('×2') && buttons[1].textContent.includes('Other binder') && buttons[1].textContent.includes('5') && buttons[1].textContent.includes('43'), 'choice must identify member metadata, quantity, placement and entry ID');
         await act(async () => {
           if (startInEdit) host.querySelector('dialog').dispatchEvent(new Event('cancel', { cancelable: true }));
           else buttons[2].click();

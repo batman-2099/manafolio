@@ -1358,6 +1358,11 @@ button.collection-card-trigger {
   font-weight: 600;
 }
 
+.stored-entry-choices :is(.card-deck-status-summary, .card-missing-status) {
+  align-self: flex-start;
+  text-align: start;
+}
+
 .card-deck-status-summary svg { flex-shrink: 0; }
 .card-deck-status-decks { display: flex; flex-direction: column; gap: var(--space-1); font-weight: 400; }
 .card-deck-status--all-out .card-deck-status-summary { font-weight: 800; }
