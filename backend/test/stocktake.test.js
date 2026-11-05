@@ -44,6 +44,29 @@ async function main() {
   const initialSnapshot = (await request('GET', endpoint)).body;
   assert.ok(initialSnapshot.entries.every(row => row.last_verified_at === null), 'new entries have no fabricated verification date');
   assert.ok(initialSnapshot.entries.every(row => row.compartment_id === compartment));
+  assert.deepStrictEqual(initialSnapshot.entries.find(row => row.entry_id === ids[2]).deck_allocations,
+    [{ deck_id: deck, name: 'Reserved sample', quantity: 1, checked_out: true }]);
+  assert.deepStrictEqual(initialSnapshot.entries.find(row => row.entry_id === ids[0]).deck_allocations, []);
+  const secondDeck = (await db.run("INSERT INTO decks (name, user_id, checked_out) VALUES ('Second reserved', 1, 1)")).lastID;
+  const pulledDeck = (await db.run("INSERT INTO decks (name, user_id) VALUES ('Pulled sample', 1)")).lastID;
+  const foreignDeck = (await db.run("INSERT INTO decks (name, user_id) VALUES ('Private other deck', 2)")).lastID;
+  await db.run("INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, 'stock-2', 1)", [secondDeck]);
+  await db.run("INSERT INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, 'stock-2', ?, 1)", [secondDeck, ids[2]]);
+  for (const id of [pulledDeck, foreignDeck]) {
+    await db.run("INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out) VALUES (?, 'stock-2', 1, 1)", [id]);
+  }
+  const allocatedSnapshot = (await request('GET', endpoint)).body;
+  assert.deepStrictEqual(allocatedSnapshot.entries.find(row => row.entry_id === ids[2]).deck_allocations, [
+    { deck_id: deck, name: 'Reserved sample', quantity: 1, checked_out: true },
+    { deck_id: secondDeck, name: 'Second reserved', quantity: 1, checked_out: true },
+    { deck_id: pulledDeck, name: 'Pulled sample', quantity: 1, checked_out: false },
+  ], 'copy allocations identify each deck, distinguish pulled copies, and exclude other accounts');
+  await db.run('UPDATE deck_cards SET checked_out = 0 WHERE deck_id = ?', [pulledDeck]);
+  const unpulledSnapshot = (await request('GET', endpoint)).body;
+  assert.notStrictEqual(unpulledSnapshot.revision, allocatedSnapshot.revision, 'pull changes invalidate displayed copy assignments');
+  assert.strictEqual(unpulledSnapshot.entries.find(row => row.entry_id === ids[2]).deck_allocations.length, 2,
+    'a saved deck list alone does not mean a physical copy is in the deck');
+  for (const id of [secondDeck, pulledDeck, foreignDeck]) await db.run('DELETE FROM decks WHERE id = ?', [id]);
   await db.run('UPDATE collection SET last_verified_at = ? WHERE user_id = 1 AND id IN (?, ?)', [oldVerifiedAt, ids[1], ids[3]]);
   const before = await state();
   let snapshot = (await request('GET', endpoint)).body;

@@ -10,7 +10,7 @@ const {
   rebalanceCompartmentByScheme,
   STACK_KEY_SQL
 } = require('../utils/compartmentSort');
-const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, checkedOutSources, physicalCardEntries } = require('../utils/collectionHelpers');
+const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, checkedOutSources, cardDeckAllocations, physicalCardEntries } = require('../utils/collectionHelpers');
 const { normalizeMtgColorIdentity } = require('../utils/mtgColors');
 const { isMtgToken } = require('../utils/tokenPairing');
 const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
@@ -361,12 +361,15 @@ async function stocktakeSnapshot(userId, locationId) {
     throw Object.assign(new Error('Container inventory has changed. Correct its placements before checking it.'), { status: 409, code: 'stocktake.stale' });
   }
   const ids = new Set(rows.map(row => row.id));
-  const reservations = (await checkedOutSources(userId)).filter(source => ids.has(source.entry_id))
+  const sources = (await checkedOutSources(userId))
     .sort((a, b) => a.entry_id - b.entry_id || a.deck_id - b.deck_id || a.card_id.localeCompare(b.card_id));
-  const revision = createHash('sha256').update(JSON.stringify([location, compartments, rows, reservations])).digest('hex');
+  const reservations = sources.filter(source => ids.has(source.entry_id));
+  const { deckAllocations } = await cardDeckAllocations(userId, sources);
+  const entryAllocations = rows.map(row => deckAllocations.get(row.id) || []);
+  const revision = createHash('sha256').update(JSON.stringify([location, compartments, rows, reservations, entryAllocations])).digest('hex');
   return {
     location, revision,
-    entries: rows.map(row => ({
+    entries: rows.map((row, index) => ({
       entry_id: row.id, card_id: row.card_id, name: row.name, printed_name: row.printed_name,
       reverse_card_id: row.reverse_card_id, reverse_name: row.reverse_name, reverse_image_url: row.reverse_image_url,
       set_name: row.set_name, set_id: row.set_id, number: row.number, image_url: row.image_url, game: row.game,
@@ -374,6 +377,7 @@ async function stocktakeSnapshot(userId, locationId) {
       missing: row.missing, position: row.position, compartment_id: row.compartment_id, last_verified_at: row.last_verified_at,
       compartment_label: compartmentLabel(compartments.find(comp => comp.id === row.compartment_id), location.type),
       reserved_quantity: reservations.filter(source => source.entry_id === row.id).reduce((sum, source) => sum + source.quantity, 0),
+      deck_allocations: entryAllocations[index],
     })),
   };
 }

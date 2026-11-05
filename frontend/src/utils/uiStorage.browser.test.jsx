@@ -4,6 +4,7 @@ import { DndContext, MouseSensor, useSensor, useSensors } from '@dnd-kit/core';
 import CompartmentView from '../components/CompartmentView';
 import CardDeckStatus from '../components/CardDeckStatus';
 import CheckoutWizardModal from '../components/CheckoutWizardModal';
+import StocktakeDialog from '../components/StocktakeDialog';
 import { I18nProvider } from './i18n';
 import en from '../locales/en.json';
 
@@ -47,6 +48,13 @@ export async function runUiStorageRegressions({ pressKey, dragCard } = {}) {
     else if (url === '/api/locations/7') body = { id: 7, type: 'Binder', sort_order: 'custom' };
     else if (url === '/api/locations/7/compartments') body = [compartment];
     else if (url === '/api/collection?compartment_id=70') body = cards.map(card => ({ ...card }));
+    else if (url === '/api/locations/7/stocktake') body = { revision: 'fixture', entries: [{
+      ...cards[0], quantity: 4, reserved_quantity: 2, deck_allocations: [
+        { deck_id: 1, name: 'Boros, skies', quantity: 1, checked_out: true },
+        { deck_id: 2, name: 'Second deck', quantity: 1, checked_out: true },
+        { deck_id: 3, name: 'Pulled deck', quantity: 1, checked_out: false },
+      ],
+    }] };
     else throw new Error(`Unexpected storage fixture request: ${url}`);
     return { ok: true, json: async () => body };
   };
@@ -116,6 +124,17 @@ export async function runUiStorageRegressions({ pressKey, dragCard } = {}) {
     await act(async () => render(<CardDeckStatus card={{ ...pulledCopy, quantity: 1 }} />));
     assert(summary().textContent !== en['deck.inPlay'], 'a single Pulled copy must not be relabeled as checked out');
     cases.push('checkout counts, full emphasis, stacked sources, distinct decks and pulled status');
+
+    await act(async () => render(<StocktakeDialog location={{ id: 7, name: 'Fixture binder' }} onClose={() => {}} onApplied={() => {}} />));
+    const copies = [...document.querySelectorAll('.stocktake-card')];
+    assert(copies.length === 4, 'stocktake must still show each physical copy');
+    for (const [index, name, status] of [[0, 'Boros, skies', 'deck.inPlay'], [1, 'Second deck', 'deck.inPlay'], [2, 'Pulled deck', 'deck.pulled']]) {
+      assert(copies[index].textContent.includes(name) && copies[index].textContent.includes(en[status]),
+        'each assigned copy must identify its own deck and checkout status');
+    }
+    assert(!copies[3].textContent.includes('deck') && !copies[3].textContent.includes(en['deck.inPlay']),
+      'an unallocated copy must not inherit a sibling copy’s deck');
+    cases.push('stocktake deck names and pulled status mapped to individual copies');
 
     const missingStack = [reserved, { ...reserved, entry_id: 3, missing: 1 }];
     await act(async () => render(<CompartmentView compartment={compartment} cards={missingStack} locationType="Binder" allowStacking />));

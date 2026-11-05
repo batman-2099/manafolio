@@ -12,7 +12,7 @@ const { searchLimiter } = require('../middleware/auth');
 const { resolveCardPrice, parseCardRow, recordPrice } = require('../utils/priceHelpers');
 const { parseSetList } = require('../utils/setQuery');
 const { compartmentLabel, isBinderType, rebalanceCompartmentByScheme, stackKey } = require('../utils/compartmentSort');
-const { checkedOutAllocation, checkedOutSources, physicalCardEntries, sourceEntries, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, defaultCompartmentPlan } = require('../utils/collectionHelpers');
+const { checkedOutAllocation, checkedOutSources, cardDeckAllocations, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { splitPrice } = require('../utils/splitPrice');
 const { isMtgToken, validateReverseCard } = require('../utils/tokenPairing');
@@ -505,49 +505,9 @@ router.get('/collection', async (req, res) => {
       }
     }
 
-    const alloc = new Map();
-    const deckAllocations = new Map();
-    const deckNames = new Map(listType === 'collection'
-      ? (await db.all("SELECT id, name FROM decks WHERE user_id = ? AND inventory_type = 'collection'", [req.user.id]))
-        .map(deck => [deck.id, deck.name])
-      : []);
-    function recordAllocation(entryId, deckId, quantity, checkedOut) {
-      if (!deckAllocations.has(entryId)) deckAllocations.set(entryId, []);
-      const allocations = deckAllocations.get(entryId);
-      const existing = allocations.find(item => item.deck_id === deckId && item.checked_out === checkedOut);
-      if (existing) existing.quantity += quantity;
-      else allocations.push({ deck_id: deckId, name: deckNames.get(deckId), quantity, checked_out: checkedOut });
-    }
-    if (listType === 'collection') {
-      for (const source of await checkedOutSources(req.user.id)) {
-        alloc.set(source.entry_id, (alloc.get(source.entry_id) || 0) + source.quantity);
-        recordAllocation(source.entry_id, source.deck_id, source.quantity, true);
-      }
-    }
-    // Display pulled copies without turning a pull flag into a reservation.
-    const inDeck = new Map(alloc);
-    if (listType === 'collection') {
-      const pulled = await db.all(`
-        SELECT dc.*, d.game FROM deck_cards dc JOIN decks d ON d.id = dc.deck_id
-        WHERE d.user_id = ? AND d.inventory_type = 'collection'
-          AND d.checked_out = 0 AND dc.checked_out = 1 AND dc.quantity > 0
-        ORDER BY (dc.source_entry_id IS NOT NULL) DESC, d.id, dc.card_id
-      `, [req.user.id]);
-      const entries = pulled.length ? await physicalCardEntries(req.user.id) : [];
-      for (const card of pulled) {
-        let needed = card.quantity;
-        for (const entry of sourceEntries(entries, card, card.game)) {
-          const used = inDeck.get(entry.entry_id) || 0;
-          const take = Math.min(needed, Math.max(0, entry.quantity - used));
-          if (take > 0) {
-            inDeck.set(entry.entry_id, used + take);
-            recordAllocation(entry.entry_id, card.deck_id, take, false);
-          }
-          needed -= take;
-          if (needed <= 0) break;
-        }
-      }
-    }
+    const { alloc, inDeck, deckAllocations } = listType === 'collection'
+      ? await cardDeckAllocations(req.user.id, await checkedOutSources(req.user.id))
+      : { alloc: new Map(), inDeck: new Map(), deckAllocations: new Map() };
 
     const formatted = rows.map(row => ({
       ...parseCardRow(row),

@@ -4,6 +4,7 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Show each assigned copy's deck name in Take Stock, distinguishing checked-out and Pulled copies while leaving unassigned copies unlabeled.
 - Keep Dashboard inventory choices in a readable two-column layout on small phones, with wrapping labels and unchanged filtering.
 - Show all Settings section links in a wrapping two-column index on mobile and tablet; wrap long desktop labels instead of clipping them.
 - Replace the red missing-card outline with a red Missing badge with white text in Collection gallery and list views, alongside existing deck statuses. Stacks show missing-copy counts, such as “2 of 3 Missing”; single copies show “Missing”.

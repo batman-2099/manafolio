@@ -98,13 +98,18 @@ export default function StocktakeDialog({ location, onClose, onApplied }) {
           const key = `${entry.entry_id}:${copyIndex}`;
           const name = displayName(entry) || entry.card_id;
           const disabled = !!pending || loading || !!error;
+          let allocatedCopies = 0;
+          const deck = entry.deck_allocations?.find(allocation => {
+            allocatedCopies += allocation.quantity;
+            return copyIndex < allocatedCopies;
+          });
           return <li key={key} data-copy={key} className="stocktake-card" aria-busy={pending?.key === key}>
             <button type="button" className="stocktake-image" aria-label={`${t('inspector.zoomHint')}: ${name}`} aria-haspopup="dialog" onClick={() => setZoomCard(entry)}>
               <CardImage card={entry} loading="lazy" />
             </button>
             <strong>{name} {getPrintingBadgeLabel(entry.printing) && <span style={{ ...getPrintingBadgeStyle(entry.printing), display: 'inline-block', fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px' }}>{getPrintingBadgeLabel(entry.printing)}</span>}</strong>
             <span className="stocktake-meta">{t('stocktake.lastVerified', { date: entry.last_verified_at ? new Date(entry.last_verified_at).toLocaleDateString(locale) : t('stocktake.never') })}</span>
-            {copyIndex < entry.reserved_quantity && <span className="stocktake-meta">{t('loc.inPlay')}</span>}
+            {deck && <span className="stocktake-meta">{t('cardDeck.allocation', { name: deck.name, count: 1, status: t(deck.checked_out ? 'deck.inPlay' : 'deck.pulled') })}</span>}
             {entry.quantity > 1 && <span className="stocktake-meta">{t('stocktake.copy', { number: copyIndex + 1, total: entry.quantity })}</span>}
             {error?.key === key && <p className="stocktake-error">{t(error.message)}</p>}
             <div className="stocktake-actions" role="group" aria-label={name}>

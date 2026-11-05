@@ -118,6 +118,45 @@ async function checkedOutSources(userId) {
   return sources;
 }
 
+// Shared display allocation: pulled copies are shown, but never reserved.
+async function cardDeckAllocations(userId, sources) {
+  const alloc = new Map();
+  const inDeck = new Map();
+  const deckAllocations = new Map();
+  const deckNames = new Map((await db.all(
+    "SELECT id, name FROM decks WHERE user_id = ? AND inventory_type = 'collection'", [userId]
+  )).map(deck => [deck.id, deck.name]));
+  function recordAllocation(entryId, deckId, quantity, checkedOut) {
+    if (!deckAllocations.has(entryId)) deckAllocations.set(entryId, []);
+    const allocations = deckAllocations.get(entryId);
+    const existing = allocations.find(item => item.deck_id === deckId && item.checked_out === checkedOut);
+    if (existing) existing.quantity += quantity;
+    else allocations.push({ deck_id: deckId, name: deckNames.get(deckId), quantity, checked_out: checkedOut });
+    inDeck.set(entryId, (inDeck.get(entryId) || 0) + quantity);
+  }
+  for (const source of sources) {
+    alloc.set(source.entry_id, (alloc.get(source.entry_id) || 0) + source.quantity);
+    recordAllocation(source.entry_id, source.deck_id, source.quantity, true);
+  }
+  const pulled = await db.all(`
+    SELECT dc.*, d.game FROM deck_cards dc JOIN decks d ON d.id = dc.deck_id
+    WHERE d.user_id = ? AND d.inventory_type = 'collection'
+      AND d.checked_out = 0 AND dc.checked_out = 1 AND dc.quantity > 0
+    ORDER BY (dc.source_entry_id IS NOT NULL) DESC, d.id, dc.card_id
+  `, [userId]);
+  const entries = pulled.length ? await physicalCardEntries(userId) : [];
+  for (const card of pulled) {
+    let needed = card.quantity;
+    for (const entry of sourceEntries(entries, card, card.game)) {
+      const take = Math.min(needed, Math.max(0, entry.quantity - (inDeck.get(entry.entry_id) || 0)));
+      if (take > 0) recordAllocation(entry.entry_id, card.deck_id, take, false);
+      needed -= take;
+      if (needed <= 0) break;
+    }
+  }
+  return { alloc, inDeck, deckAllocations };
+}
+
 async function checkedOutAllocation(userId, excludeDeckId = null) {
   const allocated = new Map();
   for (const source of await checkedOutSources(userId)) {
@@ -460,6 +499,7 @@ module.exports = {
   moveContainerCopies,
   checkedOutAllocation,
   checkedOutSources,
+  cardDeckAllocations,
   deckMissingCards,
   deckCardSources,
   validateDeckSource,
