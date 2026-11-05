@@ -995,7 +995,7 @@ function CardInspectorSelection(props) {
   const { t } = useT();
   const titleId = useId();
   const descriptionId = useId();
-  const entries = props.card.stack_entries;
+  const entries = props.card.stack_entries?.toSorted((a, b) => (getSlotNumber(a) ?? Infinity) - (getSlotNumber(b) ?? Infinity));
   const [selectedEntry, setSelectedEntry] = useState(null);
   const card = selectedEntry || (entries?.length === 1 ? entries[0] : !entries?.length ? props.card : null);
   if (card) return <CardInspectorContent key={card.entry_id || card.id} {...props} card={card} />;

@@ -18,7 +18,7 @@ export async function runInspectorNavigationRegressions() {
   const root = createRoot(host);
   const cards = [1, 2, 3].map(entry_id => ({ entry_id, id: 'sample-printing', card_id: 'sample-printing', name: `Sample ${entry_id}`, quantity: entry_id, game: 'mtg', list_type: 'collection', printing: 'Normal', set_id: `set${entry_id}`, set_name: `Sample Set ${entry_id}` }));
   cards[0] = { ...cards[0], subtypes: ['Token'], image_url: '/logo.svg?front', reverse_card_id: 'sample-reverse', reverse_name: 'Sample reverse', reverse_image_url: '/logo.svg?reverse' };
-  cards[2] = { ...cards[2], stack_entries: [{ ...cards[2], missing: 1 }, { ...cards[2], entry_id: 4, quantity: 1 }, { ...cards[2], entry_id: 5, quantity: 1, missing: 1 }] };
+  cards[2] = { ...cards[2], stack_entries: [{ ...cards[2], position: 10000, missing: 1 }, { ...cards[2], entry_id: 4, position: 2000, quantity: 1 }, { ...cards[2], entry_id: 5, quantity: 1, missing: 1 }] };
   cards[2].stack_entries[0].deck_allocations = [
     { deck_id: 1, name: 'Sample reserved deck', quantity: 1, checked_out: true },
     { deck_id: 2, name: 'Sample pulled deck', quantity: 1, checked_out: false },
@@ -105,7 +105,11 @@ export async function runInspectorNavigationRegressions() {
     await click(next());
     assert(updates === 1, 'successful quick changes refresh parent before navigating');
     assert(host.textContent.includes(en['inspector.chooseEntry']), 'next aggregate still requires explicit member choice');
-    const entryButton = id => host.querySelectorAll('.stored-entry-choices > button')[cards[2].stack_entries.findIndex(entry => entry.entry_id === id)];
+    const choices = [...host.querySelectorAll('.stored-entry-choices > button')];
+    assert(choices[0].textContent.includes('Slot 2') && choices[1].textContent.includes('Slot 10') && !choices[2].textContent.includes('Slot'),
+      'stored entries sort numerically by slot, with unpositioned copies last');
+    assert(cards[2].stack_entries.map(entry => entry.entry_id).join() === '3,4,5', 'sorting must not mutate the source stack');
+    const entryButton = id => choices[[4, 3, 5].indexOf(id)];
     assert(entryButton(3).querySelector('.card-missing-status')?.textContent === '3 of 3 Missing', 'missing entry counts all its copies');
     assert(!entryButton(4).querySelector('.card-missing-status'), 'available entry has no missing tag');
     assert(entryButton(5).querySelector('.card-missing-status')?.textContent === en['inspector.missing'], 'single missing entry shows the missing tag');
