@@ -4,7 +4,7 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
-- Left-align card-detail Missing and deck tags, and include each deck name inside its In Deck or Pulled tag.
+- Left-align card-detail Missing and deck tags, include each deck name inside its In Deck or Pulled tag, and separate the tags from the metadata above with an 8px gap.
 - Order “Choose a stored entry” choices by slot number, lowest first, with entries without a slot last.
 - Left-align Missing and In Deck tags in the “Choose a stored entry” dialog, with each deck name inside its “In Deck: [deck name]” or “Pulled: [deck name]” tag; remove the internal Entry # line.
 - Show each assigned copy's deck name in Take Stock as “In Deck: [deck name]” or “Pulled: [deck name]”, leaving unassigned copies unlabeled.
