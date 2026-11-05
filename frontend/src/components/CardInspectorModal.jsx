@@ -539,7 +539,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
             {needsDeckDetails && deckDetailsError && <p role="alert">
               {t('loc.errLoadCards')} <button type="button" className="btn btn-secondary" onClick={() => setDeckDetailsRetry(value => value + 1)}>{t('loc.retry')}</button>
             </p>}
-            {(!needsDeckDetails || deckDetails) && <CardDeckStatus card={needsDeckDetails ? deckDetails : card} details />}
+            {(!needsDeckDetails || deckDetails) && <StoredEntryStatus card={needsDeckDetails ? { ...card, ...deckDetails } : card} />}
 
             {/* MTG color pips and type line. */}
             {(activeCard.supertype === 'MTG' || activeCard.game === 'mtg') && (
@@ -991,6 +991,20 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   );
 }
 
+function StoredEntryStatus({ card }) {
+  const { t } = useT();
+  return <span className="stored-entry-status">
+    {card.deck_allocations?.length ? card.deck_allocations.map(deck => (
+      <span key={`${deck.deck_id}:${deck.checked_out}`} className="card-deck-status-summary">
+        {t(deck.checked_out ? 'deck.inPlay' : 'deck.pulled')}: {deck.name}
+      </span>
+    )) : <CardDeckStatus card={card} />}
+    {!!card.missing && <span className="card-missing-status">{card.quantity > 1
+      ? t('inspector.missingCount', { count: card.quantity, total: card.quantity })
+      : t('inspector.missing')}</span>}
+  </span>;
+}
+
 function CardInspectorSelection(props) {
   const { t } = useT();
   const titleId = useId();
@@ -1011,16 +1025,7 @@ function CardInspectorSelection(props) {
             <button key={entry.entry_id || entry.id} type="button" className="btn btn-secondary" onClick={() => setSelectedEntry(entry)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', whiteSpace: 'normal', overflowWrap: 'anywhere', textAlign: 'start', padding: '0.75rem' }}>
               <span>{entry.printing || 'Normal'} · {entry.condition || 'Near Mint'} · {entry.language || 'English'} · ×{entry.quantity ?? 1}</span>
               <span>{[entry.storage_unit_name, entry.location_name || (entry.location_id ? t('inspector.currentStorage') : t('bulk.unassignedPile')), entry.compartment_name, entry.position != null && getSlotNumber(entry) != null ? t('stocktake.slot', { slot: getSlotNumber(entry) }) : null].filter(Boolean).join(' · ')}</span>
-              {entry.deck_allocations?.length ? entry.deck_allocations.map(deck => (
-                <span key={`${deck.deck_id}:${deck.checked_out}`} className="card-deck-status-summary">
-                  {t(deck.checked_out ? 'deck.inPlay' : 'deck.pulled')}: {deck.name}
-                </span>
-              )) : <CardDeckStatus card={entry} />}
-              {!!entry.missing && (
-                <span className="card-missing-status">{entry.quantity > 1
-                  ? t('inspector.missingCount', { count: entry.quantity, total: entry.quantity })
-                  : t('inspector.missing')}</span>
-              )}
+              <StoredEntryStatus card={entry} />
             </button>
           ))}
         </div>

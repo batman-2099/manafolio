@@ -23,6 +23,7 @@ export async function runInspectorNavigationRegressions() {
     { deck_id: 1, name: 'Sample reserved deck', quantity: 1, checked_out: true },
     { deck_id: 2, name: 'Sample pulled deck', quantity: 1, checked_out: false },
   ];
+  cards[0].missing = 1;
   let settle;
   let updates = 0;
   let deckLookupFails = true;
@@ -64,8 +65,9 @@ export async function runInspectorNavigationRegressions() {
     assert(host.textContent.includes(en['loc.errLoadCards']), 'missing dashboard allocation data must report lookup failures');
     deckLookupFails = false;
     await click(button(en['loc.retry']));
-    assert(host.querySelector('.card-deck-status [role="list"]')?.textContent.includes('Reserved sample'),
-      'retry must show the current stored entry allocation, not another copy of the printing');
+    assert(host.querySelector('.stored-entry-status .card-deck-status-summary')?.textContent.includes('Reserved sample'),
+      'retry must show the current stored entry deck inside its status tag');
+    assert(host.querySelector('.stored-entry-status .card-missing-status'), 'missing card details must show a Missing tag');
     assert(previous().disabled && !next().disabled, 'first card has only next available');
     assert(setDetails().textContent.includes('Sample Set 1') && setDetails().querySelector('img')?.getAttribute('src') === '/logo.svg', 'set metadata shows the current symbol beside the name');
     assert(host.textContent.split('Sample Set 1').length === 2, 'the set name is not duplicated under Printing');
@@ -85,8 +87,9 @@ export async function runInspectorNavigationRegressions() {
     assert(host.querySelector('.section-heading').textContent.includes('Sample 2'), 'same-printing entries navigate by entry identity');
     assert(setDetails().textContent.includes('Sample Set 2') && !setDetails().querySelector('img'), 'navigation keeps the set name without leaking the previous set symbol');
     assert(host.querySelectorAll('.ci-image-col .ci-image-wrap').length === 1, 'unpaired card does not retain the previous reverse artwork');
-    assert(host.querySelector('.card-deck-status [role="list"]')?.textContent.includes('Pulled sample')
+    assert(host.querySelector('.stored-entry-status .card-deck-status-summary')?.textContent.includes('Pulled sample')
       && !host.textContent.includes('Reserved sample'), 'navigation must replace deck allocation details with the new entry');
+    assert(!host.querySelector('.stored-entry-status .card-missing-status'), 'navigation must not retain another entry’s Missing tag');
     await click(button(en['inspector.editCard']));
     const notes = host.querySelector('textarea');
     await act(async () => {

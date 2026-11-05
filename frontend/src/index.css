@@ -1358,7 +1358,8 @@ button.collection-card-trigger {
   font-weight: 600;
 }
 
-.stored-entry-choices :is(.card-deck-status-summary, .card-missing-status) {
+.stored-entry-status { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); min-width: 0; }
+.stored-entry-status :is(.card-deck-status-summary, .card-missing-status) {
   align-self: flex-start;
   text-align: start;
 }
