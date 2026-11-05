@@ -109,7 +109,7 @@ export default function StocktakeDialog({ location, onClose, onApplied }) {
             </button>
             <strong>{name} {getPrintingBadgeLabel(entry.printing) && <span style={{ ...getPrintingBadgeStyle(entry.printing), display: 'inline-block', fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px' }}>{getPrintingBadgeLabel(entry.printing)}</span>}</strong>
             <span className="stocktake-meta">{t('stocktake.lastVerified', { date: entry.last_verified_at ? new Date(entry.last_verified_at).toLocaleDateString(locale) : t('stocktake.never') })}</span>
-            {deck && <span className="stocktake-meta">{t('cardDeck.allocation', { name: deck.name, count: 1, status: t(deck.checked_out ? 'deck.inPlay' : 'deck.pulled') })}</span>}
+            {deck && <span className="stocktake-meta">{t(deck.checked_out ? 'deck.inPlay' : 'deck.pulled')}: {deck.name}</span>}
             {entry.quantity > 1 && <span className="stocktake-meta">{t('stocktake.copy', { number: copyIndex + 1, total: entry.quantity })}</span>}
             {error?.key === key && <p className="stocktake-error">{t(error.message)}</p>}
             <div className="stocktake-actions" role="group" aria-label={name}>
