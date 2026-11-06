@@ -184,8 +184,11 @@ function normalizeCard(raw, lang) {
   const imgSrc = raw.image_uris || face.image_uris || {};
   const typeLine = raw.type_line || face.type_line || '';
   const name = face.name || raw.name || '';
+  const producedColors = /\bLand\b/.test(typeLine)
+    ? [...new Set((raw.produced_mana || face.produced_mana || []).filter(color => Object.hasOwn(COLOR_NAMES, color)))]
+    : [];
   const colors = Object.hasOwn(BASIC_LAND_COLORS, name)
-    ? [BASIC_LAND_COLORS[name]] : raw.colors || face.colors || [];
+    ? [BASIC_LAND_COLORS[name]] : producedColors.length > 1 ? producedColors : raw.colors || face.colors || [];
   // USD first, then EUR — and never a mix of the two in one row.
   //
   // Scryfall quotes `usd` from TCGplayer and `eur` from Cardmarket, and which one it

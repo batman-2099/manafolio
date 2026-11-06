@@ -40,6 +40,23 @@ async function testBasicLandSort() {
         [nick.name, multicolor.name, land.name]);
     }
     await db.initDb();
+    for (const [type_line, produced_mana, expected] of [
+      ['Land', ['W', 'U'], ['White', 'Blue']],
+      ['Land', ['C', 'R', 'G', 'R'], ['Red', 'Green']],
+      ['Land', ['W', 'U', 'B', 'R', 'G'], ['White', 'Blue', 'Black', 'Red', 'Green']],
+      ['Land', ['C', 'U'], []],
+      ['Land', ['U', 'U'], []],
+      ['Land', ['C'], []],
+      ['Land', undefined, []],
+      ['Artifact', ['W', 'U'], []],
+    ]) {
+      const card = normalizeCard({ id: 'mana-land', name: 'Sample producer', type_line, produced_mana, colors: [], color_identity: ['U'] });
+      assert.deepStrictEqual(card.types, expected);
+      assert.deepStrictEqual(card.color_identity, ['Blue'], 'mana production must not replace Commander identity');
+      assert.strictEqual(getSortCategory(card, [{ by: 'color' }]), expected.length > 1 ? 'Multicolor' : 'Colorless');
+      await cacheCards([card]);
+      assert.deepStrictEqual(JSON.parse((await db.get("SELECT types FROM card_cache WHERE id = 'mtg-mana-land'")).types), expected);
+    }
     for (const name of ['Snow-Covered Forest', 'Forest Bear', 'Island Sanctuary', 'swamp']) {
       assert.deepStrictEqual(normalizeCard({ id: name, name, colors: [] }).types, [], 'only exact basic land names receive an override');
     }
