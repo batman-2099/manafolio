@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getPrintingPrice } from './resolveCardPrice.js';
+import { getPrintingPrice, resolveCardPrice } from './resolveCardPrice.js';
 
 test('finish quotes stay distinct and never substitute another finish or copy valuation', () => {
   const card = { price_normal: 4.25, price_holofoil: 9.5, price_trend: 4.25, market_value: 100 };
@@ -13,4 +13,13 @@ test('finish quotes stay distinct and never substitute another finish or copy va
   }
   assert.equal(getPrintingPrice(null, 'Normal'), null);
   assert.equal(getPrintingPrice(card, 'Unknown'), null);
+});
+
+test('encoded foil treatments use the foil quote without multiplying price rows', () => {
+  const card = { price_normal: 4.25, price_holofoil: 9.5, price_trend: 4.25 };
+  for (const treatment of ['traditional', 'etched', 'textured', 'surge', 'galaxy', 'halo', 'raised', 'neon_ink', 'double_rainbow']) {
+    assert.equal(getPrintingPrice(card, `foil:${treatment}`), 9.5);
+    assert.equal(resolveCardPrice(card, `foil:${treatment}`), 9.5);
+  }
+  assert.equal(resolveCardPrice(card), 4.25);
 });

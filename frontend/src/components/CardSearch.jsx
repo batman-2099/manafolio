@@ -10,7 +10,7 @@ import CardImageZoom from './CardImageZoom';
 import Modal from './Modal';
 import { getCardDisplayName } from '../utils/langHelper';
 import { useMultiSelect } from '../utils/useMultiSelect';
-import { CONDITIONS, getPrintings } from '../utils/cardOptions';
+import { CONDITIONS, getPrintings, decodePrinting, encodePrinting } from '../utils/cardOptions';
 import { langName, isEnglish, displayName, translatedName, setReference, setCode, getLanguagesForGame } from '../utils/languages';
 import { defaultGame, gameLabel } from '../utils/games';
 import CardImage from './CardImage';
@@ -28,6 +28,7 @@ const CSV_FIELDS = [
   ['collector_number', 'csvMapping.collectorNumber', ['card number', 'collector number', 'number']],
   ['condition', 'csvMapping.condition', ['condition']],
   ['printing', 'csvMapping.printing', ['printing', 'foil']],
+  ['foil_treatment', 'csvMapping.foilTreatment', ['foil treatment', 'foil type']],
   ['language', 'csvMapping.language', ['language']],
   ['purchase_price', 'csvMapping.purchasePrice', ['purchase price', 'price']],
   ['card_id', 'csvMapping.cardId', ['card id', 'id']],
@@ -451,7 +452,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
           reverse_card_ids: reverseCardIds,
           quantity: submittedQuantity,
           condition,
-          printing,
+          ...decodePrinting(printing),
           language,
           purchase_price: parseFloat(purchasePrice) || 0,
           list_type: submittedInventory,
@@ -500,7 +501,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
         reverse_card_id: choice.reverseCard?.id || null,
         quantity: copies,
         condition,
-        printing: cardPrinting,
+        ...decodePrinting(cardPrinting),
         language,
         purchase_price: parseFloat(purchasePrice) || 0,
         game,
@@ -511,7 +512,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || t('search.errAddCard'));
-    return data;
+    return { ...data, ...decodePrinting(cardPrinting) };
   };
 
   // Enter in the rapid field: look the number up in the pinned set and add it.
@@ -603,7 +604,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
           ? t('search.addedToContainer', { name: displayName(hit), location: result.placement.label })
           : t('search.addedUnassigned', { name: displayName(hit) }), 'success');
       }
-      setRapidLog(prev => [{ entryId: result.id, card: hit, qty: copies, printing: rapidPrinting }, ...prev]);
+      setRapidLog(prev => [{ entryId: result.id, card: hit, qty: copies, ...decodePrinting(rapidPrinting) }, ...prev]);
       setRapidNumber('');
       // Keep the owned badge honest if the card is also on screen.
       if (!addToArena) {
@@ -624,19 +625,18 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
     }
   };
 
-  const toggleRapidFoil = async (entry) => {
+  const updateRapidPrinting = async (entry, nextPrinting) => {
     if (rapidEdits.current.has(entry.entryId)) return;
     rapidEdits.current.add(entry.entryId);
     setRapidLog(prev => prev.map(item => item.entryId === entry.entryId ? { ...item, busy: true } : item));
-    const nextPrinting = entry.printing === 'Holofoil' ? 'Normal' : 'Holofoil';
     try {
       const response = await fetch(`/api/collection/${entry.entryId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ printing: nextPrinting }),
+        body: JSON.stringify(decodePrinting(nextPrinting)),
       });
       if (!response.ok) throw new Error();
-      setRapidLog(prev => prev.map(item => item.entryId === entry.entryId ? { ...item, printing: nextPrinting } : item));
+      setRapidLog(prev => prev.map(item => item.entryId === entry.entryId ? { ...item, ...decodePrinting(nextPrinting) } : item));
       onAddSuccess();
     } catch {
       showToast(t('search.errRapidFinish'), 'error');
@@ -772,7 +772,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
           reverse_card_id: choice.reverseCard?.id || null,
           quantity: parseInt(quantity, 10),
           condition,
-          printing,
+          ...decodePrinting(printing),
           language,
           purchase_price: parseFloat(purchasePrice) || 0,
           location_id: listType === 'collection' && addLocation ? Number(addLocation) : null,
@@ -1200,16 +1200,12 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                   <span style={{ fontSize: 'var(--text-md)', color: 'var(--text-strong)' }}>
                     {price === null ? t('priceCheck.unavailable') : `${priceText(price, entry.card.price_currency || 'USD')} ${t('dash.each')}`}
                   </span>
-                  <button
-                    type="button"
-                    className={`btn ${entry.printing === 'Holofoil' ? 'btn-primary' : 'btn-secondary'}`}
-                    aria-pressed={entry.printing === 'Holofoil'}
-                    disabled={entry.busy}
-                    onClick={() => toggleRapidFoil(entry)}
-                    style={{ fontSize: 'var(--text-sm)', padding: '0.35rem 0.5rem', minHeight: '44px', justifyContent: 'center' }}
-                  >
-                    {t('search.foil')}
-                  </button>
+                  <label>{t('card.printing')}
+                    <select className="select-control" data-rapid-printing value={encodePrinting(entry.printing, entry.foil_treatment)}
+                      disabled={entry.busy} onChange={event => updateRapidPrinting(entry, event.target.value)}>
+                      {getPrintings().map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
                   <button
                     type="button"
                     className="btn btn-secondary"

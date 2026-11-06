@@ -1,3 +1,4 @@
+import { decodePrinting, encodePrinting } from '../utils/cardOptions';
 import { useState, useEffect, useLayoutEffect, useRef, useId } from 'react';
 import './CatalogueWorkbench.css';
 import { X, MapPin, Trash2, Star, Maximize2, ExternalLink, Search, Copy, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -20,6 +21,7 @@ import { getSlotNumber } from '../utils/getSlotNumber';
 import Modal from './Modal';
 import { isMtgToken, pairedCardName, reverseFace } from '../utils/tokenFaces';
 import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
+import { getPrintingBadgeLabel } from '../utils/cardPrinting';
 
 // MTG color identity pips share the application's mana palette.
 const MTG_COLOR_BG = {
@@ -57,7 +59,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   };
   const [q, setQ] = useState(card.quantity ?? 1);
   const [condition, setCondition] = useState(card.condition || 'Near Mint');
-  const [printing, setPrinting] = useState(card.printing || 'Normal');
+  const [printing, setPrinting] = useState(encodePrinting(card.printing, card.foil_treatment));
   const [language, setLanguage] = useState(card.language || 'English');
   const [purchasePrice, setPurchasePrice] = useState(card.purchase_price || 0);
   const [reverseCard, setReverseCard] = useState(() => card.reverse_card_id ? reverseFace(card) : null);
@@ -212,7 +214,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
     setLocalizedCard(null);
     setQ(card.quantity ?? 1);
     setCondition(card.condition || 'Near Mint');
-    setPrinting(card.printing || 'Normal');
+    setPrinting(encodePrinting(card.printing, card.foil_treatment));
     setLanguage(card.language || 'English');
     setPurchasePrice(card.purchase_price || 0);
     setReverseCard(card.reverse_card_id ? reverseFace(card) : null);
@@ -247,7 +249,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
           ...(qNum !== (card.quantity ?? 1) ? { quantity: qNum } : {}),
           condition,
           reverse_card_id: reverseCard?.id || null,
-          printing,
+          ...decodePrinting(printing),
           language,
           purchase_price: parseFloat(purchasePrice) || 0,
           // Metadata saves must not re-file the copy. An inventory change still
@@ -306,6 +308,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
           quantity: 1,
           condition: activeCard.condition,
           printing: activeCard.printing,
+          foil_treatment: activeCard.foil_treatment ?? null,
           language: activeCard.language,
           purchase_price: activeCard.purchase_price || 0,
           location_id: activeCard.location_id || null,
@@ -748,7 +751,7 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                 {activeCard.cert_number && (
                   <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specCert')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.cert_number}</span></div>
                 )}
-                <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.printing}</span></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{getPrintingBadgeLabel(activeCard.printing, activeCard.foil_treatment) || activeCard.printing}</span></div>
                 <div><span style={{ color: 'var(--text-muted)' }}>{t('inspector.specLanguage')}</span> <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{activeCard.language}</span></div>
               </div>
 
@@ -1023,7 +1026,7 @@ function CardInspectorSelection(props) {
         <div className="stored-entry-choices" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', margin: '1rem 0' }}>
           {entries.map(entry => (
             <button key={entry.entry_id || entry.id} type="button" className="btn btn-secondary" onClick={() => setSelectedEntry(entry)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', whiteSpace: 'normal', overflowWrap: 'anywhere', textAlign: 'start', padding: '0.75rem' }}>
-              <span>{entry.printing || 'Normal'} · {entry.condition || 'Near Mint'} · {entry.language || 'English'} · ×{entry.quantity ?? 1}</span>
+              <span>{getPrintingBadgeLabel(entry.printing, entry.foil_treatment) || entry.printing || 'Normal'} · {entry.condition || 'Near Mint'} · {entry.language || 'English'} · ×{entry.quantity ?? 1}</span>
               <span>{[entry.storage_unit_name, entry.location_name || (entry.location_id ? t('inspector.currentStorage') : t('bulk.unassignedPile')), entry.compartment_name, entry.position != null && getSlotNumber(entry) != null ? t('stocktake.slot', { slot: getSlotNumber(entry) }) : null].filter(Boolean).join(' · ')}</span>
               <StoredEntryStatus card={entry} />
             </button>

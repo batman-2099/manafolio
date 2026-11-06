@@ -11,6 +11,7 @@ const COLUMNS = [
   'price_currency', 'price_source',
   'printing_treatments',
   'produced_mana',
+  'finishes', 'promo_types',
 ];
 
 // A page of results can be 250 cards and one round trip per card cost more than
@@ -23,7 +24,7 @@ const num = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : Nu
 // Upsert without deleting referenced card rows or resetting unrelated columns.
 const SET_CLAUSE = COLUMNS
   .filter(c => c !== 'id')
-  .map(c => ['printing_treatments', 'produced_mana'].includes(c)
+  .map(c => ['printing_treatments', 'produced_mana', 'finishes', 'promo_types'].includes(c)
     ? `${c} = COALESCE(excluded.${c}, card_cache.${c})`
     : `${c} = excluded.${c}`)
   .join(', ');
@@ -60,6 +61,8 @@ async function cacheNormalizedCards(cards, game) {
         c.price_currency || 'USD', c.price_source || null,
         c.printing_treatments == null ? null : JSON.stringify(c.printing_treatments),
         c.produced_mana == null ? null : JSON.stringify(c.produced_mana),
+        c.finishes == null ? null : JSON.stringify(c.finishes),
+        c.promo_types == null ? null : JSON.stringify(c.promo_types),
       );
     }
     await db.run(

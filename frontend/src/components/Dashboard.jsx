@@ -350,8 +350,8 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
                       <div className="dashboard-card-meta">
                         <span>{card.set_name}</span><span>#{card.number}</span>
                         {card.printing && card.printing !== 'Normal' && (
-                          <span className="collection-card-tag" style={getPrintingBadgeStyle(card.printing)}>
-                            {getPrintingBadgeLabel(card.printing)}
+                          <span className="collection-card-tag" style={getPrintingBadgeStyle(card.printing, card.foil_treatment)}>
+                            {getPrintingBadgeLabel(card.printing, card.foil_treatment)}
                           </span>
                         )}
                       </div>
@@ -385,8 +385,8 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
                     <div className="dashboard-card-meta">
                       <span>{card.set_name}</span><span>{card.rarity}</span>
                       {card.printing && card.printing !== 'Normal' && (
-                        <span className="collection-card-tag" style={getPrintingBadgeStyle(card.printing)}>
-                          {getPrintingBadgeLabel(card.printing)}
+                        <span className="collection-card-tag" style={getPrintingBadgeStyle(card.printing, card.foil_treatment)}>
+                          {getPrintingBadgeLabel(card.printing, card.foil_treatment)}
                         </span>
                       )}
                     </div>

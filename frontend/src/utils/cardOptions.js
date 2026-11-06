@@ -2,6 +2,7 @@
 // copy-pasted across LocationManager, CollectionList, CardSearch, and
 // CameraScanner's quick-add/edit forms.
 import { LANGUAGE_NAMES, getLanguageNamesForGame, getLanguagesForGame } from './languages';
+import foilTreatments from '../../../shared/foilTreatments.json';
 
 export const CONDITIONS = ['Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged'];
 export const MTG_FORMATS = ['Commander / EDH', 'Standard', 'Modern', 'Pioneer', 'Legacy', 'Vintage', 'Pauper', 'Alchemy', 'Historic', 'Explorer', 'Timeless', 'Brawl', 'Casual'];
@@ -10,12 +11,25 @@ export const MTG_FORMATS = ['Commander / EDH', 'Standard', 'Modern', 'Pioneer', 
 export const LANGUAGES = LANGUAGE_NAMES;
 export { getLanguageNamesForGame, getLanguagesForGame };
 
-// The foil price is stored under 'Holofoil'; display the finish as "Foil".
-const TWO_FINISH_PRINTINGS = [{ value: 'Normal', label: 'Nonfoil' }, { value: 'Holofoil', label: 'Foil' }];
+export const BASE_PRINTINGS = [{ value: 'Normal', label: 'Nonfoil' }, { value: 'Holofoil', label: 'Foil' }];
+const PRINTINGS = [...BASE_PRINTINGS, ...Object.entries(foilTreatments).filter(([key]) => key !== 'traditional').map(([key, label]) => ({ value: `foil:${key}`, label })).sort((a, b) => a.label.localeCompare(b.label))];
 
-// Both supported games use the same stored finishes and display labels.
 export function getPrintings() {
-  return TWO_FINISH_PRINTINGS;
+  return PRINTINGS;
+}
+
+export function decodePrinting(value) {
+  return value?.startsWith('foil:')
+    ? { printing: 'Holofoil', foil_treatment: value.slice(5) }
+    : { printing: value || 'Normal', foil_treatment: null };
+}
+
+export function encodePrinting(printing, treatment) {
+  return printing === 'Holofoil' && treatment && treatment !== 'traditional' ? `foil:${treatment}` : printing || 'Normal';
+}
+
+export function matchesPrinting(card, value) {
+  return value.startsWith('foil:') ? encodePrinting(card.printing, card.foil_treatment) === value : card.printing === value;
 }
 
 // Grading companies, mirroring the collection.grader CHECK constraint in

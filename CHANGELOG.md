@@ -4,6 +4,11 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- List all supported foil types directly in Printing, without Scryfall availability restrictions or a separate foil-type selector. Preserve selections across scans, edits, trades, exports, backups, and storage stacks.
+- Remove Traditional Foil from Printing choices; existing saved records remain intact and display as Foil in the selector.
+- Keep foil tags below Condition in collection cards and storage details, with distinct readable colors for each foil type across card badges.
+- Sort named foil types alphabetically in Printing, keeping Nonfoil and generic Foil before them.
+
 ## 2.7.0 — 2026-11-06
 
 - Keep collection placement checks inside the update transaction, and create imported decks with their cards atomically so failed imports do not leave partial decks.

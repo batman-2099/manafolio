@@ -67,7 +67,7 @@ async function testMtgDeckImport() {
     };
     scryfallApi.bulkFetchByIdentifier = async rows => {
       const cards = rows.map((row, index) => ({
-        id: `mtg-${index + 1}`, name: row.name, game: 'mtg', language: 'English',
+        id: `mtg-00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`, name: row.name, game: 'mtg', language: 'English',
         set_id: row.set_id, set_name: row.isToken ? 'Test Tokens' : 'Test',
         number: row.number, supertype: 'Creature', subtypes: row.isToken ? '["Token"]' : '[]',
       }));
@@ -75,8 +75,8 @@ async function testMtgDeckImport() {
     };
     scryfallApi.cacheCards = async cards => {
       for (const card of cards) {
-        await db.run(`INSERT OR REPLACE INTO card_cache (id, name, game, language, set_id, set_name, number, supertype, subtypes)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        await db.run(`INSERT OR REPLACE INTO card_cache (id, name, game, language, set_id, set_name, number, supertype, subtypes, finishes, promo_types)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '["nonfoil","foil"]', '[]')`,
         [card.id, card.name, card.game, card.language, card.set_id, card.set_name, card.number, card.supertype, card.subtypes]);
       }
     };
@@ -110,7 +110,7 @@ async function testMtgDeckImport() {
     assert.strictEqual(importRes.body.added, 10, 'import includes five playable cards and five known-quantity tokens');
     assert.strictEqual(importRes.body.missing, 0);
     assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM collection WHERE user_id = 1')).count, 10);
-    assert.strictEqual((await db.get(`SELECT printing FROM collection WHERE card_id = 'mtg-3'`)).printing, 'Holofoil');
+    assert.strictEqual((await db.get(`SELECT printing FROM collection WHERE card_id = 'mtg-00000000-0000-4000-8000-000000000003'`)).printing, 'Holofoil');
     assert.ok(importRes.body.location_id);
     assert.deepStrictEqual(
       await db.get('SELECT name, type, game FROM locations WHERE id = ?', [importRes.body.location_id]),
@@ -118,16 +118,16 @@ async function testMtgDeckImport() {
     );
     assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM collection WHERE location_id = ?', [importRes.body.location_id])).count, 10);
     assert.deepStrictEqual(await db.all(`SELECT c.card_id, SUM(c.quantity) AS quantity, c.printing, c.reverse_card_id
-      FROM collection c WHERE c.card_id IN ('mtg-4', 'mtg-5') GROUP BY c.card_id ORDER BY c.card_id`),
+      FROM collection c WHERE c.card_id IN ('mtg-00000000-0000-4000-8000-000000000004', 'mtg-00000000-0000-4000-8000-000000000005') GROUP BY c.card_id ORDER BY c.card_id`),
     [
-      { card_id: 'mtg-4', quantity: 3, printing: 'Normal', reverse_card_id: null },
-      { card_id: 'mtg-5', quantity: 2, printing: 'Holofoil', reverse_card_id: null },
+      { card_id: 'mtg-00000000-0000-4000-8000-000000000004', quantity: 3, printing: 'Normal', reverse_card_id: null },
+      { card_id: 'mtg-00000000-0000-4000-8000-000000000005', quantity: 2, printing: 'Holofoil', reverse_card_id: null },
     ], 'tokens preserve supplied quantities and finishes without guessing reverse faces');
     assert.strictEqual((await db.get('SELECT target_size FROM decks WHERE id = ?', [importRes.body.deck_id])).target_size, 5);
-    assert.strictEqual((await db.get('SELECT commander_card_id FROM decks WHERE id = ?', [importRes.body.deck_id])).commander_card_id, 'mtg-1',
+    assert.strictEqual((await db.get('SELECT commander_card_id FROM decks WHERE id = ?', [importRes.body.deck_id])).commander_card_id, 'mtg-00000000-0000-4000-8000-000000000001',
       'collection precon import must designate the resolved commander, not the provider UUID');
     assert.strictEqual((await db.get(`SELECT COALESCE(SUM(quantity), 0) AS count FROM deck_card_allocations
-      WHERE deck_id = ? AND card_id IN ('mtg-4', 'mtg-5')`, [importRes.body.deck_id])).count, 0,
+      WHERE deck_id = ? AND card_id IN ('mtg-00000000-0000-4000-8000-000000000004', 'mtg-00000000-0000-4000-8000-000000000005')`, [importRes.body.deck_id])).count, 0,
     'imported tokens do not become playable deck entries or reservations');
     const importedDeck = await db.get('SELECT name, checked_out, checked_out_at, user_id, inventory_type FROM decks WHERE id = ?', [importRes.body.deck_id]);
     assert.strictEqual(importedDeck.name, 'Example Deck');
@@ -137,7 +137,7 @@ async function testMtgDeckImport() {
     assert.strictEqual(importedDeck.inventory_type, 'collection');
     assert.deepStrictEqual(
       await db.all('SELECT card_id, quantity FROM deck_cards WHERE deck_id = ? ORDER BY card_id', [importRes.body.deck_id]),
-      [{ card_id: 'mtg-1', quantity: 3 }, { card_id: 'mtg-2', quantity: 1 }, { card_id: 'mtg-3', quantity: 1 }]
+      [{ card_id: 'mtg-00000000-0000-4000-8000-000000000001', quantity: 3 }, { card_id: 'mtg-00000000-0000-4000-8000-000000000002', quantity: 1 }, { card_id: 'mtg-00000000-0000-4000-8000-000000000003', quantity: 1 }]
     );
     const unpackedRes = response();
     await importDeck({ params: { fileName: 'ExampleDeck_TST' }, body: { create_container: false }, user: { id: 1 } }, unpackedRes);
@@ -153,13 +153,13 @@ async function testMtgDeckImport() {
 
     const counts = () => db.get(`SELECT (SELECT COUNT(*) FROM collection) AS cards, (SELECT COUNT(*) FROM decks) AS decks`);
     const beforeFailure = await counts();
-    await db.run(`CREATE TRIGGER fail_precon BEFORE INSERT ON deck_cards WHEN NEW.card_id = 'mtg-2' BEGIN SELECT RAISE(ABORT, 'test import failure'); END`);
+    await db.run(`CREATE TRIGGER fail_precon BEFORE INSERT ON deck_cards WHEN NEW.card_id = 'mtg-00000000-0000-4000-8000-000000000002' BEGIN SELECT RAISE(ABORT, 'test import failure'); END`);
     const failedImport = response();
     await importDeck({ params: { fileName: 'ExampleDeck_TST' }, body: { create_deck: true }, user: { id: 1 } }, failedImport);
     assert.strictEqual(failedImport.statusCode, 502);
     assert.deepStrictEqual(await counts(), beforeFailure, 'failed deck creation must roll back newly imported copies and deck');
     await db.run('DROP TRIGGER fail_precon');
-    await db.run(`CREATE TRIGGER fail_token BEFORE INSERT ON collection WHEN NEW.card_id = 'mtg-4' BEGIN SELECT RAISE(ABORT, 'test token failure'); END`);
+    await db.run(`CREATE TRIGGER fail_token BEFORE INSERT ON collection WHEN NEW.card_id = 'mtg-00000000-0000-4000-8000-000000000004' BEGIN SELECT RAISE(ABORT, 'test token failure'); END`);
     const failedToken = response();
     await importDeck({ params: { fileName: 'ExampleDeck_TST' }, body: { create_deck: true }, user: { id: 1 } }, failedToken);
     assert.strictEqual(failedToken.statusCode, 502);
@@ -187,7 +187,7 @@ async function testMtgDeckImport() {
     assert.strictEqual(createRes.statusCode, 201);
     assert.strictEqual((await db.get('SELECT game FROM decks WHERE id = ?', [createRes.body.id])).game, 'mtg');
     assert.deepStrictEqual(await db.get('SELECT format, commander_card_id FROM decks WHERE id = ?', [createRes.body.id]),
-      { format: 'Commander / EDH', commander_card_id: 'mtg-1' },
+      { format: 'Commander / EDH', commander_card_id: 'mtg-00000000-0000-4000-8000-000000000001' },
       'deck-only precon creation must retain its commander and Commander format');
     assert.deepStrictEqual(
       await db.get('SELECT COUNT(*) AS types, SUM(quantity) AS copies FROM deck_cards WHERE deck_id = ?', [createRes.body.id]),
@@ -202,7 +202,7 @@ async function testMtgDeckImport() {
         user: { id: 2 }
       }, unowned);
       assert.strictEqual(unowned.statusCode, 201, JSON.stringify(unowned.body));
-      assert.strictEqual((await db.get('SELECT commander_card_id FROM decks WHERE id = ?', [unowned.body.id])).commander_card_id, 'mtg-1');
+      assert.strictEqual((await db.get('SELECT commander_card_id FROM decks WHERE id = ?', [unowned.body.id])).commander_card_id, 'mtg-00000000-0000-4000-8000-000000000001');
       assert.deepStrictEqual(
         await db.get('SELECT COUNT(*) AS types, SUM(quantity) AS copies FROM deck_cards WHERE deck_id = ?', [unowned.body.id]),
         { types: 3, copies: 5 }

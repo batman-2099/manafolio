@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useLongPress } from './useLongPress';
+import { decodePrinting } from './cardOptions';
 
 // Long-press-to-arm multi-select + bulk actions over collection entries. Shared
 // by CollectionList and the scanner's recent-scans strip so both get the same
@@ -102,7 +103,8 @@ export function useMultiSelect({ showToast, onChanged, guard } = {}) {
       const res = await fetch('/api/collection/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entry_ids: ids, action, value })
+        body: JSON.stringify({ entry_ids: ids, action, value: action === 'printing' ? decodePrinting(value).printing : value,
+          ...(action === 'printing' ? { foil_treatment: decodePrinting(value).foil_treatment } : {}) })
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {

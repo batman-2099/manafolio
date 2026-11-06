@@ -83,6 +83,7 @@ export default function SetCompletion() {
         body: JSON.stringify({
           card_id: printing.id, quantity: 1, list_type: 'wishlist',
           printing: finish,
+          foil_treatment: null,
           language: printing.language || 'English',
         }),
       });

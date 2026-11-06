@@ -1450,7 +1450,6 @@
   "scan.discardedRepeat": "Wiederholten Scan verworfen — dieselbe Karte.",
   "scan.discardDraft": "Verwerfen",
   "scan.discardRepeat": "Dieselbe Karte — weiter scannen",
-  "scan.foil": "Foil",
   "scan.errDraftAction": "Aktion fehlgeschlagen. Der Entwurf bleibt in der Scan-Prüfung. Verbindung prüfen und erneut versuchen.",
   "scan.errCommitDrafts": "Der Stapel konnte nicht hinzugefügt werden. Deine Karten bleiben in der Scan-Prüfung. Verbindung prüfen und erneut versuchen. Falls die Prüfung in einem anderen Tab geändert wurde, lade sie zuerst neu.",
   "scan.addingBatch": "Geprüfte Karten werden zur Sammlung hinzugefügt …",

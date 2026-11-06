@@ -234,6 +234,8 @@ async function initDb() {
       color_identity TEXT,
       printing_treatments TEXT,
       produced_mana TEXT,
+      finishes TEXT,
+      promo_types TEXT,
       game TEXT DEFAULT 'mtg',
       language TEXT DEFAULT 'English',
       printed_name TEXT,
@@ -249,6 +251,7 @@ async function initDb() {
       quantity INTEGER DEFAULT 1,
       condition TEXT CHECK(condition IN ('Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged')) DEFAULT 'Near Mint',
       printing TEXT CHECK(printing IN ('Normal', 'Holofoil')) DEFAULT 'Normal',
+      foil_treatment TEXT,
       language TEXT DEFAULT 'English',
       purchase_price REAL,
       location_id INTEGER,
@@ -274,6 +277,7 @@ async function initDb() {
       quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity BETWEEN 1 AND 250 AND quantity = CAST(quantity AS INTEGER)),
       condition TEXT NOT NULL DEFAULT 'Near Mint' CHECK(condition IN ('Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged')),
       printing TEXT NOT NULL DEFAULT 'Normal' CHECK(printing IN ('Normal', 'Holofoil')),
+      foil_treatment TEXT,
       language TEXT NOT NULL DEFAULT 'English',
       purchase_price REAL NOT NULL DEFAULT 0 CHECK(purchase_price >= 0),
       location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL
@@ -476,6 +480,11 @@ async function initDb() {
   if (!cardCacheCols.some(c => c.name === 'produced_mana')) {
     await run(`ALTER TABLE card_cache ADD COLUMN produced_mana TEXT`);
   }
+  for (const col of ['finishes', 'promo_types']) {
+    if (!cardCacheCols.some(c => c.name === col)) {
+      await run(`ALTER TABLE card_cache ADD COLUMN ${col} TEXT`);
+    }
+  }
   // Store provider artwork and marketplace URLs without guessing them.
   for (const col of ['tcgplayer_url', 'cardmarket_url', 'image_url_back', 'name_back']) {
     if (!cardCacheCols.some(c => c.name === col)) {
@@ -540,6 +549,12 @@ async function initDb() {
   const scanDraftCols = await all(`PRAGMA table_info(scan_drafts)`);
   if (!scanDraftCols.some(c => c.name === 'reverse_card_id')) {
     await run(`ALTER TABLE scan_drafts ADD COLUMN reverse_card_id TEXT REFERENCES card_cache(id)`);
+  }
+  if (!collectionCols.some(c => c.name === 'foil_treatment')) {
+    await run(`ALTER TABLE collection ADD COLUMN foil_treatment TEXT`);
+  }
+  if (!scanDraftCols.some(c => c.name === 'foil_treatment')) {
+    await run(`ALTER TABLE scan_drafts ADD COLUMN foil_treatment TEXT`);
   }
   if (!collectionCols.some(c => c.name === 'user_id')) {
     await run(`ALTER TABLE collection ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE`);

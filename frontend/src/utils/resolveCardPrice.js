@@ -7,6 +7,7 @@
 // silently showing a different finish's price.
 export function resolveCardPrice(card, printing) {
   if (!card) return 0;
+  if (printing?.startsWith('foil:')) printing = 'Holofoil';
   // Owner-set or graded-provider value for this copy. See the backend twin.
   if (card.market_value > 0) return card.market_value;
   if (printing === 'Holofoil' && card.price_holofoil > 0) return card.price_holofoil;
@@ -16,6 +17,7 @@ export function resolveCardPrice(card, printing) {
 
 // A finish quote must not borrow a generic trend or an owner's copy valuation.
 export function getPrintingPrice(card, printing) {
+  if (printing?.startsWith('foil:')) printing = 'Holofoil';
   const raw = printing === 'Normal' ? card?.price_normal : printing === 'Holofoil' ? card?.price_holofoil : null;
   const price = typeof raw === 'number' || typeof raw === 'string' ? Number(raw) : NaN;
   return Number.isFinite(price) && price > 0 ? price : null;

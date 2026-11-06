@@ -16,6 +16,7 @@ const { checkedOutAllocation, checkedOutSources, cardDeckAllocations, reserveDec
 const { validateDeckAddition } = require('../utils/deckRules');
 const { splitPrice } = require('../utils/splitPrice');
 const { isMtgToken, validateReverseCard } = require('../utils/tokenPairing');
+const { resolveFoilTreatment } = require('../utils/foilTreatments');
 
 const router = express.Router();
 const LIST_TYPES = ['collection', 'wishlist', 'arena', 'graveyard'];
@@ -420,6 +421,7 @@ router.get('/collection', async (req, res) => {
         c.quantity,
         c.condition,
         c.printing,
+        c.foil_treatment,
         c.language,
         c.purchase_price,
         c.compartment_id,
@@ -544,7 +546,7 @@ router.get('/collection/offline-snapshot', async (req, res) => {
         SELECT c.id AS entry_id, c.card_id, cc.name, cc.printed_name,
           c.reverse_card_id, rc.name AS reverse_name, rc.printed_name AS reverse_printed_name,
           cc.set_id, cc.set_name, cc.number, c.quantity, c.list_type,
-          c.printing, c.language, c.condition, cc.color_identity,
+          c.printing, c.foil_treatment, c.language, c.condition, cc.color_identity,
           COALESCE(c.missing, 0) AS missing,
           l.id AS location_id, l.name AS location_name, su.name AS storage_unit_name,
           l.type AS location_type, cp.idx AS compartment_idx, cp.label AS compartment_label,
@@ -701,6 +703,7 @@ async function addCardToCollection(user, body, preparedCard = null, inTransactio
       cardId = localized.id;
     }
     const effectiveGame = 'mtg';
+    const foilTreatment = resolveFoilTreatment(printing, body.foil_treatment);
     const reverseCardId = await validateReverseCard(card, body.reverse_card_id, list_type);
     const insert = async () => {
 
@@ -725,6 +728,7 @@ async function addCardToCollection(user, body, preparedCard = null, inTransactio
       cardId,
       reverseCardId,
       printing,
+      foilTreatment,
       language
     });
 
@@ -741,12 +745,12 @@ async function addCardToCollection(user, body, preparedCard = null, inTransactio
         INSERT INTO collection (
           card_id, user_id, quantity, condition, printing, language, purchase_price,
           location_id, compartment_id, position, is_trade, list_type, game,
-          grader, grade, cert_number, reverse_card_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          grader, grade, cert_number, reverse_card_id, foil_treatment
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         cardId, req.user.id, count, condition, printing, language, purchase_price || 0,
         targetLocationId, resolved.compartment_id, resolved.position, is_trade ? 1 : 0, list_type, effectiveGame,
-        grader, gradeValue, certValue, reverseCardId
+        grader, gradeValue, certValue, reverseCardId, foilTreatment
       ]);
       lastInsertedId = result.lastID;
     } else {
@@ -755,12 +759,12 @@ async function addCardToCollection(user, body, preparedCard = null, inTransactio
           INSERT INTO collection (
             card_id, user_id, quantity, condition, printing, language, purchase_price,
             location_id, compartment_id, position, is_trade, list_type, game,
-            grader, grade, cert_number, reverse_card_id
-          ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            grader, grade, cert_number, reverse_card_id, foil_treatment
+          ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
           cardId, req.user.id, condition, printing, language, purchase_price || 0,
           targetLocationId, resolved.compartment_id, resolved.position + (i * 0.001), is_trade ? 1 : 0, list_type, effectiveGame,
-          grader, gradeValue, certValue, reverseCardId
+          grader, gradeValue, certValue, reverseCardId, foilTreatment
         ]);
         lastInsertedId = result.lastID;
       }
@@ -789,7 +793,7 @@ async function addCardToCollection(user, body, preparedCard = null, inTransactio
 }
 
 const SCAN_DRAFT_SELECT = `
-  SELECT cc.*, d.id AS draft_id, d.card_id, d.quantity, d.condition, d.printing,
+  SELECT cc.*, d.id AS draft_id, d.card_id, d.quantity, d.condition, d.printing, d.foil_treatment,
     d.language, d.purchase_price, d.location_id, d.reverse_card_id,
     rc.name AS reverse_name, rc.printed_name AS reverse_printed_name,
     rc.image_url AS reverse_image_url, rc.set_id AS reverse_set_id,
@@ -844,6 +848,7 @@ async function normalizeScanDraft(body, previous = {}) {
   if (!card || card.game !== 'mtg') throw new AddCardError(400, 'Invalid Magic card');
   card = await cardApi.printingInLanguage(card, draft.language) || card;
   draft.card_id = card.id;
+  draft.foil_treatment = resolveFoilTreatment(draft.printing, body.foil_treatment, previous);
   draft.reverse_card_id = await validateReverseCard(card, draft.reverse_card_id);
   return draft;
 }
@@ -856,7 +861,7 @@ async function assertScanDraftLocation(draft, userId) {
 }
 
 function scanDraftError(res, error) {
-  if (error.status === 400 || error.status === 404) return res.status(error.status).json({ error: error.message });
+  if (error.status) return res.status(error.status).json({ error: error.message });
   console.error(error);
   return res.status(500).json({ error: 'Failed to save scan draft' });
 }
@@ -875,10 +880,10 @@ router.post('/scan-drafts', async (req, res) => {
     const result = await db.withTransaction(async () => {
       await assertScanDraftLocation(draft, req.user.id);
       const inserted = await db.run(`INSERT INTO scan_drafts
-        (user_id, card_id, quantity, condition, printing, language, purchase_price, location_id, reverse_card_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+        (user_id, card_id, quantity, condition, printing, language, purchase_price, location_id, reverse_card_id, foil_treatment)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
         req.user.id, draft.card_id, draft.quantity, draft.condition, draft.printing,
-        draft.language, draft.purchase_price, draft.location_id, draft.reverse_card_id
+        draft.language, draft.purchase_price, draft.location_id, draft.reverse_card_id, draft.foil_treatment
       ]);
       return getScanDraft(req.user.id, inserted.lastID);
     });
@@ -895,10 +900,10 @@ router.patch('/scan-drafts/:id', async (req, res) => {
     const result = await db.withTransaction(async () => {
       await assertScanDraftLocation(draft, req.user.id);
       const updated = await db.run(`UPDATE scan_drafts SET
-        card_id = ?, quantity = ?, condition = ?, printing = ?, language = ?, purchase_price = ?, location_id = ?, reverse_card_id = ?
+        card_id = ?, quantity = ?, condition = ?, printing = ?, language = ?, purchase_price = ?, location_id = ?, reverse_card_id = ?, foil_treatment = ?
         WHERE id = ? AND user_id = ?`, [
         draft.card_id, draft.quantity, draft.condition, draft.printing,
-        draft.language, draft.purchase_price, draft.location_id, draft.reverse_card_id, req.params.id, req.user.id
+        draft.language, draft.purchase_price, draft.location_id, draft.reverse_card_id, draft.foil_treatment, req.params.id, req.user.id
       ]);
       if (!updated.changes) throw new AddCardError(404, 'Scan draft not found');
       return getScanDraft(req.user.id, req.params.id);
@@ -1135,8 +1140,8 @@ router.post('/collection/bulk-add', async (req, res) => {
       const result = await addCardToCollection(req.user, { ...shared, card_id, reverse_card_id });
       added.push({ card_id, id: result.id });
     } catch (error) {
-      if (!(error instanceof AddCardError)) console.error(error);
-      failed.push({ card_id, error: error instanceof AddCardError ? error.message : 'Failed to add card' });
+      if (!error.status) console.error(error);
+      failed.push({ card_id, error: error.status ? error.message : 'Failed to add card' });
     }
   }
   res.status(failed.length && !added.length ? 500 : 200).json({
@@ -1306,6 +1311,7 @@ router.post('/mtg-decks/:fileName/import', searchLimiter, async (req, res) => {
           reverse_card_id: row.reverse_card_id,
           quantity: row.quantity,
           printing: row.printing,
+          foil_treatment: row.foil_treatment,
           language: row.language,
           game: 'mtg',
           location_id: locationId,
@@ -1380,6 +1386,7 @@ router.put('/collection/:id', async (req, res) => {
     }
     if (list_type !== undefined && !LIST_TYPES.includes(list_type)) return res.status(400).json({ error: 'Invalid list_type' });
     const nextListType = list_type ?? entry.list_type;
+    const foilTreatment = resolveFoilTreatment(printing ?? entry.printing, req.body.foil_treatment, entry);
     const reverseCardId = req.body.reverse_card_id === undefined ? entry.reverse_card_id : req.body.reverse_card_id;
     await validateReverseCard(await db.get('SELECT * FROM card_cache WHERE id = ?', [entry.card_id]), reverseCardId, nextListType);
     const listChanged = nextListType !== entry.list_type;
@@ -1399,6 +1406,7 @@ router.put('/collection/:id', async (req, res) => {
     if (requestedQty !== null) { updates.push('quantity = ?'); params.push(requestedQty); }
     if (condition !== undefined) { updates.push('condition = ?'); params.push(condition); }
     if (printing !== undefined) { updates.push('printing = ?'); params.push(printing); }
+    if (foilTreatment !== entry.foil_treatment) { updates.push('foil_treatment = ?'); params.push(foilTreatment); }
     if (language !== undefined) {
       updates.push('language = ?');
       params.push(language);
@@ -1464,6 +1472,7 @@ router.put('/collection/:id', async (req, res) => {
         reverseCardId,
         quantity: requestedQty ?? entry.quantity,
         printing: printing ?? entry.printing,
+        foilTreatment,
         language: language ?? entry.language,
         excludeEntryId: entry.id
       });
@@ -1704,6 +1713,18 @@ router.post('/collection/bulk', async (req, res) => {
     if (action === 'condition' || action === 'printing') {
       const allowed = action === 'condition' ? BULK_CONDITIONS : BULK_PRINTINGS;
       if (!allowed.includes(value)) return res.status(400).json({ error: `Invalid ${action}` });
+      if (action === 'printing') {
+        const affected = await db.withTransaction(async () => {
+          const entries = await db.all(`SELECT * FROM collection WHERE id IN (${placeholders}) AND user_id = ?`, [...ids, req.user.id]);
+          for (const entry of entries) {
+            const treatment = resolveFoilTreatment(value, req.body.foil_treatment, entry);
+            await db.run('UPDATE collection SET printing = ?, foil_treatment = ? WHERE id = ? AND user_id = ?',
+              [value, treatment, entry.id, req.user.id]);
+          }
+          return entries.length;
+        });
+        return res.json({ message: `Set printing on ${affected} card(s)`, affected });
+      }
       // Column name is action, drawn from the BULK_ACTIONS whitelist (not user
       // input), so it is safe to interpolate.
       const result = await db.run(`UPDATE collection SET ${action} = ? WHERE id IN (${placeholders}) AND user_id = ?`, [value, ...ids, req.user.id]);
@@ -1761,7 +1782,7 @@ router.post('/collection/bulk', async (req, res) => {
         continue;
       }
       const resolved = await resolveCompartmentAndPosition({
-        locationId, userId: req.user.id, cardId: entry.card_id, printing: entry.printing, language: entry.language,
+        locationId, userId: req.user.id, cardId: entry.card_id, printing: entry.printing, foilTreatment: entry.foil_treatment, language: entry.language,
         listType: entry.list_type, quantity: entry.quantity, excludeEntryId: entry.id, reverseCardId: entry.reverse_card_id
       });
       const finalLoc = resolved.compartment_id ? (resolved.location_id ?? locationId) : null;

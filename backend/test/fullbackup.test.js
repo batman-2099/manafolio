@@ -19,6 +19,7 @@ async function testFullBackup() {
     await db.run(`INSERT INTO card_cache (id, name, game, tcgplayer_url, cardmarket_url) VALUES ('backup-card', 'Backup Card', 'mtg', 'https://www.tcgplayer.com/product/123', 'https://www.cardmarket.com/en/Magic/Products/Singles/Test/Card')`);
     await db.run("UPDATE card_cache SET printing_treatments = ? WHERE id = 'backup-card'", [JSON.stringify(['borderless', 'fullart'])]);
     await db.run("UPDATE card_cache SET produced_mana = ? WHERE id = 'backup-card'", ['["R","W"]']);
+    await db.run(`UPDATE card_cache SET finishes = '["nonfoil","foil"]', promo_types = '["surgefoil"]' WHERE id = 'backup-card'`);
     const location = await db.run(`INSERT INTO locations (name, type, user_id, sleeved) VALUES ('Backup Box', 'Box', 1, 3)`);
     const compartment = await db.run(`INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 100)`, [location.lastID]);
     await db.run(`INSERT INTO compartment_assignments (compartment_id, filter_value) VALUES (?, 'mtg')`, [compartment.lastID]);
@@ -54,6 +55,8 @@ async function testFullBackup() {
     assert.deepStrictEqual(res.body.deck_cards.map(card => [card.card_id, card.quantity, card.checked_out]), [['backup-card', 2, 1]]);
     assert.deepStrictEqual(res.body.card_cache.map(card => card.id), ['backup-card']);
     assert.strictEqual(res.body.card_cache[0].printing_treatments, '["borderless","fullart"]');
+    assert.strictEqual(res.body.card_cache[0].finishes, '["nonfoil","foil"]');
+    assert.strictEqual(res.body.card_cache[0].promo_types, '["surgefoil"]');
     // Restore without the source cache row so an existing cache cannot mask lost fields.
     await db.run("DELETE FROM collection WHERE card_id = 'backup-card'");
     await db.run('DELETE FROM decks WHERE id = ?', [deck.lastID]);
@@ -95,6 +98,8 @@ async function testFullBackup() {
     }
     restoreRes.statusCode = 200;
     assert.deepStrictEqual(await db.all(`SELECT card_id, position FROM collection WHERE user_id = 1 ORDER BY id`), [{ card_id: 'backup-card', position: 1000 }]);
+    assert.deepStrictEqual(await db.get("SELECT finishes, promo_types FROM card_cache WHERE id = 'backup-card'"),
+      { finishes: '["nonfoil","foil"]', promo_types: '["surgefoil"]' }, 'fresh-cache restore preserves finish evidence');
     assert.strictEqual((await db.get(`SELECT COUNT(*) AS count FROM locations WHERE user_id = 1 AND name = 'Discard Box'`)).count, 0);
     assert.strictEqual((await db.get("SELECT sleeved FROM locations WHERE user_id = 1 AND name = 'Backup Box'")).sleeved, 3);
     assert.deepStrictEqual(await db.all(`SELECT name, checked_out, commander_card_id, inventory_type, wins, losses, sleeved FROM decks WHERE user_id = 1 ORDER BY id`), [

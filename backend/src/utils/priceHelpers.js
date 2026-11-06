@@ -34,6 +34,8 @@ function parseCardRow(row) {
     color_identity: JSON.parse(row.color_identity || '[]'),
     ...(Object.hasOwn(row, 'printing_treatments') ? { printing_treatments: JSON.parse(row.printing_treatments || 'null') } : {}),
     ...(Object.hasOwn(row, 'produced_mana') ? { produced_mana: JSON.parse(row.produced_mana || 'null') } : {}),
+    ...(Object.hasOwn(row, 'finishes') ? { finishes: JSON.parse(row.finishes || 'null') } : {}),
+    ...(Object.hasOwn(row, 'promo_types') ? { promo_types: JSON.parse(row.promo_types || 'null') } : {}),
   };
 }
 

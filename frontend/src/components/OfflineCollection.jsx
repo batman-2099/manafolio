@@ -4,6 +4,7 @@ import { filterOfflineCards } from '../utils/offlineFilter';
 import { useOfflineSnapshot } from './OfflineSettings';
 import './OfflineCollection.css';
 import { pairedCardName } from '../utils/tokenFaces';
+import { getPrintingBadgeLabel } from '../utils/cardPrinting';
 
 const PAGE_SIZE = 40;
 const EMPTY_CARDS = [];
@@ -102,7 +103,7 @@ export default function OfflineCollection() {
               <div><dt>{t('offline.quantity')}</dt><dd>{card.quantity}</dd></div>
               <div><dt>{t('offline.missing')}</dt><dd>{card.missing ? card.quantity : 0}</dd></div>
               <div><dt>{t('offline.reserved')}</dt><dd>{card.reserved_quantity}</dd></div>
-              <div><dt>{t('offline.finish')}</dt><dd>{finishLabel(card.printing) || t('offline.unknown')}</dd></div>
+              <div><dt>{t('offline.finish')}</dt><dd>{card.foil_treatment ? getPrintingBadgeLabel(card.printing, card.foil_treatment) : finishLabel(card.printing) || t('offline.unknown')}</dd></div>
               <div><dt>{t('offline.language')}</dt><dd>{card.language || t('offline.unknown')}</dd></div>
               <div><dt>{t('offline.condition')}</dt><dd>{card.condition || t('offline.unknown')}</dd></div>
             </dl>

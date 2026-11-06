@@ -12,8 +12,8 @@ export function buildCollectionExport(cards, format) {
     return buildDeckExport([...totals.values()], 'mtga');
   }
   const rows = [
-    ['Card ID', 'Name', 'Set Name', 'Set ID', 'Card Number', 'Quantity', 'Condition', 'Printing', 'Language', 'Purchase Price', 'Reverse Card ID'],
-    ...cards.map(card => [card.card_id, card.name, card.set_name, card.set_id, card.number, card.quantity, card.condition, card.printing, card.language, card.purchase_price, card.reverse_card_id]),
+    ['Card ID', 'Name', 'Set Name', 'Set ID', 'Card Number', 'Quantity', 'Condition', 'Printing', 'Language', 'Purchase Price', 'Reverse Card ID', 'Foil Treatment'],
+    ...cards.map(card => [card.card_id, card.name, card.set_name, card.set_id, card.number, card.quantity, card.condition, card.printing, card.language, card.purchase_price, card.reverse_card_id, card.foil_treatment]),
   ];
   return rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
 }

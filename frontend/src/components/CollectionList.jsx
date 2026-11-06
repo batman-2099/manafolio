@@ -3,7 +3,7 @@ import './CatalogueWorkbench.css';
 import { Search, Trash2, Edit2, LayoutGrid, List, SlidersHorizontal, X, MousePointerClick, Download, ChevronDown } from 'lucide-react';
 import { pairedCardName } from '../utils/tokenFaces';
 import { priceText } from '../utils/formatPrice';
-import { CONDITIONS, getPrintings, GRADERS } from '../utils/cardOptions';
+import { CONDITIONS, getPrintings, GRADERS, matchesPrinting as matchesPrintingOption } from '../utils/cardOptions';
 import { getPrintingBadgeLabel, getPrintingBadgeStyle, getFoilOverlayClass } from '../utils/cardPrinting';
 import { getCardRarityBorder, getRarityBadgeLabel, getRarityBadgeStyle } from '../utils/cardRarity';
 import { COLLECTION_SORT_CRITERIA, sortCardsByOrder } from '../utils/cardSort';
@@ -288,7 +288,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       const matchesGame = gameFilter === '' ? isGameEnabled(itemGame) : itemGame === gameFilter;
       const matchesRarity = rarityFilter.length === 0 ? true : rarityFilter.includes(item.rarity);
       const matchesCondition = conditionFilter.length === 0 ? true : conditionFilter.includes(item.condition);
-      const matchesPrinting = (finishes.length === 0 || finishes.includes(item.printing)) &&
+      const matchesPrinting = (finishes.length === 0 || finishes.some(value => matchesPrintingOption(item, value))) &&
         (treatments.length === 0 || (Array.isArray(item.printing_treatments) && treatments.some(value => item.printing_treatments.includes(value))));
       const matchesSet = setFilter.length === 0 ? true : setFilter.includes(item.set_name);
       const matchesType = typeFilter.length === 0 ? true : typeFilter.some(t => (item.subtypes || []).includes(t));
@@ -331,6 +331,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       let key = `${item.card_id}-${JSON.stringify([item.reverse_card_id || null, item.grader || 'Raw', item.grade ?? null, item.cert_number ?? null])}`;
       if (stackByCondition) key += `-${item.condition}`;
       if (stackByPrinting) key += `-${item.printing}`;
+      key += `-foil:${item.foil_treatment || ''}`;
 
       if (!groups[key]) {
         groups[key] = { ...item, stack_entries: [item] };
@@ -879,14 +880,14 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                     <span className="collection-card-tag" style={getRarityBadgeStyle(item.rarity)}>{getRarityBadgeLabel(item.rarity)}</span>
                     <span className="tcg-card-price" style={{ whiteSpace: 'nowrap' }}>{priceText(item.price_trend, item.price_currency)}</span>
                   </span>
-                  <span style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
+                  <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem', fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
                     <span>
                       {item.grader && item.grader !== 'Raw'
                         ? `${item.grader}${item.grade != null ? ` ${item.grade}` : ''}`
                         : item.condition}
                     </span>
                     {item.printing !== 'Normal' && (
-                      <span className="collection-card-tag collection-card-tag--foil" style={getPrintingBadgeStyle(item.printing)}>{getPrintingBadgeLabel(item.printing)}</span>
+                      <span className="collection-card-tag collection-card-tag--foil" style={getPrintingBadgeStyle(item.printing, item.foil_treatment)}>{getPrintingBadgeLabel(item.printing, item.foil_treatment)}</span>
                     )}
                   </span>
                 </span>

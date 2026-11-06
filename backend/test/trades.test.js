@@ -15,10 +15,11 @@ const db = require('../src/db');
     await db.initDb();
     await db.run("INSERT INTO users (id, username, password_hash, share_token) VALUES (2, 'other', 'unused', 'trade-test-other')");
     await db.run(`INSERT INTO card_cache (id, name, game, language, price_normal, price_holofoil, price_currency)
-      VALUES ('mtg-give', 'Giving sample', 'mtg', 'English', 2, NULL, 'USD'),
-      ('mtg-receive', 'Receiving sample', 'mtg', 'Japanese', 3, NULL, 'EUR')`);
-    const entry = (await db.run(`INSERT INTO collection (user_id, card_id, quantity, printing, purchase_price, notes)
-      VALUES (1, 'mtg-give', 4, 'Holofoil', 7, 'preserve this')`)).lastID;
+      VALUES ('mtg-00000000-0000-4000-8000-000000000021', 'Giving sample', 'mtg', 'English', 2, NULL, 'USD'),
+      ('mtg-00000000-0000-4000-8000-000000000022', 'Receiving sample', 'mtg', 'Japanese', 3, 3, 'EUR')`);
+    await db.run(`UPDATE card_cache SET finishes = '["nonfoil","foil"]', promo_types = '["surgefoil"]'`);
+    const entry = (await db.run(`INSERT INTO collection (user_id, card_id, quantity, printing, foil_treatment, purchase_price, notes)
+      VALUES (1, 'mtg-00000000-0000-4000-8000-000000000021', 4, 'Holofoil', 'surge', 7, 'preserve this')`)).lastID;
     const app = express();
     app.use(express.json());
     app.use((req, res, next) => { req.user = { id: Number(req.headers['x-test-user'] || 1) }; next(); });
@@ -33,12 +34,18 @@ const db = require('../src/db');
     };
     const available = () => request('/trades/entries');
     const draft = async () => ({ trade_id: randomUUID(), giving: [{ entry_id: entry, quantity: 2, snapshot: (await available()).body.find(row => row.entry_id === entry).snapshot }],
-      receiving: [{ card_id: 'mtg-receive', quantity: 3, printing: 'Normal', condition: 'Lightly Played', language: 'Japanese' }] });
+      receiving: [{ card_id: 'mtg-00000000-0000-4000-8000-000000000022', quantity: 3, printing: 'Holofoil', condition: 'Lightly Played', language: 'Japanese' }] });
     let trade = await draft();
     const review = await request('/trades/review', trade);
     assert.equal(review.body.giving[0].estimate, null, 'foil must not borrow a normal price');
     assert.equal(review.body.receiving[0].estimate, 3);
     assert.equal(review.body.receiving[0].currency, 'EUR');
+    assert.equal(review.body.receiving[0].foil_treatment, null, 'omitted receiving treatment stays unspecified');
+    assert.equal((await request('/trades/review', { ...trade, receiving: [{ ...trade.receiving[0], foil_treatment: 'traditional' }] })).body.receiving[0].foil_treatment, 'traditional');
+    assert.equal((await request('/trades/confirm', { ...trade, receiving: [{ ...trade.receiving[0], foil_treatment: 'unknown' }] })).status, 400);
+    await db.run('UPDATE collection SET foil_treatment = NULL WHERE id = ?', [entry]);
+    assert.equal((await request('/trades/confirm', trade)).status, 409, 'treatment changes invalidate the giving snapshot');
+    await db.run("UPDATE collection SET foil_treatment = 'surge' WHERE id = ?", [entry]);
     assert.equal((await db.get('SELECT quantity FROM collection WHERE id = ?', [entry])).quantity, 4, 'review has no inventory effect');
     assert.equal((await request('/trades/confirm', trade, 2)).status, 409, 'cross-account entry is unavailable');
     assert.equal((await request('/trades/confirm', { ...trade, receiving: [{ ...trade.receiving[0], language: 'English' }] })).status, 400);
@@ -49,13 +56,14 @@ const db = require('../src/db');
     assert.equal((await request('/trades/confirm', trade)).status, 409, 'stale quantity invalidates review');
     await db.run('UPDATE collection SET quantity = 4 WHERE id = ?', [entry]);
     const deck = (await db.run("INSERT INTO decks (name, user_id, checked_out) VALUES ('Reserved', 1, 1)")).lastID;
-    await db.run("INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, 'mtg-give', 1)", [deck]);
-    await db.run("INSERT INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, 'mtg-give', ?, 1)", [deck, entry]);
+    await db.run("INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, 'mtg-00000000-0000-4000-8000-000000000021', 1)", [deck]);
+    await db.run("INSERT INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, 'mtg-00000000-0000-4000-8000-000000000021', ?, 1)", [deck, entry]);
     assert.equal((await request('/trades/confirm', trade)).status, 409, 'any reservation blocks the specific entry');
     await db.run('UPDATE decks SET checked_out = 0 WHERE id = ?', [deck]);
     const location = (await db.get('SELECT id FROM locations WHERE user_id = 1 LIMIT 1')).id;
     await db.run('UPDATE collection SET location_id = ? WHERE id = ?', [location, entry]);
     trade = await draft();
+    trade.receiving[0].foil_treatment = 'traditional';
     await db.run('UPDATE locations SET locked = 1 WHERE id = ?', [location]);
     assert.equal((await request('/trades/confirm', trade)).status, 409);
     await db.run('UPDATE locations SET locked = 0 WHERE id = ?', [location]);
@@ -65,7 +73,7 @@ const db = require('../src/db');
     }
     await db.run("UPDATE collection SET list_type = 'collection' WHERE id = ?", [entry]);
     // Real SQLite failure after the giving UPDATE proves rollback, not just preflight rejection.
-    await db.run("CREATE TRIGGER reject_trade_receiving BEFORE INSERT ON collection WHEN NEW.card_id = 'mtg-receive' BEGIN SELECT RAISE(ABORT, 'test receiving failure'); END");
+    await db.run("CREATE TRIGGER reject_trade_receiving BEFORE INSERT ON collection WHEN NEW.card_id = 'mtg-00000000-0000-4000-8000-000000000022' BEGIN SELECT RAISE(ABORT, 'test receiving failure'); END");
     assert.equal((await request('/trades/confirm', trade)).status, 500);
     assert.equal((await db.get('SELECT quantity FROM collection WHERE id = ?', [entry])).quantity, 4);
     assert.equal((await db.get('SELECT COUNT(*) AS n FROM completed_trades')).n, 0);
@@ -77,12 +85,15 @@ const db = require('../src/db');
     assert.equal((await request('/trades/confirm', { ...trade, receiving: [{ ...trade.receiving[0], quantity: 1 }] })).status, 409);
     const remaining = await db.get('SELECT * FROM collection WHERE id = ?', [entry]);
     assert.equal(remaining.quantity, 2); assert.equal(remaining.printing, 'Holofoil'); assert.equal(remaining.purchase_price, 7); assert.equal(remaining.notes, 'preserve this'); assert.equal(remaining.location_id, location);
-    const received = await db.get("SELECT * FROM collection WHERE card_id = 'mtg-receive'");
+    assert.equal(remaining.foil_treatment, 'surge');
+    const received = await db.get("SELECT * FROM collection WHERE card_id = 'mtg-00000000-0000-4000-8000-000000000022'");
     assert.equal(received.quantity, 3); assert.equal(received.language, 'Japanese'); assert.equal(received.condition, 'Lightly Played'); assert.equal(received.purchase_price, null); assert.equal(received.location_id, null); assert.equal(received.compartment_id, null); assert.equal(received.list_type, 'collection');
+    assert.equal(received.foil_treatment, 'traditional');
     const backup = (await request('/api/export?format=backup')).body;
     assert.equal(backup.completed_trades[0].trade_id, trade.trade_id);
     const restore = await request('/api/import', { format: 'backup', data: backup }, 2);
     assert.equal(restore.status, 200, JSON.stringify(restore.body));
+    assert.equal((await db.get("SELECT foil_treatment FROM collection WHERE user_id = 2 AND card_id = 'mtg-00000000-0000-4000-8000-000000000022'")).foil_treatment, 'traditional');
     assert.equal((await request('/trades/confirm', trade, 2)).status, 200, 'restored receipt prevents replay even after entry IDs remap');
     console.log('Trade transaction, identity, inventory, reservation, rollback, retry, pricing and backup checks passed.');
   } finally {

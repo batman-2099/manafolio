@@ -107,7 +107,7 @@ export default function StocktakeDialog({ location, onClose, onApplied }) {
             <button type="button" className="stocktake-image" aria-label={`${t('inspector.zoomHint')}: ${name}`} aria-haspopup="dialog" onClick={() => setZoomCard(entry)}>
               <CardImage card={entry} loading="lazy" />
             </button>
-            <strong>{name} {getPrintingBadgeLabel(entry.printing) && <span style={{ ...getPrintingBadgeStyle(entry.printing), display: 'inline-block', fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px' }}>{getPrintingBadgeLabel(entry.printing)}</span>}</strong>
+            <strong>{name} {getPrintingBadgeLabel(entry.printing) && <span style={{ ...getPrintingBadgeStyle(entry.printing, entry.foil_treatment), display: 'inline-block', fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px' }}>{getPrintingBadgeLabel(entry.printing, entry.foil_treatment)}</span>}</strong>
             <span className="stocktake-meta">{t('stocktake.lastVerified', { date: entry.last_verified_at ? new Date(entry.last_verified_at).toLocaleDateString(locale) : t('stocktake.never') })}</span>
             {deck && <span className="stocktake-meta">{t(deck.checked_out ? 'deck.inPlay' : 'deck.pulled')}: {deck.name}</span>}
             {entry.quantity > 1 && <span className="stocktake-meta">{t('stocktake.copy', { number: copyIndex + 1, total: entry.quantity })}</span>}

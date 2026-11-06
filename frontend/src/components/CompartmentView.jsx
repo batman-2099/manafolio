@@ -27,7 +27,7 @@ function stackPocketCards(cards, highlightSet, pulledSet) {
   const priority = card => highlightSet?.has(card.entry_id) ? 2 : pulledSet?.has(card.entry_id) ? 1 : 0;
   const stacks = new Map();
   for (const card of cards) {
-    const key = JSON.stringify([card.card_id, card.reverse_card_id || null, card.printing || 'Normal', card.language || 'English']);
+    const key = JSON.stringify([card.card_id, card.reverse_card_id || null, card.printing || 'Normal', card.foil_treatment || null, card.language || 'English']);
     const held = stacks.get(key);
     if (!held) {
       stacks.set(key, { ...card, quantity: card.quantity || 1, stack_entries: [card] });
@@ -184,7 +184,7 @@ function DroppablePocket({ enabled, dropId, dropData, dragId, dragCard, children
   return <ActiveDroppable dropId={dropId} dropData={dropData} {...divProps}>{children}</ActiveDroppable>;
 }
 
-function PrintingBadge({ printing }) {
+function PrintingBadge({ printing, foilTreatment }) {
   if (!printing || printing === 'Normal') return null;
   return (
     <div style={{
@@ -192,9 +192,9 @@ function PrintingBadge({ printing }) {
       fontSize: '0.55rem', fontWeight: 'bold',
       padding: '0.1rem 0.3rem', borderRadius: '4px',
       zIndex: 20, boxShadow: 'none',
-      ...getPrintingBadgeStyle(printing)
+      ...getPrintingBadgeStyle(printing, foilTreatment)
     }}>
-      {getPrintingBadgeLabel(printing)}
+      {getPrintingBadgeLabel(printing, foilTreatment)}
     </div>
   );
 }
@@ -235,16 +235,18 @@ export function FocusedCardInfo({ card, slotNumber, moveSelect = null }) {
                 {getRarityBadgeLabel(card.rarity)}
               </span>
             )}
-            {card.printing && card.printing !== 'Normal' && (
-              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', ...getPrintingBadgeStyle(card.printing) }}>
-                {getPrintingBadgeLabel(card.printing)}
-              </span>
-            )}
             {card.printing === 'Normal' && <span style={infoChipStyle}>{t('compartment.printingNormal')}</span>}
             {card.supertype && <span style={{ ...infoChipStyle, color: 'var(--text-strong)' }} title={t('compartment.supertype')}>{card.supertype}</span>}
             {(card.types || []).length > 0 && <span style={infoChipStyle} title={t('compartment.types')}>{card.types.join(' / ')}</span>}
             {(card.subtypes || []).length > 0 && <span style={infoChipStyle} title={t('compartment.subtypes')}>{card.subtypes.join(' / ')}</span>}
-            {card.condition && <span style={infoChipStyle}>{card.condition}</span>}
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
+              {card.condition && <span style={infoChipStyle}>{card.condition}</span>}
+              {card.printing && card.printing !== 'Normal' && (
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', ...getPrintingBadgeStyle(card.printing, card.foil_treatment) }}>
+                  {getPrintingBadgeLabel(card.printing, card.foil_treatment)}
+                </span>
+              )}
+            </span>
             {card.language && card.language !== 'English' && <span style={infoChipStyle}>{card.language}</span>}
             {card.quantity > 1 && <span style={{ ...infoChipStyle, color: 'var(--text-strong)' }}>x{card.quantity}</span>}
             {card.price_trend > 0 && (
@@ -690,7 +692,7 @@ export default function CompartmentView({
                 >
                   <CardImage card={card} alt={displayName(card)} title={displayName(card)} loading="lazy" decoding="async" draggable={dropEnabled ? false : undefined} />
                   {getFoilOverlayClass(card.printing) && <div className={getFoilOverlayClass(card.printing)} style={{ borderRadius: '4px' }} />}
-                  <PrintingBadge printing={card.printing} />
+                  <PrintingBadge printing={card.printing} foilTreatment={card.foil_treatment} />
                   {allowStacking && card.quantity > 1 && (pullMode || !(card.in_deck_qty > 0)) && (
                     <span title={t('compartment.stackedHere', { count: card.quantity })} style={{ position: 'absolute', bottom: '3px', left: '3px', zIndex: 24, fontSize: '0.6rem', fontWeight: 900, padding: '1px 4px', borderRadius: '4px', background: 'var(--media-background)', border: '1px solid var(--border-glass-hover)', color: 'var(--media-foreground)' }}>
                       &times;{card.quantity}
@@ -1012,7 +1014,7 @@ export default function CompartmentView({
                   >
                     {absOffset <= IMG_WINDOW && <CardImage card={card} decoding="async" />}
                     {getFoilOverlayClass(card.printing) && <div className={getFoilOverlayClass(card.printing)} style={{ borderRadius: '4.5px' }} />}
-                    <PrintingBadge printing={card.printing} />
+                    <PrintingBadge printing={card.printing} foilTreatment={card.foil_treatment} />
                     {pullMode && pulledSet.has(card.entry_id) && (
                       <div style={{ position: 'absolute', inset: 0, background: 'color-mix(in srgb, var(--media-background) 62%, transparent)', borderRadius: '5px', zIndex: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                         <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-strong)', background: 'var(--surface-3)', padding: '3px 8px', borderRadius: '4px' }}>

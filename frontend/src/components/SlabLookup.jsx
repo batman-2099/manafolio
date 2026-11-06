@@ -66,6 +66,7 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
           // this one is never shown for a graded row (see CardEntryFields).
           condition: 'Near Mint',
           printing: card.printing || 'Normal',
+          foil_treatment: null,
           language: card.language || 'English',
           game: card.game || result.game,
           grader: result.cert.grader,

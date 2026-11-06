@@ -13,6 +13,8 @@ const { normalizeUploadedImage } = require('../utils/uploadedImage');
 const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
 const { assertTokenPair, validateReverseCard } = require('../utils/tokenPairing');
 const cardApi = require('../utils/cardApi');
+const { resolveFoilTreatment } = require('../utils/foilTreatments');
+const foilTreatments = require('../../../shared/foilTreatments.json');
 const validImportQuantity = quantity => Number.isSafeInteger(quantity) && quantity > 0 && quantity <= 2147483647;
 
 function parseCsvRows(data) {
@@ -103,6 +105,21 @@ async function parseCompleteBackup(data) {
     if (!Array.isArray(mana) || mana.some(value => !['W', 'U', 'B', 'R', 'G', 'C'].includes(value))) {
       throw new Error('Invalid backup produced mana');
     }
+  }
+  for (const card of backup.card_cache) {
+    for (const field of ['finishes', 'promo_types']) {
+      if (card[field] == null) continue;
+      let values;
+      try { values = typeof card[field] === 'string' ? JSON.parse(card[field]) : null; } catch {}
+      if (!Array.isArray(values) || values.some(value => typeof value !== 'string' ||
+          (field === 'finishes' && !['nonfoil', 'foil', 'etched'].includes(value)))) {
+        throw new Error(`Invalid backup ${field}`);
+      }
+    }
+  }
+  if (backup.collection.some(card => card.foil_treatment != null &&
+      (card.printing !== 'Holofoil' || typeof card.foil_treatment !== 'string' || !Object.hasOwn(foilTreatments, card.foil_treatment)))) {
+    throw new Error('Invalid backup foil treatment');
   }
   if (backup.collection.some(card => !Number.isSafeInteger(card.quantity) || card.quantity < 1)
       || backup.deck_cards.some(card => !card || (card.quantity !== 0 && !validImportQuantity(card.quantity)))) {
@@ -299,17 +316,20 @@ async function restoreCompleteBackup(backup, userId) {
           price_trend, price_normal, price_holofoil, price_avg1, price_avg7,
           price_avg30, price_currency, price_source, cmc, color_identity, game,
           language, printed_name, tcgplayer_product_id, last_updated, image_url_back, name_back,
-          tcgplayer_url, cardmarket_url, printing_treatments, produced_mana
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          tcgplayer_url, cardmarket_url, printing_treatments, produced_mana, finishes, promo_types
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           printing_treatments = COALESCE(card_cache.printing_treatments, excluded.printing_treatments),
-          produced_mana = COALESCE(card_cache.produced_mana, excluded.produced_mana)
+          produced_mana = COALESCE(card_cache.produced_mana, excluded.produced_mana),
+          finishes = COALESCE(card_cache.finishes, excluded.finishes),
+          promo_types = CASE WHEN card_cache.finishes IS NULL THEN excluded.promo_types ELSE card_cache.promo_types END
       `, [
         card.id, card.name, card.supertype, card.subtypes, card.types, card.rarity, card.set_id, card.set_name, card.number, card.image_url,
         card.price_trend, card.price_normal, card.price_holofoil, card.price_avg1, card.price_avg7,
         card.price_avg30, card.price_currency, card.price_source, card.cmc, card.color_identity, card.game,
         card.language, card.printed_name, card.tcgplayer_product_id, card.last_updated, card.image_url_back ?? null, card.name_back ?? null,
-        card.tcgplayer_url ?? null, card.cardmarket_url ?? null, card.printing_treatments ?? null, card.produced_mana ?? null
+        card.tcgplayer_url ?? null, card.cardmarket_url ?? null, card.printing_treatments ?? null, card.produced_mana ?? null,
+        card.finishes ?? null, card.promo_types ?? null
       ]);
     }
 
@@ -352,15 +372,15 @@ async function restoreCompleteBackup(backup, userId) {
         INSERT INTO collection (
           card_id, quantity, condition, printing, language, purchase_price, location_id, compartment_id,
           position, favorite, is_trade, list_type, game, added_at, notes, grader, grade, cert_number,
-          market_value, market_value_source, market_value_at, missing, user_id, last_verified_at, reverse_card_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          market_value, market_value_source, market_value_at, missing, user_id, last_verified_at, reverse_card_id, foil_treatment
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         card.card_id, card.quantity, card.condition, card.printing, card.language, card.purchase_price,
         card.location_id == null ? null : locationIds.get(card.location_id),
         card.compartment_id == null ? null : compartmentIds.get(card.compartment_id),
         card.position, card.favorite || 0, card.is_trade || 0, card.list_type, card.game, card.added_at,
         card.notes || '', card.grader || 'Raw', card.grade, card.cert_number, card.market_value,
-        card.market_value_source, card.market_value_at, card.missing || 0, userId, card.last_verified_at ?? null, card.reverse_card_id ?? null
+        card.market_value_source, card.market_value_at, card.missing || 0, userId, card.last_verified_at ?? null, card.reverse_card_id ?? null, card.foil_treatment ?? null
       ]);
       entryIds.set(card.id, result.lastID);
     }
@@ -463,6 +483,7 @@ router.get('/export', async (req, res) => {
         c.quantity,
         c.condition,
         c.printing,
+        c.foil_treatment,
         c.language,
         c.purchase_price,
         c.added_at,
@@ -715,6 +736,16 @@ router.post('/import', importLimiter, async (req, res) => {
         await cardApi.getCardById(frontId, { game: 'mtg' });
       }
     }
+    for (const item of rawItems) {
+      if (item.printing === 'Holofoil') {
+        let card = await db.get('SELECT * FROM card_cache WHERE id = ?', [item.card_id || item.id])
+          || await cardApi.getCardById(item.card_id || item.id, { game: 'mtg' });
+        if (!card) throw Object.assign(new Error('Printing not found'), { status: 400 });
+        card = await cardApi.printingInLanguage(card, item.language || 'English') || card;
+        item.card_id = card.id;
+      }
+      item.foil_treatment = resolveFoilTreatment(item.printing || 'Normal', item.foil_treatment);
+    }
 
     let importedCount = 0;
     let addedItems = [];
@@ -756,8 +787,8 @@ router.post('/import', importLimiter, async (req, res) => {
 
         await db.run(
           `INSERT INTO collection 
-           (card_id, user_id, quantity, condition, printing, language, purchase_price, list_type, game, reverse_card_id, added_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+           (card_id, user_id, quantity, condition, printing, language, purchase_price, list_type, game, reverse_card_id, foil_treatment, added_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
           [
             cardId,
             req.user.id,
@@ -768,7 +799,8 @@ router.post('/import', importLimiter, async (req, res) => {
             item.purchase_price || 0,
             list_type,
             game,
-            reverseCardId
+            reverseCardId,
+            item.foil_treatment
           ]
         );
         importedCount++;

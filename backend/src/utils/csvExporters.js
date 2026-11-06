@@ -53,7 +53,7 @@ function generateExportCSV(collectionItems, formatType = 'internal') {
   const formatKey = (formatType || 'internal').toLowerCase();
   const strategy = EXPORT_STRATEGIES[formatKey] || EXPORT_STRATEGIES.internal;
   
-  const mappedRows = collectionItems.map(strategy);
+  const mappedRows = collectionItems.map(item => ({ ...strategy(item), 'Foil Treatment': item.foil_treatment || '' }));
   if (mappedRows.length === 0) return '';
 
   const headers = Object.keys(mappedRows[0]);

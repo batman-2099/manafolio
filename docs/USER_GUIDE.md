@@ -159,6 +159,8 @@ Pressing **Enter** in the quick-add form submits to the selected Physical or Are
 
 Changing the language in an add form can resolve a different printing, rather than merely relabeling the same card. Recheck the artwork and identification after changing it. Finish and condition are choices you make; the application does not inspect a card to determine them.
 
+**Printing** lists **Nonfoil**, **Foil** (unspecified), **Foil-Etched**, **Textured Foil**, **Surge Foil**, **Galaxy Foil**, **Halo Foil**, **Raised Foil**, **Neon Ink Foil**, and **Double Rainbow Foil** in one dropdown. All choices are available for every printing; Manafolio does not restrict them using Scryfall metadata. Choose the finish on your physical copy. Scanning does not detect foil type.
+
 For **Bulk Add**, enter a positive whole-number quantity. While the request is pending, selection and entry controls stay locked. If some cards fail, successful cards are added once and failures remain selected with their errors; retry adds only those retained cards. Arena additions do not change Physical-owned counts.
 
 An add request can create at most **10,000 individual collection rows**, including the combined copies in a bulk add, precon import, or Scan review confirmation. Split larger requests into smaller batches. This limit counts newly expanded rows, not the quantity stored in an existing stack; it does not reduce existing entries. A rejected Scan review confirmation leaves its drafts intact.
