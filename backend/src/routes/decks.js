@@ -238,7 +238,6 @@ router.post('/', async (req, res) => {
     }
   }
 
-  let newDeckId;
   try {
     let preconPairs = null;
     if (archidekt_url) {
@@ -264,44 +263,14 @@ router.post('/', async (req, res) => {
       preconPairs = pairs;
     }
 
-    const preconCommanderId = preconPairs?.find(({ row }) => row.isCommander)?.card.id || null;
-    const result = await db.withTransaction(async () => {
-      const deck = await db.run(
-        `INSERT INTO decks (name, description, game, format, category, accent_color, target_size, inventory_type, user_id, commander_card_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [name, description, deckGame, preconCommanderId ? 'Commander / EDH' : format, category, accent_color, targetSizeNum, inventoryType, req.user.id, preconCommanderId]
-      );
-      if (commander_card_id !== undefined) {
-        const check = await validateDeckAddition({ deckId: deck.lastID, userId: req.user.id, cardId: commander_card_id, newQty: 1, mode: 'draft' });
-        if (!check.ok) throw Object.assign(new Error(check.error), { status: 400 });
-        await db.run(`INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, 1)`, [deck.lastID, commander_card_id]);
-        await db.run(`UPDATE decks SET commander_card_id = ? WHERE id = ? AND user_id = ?`, [commander_card_id, deck.lastID, req.user.id]);
-      }
-      return deck;
-    });
-    newDeckId = result.lastID;
-    const addDeckCard = async (cardId, quantity) => {
-      if (inventoryType !== 'collection') {
-        const current = await db.get(`SELECT quantity FROM deck_cards WHERE deck_id = ? AND card_id = ?`, [newDeckId, cardId]);
-        const check = await validateDeckAddition({ deckId: newDeckId, userId: req.user.id, cardId, newQty: (current?.quantity || 0) + quantity, mode: 'draft' });
-        if (!check.ok) {
-          const error = new Error(check.error);
-          error.status = 400;
-          throw error;
-        }
-      }
-      await db.run(
-        `INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, ?)
-         ON CONFLICT(deck_id, card_id) DO UPDATE SET quantity = quantity + EXCLUDED.quantity`,
-        [newDeckId, cardId, quantity]
-      );
-    };
 
+    const additions = [];
     // Optional decklist import. ManaBox identifies a printing by set and
     // collector number, so resolve those identifiers in batches instead of
     // guessing from a card name shared by many printings.
     if (preconPairs) {
       for (const { row, card } of preconPairs) {
-        await addDeckCard(card.id, row.quantity);
+        additions.push({ cardId: card.id, quantity: row.quantity });
       }
     } else if (decklist_text && typeof decklist_text === 'string') {
       const manaBoxItems = deckGame === 'mtg' ? parseManaboxText(decklist_text) : [];
@@ -323,7 +292,7 @@ router.post('/', async (req, res) => {
         }
         await scryfallApi.cacheCards(cards);
         for (const { row, card } of pairs) {
-          await addDeckCard(card.id, row.quantity);
+          additions.push({ cardId: card.id, quantity: row.quantity });
         }
       } else {
         const lines = decklist_text.split('\n');
@@ -336,7 +305,7 @@ router.post('/', async (req, res) => {
             const cardName = match[2].trim();
             const card = await db.get(`SELECT id FROM card_cache WHERE LOWER(name) = LOWER(?) AND game = ? LIMIT 1`, [cardName, deckGame]);
             if (card) {
-              await addDeckCard(card.id, qty);
+              additions.push({ cardId: card.id, quantity: qty });
             }
             else if (inventoryType === 'graveyard') {
               throw Object.assign(new Error(`${cardName} was not found in the card catalog`), { status: 400 });
@@ -345,10 +314,35 @@ router.post('/', async (req, res) => {
         }
       }
     }
+    const preconCommanderId = preconPairs?.find(({ row }) => row.isCommander)?.card.id || null;
+    const result = await db.withTransaction(async () => {
+      const deck = await db.run(
+        `INSERT INTO decks (name, description, game, format, category, accent_color, target_size, inventory_type, user_id, commander_card_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, description, deckGame, preconCommanderId ? 'Commander / EDH' : format, category, accent_color, targetSizeNum, inventoryType, req.user.id, preconCommanderId]
+      );
+      if (commander_card_id !== undefined) {
+        const check = await validateDeckAddition({ deckId: deck.lastID, userId: req.user.id, cardId: commander_card_id, newQty: 1, mode: 'draft' });
+        if (!check.ok) throw Object.assign(new Error(check.error), { status: 400 });
+        await db.run(`INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, 1)`, [deck.lastID, commander_card_id]);
+        await db.run(`UPDATE decks SET commander_card_id = ? WHERE id = ? AND user_id = ?`, [commander_card_id, deck.lastID, req.user.id]);
+      }
+      for (const { cardId, quantity } of additions) {
+        if (inventoryType !== 'collection') {
+          const current = await db.get(`SELECT quantity FROM deck_cards WHERE deck_id = ? AND card_id = ?`, [deck.lastID, cardId]);
+          const check = await validateDeckAddition({ deckId: deck.lastID, userId: req.user.id, cardId, newQty: (current?.quantity || 0) + quantity, mode: 'draft' });
+          if (!check.ok) throw Object.assign(new Error(check.error), { status: 400 });
+        }
+        await db.run(
+          `INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, ?)
+           ON CONFLICT(deck_id, card_id) DO UPDATE SET quantity = quantity + EXCLUDED.quantity`,
+          [deck.lastID, cardId, quantity]
+        );
+      }
+      return deck;
+    });
 
-    res.status(201).json({ message: 'Deck created successfully', id: newDeckId });
+    res.status(201).json({ message: 'Deck created successfully', id: result.lastID });
   } catch (error) {
-    if (newDeckId) await db.run(`DELETE FROM decks WHERE id = ? AND user_id = ?`, [newDeckId, req.user.id]);
     if (!error.status) console.error(error);
     res.status(error.status || 500).json({ error: error.status ? error.message : 'Failed to create deck' });
   }

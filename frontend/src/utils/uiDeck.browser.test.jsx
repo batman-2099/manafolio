@@ -36,6 +36,7 @@ export async function runUiDeckRegressions() {
   let previewBody;
   let createdBody;
   let createFails = true;
+  const searches = [];
   const response = (body, status = 200) => ({ ok: status < 400, status, headers: new Headers(), json: async () => body });
   const card = { id: 'fixture', name: 'Fixture card', game: 'mtg', quantity: 2, owned_qty: 0, types: [], subtypes: [], number: '1' };
   const deck = { id: 7, name: 'Fixture deck', game: 'mtg', inventory_type: 'arena', format: 'Casual', target_size: 60, cards: [card], total_cards: 2 };
@@ -67,6 +68,9 @@ export async function runUiDeckRegressions() {
   window.confirm = () => { confirms++; return false; };
   window.open = () => { opened++; return null; };
   window.fetch = async (url, options = {}) => {
+    if (String(url).startsWith('/api/search?')) {
+      return new Promise((resolve, reject) => searches.push({ resolve: (cards, status = 200) => resolve(response(cards, status)), reject }));
+    }
     if (url === '/api/decks/archidekt/preview') {
       archidektSignal = options.signal;
       previewBody = JSON.parse(options.body);
@@ -111,6 +115,44 @@ export async function runUiDeckRegressions() {
       assert(button('deck.backToDecks') && detailRequests === before + 1, 'activating a deck name opens it once without bubbling into another load');
       await click(button('deck.backToDecks'));
     }
+    deck.inventory_type = 'collection';
+    await click([...host.querySelectorAll('button')].find(element => element.textContent.trim() === deck.name));
+    const search = async query => {
+      await change(host.querySelector('.deck-search-form input'), query);
+      await act(async () => host.querySelector('.deck-search-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    };
+    const oldCard = { ...card, id: 'old-search', name: 'Old search result', owned_qty: 1 };
+    const newCard = { ...card, id: 'new-search', name: 'Current search result', owned_qty: 1 };
+    await search('old');
+    await search('current');
+    await act(async () => searches[1].resolve([newCard]));
+    await act(async () => searches[0].resolve([oldCard]));
+    assert(host.textContent.includes(newCard.name) && !host.textContent.includes(oldCard.name), 'late old search cannot replace the current results');
+    await search('stale-error');
+    await search('pending');
+    const toastCount = toasts.length;
+    await act(async () => searches[2].reject(new Error('stale request')));
+    assert(toasts.length === toastCount && host.querySelector('.deck-editing-workspace .spinner'), 'stale failure cannot publish an error or clear current loading');
+    await act(async () => searches[3].resolve([newCard]));
+    await click(button('deck.editProperties'));
+    // Dispatch directly while properties are open to exercise the inventory boundary.
+    await search('before-inventory-switch');
+    await click([...host.querySelectorAll('dialog button')].find(element => element.textContent.trim() === en['deck.arena']));
+    await click(button('deck.applyProperties'));
+    await act(async () => searches[4].resolve([oldCard]));
+    assert(!host.textContent.includes(oldCard.name) && !host.querySelector('.deck-editing-workspace .spinner'), 'inventory switch invalidates pending search and resets loading');
+    window.confirm = () => true;
+    await click(button('deck.backToDecks'));
+    window.confirm = () => { confirms++; return false; };
+    deck.inventory_type = 'collection';
+    await click([...host.querySelectorAll('button')].find(element => element.textContent.trim() === deck.name));
+    await search('before-leave');
+    await click(button('deck.backToDecks'));
+    await click([...host.querySelectorAll('button')].find(element => element.textContent.trim() === deck.name));
+    await act(async () => searches[5].resolve([oldCard]));
+    assert(!host.textContent.includes(oldCard.name), 'leaving and reopening a deck invalidates its previous search');
+    await click(button('deck.backToDecks'));
+    deck.inventory_type = 'arena';
     await click(button('deck.gridView'));
     await click(button('aiDeck.title'));
     assert(guard.current(), 'pristine AI builder must allow navigation');

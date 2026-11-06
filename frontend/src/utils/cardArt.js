@@ -34,7 +34,14 @@ function start() {
     // Demo mode answers un-captured GETs with {}, and a self-hosted instance that
     // has never had an upload answers with []. Both mean "no contributed art",
     // which is the common case and must not be an error.
-    .then(d => { if (Array.isArray(d?.ids) && d.ids.length) emit(new Set(d.ids)); })
+    .then(d => {
+      if (!Array.isArray(d?.ids)) return;
+      const next = new Set(d.ids);
+      for (const cardId of revisions.keys()) {
+        if (ids.has(cardId)) next.add(cardId); else next.delete(cardId);
+      }
+      emit(next);
+    })
     .catch(() => {}); // art is decoration; a failed index just means card backs
 }
 

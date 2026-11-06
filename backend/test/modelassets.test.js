@@ -27,7 +27,7 @@ const originalFetch = global.fetch;
       global.fetch = async () => response();
       await assert.rejects(assets.fetchAsset(asset), error);
       assert.deepStrictEqual(fs.readFileSync(dest), installed, 'failed download must preserve the installed model');
-      assert.strictEqual(fs.existsSync(`${dest}.tmp`), false, 'failed download must remove its temporary file');
+      assert.deepStrictEqual(fs.readdirSync(dir), [asset.name], 'failed download must remove its temporary file');
     }
     for (const chunks of [[Buffer.alloc(9)], [Buffer.alloc(4), Buffer.alloc(5), Buffer.alloc(2)]]) {
       const body = Readable.from(chunks);
@@ -53,13 +53,45 @@ const originalFetch = global.fetch;
       assert(progress.every(got => got <= asset.bytes), 'progress never exceeds the declared size');
       assert(body.destroyed, 'oversized response is closed');
       assert.deepStrictEqual(fs.readFileSync(dest), installed);
-      assert.strictEqual(fs.existsSync(`${dest}.tmp`), false);
+      assert.deepStrictEqual(fs.readdirSync(dir), [asset.name]);
     }
 
     global.fetch = async () => ({ ok: true, body: Readable.from([Buffer.from('1234'), Buffer.from('5678')]) });
     await assets.fetchAsset(asset);
     assert.strictEqual(fs.readFileSync(dest, 'utf8'), '12345678', 'exact-size downloads still install');
-    assert.strictEqual(fs.existsSync(`${dest}.tmp`), false);
+    assert.deepStrictEqual(fs.readdirSync(dir), [asset.name]);
+
+    const renameSync = fs.renameSync;
+    fs.renameSync = () => { throw new Error('rename failed'); };
+    try {
+      await assert.rejects(assets.fetchAsset(asset), /rename failed/);
+    } finally {
+      fs.renameSync = renameSync;
+    }
+    assert.strictEqual(fs.readFileSync(dest, 'utf8'), '12345678');
+    assert.deepStrictEqual(fs.readdirSync(dir), [asset.name], 'rename failure leaves no staging file');
+
+    let release;
+    const resume = new Promise(resolve => { release = resolve; });
+    let started;
+    const ready = new Promise(resolve => { started = resolve; });
+    global.fetch = async () => ({ ok: true, body: Readable.from((async function* () {
+      yield Buffer.from('abcd');
+      await resume;
+      yield Buffer.from('efgh');
+    })()) });
+    const successful = assets.fetchAsset(asset, () => started());
+    await ready;
+    try {
+      global.fetch = async () => ({ ok: true, body: Readable.from([Buffer.from('short')]) });
+      await assert.rejects(assets.fetchAsset(asset), /expected 8/);
+      assert.strictEqual(fs.readFileSync(dest, 'utf8'), '12345678', 'failed overlapping download preserves installed asset');
+    } finally {
+      release();
+      await successful;
+    }
+    assert.strictEqual(fs.readFileSync(dest, 'utf8'), 'abcdefgh', 'overlapping exact-size download installs intact');
+    assert.deepStrictEqual(fs.readdirSync(dir), [asset.name], 'neither download leaves staging files');
 
     const [cornelius, milo] = assets.MODELS;
     const corneliusPath = path.join(dir, cornelius.name);
@@ -84,7 +116,7 @@ const originalFetch = global.fetch;
     };
     await import('../scripts/fetch-models.mjs');
     assert.deepStrictEqual(fs.readFileSync(corneliusPath), upgraded, 'CLI must replace the legacy model with the current exact-size download');
-    assert.strictEqual(fs.existsSync(`${corneliusPath}.tmp`), false);
+    assert.deepStrictEqual(fs.readdirSync(dir).sort(), [asset.name, cornelius.name, milo.name].sort());
     console.log('Model asset download boundaries passed');
   } finally {
     global.fetch = originalFetch;

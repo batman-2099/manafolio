@@ -69,12 +69,27 @@ if (!process.versions.electron) {
             (async () => {
               await window.loadURL(url);
               const results = await window.webContents.executeJavaScript(`(async () => {
-                const suite = await import('/src/utils/${suite}');
-                const entries = Object.entries(suite).filter(([name, value]) => name.startsWith('run') && typeof value === 'function');
-                if (!entries.length) throw new Error('Suite has no runnable export');
-                const results = {};
-                for (const [name, run] of entries) results[name] = await run();
-                return results;
+                let fail;
+                const unexpected = new Promise((_, reject) => { fail = reject; });
+                const onError = event => fail(new Error('Unexpected renderer error: ' + (event.error?.stack || event.message)));
+                const onRejection = event => fail(new Error('Unhandled renderer rejection: ' + (event.reason?.stack || String(event.reason))));
+                window.addEventListener('error', onError);
+                window.addEventListener('unhandledrejection', onRejection);
+                try {
+                  return await Promise.race([unexpected, (async () => {
+                    const suite = await import('/src/utils/${suite}');
+                    const entries = Object.entries(suite).filter(([name, value]) => name.startsWith('run') && typeof value === 'function');
+                    if (!entries.length) throw new Error('Suite has no runnable export');
+                    const results = {};
+                    for (const [name, run] of entries) results[name] = await run();
+                    // Deliver errors/rejections queued by the suite's final action.
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    return results;
+                  })()]);
+                } finally {
+                  window.removeEventListener('error', onError);
+                  window.removeEventListener('unhandledrejection', onRejection);
+                }
               })()`);
               console.log(`PASS ${suite} ${JSON.stringify(results)}`);
             })(),

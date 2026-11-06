@@ -4,6 +4,14 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Keep collection placement checks inside the update transaction, and create imported decks with their cards atomically so failed imports do not leave partial decks.
+- Preserve paired-token identity and filing metadata in batch recommendations so previewed slots match applied placement.
+- Honor collector-number filters and pagination when searching all printings; preserve and validate produced-mana metadata in complete backup restores while accepting older backups without it.
+- Ignore stale Deck Builder search responses after newer searches or editor changes, and retain local artwork uploads/deletions when the initial artwork index arrives late.
+- Make public collection Type filters use card types rather than colors.
+- Give concurrent model downloads separate temporary files and clean up only each download's own staging file.
+- Fail browser regression suites on uncaught renderer errors and unhandled rejections; synchronize history checks with navigation events rather than fixed delays.
+- Remove unused provider helpers, model annotations, and metric CSS; package only the four supported operator scripts in the production image.
 - Classify exact-name Magic basic lands as Swamp → Black, Mountain → Red, Island → Blue, Forest → Green, and Plains → White for display/filtering/sorting. Normalize new provider data and repair existing cached cards on startup; other names and games remain unchanged.
 - Classify other lands producing multiple distinct mana colors as Multicolor from Scryfall mana-production metadata, excluding colorless mana and preserving Commander identity. Persist produced mana and refresh legacy collection/deck lands independently of the price interval during the existing background check; explicitly disabled automatic refresh remains disabled.
 - Left-align card-detail Missing and deck tags, include each deck name inside its In Deck or Pulled tag, and separate the tags from the metadata above with an 8px gap.

@@ -1358,8 +1358,23 @@ router.put('/collection/:id', async (req, res) => {
 
   try {
     const requestedQty = quantity !== undefined ? collectionQuantity(quantity) : null;
+    let localized = null;
+    let languageSourceId = null;
+    if (language !== undefined) {
+      const source = await db.get('SELECT card_id, language FROM collection WHERE id = ? AND user_id = ?', [id, req.user.id]);
+      if (source && language !== source.language) {
+        languageSourceId = source.card_id;
+        const card = await db.get('SELECT * FROM card_cache WHERE id = ?', [source.card_id]);
+        if (card) localized = await cardApi.printingInLanguage(card, language);
+      }
+    }
+    let isMoving, finalCompartmentId, resolvedRejected;
+    const changed = await db.withTransaction(async () => {
     const entry = await db.get(`SELECT * FROM collection WHERE id = ? AND user_id = ?`, [id, req.user.id]);
     if (!entry) return res.status(404).json({ error: 'Collection entry not found' });
+    if (languageSourceId && languageSourceId !== entry.card_id) {
+      throw new AddCardError(409, 'Card identity changed; retry the update.');
+    }
     if (entry.game !== 'mtg' || (game !== undefined && game !== entry.game)) {
       return res.status(400).json({ error: 'Unsupported game' });
     }
@@ -1370,30 +1385,12 @@ router.put('/collection/:id', async (req, res) => {
     const listChanged = nextListType !== entry.list_type;
     const placementChanged = (location_id !== undefined && String(location_id ?? '') !== String(entry.location_id ?? ''))
       || (compartment_id !== undefined && String(compartment_id ?? '') !== String(entry.compartment_id ?? ''));
-    const isMoving = placementChanged || listChanged;
-    let finalCompartmentId = listChanged ? null : entry.compartment_id;
+    isMoving = placementChanged || listChanged;
+    finalCompartmentId = listChanged ? null : entry.compartment_id;
     let finalLocationId = listChanged ? null : entry.location_id;
     let finalPosition = listChanged ? 0 : entry.position;
-    let resolvedRejected = false;
+    resolvedRejected = false;
 
-    if (isMoving && (location_id !== undefined || compartment_id !== undefined)) {
-      const resolved = await resolveCompartmentAndPosition({
-        locationId: location_id === undefined ? (compartment_id ? null : finalLocationId) : location_id,
-        compartmentId: compartment_id,
-        listType: nextListType,
-        userId: req.user.id,
-        cardId: entry.card_id,
-        reverseCardId,
-        quantity: requestedQty ?? entry.quantity,
-        printing: printing ?? entry.printing,
-        language: language ?? entry.language,
-        excludeEntryId: entry.id
-      });
-      finalCompartmentId = resolved.compartment_id;
-      finalLocationId = resolved.compartment_id ? resolved.location_id : null;
-      finalPosition = resolved.position;
-      resolvedRejected = !!resolved.rejected;
-    }
 
     const updates = [];
     const params = [];
@@ -1405,23 +1402,13 @@ router.put('/collection/:id', async (req, res) => {
     if (language !== undefined) {
       updates.push('language = ?');
       params.push(language);
-      if (language !== entry.language) {
-        let card = await db.get(`SELECT * FROM card_cache WHERE id = ?`, [entry.card_id]);
-        if (card) {
-          const localized = await cardApi.printingInLanguage(card, language);
-          if (localized && localized.id && localized.id !== entry.card_id) {
-            await validateReverseCard(localized, reverseCardId, nextListType);
-            updates.push('card_id = ?');
-            params.push(localized.id);
-          }
-        }
+      if (localized?.id && localized.id !== entry.card_id) {
+        await validateReverseCard(localized, reverseCardId, nextListType);
+        updates.push('card_id = ?');
+        params.push(localized.id);
       }
     }
     if (purchase_price !== undefined) { updates.push('purchase_price = ?'); params.push(purchase_price); }
-    if (isMoving) {
-      updates.push('location_id = ?', 'compartment_id = ?', 'position = ?');
-      params.push(finalLocationId, finalCompartmentId, finalPosition);
-    }
     if (list_type !== undefined) {
       updates.push('list_type = ?');
       params.push(list_type);
@@ -1467,10 +1454,30 @@ router.put('/collection/:id', async (req, res) => {
       }
     }
 
-    await db.withTransaction(async () => {
+    if (isMoving && (location_id !== undefined || compartment_id !== undefined)) {
+      const resolved = await resolveCompartmentAndPosition({
+        locationId: location_id === undefined ? (compartment_id ? null : finalLocationId) : location_id,
+        compartmentId: compartment_id,
+        listType: nextListType,
+        userId: req.user.id,
+        cardId: localized?.id || entry.card_id,
+        reverseCardId,
+        quantity: requestedQty ?? entry.quantity,
+        printing: printing ?? entry.printing,
+        language: language ?? entry.language,
+        excludeEntryId: entry.id
+      });
+      finalCompartmentId = resolved.compartment_id;
+      finalLocationId = resolved.compartment_id ? resolved.location_id : null;
+      finalPosition = resolved.position;
+      resolvedRejected = !!resolved.rejected;
+    }
+    if (isMoving) {
+      updates.push('location_id = ?', 'compartment_id = ?', 'position = ?');
+      params.push(finalLocationId, finalCompartmentId, finalPosition);
+    }
     if (updates.length > 0) {
-      const current = await db.get('SELECT * FROM collection WHERE id = ? AND user_id = ?', [id, req.user.id]);
-      if (!current) throw new AddCardError(404, 'Collection entry not found');
+      const current = entry;
       const sources = await checkedOutSources(req.user.id);
       const reserved = sources.filter(source => source.entry_id === current.id)
         .reduce((sum, source) => sum + source.quantity, 0);
@@ -1505,7 +1512,9 @@ router.put('/collection/:id', async (req, res) => {
       if (oldLoc) await rebalanceCompartmentByScheme(db, entry.compartment_id, oldLoc.sort_order, oldLoc.foil_sorting);
     }
 
+    return true;
     });
+    if (changed !== true) return;
 
     const finalPlacement = isMoving && finalCompartmentId ? await describePlacement(db, id, req.user.id) : null;
     res.json({ message: 'Collection entry updated successfully', placement: finalPlacement, rule_rejected: resolvedRejected });

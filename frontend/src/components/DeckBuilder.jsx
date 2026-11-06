@@ -174,6 +174,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const searchRequest = useRef(0);
   const [browseFilters, setBrowseFilters] = useState({});
   const [showBrowseFilters, setShowBrowseFilters] = useState(false);
   const browseEntries = useMemo(() => searchResults.flatMap(card => card.inventory_entries || []), [searchResults]);
@@ -395,6 +396,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
   const leaveDeck = () => {
     if (!confirmLeaveEditor()) return false;
     deckDetailsRequest.current++;
+    searchRequest.current++;
+    setSearching(false);
     setActiveDeck(null);
     setSavedEditorState(null);
     setDeckDraft(null);
@@ -506,9 +509,10 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
   useEffect(() => {
     const requests = decksRequest;
     const detailRequests = deckDetailsRequest;
+    const searchRequests = searchRequest;
     fetchDecks();
     if (initialDeckId) loadDeckDetails(initialDeckId);
-    return () => { requests.current++; detailRequests.current++; };
+    return () => { requests.current++; detailRequests.current++; searchRequests.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -598,6 +602,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
     }
     let cards = activeDeck.cards;
     if (deckDraft.inventory_type !== activeDeck.inventory_type) {
+      searchRequest.current++;
+      setSearching(false);
       setRefreshingInventory(true);
       try {
         const inventory = await loadInventoryCards(activeDeck.game, deckDraft.inventory_type);
@@ -650,6 +656,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
 
   const loadDeckDetails = async (deckId) => {
     const request = ++deckDetailsRequest.current;
+    searchRequest.current++;
+    setSearching(false);
     const knownDeck = activeDeck?.id === deckId ? activeDeck : decks.find(deck => deck.id === deckId);
     const locationsRequest = knownDeck?.inventory_type === 'collection'
       ? fetch(`/api/decks/${deckId}/locations`).then(response => ({ response }), error => ({ error }))
@@ -844,27 +852,32 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
 
   const handleSearchCards = async (e, forceBrowse = false, search = searchQuery) => {
     if (e) e.preventDefault();
+    if (!activeDeck || editorBusy) return;
+    const request = ++searchRequest.current;
     try {
       setSearching(true);
       const inventoryType = activeDeck?.inventory_type || 'collection';
       if (forceBrowse || !search.trim() || inventoryType !== 'collection') {
         const cards = await loadInventoryCards(deckSearchGame, inventoryType);
+        if (request !== searchRequest.current) return;
         const query = search.trim().toLowerCase();
         setSearchResults(cards.filter(card => !query || [card.name, card.printed_name, card.set_name, card.number].some(value => String(value || '').toLowerCase().includes(query))));
       } else {
         const response = await fetch(`/api/search?name=${encodeURIComponent(search)}&scope=collection&game=${deckSearchGame}`);
+        if (request !== searchRequest.current) return;
         if (response.ok) {
           const data = await response.json();
-          setSearchResults(data);
+          if (request === searchRequest.current) setSearchResults(data);
         } else {
           showToast(t(response.status === 429 ? 'deck.errRateLimit' : 'deck.errSearch'), 'error');
         }
       }
     } catch (err) {
+      if (request !== searchRequest.current) return;
       console.error(err);
       showToast(t('deck.errSearch'), 'error');
     } finally {
-      setSearching(false);
+      if (request === searchRequest.current) setSearching(false);
     }
   };
 

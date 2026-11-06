@@ -113,6 +113,39 @@ async function testManaBoxDeckCreation() {
     assert.strictEqual(importedGreenRamp.reduce((sum, card) => sum + card.quantity, 0), 60);
     assert(importedGreenRamp.some(card => card.card_id === 'mtg-test-FDN-227-0'), 'exact ManaBox printing is used');
 
+    const resolver = scryfallApi.bulkFetchByIdentifier;
+    let release, entered;
+    const pending = new Promise(resolve => { release = resolve; });
+    const resolving = new Promise(resolve => { entered = resolve; });
+    scryfallApi.bulkFetchByIdentifier = async rows => { entered(); await pending; return resolver(rows); };
+    const atomic = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+    const creating = createDeck({
+      body: { name: 'Atomic import', decklist_format: 'manabox', decklist_text: greenRampDecklist }, user: { id: 1 }
+    }, atomic);
+    await resolving;
+    try {
+      assert.strictEqual(await db.get("SELECT id FROM decks WHERE name = 'Atomic import'"), undefined, 'pending resolution exposes no empty deck');
+    } finally {
+      release();
+      await creating;
+    }
+    assert.strictEqual(atomic.statusCode, 201);
+    assert.strictEqual((await db.get('SELECT SUM(quantity) AS n FROM deck_cards WHERE deck_id = ?', [atomic.body.id])).n, 60);
+    scryfallApi.bulkFetchByIdentifier = resolver;
+    const beforeFailure = await db.all('SELECT * FROM decks ORDER BY id');
+    const beforeCards = await db.all('SELECT * FROM deck_cards ORDER BY deck_id, card_id');
+    await db.run(`CREATE TRIGGER reject_import BEFORE INSERT ON deck_cards
+      WHEN EXISTS (SELECT 1 FROM deck_cards WHERE deck_id = NEW.deck_id)
+      BEGIN SELECT RAISE(ABORT, 'injected import failure'); END`);
+    try {
+      const failed = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+      await createDeck({ body: { name: 'Failed atomic import', decklist_text: greenRampDecklist }, user: { id: 1 } }, failed);
+      assert.strictEqual(failed.statusCode, 500);
+      assert.deepStrictEqual(await db.all('SELECT * FROM decks ORDER BY id'), beforeFailure);
+      assert.deepStrictEqual(await db.all('SELECT * FROM deck_cards ORDER BY deck_id, card_id'), beforeCards);
+    } finally {
+      await db.run('DROP TRIGGER reject_import');
+    }
     scryfallApi.bulkFetchByIdentifier = async () => ({ cards: [], pairs: [] });
     const unmatched = {
       statusCode: 200,

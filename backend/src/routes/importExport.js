@@ -92,6 +92,18 @@ async function parseCompleteBackup(data) {
       throw new Error('Invalid backup printing treatments');
     }
   }
+  for (const card of backup.card_cache) {
+    if (card.produced_mana == null) continue;
+    let mana;
+    try {
+      mana = typeof card.produced_mana === 'string' ? JSON.parse(card.produced_mana) : null;
+    } catch {
+      throw new Error('Invalid backup produced mana');
+    }
+    if (!Array.isArray(mana) || mana.some(value => !['W', 'U', 'B', 'R', 'G', 'C'].includes(value))) {
+      throw new Error('Invalid backup produced mana');
+    }
+  }
   if (backup.collection.some(card => !Number.isSafeInteger(card.quantity) || card.quantity < 1)
       || backup.deck_cards.some(card => !card || (card.quantity !== 0 && !validImportQuantity(card.quantity)))) {
     throw new Error('Invalid backup quantities');
@@ -287,15 +299,17 @@ async function restoreCompleteBackup(backup, userId) {
           price_trend, price_normal, price_holofoil, price_avg1, price_avg7,
           price_avg30, price_currency, price_source, cmc, color_identity, game,
           language, printed_name, tcgplayer_product_id, last_updated, image_url_back, name_back,
-          tcgplayer_url, cardmarket_url, printing_treatments
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET printing_treatments = COALESCE(card_cache.printing_treatments, excluded.printing_treatments)
+          tcgplayer_url, cardmarket_url, printing_treatments, produced_mana
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          printing_treatments = COALESCE(card_cache.printing_treatments, excluded.printing_treatments),
+          produced_mana = COALESCE(card_cache.produced_mana, excluded.produced_mana)
       `, [
         card.id, card.name, card.supertype, card.subtypes, card.types, card.rarity, card.set_id, card.set_name, card.number, card.image_url,
         card.price_trend, card.price_normal, card.price_holofoil, card.price_avg1, card.price_avg7,
         card.price_avg30, card.price_currency, card.price_source, card.cmc, card.color_identity, card.game,
         card.language, card.printed_name, card.tcgplayer_product_id, card.last_updated, card.image_url_back ?? null, card.name_back ?? null,
-        card.tcgplayer_url ?? null, card.cardmarket_url ?? null, card.printing_treatments ?? null
+        card.tcgplayer_url ?? null, card.cardmarket_url ?? null, card.printing_treatments ?? null, card.produced_mana ?? null
       ]);
     }
 

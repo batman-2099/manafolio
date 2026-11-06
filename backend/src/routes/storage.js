@@ -944,6 +944,8 @@ router.post('/locations/:id/recommend-batch', async (req, res) => {
       mockCards.push({
         entry_id: entry.entry_id,
         card_id: entry.card_id,
+        reverse_card_id: entry.reverse_card_id,
+        favorite: entry.favorite,
         quantity: entry.quantity,
         position: recommended.position,
         compartment_id: recommended.compartment_id,
@@ -953,6 +955,7 @@ router.post('/locations/:id/recommend-batch', async (req, res) => {
         name: entry.name,
         supertype: entry.supertype,
         types: JSON.stringify(entry.types),
+        subtypes: entry.subtypes,
         rarity: entry.rarity,
         set_name: entry.set_name,
         number: entry.number,

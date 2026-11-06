@@ -138,7 +138,6 @@ function builtLangs(game = 'mtg') {
 function loadModels() {
   if (!models) {
     const cornPath = path.join(MODEL_DIR, 'cornelius.onnx');
-    const isFastWeb = fs.existsSync(cornPath) && fs.statSync(cornPath).size < 4000000;
     models = Promise.allSettled([
       ort.InferenceSession.create(cornPath, SESSION_OPTS),
       ort.InferenceSession.create(path.join(MODEL_DIR, 'milo.onnx'), SESSION_OPTS),
@@ -150,7 +149,6 @@ function loadModels() {
         throw failure.reason;
       }
       const [corn, milo] = results.map(result => result.value);
-      corn.isFastWeb = isFastWeb;
       return { corn, milo };
     }).catch((err) => { models = null; throw err; });
   }

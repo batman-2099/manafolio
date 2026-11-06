@@ -56,9 +56,16 @@ export async function runUiContainerRegressions() {
     });
   };
   const clear = async () => {
+    const guards = host.querySelectorAll('dialog[open], .storage-workspace-identity').length;
+    const popped = new Promise(resolve => {
+      const next = remaining => remaining
+        ? window.addEventListener('popstate', () => next(remaining - 1), { once: true })
+        : resolve();
+      next(guards);
+    });
     await act(async () => root.render(null));
-    // Let useBackGuard's programmatic pop finish before mounting another overlay.
-    await new Promise(resolve => setTimeout(resolve, 40));
+    await popped;
+    await act(async () => {});
   };
   const cancelDialog = () => host.querySelector('dialog').dispatchEvent(new Event('cancel', { cancelable: true }));
   const back = async () => {
@@ -200,8 +207,10 @@ export async function runUiContainerRegressions() {
     await back();
     assert(button('loc.createContainer') && !host.querySelector('.storage-workspace-identity'), 'Back from an opened container returns to the gallery');
     await act(async () => [...host.querySelectorAll('button')].find(node => node.textContent.includes('Token box')).click());
+    const popped = new Promise(resolve => window.addEventListener('popstate', resolve, { once: true }));
     await act(async () => host.querySelector(`button[aria-label="${en['nav.storage']}"]`).click());
-    await new Promise(resolve => setTimeout(resolve, 40));
+    await popped;
+    await act(async () => {});
     assert(button('loc.createContainer'), 'the explicit Storage button returns to the same gallery state');
     cases.push('storage Back unwinds settings then workspace and matches the gallery button');
     await clear();
@@ -305,8 +314,8 @@ export async function runUiContainerRegressions() {
     cases.push('detail list saved and legacy dividers, multiple levels, repeated groups, disabled/custom rules, filtering and storage order');
     return { passed: cases.length, cases };
   } finally {
+    await clear();
     await act(async () => root.unmount());
-    await new Promise(resolve => setTimeout(resolve, 40));
     host.remove();
     history.replaceState(originalState, '', originalUrl);
     window.fetch = originalFetch;

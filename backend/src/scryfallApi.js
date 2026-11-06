@@ -139,10 +139,8 @@ async function scryRequestRetried(url, request, retries = 4, onProgress) {
   throw lastError;
 }
 
-// Queue + 429 retry, returning the raw axios response (callers that need
-// has_more/next_page/total_cards can't use fetchFromScryfall, which strips to
-// .data.data). The wait itself is handled by the shared cooldown above, so a
-// retry here just re-queues behind it.
+// Queue + 429 retry, returning the raw axios response with paging metadata.
+// The shared cooldown handles the wait; retries re-queue behind it.
 function scryGetRetried(url, config, retries = 4, onProgress) {
   return scryRequestRetried(url, () => client.get(url, config), retries, onProgress);
 }
@@ -454,15 +452,6 @@ async function bulkFetchByIdentifier(rows, onProgress, { localFirst = false } = 
   return { cards, pairs, notFound, unmatchedRows };
 }
 
-async function fetchFromScryfall(q, lang, retries = 3) {
-  const scoped = langSearch(q, lang);
-  const url = `/cards/search?q=${encodeURIComponent(scoped.q)}${scoped.params}`;
-
-  if (!(retries > 0)) return;
-  const resp = await scryGetRetried(url, undefined, retries);
-  return (resp.data && resp.data.data) || [];
-}
-
 // Scryfall pages are a fixed 175 cards. Pull the caller's [offset, offset+limit)
 // window out of them so search can page by its own limit instead of being capped
 // at one Scryfall page. Returns the raw cards plus whether more exist after them.
@@ -507,6 +496,8 @@ async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', 
   const offset = (page - 1) * limit;
   const cleanName = (nameQuery || '').trim();
   const cleanNumber = (numberQuery || '').trim().replace(/^#/, '').split('/')[0].trim();
+  // Scryfall expects "488" rather than a zero-padded collector number.
+  const strippedNumber = cleanNumber.replace(/^0+/, '') || cleanNumber;
   // Set field may list several sets ("ltr, ltc") — match any of them. Scryfall
   // uses `(set:ltr or set:ltc)`; a single set stays the plain `set:ltr` form.
   const setList = parseSetList(setQuery);
@@ -519,11 +510,12 @@ async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', 
     try {
       // A set code narrows to that printing (exact, usually one result -> fast
       // path in the scanner); without it, return every printing to pick from.
-      const q = setList.length ? `!"${cleanName}" ${scrySet} unique:prints` : `!"${cleanName}" unique:prints`;
-      const raw = await fetchFromScryfall(q, lang);
-      if (raw.length) {
-        const cards = raw.map(c => normalizeCard(c, lang)).slice(0, 60);
+      const q = `!"${cleanName}"${setList.length ? ` ${scrySet}` : ''}${strippedNumber ? ` cn:${strippedNumber}` : ''} unique:prints`;
+      const { cards: raw, total } = await fetchWindow(q, lang, offset, limit);
+      if (raw.length || total > 0) {
+        const cards = raw.map(c => normalizeCard(c, lang));
         await cacheCards(cards);
+        meta.total = total;
         return cards;
       }
     } catch (e) {
@@ -583,10 +575,6 @@ async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', 
       return localResults.map(parseCardRow);
     }
   }
-
-  // Strip leading zeros from collector numbers — input may arrive as "0488" but
-  // Scryfall expects "488".
-  const strippedNumber = cleanNumber.replace(/^0+/, '') || cleanNumber;
 
   // Run specific query (set+cn or name+cn) AND the broad name-only query, then
   // merge results: exact matches first, remaining alternatives sorted by cn.
@@ -685,20 +673,6 @@ async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', 
     const status = err.response && err.response.status;
     if (status === 429) throw new Error('RATE_LIMIT_EXCEEDED');
     throw new Error('UPSTREAM_UNAVAILABLE');
-  }
-}
-
-// Fetch and cache a varied MTG seed pool from the first page of a set.
-async function getCardsBySet(setCode) {
-  try {
-    console.log(`Querying Scryfall for full set: ${setCode}`);
-    const raw = await fetchFromScryfall(`set:${setCode}`);
-    const cards = raw.map(c => normalizeCard(c));
-    if (cards.length > 0) await cacheCards(cards);
-    return cards;
-  } catch (error) {
-    console.error(`Error fetching MTG set ${setCode} from Scryfall:`, error.message);
-    return [];
   }
 }
 
@@ -929,4 +903,4 @@ async function getRelatedTokens(cardIds) {
 }
 
 // Export the client and fetchWindow for adapter-based tests.
-module.exports = { searchCards, normalizeCard, cacheCards, getCardsBySet, getSetChecklist, fetchAndCacheSets, updateCollectionPrices, getCardById, getRelatedTokens, getPrintingInLang, scryGetRetried, bulkFetchByIdentifier, scryfallUuid, client, fetchWindow };
+module.exports = { searchCards, normalizeCard, cacheCards, getSetChecklist, fetchAndCacheSets, updateCollectionPrices, getCardById, getRelatedTokens, getPrintingInLang, scryGetRetried, bulkFetchByIdentifier, scryfallUuid, client, fetchWindow };

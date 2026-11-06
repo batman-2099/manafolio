@@ -79,8 +79,10 @@ export async function runInspectorNavigationRegressions() {
       await click(faces[index]);
       const zoom = host.querySelector(`dialog[aria-label="${en['inspector.fullScreen']}"]`);
       assert(zoom?.querySelector('img').getAttribute('src') === source, 'zoom opens the selected face');
+      const popped = new Promise(resolve => window.addEventListener('popstate', resolve, { once: true }));
       await act(async () => zoom.dispatchEvent(new Event('cancel', { cancelable: true })));
-      await new Promise(resolve => setTimeout(resolve, 40));
+      await popped;
+      await act(async () => {});
       assert(document.activeElement === faces[index] && host.querySelector('dialog[open]'), 'closing zoom retains inspector and restores the selected face trigger');
     }
     await click(next());
@@ -129,7 +131,10 @@ export async function runInspectorNavigationRegressions() {
     await click(button(en['common.cancel']));
     await click(previous());
     assert(previous().disabled && host.querySelector('.section-heading').textContent.includes('Sample 1'), 'previous returns to first without wrapping');
+    const closed = new Promise(resolve => window.addEventListener('popstate', resolve, { once: true }));
     await click(button(en['common.close']));
+    await closed;
+    await act(async () => {});
     assert(!host.querySelector('dialog') && document.activeElement === trigger, 'close restores original trigger after multiple card changes');
     await act(async () => root.render(<CardInspectorModal card={{ ...cards[1], subtypes: ['Token'], image_url: '/logo.svg?native-front', image_url_back: '/logo.svg?native-back', name_back: 'Phyrexian' }} onClose={() => {}} />));
     const nativeFaces = host.querySelectorAll('.ci-image-col .ci-image-wrap');
@@ -137,9 +142,14 @@ export async function runInspectorNavigationRegressions() {
     await click(nativeFaces[1]);
     const nativeZoom = host.querySelector(`dialog[aria-label="${en['inspector.fullScreen']}"]`);
     assert(nativeZoom.querySelector('img').getAttribute('src') === '/logo.svg?native-back', 'native reverse zoom uses back artwork, not the front');
+    const popped = new Promise(resolve => window.addEventListener('popstate', resolve, { once: true }));
     await act(async () => nativeZoom.dispatchEvent(new Event('cancel', { cancelable: true })));
-    await new Promise(resolve => setTimeout(resolve, 40));
+    await popped;
+    await act(async () => {});
+    const replaced = new Promise(resolve => window.addEventListener('popstate', resolve, { once: true }));
     await act(async () => root.render(<CommanderPreview />));
+    await replaced;
+    await act(async () => {});
     await click(button(en['inspector.createCommanderDeck']));
     assert(host.querySelector('dialog[open]') && host.textContent.includes('Sample creation failure'), 'failed commander creation retains the inspector and error');
     creationFails = false;

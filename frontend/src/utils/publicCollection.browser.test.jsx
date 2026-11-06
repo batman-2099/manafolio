@@ -14,6 +14,10 @@ export async function runPublicCollectionRegressions() {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   localStorage.setItem('manafolio_ui_lang', 'en');
   const cards = Array.from({ length: 121 }, (_, index) => ({ entry_id: index + 1, card_id: `pagination-${index}`, name: `Pagination fixture ${String(index).padStart(3, '0')}`, set_name: 'Fixture set', number: String(index), game: 'mtg', types: [], subtypes: [], rarity: index === 0 ? 'Rare' : 'Common', printing: 'Normal', condition: 'Near Mint', quantity: 1, price_trend: 1, price_currency: 'USD' }));
+  cards[0].types = ['Blue'];
+  cards[0].subtypes = ['Creature'];
+  cards[1].types = ['Blue'];
+  cards[1].subtypes = ['Instant'];
   let entries = [...cards, { ...cards[0], entry_id: 122, printing: 'Holofoil' }];
   window.fetch = async url => {
     assert(String(url).startsWith('/api/shared/'), `unexpected request: ${url}`);
@@ -47,6 +51,11 @@ export async function runPublicCollectionRegressions() {
     await change(host.querySelector('#shared-sort'), 'name-asc');
     assert(button('collection.previousPage').disabled, 'sort change resets the page');
     await click(host.querySelector('[aria-controls="shared-filters"]'));
+    const type = host.querySelector('#shared-type');
+    assert([...type.options].map(option => option.value).join(',') === ',Creature,Instant', 'Type choices use card types rather than colors');
+    await change(type, 'Creature');
+    assert(grid().length === 1 && grid()[0].querySelector('.tcg-card-name').textContent === cards[0].name, 'Type filter includes only matching subtypes');
+    await change(type, '');
     await click(button('collection.nextPage'));
     await click(host.querySelector('#stackCardsSharedOpt'));
     assert(button('collection.previousPage').disabled, 'stack change resets the page');
@@ -56,7 +65,7 @@ export async function runPublicCollectionRegressions() {
     entries = cards.slice(0, 2);
     await render('replacement-fixture');
     assert(grid().length === 2 && !button('collection.nextPage'), 'replacement load clamps and resets pagination');
-    return { passed: ['public-bounded-pagination-all-matches', 'filter-sort-stack-page-reset', 'replacement-load-clamp'] };
+    return { passed: ['public-bounded-pagination-all-matches', 'filter-sort-stack-page-reset', 'replacement-load-clamp', 'public-type-filter-subtypes'] };
   } finally {
     await act(async () => { root.unmount(); });
     host.remove();

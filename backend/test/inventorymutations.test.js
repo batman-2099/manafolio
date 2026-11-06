@@ -263,6 +263,28 @@ async function main() {
   }
   assert.deepStrictEqual(await db.get('SELECT * FROM collection WHERE id = ?', [first]), archived);
   assert.deepStrictEqual(await db.all('SELECT * FROM deck_card_allocations'), reservation);
+  const destination = await location(user, 'Concurrent destination');
+  const moving = await entry('b', 1);
+  const beforeMove = await db.get('SELECT * FROM collection WHERE id = ?', [moving]);
+  const cardApi = require('../src/utils/cardApi');
+  const originalPrinting = cardApi.printingInLanguage;
+  let release, entered;
+  const pending = new Promise(resolve => { release = resolve; });
+  const resolving = new Promise(resolve => { entered = resolve; });
+  cardApi.printingInLanguage = async () => { entered(); await pending; return null; };
+  let update;
+  try {
+    update = request('PUT', `/collection/${moving}`, { location_id: destination.id, language: 'German' });
+    await resolving;
+    assert.strictEqual((await request('POST', `/locations/${destination.id}/transfer`, { inventory_type: 'graveyard' })).status, 200);
+    release();
+    assert.strictEqual((await update).status, 400, 'placement validates the destination after provider work');
+    assert.deepStrictEqual(await db.get('SELECT * FROM collection WHERE id = ?', [moving]), beforeMove);
+  } finally {
+    release();
+    if (update) await update;
+    cardApi.printingInLanguage = originalPrinting;
+  }
   console.log('inventorymutations.test.js passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {

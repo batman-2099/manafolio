@@ -47,16 +47,26 @@ export async function runCardAiExplainRegressions() {
   const dialog = () => [...host.querySelectorAll('dialog[open]')].find(node => node.querySelector('h3')?.textContent === en['aiExplain.button']);
   const click = async node => { assert(node, 'expected control exists'); node.focus(); await act(async () => node.click()); };
   const settleAccount = async (connected = true, ok = true) => act(async () => accounts.at(-1).resolve(response({ connected, provider: 'ollama' }, ok)));
-  const flushBack = () => new Promise(resolve => setTimeout(resolve, 50));
+  const afterHistory = async (action, guards = 1) => {
+    const popped = new Promise(resolve => {
+      const next = remaining => remaining
+        ? window.addEventListener('popstate', () => next(remaining - 1), { once: true })
+        : resolve();
+      next(guards);
+    });
+    await act(action);
+    await popped;
+    await act(async () => {});
+  };
   try {
     await act(async () => root.render(<I18nProvider><Preview key="disconnected" /></I18nProvider>));
     assert(!explainButton() && requests.length === 0, 'pending connection hides the action and never generates');
     await settleAccount(false);
     assert(!explainButton() && requests.length === 0, 'disconnected selected provider hides the action');
-    await act(async () => root.render(<I18nProvider><Preview key="failed" /></I18nProvider>));
+    await afterHistory(async () => root.render(<I18nProvider><Preview key="failed" /></I18nProvider>));
     await settleAccount(true, false);
     assert(!explainButton(), 'failed account status cannot expose the action');
-    await act(async () => root.render(<I18nProvider><Preview key="connected" /></I18nProvider>));
+    await afterHistory(async () => root.render(<I18nProvider><Preview key="connected" /></I18nProvider>));
     await settleAccount();
     assert(explainButton() && requests.length === 0, 'connected account shows the action without sending card data');
     await act(async () => noteArtChanged(cards[0].card_id, true));
@@ -79,8 +89,7 @@ export async function runCardAiExplainRegressions() {
     await act(async () => requests[0].resolve(response({ explanation: 'Tap this card.\n<img src=x onerror=alert(1)>' })));
     assert(dialog().textContent.includes('<img src=x onerror=alert(1)>') && !dialog().querySelector('img'), 'provider output is text, never HTML');
     assert(dialog().querySelector('[role="status"]').style.whiteSpace === 'pre-wrap', 'explanation preserves whitespace');
-    await click([...dialog().querySelectorAll('button')].find(node => node.textContent === en['common.close']));
-    await flushBack();
+    await afterHistory(async () => [...dialog().querySelectorAll('button')].find(node => node.textContent === en['common.close']).click());
     assert(!dialog() && document.activeElement === explainButton(), 'closing restores focus and retains inspector');
 
     await click(explainButton());
@@ -90,21 +99,18 @@ export async function runCardAiExplainRegressions() {
     assert(requests.length === 3 && requests[2].payload.card_id === cards[0].card_id, 'Retry repeats only the selected printing request');
     await act(async () => requests[2].resolve(response({ explanation: 'Retry explanation' })));
     assert(dialog().textContent.includes('Retry explanation'), 'Retry can recover');
-    await act(async () => dialog().dispatchEvent(new Event('cancel', { cancelable: true })));
-    await flushBack();
+    await afterHistory(async () => dialog().dispatchEvent(new Event('cancel', { cancelable: true })));
     assert(!dialog() && host.querySelector('dialog[open]'), 'Escape cancellation closes only the explanation');
 
     await click(explainButton());
     const canceled = requests.at(-1);
-    await act(async () => dialog().dispatchEvent(new Event('cancel', { cancelable: true })));
-    await flushBack();
+    await afterHistory(async () => dialog().dispatchEvent(new Event('cancel', { cancelable: true })));
     assert(canceled.signal.aborted, 'cancel aborts in-flight generation');
     await click(explainButton());
     const reopened = requests.at(-1);
     await act(async () => canceled.resolve(response({ explanation: 'Stale canceled answer' })));
     assert(!dialog().textContent.includes('Stale canceled answer') && dialog().textContent.includes(en['aiExplain.loading']), 'late canceled response cannot overwrite reopened dialog');
-    await act(async () => selectCard(cards[1]));
-    await flushBack();
+    await afterHistory(async () => selectCard(cards[1]));
     assert(reopened.signal.aborted && !dialog(), 'card navigation unmounts explanation and aborts its request');
     await settleAccount();
     await click(explainButton());
@@ -112,31 +118,32 @@ export async function runCardAiExplainRegressions() {
     assert(second.payload.card_id === cards[1].card_id, 'navigation uses the newly selected printing');
     await act(async () => reopened.resolve(response({ explanation: 'Stale previous card' })));
     assert(!dialog().textContent.includes('Stale previous card'), 'previous card response cannot leak into new printing');
-    await act(async () => { window.history.back(); await flushBack(); });
+    await afterHistory(async () => window.history.back());
     assert(second.signal.aborted && !dialog() && host.querySelector('dialog[open]'), 'browser Back cancels only the topmost explanation');
 
     await click(explainButton());
     const localized = requests.at(-1);
+    const localePopped = new Promise(resolve => window.addEventListener('popstate', resolve, { once: true }));
     await act(async () => selectLocale('de'));
     // Locale dictionaries are Vite dynamic imports, not fixture API requests.
     for (let attempt = 0; attempt < 100 && document.documentElement.lang !== 'de'; attempt++) {
       await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
     }
+    await localePopped;
+    await act(async () => {});
     assert(document.documentElement.lang === 'de' && localized.signal.aborted && !dialog(), 'UI locale changes reset and cancel explanation');
     await settleAccount();
     const translatedButton = host.querySelector('input[type="file"]').nextElementSibling.nextElementSibling;
     await click(translatedButton);
     assert(requests.at(-1).payload.locale === 'de', 'new explanations use the current UI locale');
     const unmounted = requests.at(-1);
-    await act(async () => root.render(null));
-    await flushBack();
+    await afterHistory(async () => root.render(null), 2);
     assert(unmounted.signal.aborted && accounts.at(-1).signal.aborted, 'unmount aborts generation and account lookup');
     await act(async () => unmounted.resolve(response({ explanation: 'Unmounted answer' })));
     assert(!host.textContent, 'late unmounted responses render nothing');
     return { passed: ['connection visibility', 'art order and mutation guard', 'printing identity and locale privacy', 'safe accessible explanation', 'error and retry', 'close/cancel/back abort', 'stale reopen/card/locale responses', 'unmount cleanup'] };
   } finally {
-    await act(async () => root.unmount());
-    await flushBack();
+    await afterHistory(async () => root.unmount(), host.querySelectorAll('dialog[open]').length);
     noteArtChanged(cards[0].card_id, false);
     host.remove();
     window.fetch = originalFetch;

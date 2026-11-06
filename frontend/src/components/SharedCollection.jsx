@@ -102,7 +102,7 @@ function SharedCollection({ shareToken }) {
 
   const uniqueRarities = useMemo(() => Array.from(new Set(collection.map(c => c.rarity).filter(Boolean))), [collection]);
   const uniqueTypes = useMemo(
-    () => Array.from(new Set(collection.flatMap(c => c.types || []))).sort(),
+    () => Array.from(new Set(collection.flatMap(c => c.subtypes || []).filter(Boolean))).sort(),
     [collection]
   );
 
@@ -121,7 +121,7 @@ function SharedCollection({ shareToken }) {
         (item.number || '').includes(searchFilter);
       const matchesRarity = !rarityFilter || item.rarity === rarityFilter;
       const matchesPrinting = !printingFilter || item.printing === printingFilter;
-      const matchesType = !typeFilter || (item.types || []).includes(typeFilter);
+      const matchesType = !typeFilter || (item.subtypes || []).includes(typeFilter);
       return matchesSearch && matchesRarity && matchesPrinting && matchesType;
     });
     if (sortBy === 'qty-desc') return result.sort((a, b) => (b.quantity || 0) - (a.quantity || 0));

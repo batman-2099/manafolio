@@ -114,6 +114,20 @@ async function main() {
     const entries = [{ entry_id: 1, card_id: 'a', reverse_card_id: 'b', quantity: 2, game: 'mtg' }, { entry_id: 2, card_id: 'a', quantity: 1, game: 'mtg' }];
     const plans = planCardSources(entries, [{ card_id: 'a', quantity: 2 }, { card_id: 'b', quantity: 2 }], 'mtg');
     assert.equal(plans.flatMap(row => [...row.values()]).reduce((sum, n) => sum + n, 0), 3);
+    const stacking = (await db.run(`INSERT INTO locations (name, type, sort_order, allow_stacking, user_id)
+      VALUES ('Paired preview', 'Binder', 'custom', 1, 1)`)).lastID;
+    await db.run('INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 9)', [stacking]);
+    const batchIds = [];
+    for (const reverse of ['mtg-back', 'mtg-back', 'mtg-third']) {
+      batchIds.push((await db.run(`INSERT INTO collection (card_id, reverse_card_id, quantity, user_id)
+        VALUES ('mtg-front', ?, 1, 1)`, [reverse])).lastID);
+    }
+    const preview = await request('POST', `locations/${stacking}/recommend-batch`, { entry_ids: batchIds });
+    assert.equal(preview.status, 200);
+    assert.deepStrictEqual(preview.body.map(row => row.recommended.position), [1000, 1000, 2000], 'matching paired tokens share a pocket; different backs do not');
+    assert.equal((await request('POST', `locations/${stacking}/apply-all`, { entry_ids: batchIds })).status, 200);
+    assert.deepStrictEqual((await db.all('SELECT position FROM collection WHERE location_id = ? ORDER BY id', [stacking])).map(row => row.position),
+      preview.body.map(row => row.recommended.position), 'paired token preview agrees with applied positions');
     console.log('Paired token allocation, storage, source, trade and search regressions passed');
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));

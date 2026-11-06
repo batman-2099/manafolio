@@ -26,6 +26,7 @@
 const fs = require('fs');
 const path = require('path');
 const { pipeline } = require('node:stream/promises');
+const { randomUUID } = require('node:crypto');
 
 const MODEL_DIR = process.env.CV_MODEL_DIR || path.join(__dirname, '..', '..', 'data', 'models');
 const HF = 'https://huggingface.co';
@@ -92,7 +93,7 @@ async function fetchAsset(a, onProgress, { timeoutMs = 900000 } = {}) {
     redirect: 'follow', signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${a.name}`);
-  const tmp = `${dest}.tmp`;
+  const tmp = `${dest}.${randomUUID()}.tmp`;
   let got = 0;
   try {
     await pipeline(res.body, async function* (chunks) {
@@ -104,17 +105,15 @@ async function fetchAsset(a, onProgress, { timeoutMs = 900000 } = {}) {
         yield chunk;
         onProgress?.(got);
       }
-    }, fs.createWriteStream(tmp));
-  } catch (e) {
+    }, fs.createWriteStream(tmp, { flags: 'wx' }));
+    if (got !== a.bytes) {
+      throw new Error(`${a.name} came back ${got} bytes, expected ${a.bytes} — refusing to install it`);
+    }
+    fs.renameSync(tmp, dest);
+    return 'fetched';
+  } finally {
     fs.rmSync(tmp, { force: true });
-    throw e;
   }
-  if (got !== a.bytes) {
-    fs.rmSync(tmp, { force: true });
-    throw new Error(`${a.name} came back ${got} bytes, expected ${a.bytes} — refusing to install it`);
-  }
-  fs.renameSync(tmp, dest);
-  return 'fetched';
 }
 
 // `what`: 'models' | 'catalog:<game>'. Returns the progress record; the caller

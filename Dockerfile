@@ -84,7 +84,7 @@ RUN --mount=type=cache,target=/root/.npm npm rebuild sqlite3 --build-from-source
 COPY --chown=node:node backend/src/ ./src/
 
 # Operator maintenance tools; runtime catalog building lives in src/.
-COPY --chown=node:node backend/scripts/ ./scripts/
+COPY --chown=node:node backend/scripts/build-catalog.mjs backend/scripts/build-cv-catalog.mjs backend/scripts/fetch-models.mjs backend/scripts/measure-scan-floor.js ./scripts/
 
 # Shared JSON tables required at runtime by backend/src/utils/compartmentSort.js
 # via ../../../shared/*.json (resolves to /app/shared)
