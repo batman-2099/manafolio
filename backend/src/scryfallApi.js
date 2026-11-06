@@ -1,6 +1,6 @@
 const axios = require('axios');
 const db = require('./db');
-const { parseCardRow, parseSqliteUtc, recordPrice, shouldSweepPrices, markPricesSwept } = require('./utils/priceHelpers');
+const { parseCardRow, parseSqliteUtc, recordPrice, shouldSweepPrices, markPricesSwept, priceRefreshDays } = require('./utils/priceHelpers');
 const { parseSetList } = require('./utils/setQuery');
 const cardSearchSql = require('./utils/cardSearchSql');
 const languages = require('./utils/languages');
@@ -254,6 +254,7 @@ function normalizeCard(raw, lang) {
     cmc: cmc,
     color_identity: colorIdentity,
     printing_treatments: printingTreatments,
+    produced_mana: raw.produced_mana || face.produced_mana || [],
     game: 'mtg',
     // Which printing this row IS. The quick-add form defaults the copy's language
     // to it, so adding a Japanese card no longer files it as English.
@@ -766,17 +767,19 @@ async function fetchAndCacheSets(force = false) {
 // is already on the right cadence by construction).
 async function updateCollectionPrices(force = false) {
   try {
-    const cards = await db.all(`
-      SELECT DISTINCT c.card_id, cc.set_id, cc.number, cc.name FROM collection c
+    let cards = await db.all(`
+      SELECT DISTINCT c.card_id, cc.set_id, cc.number, cc.name, cc.subtypes, cc.produced_mana FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id WHERE cc.game = 'mtg'
       UNION
-      SELECT DISTINCT d.card_id, cc.set_id, cc.number, cc.name FROM deck_cards d
+      SELECT DISTINCT d.card_id, cc.set_id, cc.number, cc.name, cc.subtypes, cc.produced_mana FROM deck_cards d
       JOIN card_cache cc ON d.card_id = cc.id WHERE cc.game = 'mtg'
     `);
     if (cards.length === 0) return;
-    if (!force && !(await shouldSweepPrices('mtg'))) {
-      console.log('Skipping MTG price update: already swept within the last 24h (Scryfall updates prices daily).');
-      return;
+    if (!force && await priceRefreshDays() === 0) return;
+    const pricesDue = force || await shouldSweepPrices('mtg');
+    if (!pricesDue) {
+      cards = cards.filter(card => card.produced_mana == null && JSON.parse(card.subtypes || '[]').includes('Land'));
+      if (!cards.length) return;
     }
     console.log(`Starting MTG price update for ${cards.length} unique cards...`);
 
@@ -790,7 +793,7 @@ async function updateCollectionPrices(force = false) {
       for (const { row, card } of pairs) {
         await recordPrice(row.card_id, card.price_trend);
       }
-      await markPricesSwept('mtg');
+      if (pricesDue) await markPricesSwept('mtg');
       console.log(`MTG price update complete: ${pairs.length} priced, ${notFound} not found on Scryfall.`);
     } catch (e) {
       console.error('MTG price update failed:', e.message);

@@ -5,7 +5,7 @@ Release history starts with Manafolio 2.0.
 ## Unreleased
 
 - Classify exact-name Magic basic lands as Swamp → Black, Mountain → Red, Island → Blue, Forest → Green, and Plains → White for display/filtering/sorting. Normalize new provider data and repair existing cached cards on startup; other names and games remain unchanged.
-- Classify other lands producing multiple distinct mana colors as Multicolor from Scryfall mana-production metadata, excluding colorless mana and preserving Commander identity. Existing cached lands update on their next provider metadata refresh.
+- Classify other lands producing multiple distinct mana colors as Multicolor from Scryfall mana-production metadata, excluding colorless mana and preserving Commander identity. Persist produced mana and refresh legacy collection/deck lands independently of the price interval during the existing background check; explicitly disabled automatic refresh remains disabled.
 - Left-align card-detail Missing and deck tags, include each deck name inside its In Deck or Pulled tag, and separate the tags from the metadata above with an 8px gap.
 - Order “Choose a stored entry” choices by slot number, lowest first, with entries without a slot last.
 - Left-align Missing and In Deck tags in the “Choose a stored entry” dialog, with each deck name inside its “In Deck: [deck name]” or “Pulled: [deck name]” tag; remove the internal Entry # line.

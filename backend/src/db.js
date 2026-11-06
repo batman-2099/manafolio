@@ -233,6 +233,7 @@ async function initDb() {
       cmc REAL,
       color_identity TEXT,
       printing_treatments TEXT,
+      produced_mana TEXT,
       game TEXT DEFAULT 'mtg',
       language TEXT DEFAULT 'English',
       printed_name TEXT,
@@ -471,6 +472,9 @@ async function initDb() {
   }
   if (!cardCacheCols.some(c => c.name === 'printing_treatments')) {
     await run(`ALTER TABLE card_cache ADD COLUMN printing_treatments TEXT`);
+  }
+  if (!cardCacheCols.some(c => c.name === 'produced_mana')) {
+    await run(`ALTER TABLE card_cache ADD COLUMN produced_mana TEXT`);
   }
   // Store provider artwork and marketplace URLs without guessing them.
   for (const col of ['tcgplayer_url', 'cardmarket_url', 'image_url_back', 'name_back']) {

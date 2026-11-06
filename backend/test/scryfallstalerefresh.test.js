@@ -78,6 +78,31 @@ async function main() {
     await search('Refresh A');
     await drain();
     assert.strictEqual(attempts, 2, 'failed refreshes release their IDs instead of blocking all future refreshes');
+
+    const citadel = { ...raw, id: 'd5f88c3d-b17b-46aa-a573-449350f95d46', name: 'Asgardian Citadel',
+      type_line: 'Land', colors: [], produced_mana: ['R', 'W'], color_identity: ['R', 'W'] };
+    const citadelId = `mtg-${citadel.id}`;
+    await api.cacheCards([api.normalizeCard(citadel)]);
+    await db.run("UPDATE card_cache SET types = '[]', produced_mana = NULL WHERE id = ?", [citadelId]);
+    await db.run('INSERT INTO collection (card_id, user_id, quantity) VALUES (?, 1, 1)', [citadelId]);
+    await require('../src/utils/priceHelpers').markPricesSwept('mtg');
+    assert.strictEqual(await require('../src/utils/priceHelpers').shouldSweepPrices('mtg'), false);
+    let repairs = 0;
+    api.client.post = async (_url, body) => {
+      repairs++;
+      assert.deepStrictEqual(body.identifiers, [{ id: citadel.id }], 'repair only requests lands missing production metadata');
+      return { data: { data: [citadel], not_found: [] } };
+    };
+    await db.run('UPDATE app_settings SET price_refresh_days = 0 WHERE id = 1');
+    await api.updateCollectionPrices();
+    assert.strictEqual(repairs, 0, 'explicitly disabled automatic refresh stays disabled');
+    await db.run('UPDATE app_settings SET price_refresh_days = 1 WHERE id = 1');
+    await api.updateCollectionPrices();
+    const repaired = await api.searchCards({ scope: 'collection', userId: 1, name: citadel.name });
+    assert.deepStrictEqual(repaired.cards[0].types, ['Red', 'White'], 'collection matching sees repaired multicolor land metadata even when prices were just refreshed');
+    assert.deepStrictEqual((await api.getCardById(citadelId)).produced_mana, ['R', 'W']);
+    await api.updateCollectionPrices();
+    assert.strictEqual(repairs, 1, 'successfully repaired lands do not repeatedly bypass the price interval');
     console.log('scryfallstalerefresh.test.js: UTC age and per-ID refresh lifecycle passed');
   } finally {
     api.client.post = originalPost;
