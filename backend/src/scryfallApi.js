@@ -253,6 +253,9 @@ function normalizeCard(raw, lang) {
     color_identity: colorIdentity,
     printing_treatments: printingTreatments,
     produced_mana: raw.produced_mana || face.produced_mana || [],
+    finishes: Array.isArray(raw.finishes) && raw.finishes.every(value => typeof value === 'string') ? raw.finishes : null,
+    promo_types: Array.isArray(raw.promo_types) && raw.promo_types.every(value => typeof value === 'string')
+      ? raw.promo_types : raw.promo_types == null && Array.isArray(raw.finishes) ? [] : null,
     game: 'mtg',
     // Which printing this row IS. The quick-add form defaults the copy's language
     // to it, so adding a Japanese card no longer files it as English.
@@ -703,7 +706,7 @@ async function getSetChecklist(setCode) {
   }
   if (rawCards.size !== total) throw new Error('Incomplete set catalog count');
   const cards = [...rawCards.values()].map(raw => ({
-    ...normalizeCard(raw), oracle_id: raw.oracle_id || raw.id, finishes: raw.finishes, games: raw.games,
+    ...normalizeCard(raw), oracle_id: raw.oracle_id || raw.id, games: raw.games,
   }));
   await cacheCards(cards);
   return cards;

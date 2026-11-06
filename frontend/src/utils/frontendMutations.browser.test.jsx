@@ -1,10 +1,11 @@
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import CardInspectorModal from '../components/CardInspectorModal';
 import AddToDeckSelect from '../components/AddToDeckSelect';
 import PackPriceSplitter from '../components/PackPriceSplitter';
 import CardEntryFields from '../components/CardEntryFields';
 import { useMultiSelect } from './useMultiSelect';
+import { decodePrinting, encodePrinting, getPrintings, matchesPrinting } from './cardOptions';
 
 // Run on an isolated Vite page, with no application mounted:
 // await (await import('/src/utils/frontendMutations.browser.test.jsx')).runFrontendMutationRegressions()
@@ -71,7 +72,32 @@ export async function runFrontendMutationRegressions() {
       <PackPriceSplitter entryIds={[...selection.selectedIds]} pending={selection.bulkPending} runBulk={selection.runBulk} showToast={() => {}} />
     </>;
   }
+  function FoilFixture() {
+    const [language, setLanguage] = useState('English');
+    const [printing, setPrinting] = useState('Holofoil');
+    return <form>
+      <CardEntryFields card={{ id: 'foil-a' }} game="mtg" printing={printing} language={language}
+        quantity={1} purchasePrice={0} condition="Near Mint" onQuantity={() => {}} onPurchasePrice={() => {}}
+        onCondition={() => {}} onPrinting={setPrinting} onLanguage={setLanguage} />
+      <button type="submit">Submit</button>
+    </form>;
+  }
   try {
+    await act(async () => root.render(<FoilFixture />));
+    const printingSelect = host.querySelector('select[id$="-printing"]');
+    assert(!printingSelect.querySelector('option[value="foil:traditional"]'), 'Traditional Foil is not offered as a Printing choice');
+    assert(encodePrinting('Holofoil', 'traditional') === 'Holofoil', 'previously saved Traditional Foil displays as Foil instead of a blank selection');
+    assert(!host.querySelector('select[name="foil_treatment"]'), 'no additional foil selector');
+    for (const option of getPrintings()) {
+      await changeValue(printingSelect, option.value);
+      const decoded = decodePrinting(option.value);
+      assert(encodePrinting(decoded.printing, decoded.foil_treatment) === option.value, 'printing options round trip saved metadata');
+      assert(matchesPrinting(decoded, option.value), 'specific filters match their own option');
+      if (decoded.printing === 'Holofoil') assert(matchesPrinting(decoded, 'Holofoil'), 'general Foil filter includes every treatment');
+    }
+    await changeValue(host.querySelector('select[id$="-language"]'), 'German');
+    assert(printingSelect.value === 'foil:double_rainbow', 'language changes preserve the selected foil type');
+    await act(async () => root.render(null));
     const fieldProps = { quantity: '2', purchasePrice: '3', condition: 'Played', printing: 'Normal', language: 'English', game: 'mtg', quantityMax: 250, onQuantity: () => {}, onPurchasePrice: () => {}, onCondition: () => {}, onPrinting: () => {}, onLanguage: () => {}, onGrader: () => {}, onGrade: () => {}, onCertNumber: () => {} };
     for (const variant of ['grid', 'stacked']) {
       await act(async () => root.render(<CardEntryFields {...fieldProps} variant={variant} grader="PSA" grade="9" certNumber="123" disabled />));
@@ -150,6 +176,19 @@ export async function runFrontendMutationRegressions() {
       assert(payload.notes === 'Keep placement', 'notes draft must be submitted');
       assert(!('location_id' in payload) && !('compartment_id' in payload) && !('quantity' in payload), 'metadata-only save must not move filed/locked copy or touch unchanged quantity');
     });
+    for (const option of getPrintings()) {
+      await inspectorCase(card, () => changeValue(host.querySelector('select[id$="-printing"]'), option.value), payload => {
+        const expected = decodePrinting(option.value);
+        assert(payload.printing === expected.printing && payload.foil_treatment === expected.foil_treatment, 'inspector decodes every dropdown option before mutation');
+      });
+    }
+    await inspectorCase({ ...card, printing: 'Holofoil', foil_treatment: 'surge' }, async () => {
+      assert(host.querySelector('select[id$="-printing"]').value === 'foil:surge', 'saved treatment selects its Printing option');
+      await changeValue(host.querySelector('#inspector-notes'), 'Saved foil');
+    }, payload => assert(payload.foil_treatment === 'surge', 'metadata edit preserves saved treatment'));
+    await inspectorCase({ ...card, printing: 'Holofoil', foil_treatment: null }, () => changeValue(host.querySelector('#inspector-notes'), 'Legacy foil'), payload => {
+      assert(payload.printing === 'Holofoil' && payload.foil_treatment === null, 'unrelated edits preserve unspecified legacy foil');
+    });
     await inspectorCase(card, async () => {
       await changeValue(host.querySelector('#inspector-location'), '8');
       await changeValue(host.querySelector('#inspector-location'), '7');
@@ -221,7 +260,7 @@ export async function runFrontendMutationRegressions() {
     } finally {
       trigger.remove();
     }
-    return { passed: true, cases: ['bulk duplicate guard', 'pending selection ownership', 'failure retry', 'cancelled confirmation', 'shared price split', 'metadata placement', 'normalized unchanged location', 'intentional move', 'unassign', 'inventory change', 'aggregate choice gate', 'picker cancel and Escape', 'picker focus restoration', 'mixed-stack member draft', 'selected-entry payload', 'repeat absolute quantity save', 'single-member aggregate'] };
+    return { passed: true, cases: ['all static Printing options', 'foil filter matching', 'foil treatment payloads', 'saved foil selection', 'legacy foil metadata edit', 'bulk duplicate guard', 'pending selection ownership', 'failure retry', 'cancelled confirmation', 'shared price split', 'metadata placement', 'normalized unchanged location', 'intentional move', 'unassign', 'inventory change', 'aggregate choice gate', 'picker cancel and Escape', 'picker focus restoration', 'mixed-stack member draft', 'selected-entry payload', 'repeat absolute quantity save', 'single-member aggregate'] };
   } finally {
     await act(async () => { root.unmount(); });
     host.remove();

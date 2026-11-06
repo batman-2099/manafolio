@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '../utils/i18n';
-import { CONDITIONS, getPrintings, getLanguageNamesForGame } from '../utils/cardOptions';
+import { CONDITIONS, getPrintings, getLanguageNamesForGame, decodePrinting } from '../utils/cardOptions';
 import CardImage from './CardImage';
 import './TradeWorkbench.css';
 import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
+import { getPrintingBadgeLabel } from '../utils/cardPrinting';
 
 async function api(path, body, signal) {
   const response = await fetch(`/api/${path}`, { signal, ...(body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
@@ -87,7 +88,7 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef, recovery,
   };
   const draft = () => ({ trade_id: tradeId.current,
     giving: giving.map(({ entry_id, quantity, snapshot }) => ({ entry_id, quantity: Number(quantity), snapshot })),
-    receiving: receiving.map(({ id, quantity, printing, language: lang, condition, reverse_card_id }) => ({ card_id: id, quantity: Number(quantity), printing, language: lang, condition, ...(reverse_card_id ? { reverse_card_id } : {}) })) });
+    receiving: receiving.map(({ id, quantity, printing, language: lang, condition, reverse_card_id }) => ({ card_id: id, quantity: Number(quantity), ...decodePrinting(printing), language: lang, condition, ...(reverse_card_id ? { reverse_card_id } : {}) })) });
   const selectedIds = new Set(giving.map(card => card.entry_id));
   const available = new Map(entries.map(card => [card.entry_id, card]));
   const staleIds = new Set(giving.filter(card => available.get(card.entry_id)?.snapshot !== card.snapshot).map(card => card.entry_id));
@@ -107,7 +108,7 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef, recovery,
         <span>{card.location_name || t('trade.unassigned')}</span>
         <span>{card.compartment_label || card.compartment_idx || t('offline.unknown')}</span>
         <span>#{card.entry_id}</span>
-        <span>{card.printing}</span>
+        <span>{getPrintingBadgeLabel(card.printing, card.foil_treatment) || card.printing}</span>
         <span>{card.condition}</span>
         {card.grader !== 'Raw' && <span>{`${card.grader} ${card.grade || ''} ${card.cert_number || ''}`}</span>}
       </p>}
@@ -142,7 +143,7 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef, recovery,
         <ul className="scan-review-list">{review[side].map((card, index) => <li className="scan-review-card" key={index}>
           <CardImage card={card} loading="lazy" />
           <div style={{ minWidth: 0 }}>
-          <strong>{card.quantity} × {identity(card)}</strong><p>{card.printing} · {card.condition}{card.entry_id ? ` · #${card.entry_id} · ${card.location_name || t('trade.unassigned')}` : ` · ${t('trade.unassigned')}`}</p>
+          <strong>{card.quantity} × {identity(card)}</strong><p>{getPrintingBadgeLabel(card.printing, card.foil_treatment) || card.printing} · {card.condition}{card.entry_id ? ` · #${card.entry_id} · ${card.location_name || t('trade.unassigned')}` : ` · ${t('trade.unassigned')}`}</p>
           <p>{card.estimate === null ? t('trade.unknown') : `${money(card.estimate * card.quantity, card.currency)} ${card.currency}`} {card.quoted_at && ` · ${card.quoted_at}`}</p>
           </div>
         </li>)}</ul>
@@ -178,7 +179,7 @@ export default function TradeWorkbench({ onUpdate, navigationGuardRef, recovery,
                 <CardImage card={card} loading="lazy" />
                 <strong>{identity(card)}</strong>
                 <p className="trade-metadata">
-                  <span>{card.quantity} × {card.printing}</span>
+                  <span>{card.quantity} × {getPrintingBadgeLabel(card.printing, card.foil_treatment) || card.printing}</span>
                   <span>{card.condition}</span>
                   <span>{card.location_name || t('trade.unassigned')}</span>
                   <span>#{card.entry_id}</span>

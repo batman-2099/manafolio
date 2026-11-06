@@ -197,7 +197,7 @@ router.get('/stats', async (req, res) => {
       SELECT
         c.id AS entry_id, c.location_id, (SELECT name FROM locations WHERE id = c.location_id) AS location_name,
         (SELECT type FROM locations WHERE id = c.location_id) AS location_type,
-        c.quantity, c.condition, c.printing, c.language, c.purchase_price, c.is_trade, c.favorite, c.list_type,
+        c.quantity, c.condition, c.printing, c.foil_treatment, c.language, c.purchase_price, c.is_trade, c.favorite, c.list_type,
         c.grader, c.grade, c.cert_number, c.market_value, c.missing, c.notes,
         cc.id as card_id, cc.name, cc.printed_name, cc.rarity, cc.set_name, cc.set_id, cc.number, cc.image_url,
         cc.image_url_back, cc.name_back,
@@ -270,7 +270,7 @@ router.get('/stats', async (req, res) => {
     const recentRows = await db.all(`
       SELECT c.id AS entry_id, c.location_id, (SELECT name FROM locations WHERE id = c.location_id) AS location_name,
              (SELECT type FROM locations WHERE id = c.location_id) AS location_type,
-             c.quantity, c.condition, c.printing, c.language, c.purchase_price, c.added_at, c.is_trade, c.favorite, c.list_type,
+             c.quantity, c.condition, c.printing, c.foil_treatment, c.language, c.purchase_price, c.added_at, c.is_trade, c.favorite, c.list_type,
              c.grader, c.grade, c.cert_number, c.market_value, c.missing, c.notes,
              cc.id as card_id, cc.name, cc.printed_name, cc.rarity, cc.set_name, cc.set_id, cc.number, cc.image_url,
              cc.image_url_back, cc.name_back,

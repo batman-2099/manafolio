@@ -38,7 +38,9 @@ async function run() {
     scryfall.client.post = async (url, body) => {
       assert.strictEqual(url, '/cards/collection');
       return { data: { data: rawCards.filter(card => card.id !== omitted && body.identifiers.some(id => id.id === card.id
-        || (id.set === card.set && id.collector_number === card.collector_number))), not_found: [] } };
+        || (id.set === card.set && id.collector_number === card.collector_number))).map(card => ({
+          ...card, finishes: ['nonfoil', 'foil'], promo_types: []
+        })), not_found: [] } };
     };
     db.withTransaction = async fn => originalTransaction(async () => {
       inTransaction = true;

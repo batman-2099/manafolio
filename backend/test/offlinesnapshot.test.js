@@ -117,7 +117,7 @@ async function main() {
     entry_id: physical, card_id: 'mtg-offline', name: 'Sample Card', printed_name: 'Beispielkarte',
     reverse_card_id: null, reverse_name: null, reverse_printed_name: null,
     set_id: 'mtg-tst', set_name: 'Sample Set', number: '007', quantity: 4, list_type: 'collection',
-    printing: 'Holofoil', language: 'German', condition: 'Lightly Played', color_identity: ['U', 'R'], missing: 0,
+    printing: 'Holofoil', foil_treatment: null, language: 'German', condition: 'Lightly Played', color_identity: ['U', 'R'], missing: 0,
     location_id: ownLocation.id, location_name: 'Sample Binder', storage_unit_name: 'Sample Shelf', location_type: 'Binder',
     compartment_idx: 2, compartment_label: 'Sample Binder Page', position: 3000, reserved_quantity: 3
   });

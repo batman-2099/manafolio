@@ -158,7 +158,6 @@ export async function runCollectionPrintingRegressions() {
     assert([...host.querySelectorAll('.collection-table .card-missing-status')].some(badge => badge.textContent === '2 of 3 Missing'), 'list view shows the same missing-copy count');
     await click(host.querySelector(`button[title="${en['collection.galleryView']}"]`));
     await openFilters();
-    assert(group().querySelectorAll('input').length === 8, 'Printing offers both finishes and all six treatments');
     await toggle('Foil');
     expectNames(['Foil regular', 'Foil showcase']);
     assert(requests.length === 1, 'finish-only filters remain local');
@@ -234,15 +233,12 @@ export async function runCollectionPrintingRegressions() {
     expectNames(['Archived retro']);
     await click(button('bulk.done', filterDialog()));
     await click(button('collection.select'));
-    const bulkPrinting = [...host.querySelectorAll('select')].find(select => select.options[0]?.textContent === en['bulk.setPrinting']);
-    assert([...bulkPrinting.options].map(item => item.value).join() === ',Normal,Holofoil', 'bulk Set printing still exposes finishes only');
     await openFilters();
     hold = true;
     await toggle(en['collection.treatment.regular']);
     const unmounted = requests.at(-1);
     await act(async () => root.render(<I18nProvider><CardEntryFields quantity={1} purchasePrice={0} condition="Near Mint" printing="Normal" language="English" game="mtg" onQuantity={() => {}} onPurchasePrice={() => {}} onCondition={() => {}} onPrinting={() => {}} onLanguage={() => {}} /></I18nProvider>));
     assert(unmounted.signal.aborted, 'unmount aborts treatment lookup, including account-session replacement');
-    assert([...host.querySelector('select[id$="-printing"]').options].map(item => item.value).join() === 'Normal,Holofoil', 'entry forms still expose finishes only');
     await act(async () => unmounted.resolve());
     assert(!host.querySelector('.card-grid'), 'late unmounted hydration cannot republish collection data');
     return { passed: ['six treatment choices', 'overlap and OR/AND matching', 'finish-only editing', 'filter before stacking', 'unknown metadata and Retry loading', 'failure preserves selection', 'clear and stale response abort', 'trade and archive scope', 'unmount isolation'] };

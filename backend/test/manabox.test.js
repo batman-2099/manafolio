@@ -44,16 +44,16 @@ async function testImportRoute() {
 
   try {
     await db.initDb();
-    await db.run(`INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)`, ['mtg-caldera', 'Caldera Kavu', 'mtg']);
-    await db.run(`INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)`, ['mtg-mountain', 'Mountain', 'mtg']);
-    await db.run(`INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)`, ['mtg-spider', 'Spider-Suit', 'mtg']);
+    await db.run(`INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)`, ['mtg-00000000-0000-4000-8000-000000000031', 'Caldera Kavu', 'mtg']);
+    await db.run(`INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)`, ['mtg-00000000-0000-4000-8000-000000000032', 'Mountain', 'mtg']);
+    await db.run(`INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)`, ['mtg-00000000-0000-4000-8000-000000000033', 'Spider-Suit', 'mtg']);
 
     let cachedCards = [];
     let bulkCalls = [];
     const resolvedCard = (row) => ({
-      id: row.name === 'Caldera Kavu' ? 'mtg-caldera'
-        : row.name === 'Spider-Suit' ? 'mtg-spider'
-          : row.name === 'Mountain' ? 'mtg-mountain'
+      id: row.name === 'Caldera Kavu' ? 'mtg-00000000-0000-4000-8000-000000000031'
+        : row.name === 'Spider-Suit' ? 'mtg-00000000-0000-4000-8000-000000000033'
+          : row.name === 'Mountain' ? 'mtg-00000000-0000-4000-8000-000000000032'
             : `mtg-${row.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`,
       name: row.name,
       game: 'mtg',
@@ -67,7 +67,7 @@ async function testImportRoute() {
       cachedCards = cards;
       for (const card of cards) {
         await db.run(`INSERT OR IGNORE INTO card_cache (id, name, game, image_url) VALUES (?, ?, ?, ?)`, [card.id, card.name, card.game, card.image_url]);
-        await db.run('UPDATE card_cache SET image_url = ? WHERE id = ?', [card.image_url, card.id]);
+        await db.run(`UPDATE card_cache SET image_url = ?, finishes = '["nonfoil","foil"]', promo_types = '[]' WHERE id = ?`, [card.image_url, card.id]);
       }
     };
 
@@ -94,10 +94,10 @@ async function testImportRoute() {
     assert.deepStrictEqual(await db.all(
       `SELECT card_id, quantity, printing, game FROM collection ORDER BY card_id, printing`
     ), [
-      { card_id: 'mtg-caldera', quantity: 2, printing: 'Normal', game: 'mtg' },
-      { card_id: 'mtg-mountain', quantity: 1, printing: 'Holofoil', game: 'mtg' },
-      { card_id: 'mtg-spider', quantity: 1, printing: 'Holofoil', game: 'mtg' },
-      { card_id: 'mtg-spider', quantity: 1, printing: 'Normal', game: 'mtg' }
+      { card_id: 'mtg-00000000-0000-4000-8000-000000000031', quantity: 2, printing: 'Normal', game: 'mtg' },
+      { card_id: 'mtg-00000000-0000-4000-8000-000000000032', quantity: 1, printing: 'Holofoil', game: 'mtg' },
+      { card_id: 'mtg-00000000-0000-4000-8000-000000000033', quantity: 1, printing: 'Holofoil', game: 'mtg' },
+      { card_id: 'mtg-00000000-0000-4000-8000-000000000033', quantity: 1, printing: 'Normal', game: 'mtg' }
     ]);
     const csvRes = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
     await handler({
@@ -106,15 +106,15 @@ async function testImportRoute() {
     }, csvRes);
     assert.strictEqual(csvRes.statusCode, 200);
     assert.strictEqual(csvRes.body.count, 1);
-    assert.deepStrictEqual(cachedCards, [{ id: 'mtg-caldera', name: 'Caldera Kavu', game: 'mtg', image_url: 'https://images.example/caldera-kavu.jpg' }]);
-    assert.strictEqual((await db.get('SELECT image_url FROM card_cache WHERE id = ?', ['mtg-caldera'])).image_url, 'https://images.example/caldera-kavu.jpg');
+    assert.deepStrictEqual(cachedCards, [{ id: 'mtg-00000000-0000-4000-8000-000000000031', name: 'Caldera Kavu', game: 'mtg', image_url: 'https://images.example/caldera-kavu.jpg' }]);
+    assert.strictEqual((await db.get('SELECT image_url FROM card_cache WHERE id = ?', ['mtg-00000000-0000-4000-8000-000000000031'])).image_url, 'https://images.example/caldera-kavu.jpg');
     const arenaRes = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
     await handler({
       body: { format: 'manabox', data: '1 Caldera Kavu (PLS) 58', list_type: 'arena' },
       user: { id: 1 }
     }, arenaRes);
     assert.strictEqual(arenaRes.statusCode, 200);
-    assert.strictEqual((await db.get(`SELECT list_type FROM collection WHERE card_id = ? ORDER BY id DESC LIMIT 1`, ['mtg-caldera'])).list_type, 'arena');
+    assert.strictEqual((await db.get(`SELECT list_type FROM collection WHERE card_id = ? ORDER BY id DESC LIMIT 1`, ['mtg-00000000-0000-4000-8000-000000000031'])).list_type, 'arena');
     const manafolioCsv = [
       '"Card ID","Name","Set Name","Set ID","Card Number","Quantity","Condition","Printing","Language","Purchase Price","Game"',
       '"mtg-arena-comber","A-Brine Comber","","VOW","","1","Near Mint","Normal","English","0","mtg"',

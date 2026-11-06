@@ -129,6 +129,19 @@ let server;
     await db.run('UPDATE locations SET type = ? WHERE id = ?', ['Box', stacked.id]);
     assert.deepEqual((await summaries()).find(row => row[0] === stacked.id), [stacked.id, 7, 7], 'normal stacked containers still count every occupied pocket');
     assert.deepEqual(await compartments(stacked), [[stacked.compartment, 6, 6, -3], [secondPocket, 1, 1, 0]], 'normal stacked containers include tokens in capacity');
+    const foilBox = await location('Box', 1);
+    for (const treatment of ['surge', 'surge', 'etched', null]) {
+      const entry = await store(foilBox, 'spell', 1, { printing: 'Holofoil' });
+      await db.run('UPDATE collection SET foil_treatment = ? WHERE id = ?', [treatment, entry.lastID]);
+    }
+    assert.deepEqual(await compartments(foilBox), [[foilBox.compartment, 3, 3, 57]], 'different foil treatments occupy separate pockets; matching treatments stack');
+    const { rebalanceCompartmentByScheme, recommendSlot } = require('../src/utils/compartmentSort');
+    await rebalanceCompartmentByScheme(db, foilBox.compartment, 'name-asc');
+    const foilRows = await db.all('SELECT foil_treatment, position FROM collection WHERE location_id = ? ORDER BY id', [foilBox.id]);
+    assert.deepEqual(foilRows.map(row => row.position), [1000, 1000, 2000, 3000], 'rebalance retains foil-type stack identity');
+    const recommendation = await recommendSlot(db, await db.get('SELECT * FROM locations WHERE id = ?', [foilBox.id]),
+      { card_id: 'spell', name: 'spell', printing: 'Holofoil', foil_treatment: 'etched', language: 'English', quantity: 1 });
+    assert.equal(recommendation.position, 2000, 'filing chooses the matching foil treatment rather than the first foil copy');
     console.log('Location and compartment totals: Deck Box token capacity, physical occupancy, stacking and account/inventory scope passed');
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));

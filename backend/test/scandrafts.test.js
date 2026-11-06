@@ -27,16 +27,17 @@ async function testScanDrafts() {
     const providerCalls = [];
     scryfall.client.get = async url => {
       providerCalls.push(url);
-      if (!['/cards/scan-source', '/cards/scan-other', '/cards/tst/2/ja'].includes(url)) {
+      if (!['/cards/00000000-0000-4000-8000-000000000011', '/cards/00000000-0000-4000-8000-000000000012', '/cards/tst/2/ja'].includes(url)) {
         throw Object.assign(new Error('Not found'), { response: { status: 404 } });
       }
       const japanese = url.endsWith('/ja');
-      const source = url === '/cards/scan-source';
+      const source = url === '/cards/00000000-0000-4000-8000-000000000011';
       return { data: {
-        id: japanese ? 'scan-japanese' : source ? 'scan-source' : 'scan-other',
+        id: japanese ? '00000000-0000-4000-8000-000000000013' : source ? '00000000-0000-4000-8000-000000000011' : '00000000-0000-4000-8000-000000000012',
         name: source ? 'Scan Source' : 'Scan Other', printed_name: japanese ? '別のカード' : undefined,
         lang: japanese ? 'ja' : 'en', set: 'tst', set_name: 'Test Set', collector_number: source ? '1' : '2',
         type_line: 'Creature — Wizard', colors: ['U'], color_identity: ['U'], rarity: 'common',
+        finishes: ['nonfoil', 'foil'], promo_types: japanese ? ['surgefoil'] : [],
         image_uris: { normal: `https://example.invalid/${japanese ? 'ja' : 'en'}.jpg` },
         prices: { usd: '4.00', usd_foil: '9.00' }
       } };
@@ -67,8 +68,8 @@ async function testScanDrafts() {
     const owned = () => db.all('SELECT * FROM collection ORDER BY id');
 
     await request('/scan-drafts', 'GET', undefined, null, 401);
-    const draft = await stage({ card_id: 'mtg-scan-source', quantity: 2, location_id: location, user_id: 2, list_type: 'arena' });
-    assert.strictEqual(draft.id, 'mtg-scan-source');
+    const draft = await stage({ card_id: 'mtg-00000000-0000-4000-8000-000000000011', quantity: 2, location_id: location, user_id: 2, list_type: 'arena' });
+    assert.strictEqual(draft.id, 'mtg-00000000-0000-4000-8000-000000000011');
     assert.strictEqual(draft.card_id, draft.id);
     assert.ok(Number.isInteger(draft.draft_id));
     assert.strictEqual(draft.entry_id, undefined, 'a review row is not an owned entry');
@@ -107,10 +108,10 @@ async function testScanDrafts() {
     assert.deepStrictEqual(await owned(), []);
 
     const edited = await request(draftUrl, 'PATCH', {
-      card_id: 'mtg-scan-other', quantity: 3, condition: 'Lightly Played', printing: 'Holofoil',
+      card_id: 'mtg-00000000-0000-4000-8000-000000000012', quantity: 3, condition: 'Lightly Played', printing: 'Holofoil',
       language: 'ja', purchase_price: 1.25, location_id: String(location)
     });
-    assert.strictEqual(edited.card_id, 'mtg-scan-japanese');
+    assert.strictEqual(edited.card_id, 'mtg-00000000-0000-4000-8000-000000000013');
     assert.strictEqual(edited.id, edited.card_id);
     assert.strictEqual(edited.draft_id, draft.draft_id);
     assert.strictEqual(edited.language, 'Japanese');
@@ -118,10 +119,14 @@ async function testScanDrafts() {
     assert.strictEqual(edited.quantity, 3);
     assert.strictEqual(edited.condition, 'Lightly Played');
     assert.strictEqual(edited.printing, 'Holofoil');
+    assert.strictEqual(edited.foil_treatment, null, 'omitted new foil stays unspecified');
+    assert.strictEqual((await request(draftUrl, 'PATCH', { foil_treatment: 'traditional' })).foil_treatment, 'traditional');
+    await request(draftUrl, 'PATCH', { foil_treatment: 'unknown' }, 1, 400);
+    assert.strictEqual((await request(draftUrl, 'PATCH', { quantity: 3 })).foil_treatment, 'traditional');
     assert.strictEqual(edited.purchase_price, 1.25);
     assert.strictEqual(edited.location_id, location);
     assert.deepStrictEqual(await request(draftUrl, 'PATCH', { printing: 'Normal' }),
-      { ...edited, printing: 'Normal' }, 'turning foil off preserves every other draft field');
+      { ...edited, printing: 'Normal', foil_treatment: null }, 'turning foil off clears its treatment');
     await request(draftUrl, 'PATCH', { printing: 'Holofoil' });
     assert.deepStrictEqual(await request('/scan-drafts'), [edited], 'turning foil back on persists without changing identity or copy details');
     assert.strictEqual((await request(draftUrl, 'PATCH', { location_id: null })).location_id, null);
@@ -131,8 +136,8 @@ async function testScanDrafts() {
     await db.run(`INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, 3)`, [deck, edited.card_id]);
     assert.strictEqual((await request(`/decks/${deck}`)).cards[0].owned_qty, 0);
 
-    const second = await stage({ card_id: 'mtg-scan-source', quantity: 2, location_id: location });
-    const unrelated = await stage({ card_id: 'mtg-scan-other' });
+    const second = await stage({ card_id: 'mtg-00000000-0000-4000-8000-000000000011', quantity: 2, location_id: location });
+    const unrelated = await stage({ card_id: 'mtg-00000000-0000-4000-8000-000000000012' });
     const foreign = await stage({ card_id: draft.card_id }, 2);
     const batch = { draft_ids: [edited.draft_id, second.draft_id] };
     const reviewed = await request('/scan-drafts');
@@ -154,7 +159,7 @@ async function testScanDrafts() {
 
     // Failure on the later card rolls back earlier copies, placements, prices, and draft deletion.
     await db.run(`CREATE TRIGGER fail_scan_commit BEFORE INSERT ON collection
-      WHEN NEW.user_id = 1 AND NEW.card_id = 'mtg-scan-source'
+      WHEN NEW.user_id = 1 AND NEW.card_id = 'mtg-00000000-0000-4000-8000-000000000011'
       BEGIN SELECT RAISE(ABORT, 'forced scan commit failure'); END`);
     const failed = await request('/scan-drafts/commit', 'POST', batch, 1, 500);
     assert.ok(!failed.error.includes('SQLITE') && !failed.error.includes('forced'));
@@ -186,8 +191,8 @@ async function testScanDrafts() {
     for (const copy of copies) {
       const source = copy.card_id === edited.card_id ? edited : second;
       assert.deepStrictEqual(
-        [copy.card_id, copy.user_id, copy.quantity, copy.condition, copy.printing, copy.language, copy.purchase_price, copy.location_id, copy.compartment_id, copy.list_type],
-        [source.card_id, 1, 1, source.condition, source.printing, source.language, source.purchase_price, location, compartment, 'collection']
+        [copy.card_id, copy.user_id, copy.quantity, copy.condition, copy.printing, copy.foil_treatment, copy.language, copy.purchase_price, copy.location_id, copy.compartment_id, copy.list_type],
+        [source.card_id, 1, 1, source.condition, source.printing, source.foil_treatment, source.language, source.purchase_price, location, compartment, 'collection']
       );
     }
     assert.strictEqual(providerCalls.length, callsBeforeCommit, 'commit uses the reviewed cache without provider requests');

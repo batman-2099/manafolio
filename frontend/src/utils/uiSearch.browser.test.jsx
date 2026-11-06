@@ -256,10 +256,15 @@ export async function runUiSearchRegressions() {
     const receiptButton = label => [...host.querySelectorAll('.search-rapid button')].find(node => node.textContent.trim() === label);
     assert(sessionTotal().includes('$10.00') && host.querySelector('.search-rapid').textContent.includes('$2.50 ea'),
       'rapid receipts show the unit price and the session total includes quantities');
-    await click(receiptButton(en['search.foil']));
+    await change(host.querySelector('[data-rapid-printing]'), 'foil:surge');
     assert(sessionTotal().includes('$15.00'), 'successful foil change reprices all copies in that receipt');
     failRapidWrite = true;
-    await click(receiptButton(en['search.foil']));
+    await act(async () => {
+      const select = host.querySelector('[data-rapid-printing]');
+      select.value = 'Normal';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    assert(host.querySelector('[data-rapid-printing]').value === 'foil:surge', 'failed printing change restores saved treatment');
     await click(receiptButton(en['search.undo']));
     assert(sessionTotal().includes('$15.00'), 'failed finish changes and undo preserve session value');
     failRapidWrite = false;
@@ -299,7 +304,7 @@ export async function runUiSearchRegressions() {
     await rapidSubmit();
     assert(lastRapidNumber === '123a' && singleWrites.at(-1).printing === 'Holofoil' && singleWrites.at(-1).quantity === 2,
       'a trailing dot selects foil for all copies and is stripped from the collector-number lookup');
-    assert(receiptButton(en['search.foil']).getAttribute('aria-pressed') === 'true' && sessionTotal().includes('$40.00'),
+    assert(host.querySelector('[data-rapid-printing]').value === 'Holofoil' && sessionTotal().includes('$40.00'),
       'foil shortcut is reflected in the receipt and running total');
     assert(host.querySelector('#rapid-printing').value === 'Normal', 'foil shortcut does not change the default finish');
     await change(host.querySelector('#rapid-card-number'), '123a');

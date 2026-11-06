@@ -4,7 +4,7 @@ import { ResponsiveContainer, Cell, Tooltip, BarChart, Bar, XAxis, YAxis } from 
 import { Search, Trophy, Compass, Library, ShieldAlert, Sparkles, X, MapPin, SlidersHorizontal } from 'lucide-react';
 import Logo from './Logo';
 import { priceText, currencySymbol, getCurrency, SYMBOLS } from '../utils/formatPrice';
-import { getPrintings } from '../utils/cardOptions';
+import { getPrintings, matchesPrinting as matchesPrintingOption } from '../utils/cardOptions';
 import { getFoilOverlayClass, getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
 import { useBackGuard } from '../utils/useBackGuard';
 import { COLLECTION_SORT_CRITERIA, sortCardsByOrder } from '../utils/cardSort';
@@ -120,7 +120,7 @@ function SharedCollection({ shareToken }) {
         (item.set_name || '').toLowerCase().includes(q) ||
         (item.number || '').includes(searchFilter);
       const matchesRarity = !rarityFilter || item.rarity === rarityFilter;
-      const matchesPrinting = !printingFilter || item.printing === printingFilter;
+      const matchesPrinting = !printingFilter || matchesPrintingOption(item, printingFilter);
       const matchesType = !typeFilter || (item.subtypes || []).includes(typeFilter);
       return matchesSearch && matchesRarity && matchesPrinting && matchesType;
     });
@@ -137,6 +137,7 @@ function SharedCollection({ shareToken }) {
       let key = JSON.stringify([item.card_id, item.reverse_card_id || null]);
       if (stackByCondition) key += `-${item.condition}`;
       if (stackByPrinting) key += `-${item.printing}`;
+      key += `-foil:${item.foil_treatment || ''}`;
 
       if (!groups[key]) {
         groups[key] = { ...item, members: [item] };
@@ -379,8 +380,8 @@ function SharedCollection({ shareToken }) {
                     <span className={getFoilOverlayClass(card.printing)} style={{ borderRadius: 'var(--radius-sm)' }} />
                   )}
                   {getPrintingBadgeLabel(card.printing) && (
-                    <span className="collection-card-tag" style={{ position: 'absolute', top: '6px', left: '6px', zIndex: 6, ...getPrintingBadgeStyle(card.printing) }}>
-                      {getPrintingBadgeLabel(card.printing)}
+                    <span className="collection-card-tag" style={{ position: 'absolute', top: '6px', left: '6px', zIndex: 6, ...getPrintingBadgeStyle(card.printing, card.foil_treatment) }}>
+                      {getPrintingBadgeLabel(card.printing, card.foil_treatment)}
                     </span>
                   )}
                   {card.members?.length > 1 && card.printing === null && <span className="collection-card-tag" style={{ position: 'absolute', top: '6px', left: '6px', background: 'var(--bg-secondary)', color: 'var(--text-strong)' }}>{t('shared.mixed')}</span>}
@@ -500,7 +501,7 @@ function SharedCollection({ shareToken }) {
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: 'var(--text-sm)', marginTop: '0.25rem' }}>
                   <span style={{ color: 'var(--text-muted)' }}>{t('inspector.specCondition')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.condition ?? t('shared.mixed')}</span>
-                  <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.printing ?? t('shared.mixed')}</span>
+                  <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{t('inspector.specPrinting')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.foil_treatment ? getPrintingBadgeLabel(activeCard.printing, activeCard.foil_treatment) : activeCard.printing ?? t('shared.mixed')}</span>
                   <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>{t('inspector.specLanguage')}</span> <span style={{ color: 'var(--text-strong)' }}>{activeCard.language ?? t('shared.mixed')}</span>
                 </div>
                 {shareLocations && (activeCard.location || (activeCard.members?.length > 1 && activeCard.location === null)) && (
@@ -514,7 +515,7 @@ function SharedCollection({ shareToken }) {
                   <ul>
                     {activeCard.members.map((member, index) => <li key={index} style={{ display: 'grid', gap: 'var(--space-1)', paddingBlock: 'var(--space-2)' }}>
                       <span>{t('shared.quantity')}: {member.quantity || 1}</span>
-                      <span>{t('card.printing')}: {member.printing}</span>
+                      <span>{t('card.printing')}: {member.foil_treatment ? getPrintingBadgeLabel(member.printing, member.foil_treatment) : member.printing}</span>
                       <span>{t('card.condition')}: {member.condition}</span>
                       <span>{t('card.language')}: {member.language}</span>
                       {shareLocations && member.location && <span>{t('inspector.locationLabel')} {member.location}</span>}

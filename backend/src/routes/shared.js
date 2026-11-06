@@ -68,7 +68,7 @@ router.get('/:share_token/containers/:id', async (req, res) => {
     // no ROI — plus the placement columns the layout is drawn from.
     const rows = await db.all(`
       SELECT c.id AS entry_id, c.card_id, c.compartment_id, c.position, c.quantity, c.condition,
-             c.printing, c.language, c.favorite, c.is_trade, c.market_value,
+             c.printing, c.foil_treatment, c.language, c.favorite, c.is_trade, c.market_value,
              c.reverse_card_id, rc.name AS reverse_name, rc.printed_name AS reverse_printed_name, rc.image_url AS reverse_image_url,
              cc.name, cc.printed_name, cc.supertype, cc.subtypes, cc.types, cc.rarity,
              cc.set_id, cc.set_name, cc.number, cc.image_url, cc.game, cc.cmc, cc.color_identity,
@@ -130,6 +130,7 @@ router.get('/:share_token', async (req, res) => {
         c.quantity,
         c.condition,
         c.printing,
+        c.foil_treatment,
         c.language,
         c.added_at,
         c.is_trade,

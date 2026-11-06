@@ -1196,6 +1196,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       let key = JSON.stringify([card.card_id, card.reverse_card_id || null]);
       if (stackContainerByCondition) key += `-${card.condition}`;
       if (stackContainerByPrinting) key += `-${card.printing}`;
+      key += `-foil:${card.foil_treatment || ''}`;
       const foilQuantity = card.printing === 'Holofoil' ? card.quantity : 0;
       if (!groups[key]) groups[key] = { ...card, foil_quantity: foilQuantity, stack_entries: [card] };
       else {
@@ -2522,8 +2523,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       )}
                       <CardDeckStatus card={card} />
                       {foilQuantity > 0 && (
-                        <span style={{ position: 'absolute', top: '0.35rem', left: '0.35rem', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, ...getPrintingBadgeStyle('Holofoil') }}>
-                          {getPrintingBadgeLabel('Holofoil')}{foilQuantity < card.quantity && ` ${foilQuantity}/${card.quantity}`}
+                        <span style={{ position: 'absolute', top: '0.35rem', left: '0.35rem', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, ...getPrintingBadgeStyle('Holofoil', card.foil_treatment) }}>
+                          {getPrintingBadgeLabel('Holofoil', card.foil_treatment)}{foilQuantity < card.quantity && ` ${foilQuantity}/${card.quantity}`}
                         </span>
                       )}
                     </button>
@@ -2924,7 +2925,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   const isHighlighted = picked || isSelected;
                   const rarityBorder = getCardRarityBorder(card.rarity);
                   const foilClass = getFoilOverlayClass(card.printing);
-                  const printingBadgeLabel = getPrintingBadgeLabel(card.printing);
+                  const printingBadgeLabel = getPrintingBadgeLabel(card.printing, card.foil_treatment);
 
                   return (
                     <DraggableCard
@@ -3013,7 +3014,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                             zIndex: 10,
                             border: '1px solid var(--border-glass)',
                             boxShadow: 'none',
-                            ...getPrintingBadgeStyle(card.printing)
+                            ...getPrintingBadgeStyle(card.printing, card.foil_treatment)
                           }}>
                             {printingBadgeLabel}
                           </span>
@@ -3060,16 +3061,18 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         </div>
                         <div style={{ fontSize: 'max(0.65rem, var(--unsorted-text-min, 0rem))', color: 'var(--text-secondary)', display: 'flex', gap: '0.4rem', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           <span>{card.set_name || 'Unset'} {card.number ? `#${card.number}` : ''}</span>
+                          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem', whiteSpace: 'normal' }}>
                           {card.condition && (
                             <span style={{ padding: '1px 3px', borderRadius: '2px', background: 'var(--surface-2)', fontSize: 'max(0.55rem, var(--unsorted-text-min, 0rem))', fontWeight: 700 }}>
                               {card.condition}
                             </span>
                           )}
                           {printingBadgeLabel && (
-                            <span style={{ padding: '1px 3px', borderRadius: '2px', fontSize: 'max(0.55rem, var(--unsorted-text-min, 0rem))', fontWeight: 700, ...getPrintingBadgeStyle(card.printing) }}>
+                            <span style={{ padding: '1px 3px', borderRadius: '2px', fontSize: 'max(0.55rem, var(--unsorted-text-min, 0rem))', fontWeight: 700, ...getPrintingBadgeStyle(card.printing, card.foil_treatment) }}>
                               {printingBadgeLabel}
                             </span>
                           )}
+                          </span>
                         </div>
                       </div>
 

@@ -65,7 +65,7 @@ async function run() {
     base = `http://127.0.0.1:${server.address().port}`;
 
     const source = await box('Source');
-    const stack = await copy('stack', 3, { ...source, position: 4000, condition: 'Lightly Played', printing: 'Holofoil', language: 'Japanese', purchase_price: 12.5, favorite: 1, is_trade: 1, added_at: '2020-01-02 03:04:05', notes: 'Keep copy history', market_value: 42, market_value_source: 'manual', market_value_at: '2026-01-01' });
+    const stack = await copy('stack', 3, { ...source, position: 4000, condition: 'Lightly Played', printing: 'Holofoil', foil_treatment: 'surge', language: 'Japanese', purchase_price: 12.5, favorite: 1, is_trade: 1, added_at: '2020-01-02 03:04:05', notes: 'Keep copy history', market_value: 42, market_value_source: 'manual', market_value_at: '2026-01-01' });
     const slab = await copy('slab', 1, { grader: 'PSA', grade: '10', cert_number: 'unique-cert', notes: 'Certified single' });
     const success = await deck('Saved definition', [['stack', 2], ['slab', 1]]);
     const before = await snapshot();

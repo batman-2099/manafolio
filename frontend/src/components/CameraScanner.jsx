@@ -4,10 +4,11 @@ import { Camera, RefreshCw, AlertTriangle, X, Zap, ZapOff, Settings, ScanLine, L
 import { getCardDisplayName } from '../utils/langHelper';
 import { priceText } from '../utils/formatPrice';
 import { resolveCardPrice, getPrintingPrice } from '../utils/resolveCardPrice';
-import { CONDITIONS, getPrintings } from '../utils/cardOptions';
+import { CONDITIONS, getPrintings, BASE_PRINTINGS, decodePrinting, encodePrinting } from '../utils/cardOptions';
 import CardEntryFields from './CardEntryFields';
 import { pairedCardName, reverseFace } from '../utils/tokenFaces';
 import { useReverseTokenPrompt } from '../utils/useReverseTokenPrompt';
+import { getPrintingBadgeLabel } from '../utils/cardPrinting';
 import Modal from './Modal';
 import { useBackGuard } from '../utils/useBackGuard';
 import { langName, langCode, getLanguagesForGame } from '../utils/languages';
@@ -1058,7 +1059,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
           reverse_card_id: selectedReverse?.id || null,
           quantity: qty,
           condition: overrides?.condition || 'Near Mint',
-          printing: autoPrinting,
+          ...decodePrinting(autoPrinting),
           language: overrides?.language || addLanguage(card),
           purchase_price: resolveCardPrice(card, autoPrinting),
           location_id: null,
@@ -1482,7 +1483,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     setQuantity(card.draft_id ? card.quantity : 1);
     setCondition(card.draft_id ? card.condition : 'Near Mint');
     setPurchasePrice(card.draft_id ? card.purchase_price : 0);
-    setPrinting(card.draft_id ? card.printing : 'Normal');
+    setPrinting(card.draft_id ? encodePrinting(card.printing, card.foil_treatment) : 'Normal');
     setLanguage(card.draft_id ? card.language : addLanguage(card));
     setIsDrawerOpen(true);
   };
@@ -1673,7 +1674,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     resolvedDupIdRef.current = null;
   };
 
-  const toggleDraftFoil = async (draft) => {
+  const updateDraftPrinting = async (draft, nextPrinting) => {
     if (priceCheck) return;
     if (draftBusyRef.current || draftActionRef.current !== null) return;
     const action = `foil-${draft.draft_id}`;
@@ -1684,7 +1685,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
       const response = await fetch(`/api/scan-drafts/${draft.draft_id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ printing: draft.printing === 'Holofoil' ? 'Normal' : 'Holofoil' }),
+        body: JSON.stringify(decodePrinting(nextPrinting)),
       });
       if (!response.ok) throw new Error('Could not update scan draft finish');
       const updated = await response.json();
@@ -1793,7 +1794,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
           reverse_card_id: choice.reverseCard?.id || null,
           quantity: Number(quantity),
           condition,
-          printing,
+          ...decodePrinting(printing),
           language,
           purchase_price: Number(purchasePrice),
           location_id: null,
@@ -2463,7 +2464,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 if (autoAddEditing) return;
                 // Pause and open the editor with sensible defaults.
                 setAutoAddCond('Near Mint');
-                setAutoAddPrint((autoAddTargetCard.rarity || '').toLowerCase().includes('holo') ? 'Holofoil' : 'Normal');
+                setAutoAddPrint('Normal');
                 setAutoAddEditing(true);
               }}
               style={{ position: 'relative', width: '115px', aspectRatio: 0.718, margin: '0.5rem 0', cursor: autoAddEditing ? 'default' : 'pointer' }}
@@ -2887,15 +2888,17 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
               <div className="scan-review-details">
                 <h3>{pairedCardName(draft)}</h3>
                 <p>{draft.set_name} · #{draft.number}</p>
-                <p>{draft.quantity}× · {draft.condition} · {draft.printing} · {draft.language}</p>
+                <p>{draft.quantity}× · {draft.condition} · {getPrintingBadgeLabel(draft.printing, draft.foil_treatment) || draft.printing} · {draft.language}</p>
                 <p>{t('card.purchasePrice')}: {priceText(draft.purchase_price, draft.price_currency)}</p>
               </div>
               <div className="scan-review-actions">
                 <button type="button" className="btn btn-secondary" disabled={draftBusy || draftAction !== null || isDrawerOpen} onClick={() => openQuickAdd({ ...draft, id: draft.card_id })}>{t('common.edit')}</button>
-                <button type="button" className={`btn ${draft.printing === 'Holofoil' ? 'btn-primary' : 'btn-secondary'}`} aria-pressed={draft.printing === 'Holofoil'} disabled={draftBusy || draftAction !== null} onClick={() => toggleDraftFoil(draft)}>
-                  {draftAction === `foil-${draft.draft_id}` && <RefreshCw size={16} className="spin" aria-hidden="true" />}
-                  {t('scan.foil')}
-                </button>
+                <label>{t('card.printing')}
+                  <select className="select-control" value={encodePrinting(draft.printing, draft.foil_treatment)}
+                    disabled={draftBusy || draftAction !== null} onChange={event => updateDraftPrinting(draft, event.target.value)}>
+                    {getPrintings().map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
                 <button type="button" className="btn btn-secondary" disabled={draftBusy || draftAction !== null} onClick={() => discardDraft(draft)}>
                   {draftAction === draft.draft_id && <RefreshCw size={16} className="spin" aria-hidden="true" />}
                   {t('scan.discardDraft')}
@@ -2921,7 +2924,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
           <div aria-live="polite">
             <p style={{ margin: '0 0 0.5rem', color: 'var(--text-secondary)' }}>{t('priceCheck.estimate')}</p>
             <dl style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', margin: 0 }}>
-              {getPrintings().map(finish => {
+              {BASE_PRINTINGS.map(finish => {
                 const price = getPrintingPrice(selectedCard, finish.value);
                 return <div key={finish.value} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
                   <dt>{t(finish.value === 'Normal' ? 'priceCheck.normal' : 'priceCheck.foil')}</dt>
@@ -3039,7 +3042,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 </div>}
                 <div className="quick-add-footer-actions">
                   <button type="button" className="btn btn-secondary" onClick={closeDrawer} disabled={draftBusy}>{t('common.cancel')}</button>
-                  <button type="submit" className="btn btn-primary" disabled={draftBusy || findingPrintings || draftsLoading || draftsError}>
+                  <button type="submit" className="btn btn-primary" disabled={draftBusy || findingPrintings || draftsLoading || draftsError || languageChanging}>
                     {draftBusy && <RefreshCw size={16} className="spin" aria-hidden="true" />}
                     {t(editingDraftId ? 'common.save' : 'scan.queueCard')}
                   </button>

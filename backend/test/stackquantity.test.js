@@ -15,14 +15,16 @@ async function main() {
   await db.initDb();
   const { lastID: user } = await db.run("INSERT INTO users (username, password_hash, share_token) VALUES ('quantity', 'unused', 'quantity-share')");
   const { lastID: otherUser } = await db.run("INSERT INTO users (username, password_hash, share_token) VALUES ('other', 'unused', 'other-share')");
-  await db.run("INSERT INTO card_cache (id, name) VALUES ('c-A', 'Card A'), ('c-localized', 'Localized A')");
+  await db.run(`INSERT INTO card_cache (id, name, finishes, promo_types) VALUES
+    ('mtg-00000000-0000-4000-8000-000000000001', 'Card A', '["nonfoil","foil"]', '[]'),
+    ('c-localized', 'Localized A', NULL, NULL)`);
   const { lastID: location } = await db.run("INSERT INTO locations (name, type, user_id) VALUES ('Box', 'Box', ?)", [user]);
   const { lastID: compartment } = await db.run('INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 400)', [location]);
   const { lastID: otherLocation } = await db.run("INSERT INTO locations (name, type, user_id) VALUES ('Other box', 'Box', ?)", [user]);
   const { lastID: otherCompartment } = await db.run('INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 400)', [otherLocation]);
   async function add({ quantity = 1, placed = true, printing = 'Normal', owner = user, list = 'collection', missing = 1 } = {}) {
     const { lastID } = await db.run(`INSERT INTO collection (card_id, user_id, quantity, printing, purchase_price, location_id, compartment_id, position, notes, added_at, missing, list_type)
-      VALUES ('c-A', ?, ?, ?, 2, ?, ?, 4000, 'Keep this metadata', '2020-01-02 03:04:05', ?, ?)`,
+      VALUES ('mtg-00000000-0000-4000-8000-000000000001', ?, ?, ?, 2, ?, ?, 4000, 'Keep this metadata', '2020-01-02 03:04:05', ?, ?)`,
     [owner, quantity, printing, placed ? location : null, placed ? compartment : null, missing, list]);
     return lastID;
   }

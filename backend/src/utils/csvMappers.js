@@ -74,6 +74,7 @@ function mappedCsvRow(row, mapping) {
     quantity: csvQuantity(value('quantity')),
     condition: CONDITION_MAP[value('condition').toLowerCase()] || 'Near Mint',
     printing: /^(true|1|foil|holofoil)$/i.test(printing) ? 'Holofoil' : printing || 'Normal',
+    ...((value('foil_treatment') || row['Foil Treatment']) ? { foil_treatment: value('foil_treatment') || row['Foil Treatment'] } : {}),
     language: value('language') || 'English',
     purchase_price: parseFloat(value('purchase_price')) || 0,
     game: 'mtg'
@@ -84,7 +85,10 @@ function parseThirdPartyCSV(rows, formatType = 'tcgplayer', mapping) {
   if (mapping && Object.values(mapping).some(Boolean)) return rows.map(row => mappedCsvRow(row, mapping));
   const formatKey = (formatType || 'internal').toLowerCase();
   const strategy = STRATEGIES[formatKey] || STRATEGIES.internal;
-  return rows.map(strategy);
+  return rows.map(row => ({
+    ...strategy(row),
+    ...((row['Foil Treatment'] || row['foil_treatment']) ? { foil_treatment: row['Foil Treatment'] || row['foil_treatment'] } : {})
+  }));
 }
 
 // ManaBox's plain-text export is a decklist: `2 Card Name (SET) 123`, with

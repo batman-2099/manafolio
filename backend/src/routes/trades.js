@@ -5,6 +5,7 @@ const cardApi = require('../utils/cardApi');
 const languages = require('../utils/languages');
 const { checkedOutAllocation } = require('../utils/collectionHelpers');
 const { validateReverseCard } = require('../utils/tokenPairing');
+const { resolveFoilTreatment } = require('../utils/foilTreatments');
 const router = express.Router();
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -27,7 +28,7 @@ async function entries(userId) {
       AND (c.compartment_id IS NULL OR (cp.id IS NOT NULL AND COALESCE(cp.locked, 0) = 0))
     ORDER BY cc.name, c.id`, [userId]);
   return rows.filter(row => !reserved.get(row.id)).map(row => ({ ...row, entry_id: row.id,
-    snapshot: hash([row.id, row.card_id, row.reverse_card_id, row.quantity, row.printing, row.language, row.condition,
+    snapshot: hash([row.id, row.card_id, row.reverse_card_id, row.quantity, row.printing, row.foil_treatment, row.language, row.condition,
       row.location_id, row.compartment_id, row.position, row.grader, row.grade, row.cert_number, row.added_at]) }));
 }
 
@@ -56,6 +57,7 @@ function payload(body) {
         || !['Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged'].includes(row.condition)
         || !languages.LANGUAGES.some(language => language.name === row.language)) fail('Invalid receiving card details.');
     return { card_id: row.card_id, quantity: row.quantity, printing: row.printing, condition: row.condition, language: row.language,
+      ...(row.foil_treatment !== undefined ? { foil_treatment: row.foil_treatment } : {}),
       ...(row.reverse_card_id != null ? { reverse_card_id: row.reverse_card_id } : {}) };
   });
   return { trade_id: body.trade_id, giving, receiving };
@@ -70,7 +72,8 @@ async function prepareReceiving(rows) {
       fail('Receiving printing or language no longer matches. Search for the exact printing again.');
     }
     await validateReverseCard(card, row.reverse_card_id ?? null, 'collection');
-    result.push(quote({ ...card, ...row }));
+    const foil_treatment = resolveFoilTreatment(row.printing, row.foil_treatment);
+    result.push(quote({ ...card, ...row, foil_treatment }));
   }
   return result;
 }
@@ -124,15 +127,16 @@ router.post('/confirm', async (req, res) => {
         const card = await db.get('SELECT * FROM card_cache WHERE id = ?', [row.card_id]);
         if (!card || card.game !== 'mtg' || languages.toName(card.language) !== row.language) fail('Receiving printing changed. Review again.', 409);
         await validateReverseCard(card, row.reverse_card_id ?? null, 'collection');
+        row.foil_treatment = resolveFoilTreatment(row.printing, row.foil_treatment);
       }
       for (const row of request.giving) {
         await db.run('UPDATE collection SET quantity = quantity - ? WHERE id = ? AND user_id = ?', [row.quantity, row.entry_id, req.user.id]);
         await db.run('DELETE FROM collection WHERE id = ? AND user_id = ? AND quantity = 0', [row.entry_id, req.user.id]);
       }
       for (const row of request.receiving) {
-        await db.run(`INSERT INTO collection (user_id, card_id, quantity, printing, language, condition, reverse_card_id,
-          list_type, game, purchase_price, location_id, compartment_id) VALUES (?, ?, ?, ?, ?, ?, ?, 'collection', 'mtg', NULL, NULL, NULL)`,
-        [req.user.id, row.card_id, row.quantity, row.printing, row.language, row.condition, row.reverse_card_id ?? null]);
+        await db.run(`INSERT INTO collection (user_id, card_id, quantity, printing, language, condition, reverse_card_id, foil_treatment,
+          list_type, game, purchase_price, location_id, compartment_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'collection', 'mtg', NULL, NULL, NULL)`,
+        [req.user.id, row.card_id, row.quantity, row.printing, row.language, row.condition, row.reverse_card_id ?? null, row.foil_treatment]);
       }
       const given = request.giving.reduce((sum, row) => sum + row.quantity, 0);
       const received = request.receiving.reduce((sum, row) => sum + row.quantity, 0);

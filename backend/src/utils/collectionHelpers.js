@@ -22,7 +22,7 @@ function defaultCompartmentPlan(type) {
 async function physicalCardEntries(userId, cardId = null, legacyCheckout = false) {
   return db.all(`
     SELECT c.id AS entry_id, c.card_id, c.reverse_card_id, c.quantity, c.position, c.location_id, c.compartment_id,
-      c.printing, c.language, c.condition, c.game,
+      c.printing, c.foil_treatment, c.language, c.condition, c.game,
       cc.name AS card_name, cc.printed_name, cc.set_name, cc.number, cc.image_url,
       su.name AS storage_unit_name,
       l.name AS location_name, l.type AS location_type, cp.label AS compartment_label, cp.idx AS compartment_idx
@@ -336,6 +336,7 @@ async function resolveCompartmentAndPosition(opts) {
     userId: uId,
     cardId: cId,
     printing,
+    foilTreatment = null,
     reverseCardId = null,
     language,
     listType = 'collection',
@@ -384,6 +385,7 @@ async function resolveCompartmentAndPosition(opts) {
   cardMetadata.quantity = quantity;
   cardMetadata.entry_id = excludeEntryId;
   cardMetadata.printing = printing || 'Normal';
+  cardMetadata.foil_treatment = foilTreatment;
   cardMetadata.language = language || 'English';
   try { cardMetadata.types = JSON.parse(cardMetadata.types || '[]'); } catch { cardMetadata.types = []; }
 
@@ -459,13 +461,13 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
           card_id, user_id, quantity, condition, printing, language, purchase_price,
           favorite, is_trade, list_type, game, added_at, notes, grader, grade,
           cert_number, market_value, market_value_source, market_value_at, missing,
-          location_id, compartment_id, position, last_verified_at, reverse_card_id
-        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          location_id, compartment_id, position, last_verified_at, reverse_card_id, foil_treatment
+        ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         entry.card_id, userId, entry.condition, entry.printing, entry.language, entry.purchase_price,
         entry.favorite, entry.is_trade, entry.list_type, entry.game, entry.added_at, entry.notes, entry.grader,
         entry.grade, entry.cert_number, entry.market_value, entry.market_value_source, entry.market_value_at, entry.missing,
-        locationId, compartmentId, ++slot * 1000, entry.last_verified_at, entry.reverse_card_id || null
+        locationId, compartmentId, ++slot * 1000, entry.last_verified_at, entry.reverse_card_id || null, entry.foil_treatment ?? null
       ]);
       segments.push({ id: inserted.lastID, offset: entry.quantity - copies + copy, quantity: 1 });
     }
