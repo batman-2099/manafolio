@@ -4,6 +4,8 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+## 2.7.0 — 2026-11-06
+
 - Keep collection placement checks inside the update transaction, and create imported decks with their cards atomically so failed imports do not leave partial decks.
 - Preserve paired-token identity and filing metadata in batch recommendations so previewed slots match applied placement.
 - Honor collector-number filters and pagination when searching all printings; preserve and validate produced-mana metadata in complete backup restores while accepting older backups without it.
