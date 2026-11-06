@@ -522,6 +522,11 @@ async function initDb() {
          AND (name = ? OR subtypes LIKE ?)`,
       [JSON.stringify([color]), landType, `%${landType}%`]
     );
+    await run(
+      `UPDATE card_cache SET types = ?
+       WHERE game = 'mtg' AND name = ? AND (types IS NULL OR types != ?)`,
+      [JSON.stringify([color]), landType, JSON.stringify([color])]
+    );
   }
 
   const collectionCols = await all(`PRAGMA table_info(collection)`);

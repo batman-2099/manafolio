@@ -5,7 +5,7 @@ const { parseSetList } = require('./utils/setQuery');
 const cardSearchSql = require('./utils/cardSearchSql');
 const languages = require('./utils/languages');
 const { cacheNormalizedCards } = require('./utils/cardCache');
-const { normalizeMtgColorIdentity } = require('./utils/mtgColors');
+const { BASIC_LAND_COLORS, normalizeMtgColorIdentity } = require('./utils/mtgColors');
 const scryfallBulk = require('./scryfallBulk');
 
 // Scryfall needs no API key but asks callers to identify themselves and accept
@@ -183,7 +183,9 @@ function normalizeCard(raw, lang) {
   const language = languages.toName(raw.lang || lang);
   const imgSrc = raw.image_uris || face.image_uris || {};
   const typeLine = raw.type_line || face.type_line || '';
-  const colors = raw.colors || face.colors || [];
+  const name = face.name || raw.name || '';
+  const colors = Object.hasOwn(BASIC_LAND_COLORS, name)
+    ? [BASIC_LAND_COLORS[name]] : raw.colors || face.colors || [];
   // USD first, then EUR — and never a mix of the two in one row.
   //
   // Scryfall quotes `usd` from TCGplayer and `eur` from Cardmarket, and which one it
@@ -227,7 +229,7 @@ function normalizeCard(raw, lang) {
 
   return {
     id: `mtg-${raw.id}`,
-    name: face.name || raw.name || '',
+    name,
     // The card game itself lives in the dedicated `game` column; `supertype`
     // just tags these as Magic cards for UI that keys off it.
     supertype: 'MTG',
