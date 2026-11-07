@@ -7,6 +7,7 @@ import { priceText } from '../utils/formatPrice';
 import { typeCategory, getColorCategory } from '../utils/cardSort';
 import { isBinderType } from '../utils/cardOptions';
 import { displayName } from '../utils/languages';
+import { getSlotNumber } from '../utils/getSlotNumber';
 import { useLongPress } from '../utils/useLongPress';
 import CardImage from './CardImage';
 import CardDeckStatus from './CardDeckStatus';
@@ -201,7 +202,7 @@ function PrintingBadge({ printing, foilTreatment }) {
 
 // Detail banner for the currently focused card. Shared by the box coverflow and
 // the binder grid so both surfaces describe a selection the same way.
-export function FocusedCardInfo({ card, slotNumber, moveSelect = null }) {
+export function FocusedCardInfo({ card, slotNumber, compartmentLabel, moveSelect = null }) {
   const { t, locale } = useT();
   if (!card) return null;
   const isEmpty = !!card.__empty;
@@ -214,8 +215,9 @@ export function FocusedCardInfo({ card, slotNumber, moveSelect = null }) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
           <div style={{ minWidth: 0 }}>
             <strong>
-              #{slotNumber || 1} | {isEmpty ? t('compartment.emptySlot') : isDivider ? (card.label || t('compartment.divider')) : isGhost ? t('compartment.recommendedSpot') : displayName(card)}
+              {isEmpty ? t('compartment.emptySlot') : isDivider ? (card.label || t('compartment.divider')) : isGhost ? t('compartment.recommendedSpot') : displayName(card)}
             </strong>
+            {!isDivider && <div className="storage-card-position">{[compartmentLabel, slotNumber != null ? t('loc.slotNumber', { n: slotNumber }) : null].filter(Boolean).join(', ')}</div>}
             {!isEmpty && !isDivider && !isGhost && card.last_verified_at !== undefined && (
               <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                 {t('stocktake.lastVerified', { date: card.last_verified_at ? new Date(card.last_verified_at).toLocaleDateString(locale) : t('stocktake.never') })}
@@ -693,6 +695,7 @@ export default function CompartmentView({
                   <CardImage card={card} alt={displayName(card)} title={displayName(card)} loading="lazy" decoding="async" draggable={dropEnabled ? false : undefined} />
                   {getFoilOverlayClass(card.printing) && <div className={getFoilOverlayClass(card.printing)} style={{ borderRadius: '4px' }} />}
                   <PrintingBadge printing={card.printing} foilTreatment={card.foil_treatment} />
+                  <span className="storage-pocket-position" aria-hidden="true">{pos}</span>
                   {allowStacking && card.quantity > 1 && (pullMode || !(card.in_deck_qty > 0)) && (
                     <span title={t('compartment.stackedHere', { count: card.quantity })} style={{ position: 'absolute', bottom: '3px', left: '3px', zIndex: 24, fontSize: '0.6rem', fontWeight: 900, padding: '1px 4px', borderRadius: '4px', background: 'var(--media-background)', border: '1px solid var(--border-glass-hover)', color: 'var(--media-foreground)' }}>
                       &times;{card.quantity}
@@ -766,7 +769,7 @@ export default function CompartmentView({
               ))}
             </select>
           ) : null;
-          return <FocusedCardInfo card={activeCard} slotNumber={slotNumber} moveSelect={moveSelect} />;
+          return <FocusedCardInfo card={activeCard} slotNumber={slotNumber} compartmentLabel={compartment.display_label} moveSelect={moveSelect} />;
         })()}
       </div>
     );
@@ -1064,7 +1067,10 @@ export default function CompartmentView({
               </select>
             ) : null;
 
-            return <FocusedCardInfo card={activeCard} slotNumber={activeCard.__slotNumber || activeCardIndex + 1} moveSelect={moveSelect} />;
+            const slotNumber = activeCard.__ghost || activeCard.__empty
+              ? activeCard.__slotNumber
+              : getSlotNumber({ position: activeCard.position }) ?? activeCard.__slotNumber;
+            return <FocusedCardInfo card={activeCard} slotNumber={slotNumber} compartmentLabel={compartment.display_label} moveSelect={moveSelect} />;
           })()}
           </>
         )}

@@ -242,6 +242,9 @@ export async function runUiContainerRegressions() {
     assert(tokenSection()?.querySelectorAll('button').length === 2, 'typed and token-set cards share a separate section, with duplicate pairs stacked');
     assert(!tokenSection().textContent.includes('Sample spell') && tokenSection().previousElementSibling.textContent.includes('Sample spell'), 'ordinary cards precede the token section');
     const tokenButtons = tokenSection().querySelectorAll('button');
+    const tokenPositions = () => [...tokenSection().querySelector('button').querySelectorAll('.storage-card-position')].map(node => node.textContent);
+    const expectedPositions = [2, 4].map(n => `Token row, ${en['loc.slotNumber'].replace('{n}', n)}`);
+    assert(JSON.stringify(tokenPositions()) === JSON.stringify(expectedPositions), 'a display stack lists both saved slots, not its gallery index');
     const missingTag = tokenButtons[0].querySelector('.card-missing-status');
     assert(missingTag?.textContent === en['inspector.missing'], 'a missing non-leading stack member must show the Missing tag');
     const missingBox = missingTag.getBoundingClientRect();
@@ -255,6 +258,7 @@ export async function runUiContainerRegressions() {
     const searchSelector = `input[aria-label="${en['shared.search']}"]`;
     await change(searchSelector, 'Soldier');
     assert(tokenSection()?.querySelectorAll('button').length === 1 && tokenSection().textContent.includes('Goblin'), 'reverse-face search retains the paired token in its section');
+    assert(JSON.stringify(tokenPositions()) === JSON.stringify(expectedPositions), 'filtering does not renumber stored slots');
     await change(searchSelector, 'Sample spell');
     assert(!tokenSection(), 'no empty token section appears when filters exclude tokens');
     await change(searchSelector, '');
@@ -264,6 +268,7 @@ export async function runUiContainerRegressions() {
       sort.dispatchEvent(new Event('change', { bubbles: true }));
     });
     assert(tokenSection()?.querySelectorAll('button').length === 2, 'sorting keeps one separate token section');
+    assert(JSON.stringify(tokenPositions()) === JSON.stringify(expectedPositions), 'view sorting does not renumber stored slots');
     await click('collection.select');
     assert(tokenSection().querySelectorAll('button').length === 3, 'selection exposes every stored token entry rather than ambiguous stacks');
     await act(async () => tokenSection().querySelector('img[alt="Soldier"]').click());

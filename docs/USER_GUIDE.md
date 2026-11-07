@@ -592,6 +592,8 @@ Browser **Back** closes the current storage dialog first, then returns an open c
 
 In the container's card view, a **FOIL** badge identifies foil copies. If **Stack Duplicates** is enabled and **Split by Holo/Printing** is off, mixed-finish stacks show the foil count—for example, **FOIL 1/3** means one of the three copies is foil. Normal-only cards and stacks have no foil badge.
 
+Container card details show the saved page/row label and slot number separately from the card's collector number. Binder pockets also display their number on the artwork. Display stacks list each distinct stored position; searching or changing the view sort does not renumber those positions. The focused card panel includes its page/row and slot, including gaps in custom-order binders.
+
 The container's card gallery places tokens in their own **Tokens** section after regular cards, including cards from Token/Tokens sets. Paired tokens show the saved reverse image beneath the front image within one item; either image opens the same details or selects the same owned entry. Search, filters, sorting, duplicate stacking, and selection still apply. The section disappears when no tokens match. Physical layout and **Arrange** views retain saved token positions; this grouping does not move cards.
 
 The container toolbar shows its saved sleeve type. Change it through **More → Container Settings → Sleeved**, then **Save Settings**. This records the sleeve layers used for the container's cards; it does not change capacity, move cards, or alter deck sleeve settings. Existing containers default to **None**, and complete account backups retain the setting.

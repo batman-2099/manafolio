@@ -65,3 +65,25 @@
 @media (prefers-reduced-motion: reduce) {
   .storage-workspace-grid [style*="transition"] { transition: none !important; }
 }
+
+.storage-card-position {
+  width: 100%;
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.storage-pocket-position {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--media-background);
+  color: var(--media-foreground);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  line-height: 1.4;
+  pointer-events: none;
+}

@@ -10,6 +10,7 @@ import AddToDeckSelect from './AddToDeckSelect';
 import { useMultiSelect } from '../utils/useMultiSelect';
 import { isBinderType as computeIsBinder, binderSpread, MTG_FORMATS, containerTypeKey } from '../utils/cardOptions';
 import { displayName } from '../utils/languages';
+import { getSlotNumber } from '../utils/getSlotNumber';
 import CompartmentView, { FocusedCardInfo, getSortCategories } from './CompartmentView';
 import { SortBuilder, FilterBuilder } from './SortFilterBuilder';
 import CreateContainerModal from './CreateContainerModal';
@@ -2496,6 +2497,11 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   const selected = storage.selectedIds.has(card.entry_id);
                   const foilQuantity = card.foil_quantity ?? (card.printing === 'Holofoil' ? card.quantity : 0);
                   const reverseImage = card.reverse_card_id || section.tokens ? reverseFace(card) : null;
+                  const positions = [...new Set((card.stack_entries || [card]).map(entry => {
+                    const compartment = compartments.find(item => item.id === entry.compartment_id);
+                    const slot = getSlotNumber(entry);
+                    return [compartment?.display_label, slot != null ? t('loc.slotNumber', { n: slot }) : null].filter(Boolean).join(', ');
+                  }).filter(Boolean))];
                   return (
                     <button
                       key={card.entry_id}
@@ -2515,6 +2521,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       <span style={{ width: '100%', marginTop: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-strong)', fontSize: '0.65rem', fontWeight: 700 }}>
                         {displayName(card)}
                       </span>
+                      {positions.map(position => <span key={position} className="storage-card-position">{position}</span>)}
                       <span style={{ width: '100%', marginTop: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.875rem', overflowWrap: 'anywhere' }}>
                         {t('stocktake.lastVerified', { date: card.last_verified_at ? new Date(card.last_verified_at).toLocaleDateString(locale) : t('stocktake.never') })}
                       </span>
@@ -2621,8 +2628,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       if (!binderActiveEntryId) return null;
                       const activeCard = cardsInActiveLocation.find(c => c.entry_id === binderActiveEntryId);
                       if (!activeCard) return null;
-                      const compCards = cardsByCompartment.get(activeCard.compartment_id) || [];
-                      const slotNumber = compCards.findIndex(c => c.entry_id === binderActiveEntryId) + 1;
+                      const compartment = compartments.find(item => item.id === activeCard.compartment_id);
+                      const slotNumber = getSlotNumber(activeCard);
                       
                       const moveSelect = selectedLoc.sort_order === 'custom' && compartments.length > 1 ? (
                         <select
@@ -2638,7 +2645,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         </select>
                       ) : null;
                       
-                      return <FocusedCardInfo card={activeCard} slotNumber={slotNumber} moveSelect={moveSelect} />;
+                      return <FocusedCardInfo card={activeCard} slotNumber={slotNumber} compartmentLabel={compartment?.display_label} moveSelect={moveSelect} />;
                     })()}
                   </div>
                 );

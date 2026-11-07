@@ -152,6 +152,14 @@ export async function runUiStorageRegressions({ pressKey, dragCard } = {}) {
     await activate(host.querySelector('.binder-pocket'), 'Space');
     assert(opened.join() === '1', 'second binder activation must open the selected card');
     cases.push('binder Enter selects and Space opens');
+    await act(async () => render(<CompartmentView compartment={compartment} cards={[{ ...cards[0], position: 3000 }]} locationType="Binder" />));
+    assert(host.querySelector('.storage-pocket-position')?.textContent === '3', 'an occupied sparse pocket displays its physical slot');
+    assert(host.querySelector('.focused-card-info-panel .storage-card-position')?.textContent === `Page 1, ${en['loc.slotNumber'].replace('{n}', 3)}`, 'focused binder details retain the page and sparse pocket number');
+    cases.push('sparse binder physical position labels');
+    await act(async () => render(<CompartmentView compartment={compartment} cards={[{ ...cards[0], position: 3000 }]} locationType="Box" />));
+    assert(host.querySelector('.focused-card-info-panel .storage-card-position')?.textContent.endsWith(en['loc.slotNumber'].replace('{n}', 3)), 'box details use the stored position rather than the coverflow index');
+    await act(async () => render(<CompartmentView compartment={compartment} cards={[{ ...cards[0], position: 3000 }]} locationType="Box" recommendedSpot={{ index: 0, card: { ...cards[0], position: 9000 } }} />));
+    assert(host.querySelector('.focused-card-info-panel .storage-card-position')?.textContent.endsWith(en['loc.slotNumber'].replace('{n}', 1)), 'recommended placement shows the destination rather than the source position');
     const renamed = [];
     await act(async () => { render(<CompartmentView compartment={compartment} cards={cards} locationType="Binder" onRename={name => renamed.push(name)} />); });
     const renameButton = () => host.querySelector('button[aria-label^="Rename page/row"]');
