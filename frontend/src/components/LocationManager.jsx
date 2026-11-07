@@ -2497,21 +2497,25 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   const selected = storage.selectedIds.has(card.entry_id);
                   const foilQuantity = card.foil_quantity ?? (card.printing === 'Holofoil' ? card.quantity : 0);
                   const reverseImage = card.reverse_card_id || section.tokens ? reverseFace(card) : null;
-                  let firstSlot = Infinity;
-                  let lastSlot = -Infinity;
+                  const occupiedRanges = [];
                   const positions = [...new Set((card.stack_entries || [card]).map(entry => {
                     const compartment = compartments.find(item => item.id === entry.compartment_id);
                     const slot = getSlotNumber(entry);
                     if (slot != null) {
-                      firstSlot = Math.min(firstSlot, slot);
-                      lastSlot = Math.max(lastSlot, slot + (selectedLoc.allow_stacking ? 1 : (entry.quantity || 1)) - 1);
+                      occupiedRanges.push([slot, slot + (selectedLoc.allow_stacking ? 1 : (entry.quantity || 1)) - 1]);
                     }
                     return [compartment?.display_label, slot != null ? t('loc.slotNumber', { n: slot }) : null].filter(Boolean).join(', ');
                   }).filter(Boolean))];
-                  const slotSummary = card.stack_entries && firstSlot !== Infinity
-                    ? firstSlot === lastSlot
-                      ? t('loc.slotNumber', { n: firstSlot })
-                      : t('loc.slotRange', { first: firstSlot, last: lastSlot })
+                  const ranges = [];
+                  for (const range of occupiedRanges.sort((a, b) => a[0] - b[0])) {
+                    const previous = ranges.at(-1);
+                    if (previous && range[0] <= previous[1] + 1) previous[1] = Math.max(previous[1], range[1]);
+                    else ranges.push(range);
+                  }
+                  const slotSummary = card.stack_entries && ranges.length
+                    ? ranges.length === 1 && ranges[0][0] === ranges[0][1]
+                      ? t('loc.slotNumber', { n: ranges[0][0] })
+                      : t('loc.slotRanges', { slots: ranges.map(([first, last]) => first === last ? first : `${first} - ${last}`).join(', ') })
                     : null;
                   return (
                     <button

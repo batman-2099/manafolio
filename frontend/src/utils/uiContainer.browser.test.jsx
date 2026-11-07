@@ -243,10 +243,10 @@ export async function runUiContainerRegressions() {
     assert(!tokenSection().textContent.includes('Sample spell') && tokenSection().previousElementSibling.textContent.includes('Sample spell'), 'ordinary cards precede the token section');
     const tokenButtons = tokenSection().querySelectorAll('button');
     const tokenPositions = () => [...tokenSection().querySelector('button').querySelectorAll('.storage-card-position')].map(node => node.textContent);
-    const expectedPositions = [en['loc.slotRange'].replace('{first}', 2).replace('{last}', 4)];
-    assert(JSON.stringify(tokenPositions()) === JSON.stringify(expectedPositions), 'a display stack summarizes its saved slot bounds, not its gallery index');
+    const expectedPositions = [en['loc.slotRanges'].replace('{slots}', '2, 4')];
+    assert(JSON.stringify(tokenPositions()) === JSON.stringify(expectedPositions), 'a display stack separates nonconsecutive stored slots with commas');
     assert(tokenButtons[0].querySelector('.storage-card-position').title.includes('Token row'), 'compact stack retains its page/row details on hover');
-    assert(tokenSection().previousElementSibling.querySelector('.storage-card-position').textContent === en['loc.slotRange'].replace('{first}', 1).replace('{last}', 3), 'quantity-bearing entries include every occupied slot in their range');
+    assert(tokenSection().previousElementSibling.querySelector('.storage-card-position').textContent === en['loc.slotRanges'].replace('{slots}', '1 - 3'), 'quantity-bearing entries include every occupied slot in their range');
     const missingTag = tokenButtons[0].querySelector('.card-missing-status');
     assert(missingTag?.textContent === en['inspector.missing'], 'a missing non-leading stack member must show the Missing tag');
     const missingBox = missingTag.getBoundingClientRect();
@@ -319,6 +319,15 @@ export async function runUiContainerRegressions() {
       await clear();
     }
     cases.push('detail list saved and legacy dividers, multiple levels, repeated groups, disabled/custom rules, filtering and storage order');
+    cards = [[9, 2], [3, 2], [7, 1], [5, 1], [10, 1]].map(([slot, quantity], index) => ({
+      ...cards[0], entry_id: index + 1, card_id: 'range-fixture', position: slot * 1000, quantity
+    }));
+    locations[2] = { ...locations[2], sort_order: 'custom' };
+    await act(async () => root.render(<LocationManager onUpdate={() => {}} showToast={() => {}} />));
+    await act(async () => [...host.querySelectorAll('button')].find(node => node.textContent.includes('Token box')).click());
+    assert(host.querySelector('.storage-card-position--stacked')?.textContent === en['loc.slotRanges'].replace('{slots}', '3 - 5, 7, 9 - 10'),
+      'slot summaries merge adjacent and overlapping quantities without filling gaps');
+    cases.push('gap-aware slot ranges merge adjacency and overlapping copies');
     return { passed: cases.length, cases };
   } finally {
     await clear();
