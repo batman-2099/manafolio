@@ -74,6 +74,11 @@
   font-weight: 400;
   overflow-wrap: anywhere;
 }
+.storage-card-position--stacked {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .storage-pocket-position {
   position: absolute;
   right: 3px;

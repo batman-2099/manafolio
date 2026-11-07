@@ -2347,6 +2347,7 @@
   "loc.rejectedRule": "Doesn't match this container's moving rule",
   "loc.containerFull": "Container Full!",
   "loc.slotNumber": "Slot {n}",
+  "loc.slotRange": "Slots {first} - {last}",
   "loc.placed": "Placed",
   "loc.unsortedCount": "Unsorted ({count})",
   "loc.confirmBulkFile": "Move {count} card(s) into \"{name}\"?",

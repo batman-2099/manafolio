@@ -2497,11 +2497,22 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                   const selected = storage.selectedIds.has(card.entry_id);
                   const foilQuantity = card.foil_quantity ?? (card.printing === 'Holofoil' ? card.quantity : 0);
                   const reverseImage = card.reverse_card_id || section.tokens ? reverseFace(card) : null;
+                  let firstSlot = Infinity;
+                  let lastSlot = -Infinity;
                   const positions = [...new Set((card.stack_entries || [card]).map(entry => {
                     const compartment = compartments.find(item => item.id === entry.compartment_id);
                     const slot = getSlotNumber(entry);
+                    if (slot != null) {
+                      firstSlot = Math.min(firstSlot, slot);
+                      lastSlot = Math.max(lastSlot, slot + (selectedLoc.allow_stacking ? 1 : (entry.quantity || 1)) - 1);
+                    }
                     return [compartment?.display_label, slot != null ? t('loc.slotNumber', { n: slot }) : null].filter(Boolean).join(', ');
                   }).filter(Boolean))];
+                  const slotSummary = card.stack_entries && firstSlot !== Infinity
+                    ? firstSlot === lastSlot
+                      ? t('loc.slotNumber', { n: firstSlot })
+                      : t('loc.slotRange', { first: firstSlot, last: lastSlot })
+                    : null;
                   return (
                     <button
                       key={card.entry_id}
@@ -2521,7 +2532,9 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                       <span style={{ width: '100%', marginTop: '0.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-strong)', fontSize: '0.65rem', fontWeight: 700 }}>
                         {displayName(card)}
                       </span>
-                      {positions.map(position => <span key={position} className="storage-card-position">{position}</span>)}
+                      {slotSummary
+                        ? <span className="storage-card-position storage-card-position--stacked" title={positions.join('; ')}>{slotSummary}</span>
+                        : positions.map(position => <span key={position} className="storage-card-position">{position}</span>)}
                       <span style={{ width: '100%', marginTop: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.875rem', overflowWrap: 'anywhere' }}>
                         {t('stocktake.lastVerified', { date: card.last_verified_at ? new Date(card.last_verified_at).toLocaleDateString(locale) : t('stocktake.never') })}
                       </span>

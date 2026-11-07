@@ -234,7 +234,7 @@ export async function runUiContainerRegressions() {
       { entry_id: 2, card_id: 'sample-token', name: 'Goblin', subtypes: ['Token'], set_name: 'Sample Set', reverse_name: 'Soldier', reverse_card_id: 'sample-reverse', checked_out_qty: 1, in_deck_qty: 1 },
       { entry_id: 3, card_id: 'sample-set-token', name: 'Treasure', set_name: 'Sample Tokens' },
       { entry_id: 4, card_id: 'sample-token', name: 'Goblin', subtypes: ['Token'], set_name: 'Sample Set', reverse_name: 'Soldier', reverse_card_id: 'sample-reverse', missing: 1 },
-    ].map(card => ({ ...card, id: card.card_id, game: 'mtg', location_id: 3, compartment_id: 30, position: card.entry_id * 1000, quantity: 1 }));
+    ].map(card => ({ ...card, id: card.card_id, game: 'mtg', location_id: 3, compartment_id: 30, position: card.entry_id * 1000, quantity: card.entry_id === 1 ? 3 : 1 }));
     await act(async () => root.render(<LocationManager onUpdate={() => {}} showToast={() => {}} />));
     await act(async () => [...host.querySelectorAll('button')].find(node => node.textContent.includes('Token box')).click());
     await act(async () => host.querySelector(`button[title="${en['loc.detailView']}"]`).click());
@@ -243,8 +243,10 @@ export async function runUiContainerRegressions() {
     assert(!tokenSection().textContent.includes('Sample spell') && tokenSection().previousElementSibling.textContent.includes('Sample spell'), 'ordinary cards precede the token section');
     const tokenButtons = tokenSection().querySelectorAll('button');
     const tokenPositions = () => [...tokenSection().querySelector('button').querySelectorAll('.storage-card-position')].map(node => node.textContent);
-    const expectedPositions = [2, 4].map(n => `Token row, ${en['loc.slotNumber'].replace('{n}', n)}`);
-    assert(JSON.stringify(tokenPositions()) === JSON.stringify(expectedPositions), 'a display stack lists both saved slots, not its gallery index');
+    const expectedPositions = [en['loc.slotRange'].replace('{first}', 2).replace('{last}', 4)];
+    assert(JSON.stringify(tokenPositions()) === JSON.stringify(expectedPositions), 'a display stack summarizes its saved slot bounds, not its gallery index');
+    assert(tokenButtons[0].querySelector('.storage-card-position').title.includes('Token row'), 'compact stack retains its page/row details on hover');
+    assert(tokenSection().previousElementSibling.querySelector('.storage-card-position').textContent === en['loc.slotRange'].replace('{first}', 1).replace('{last}', 3), 'quantity-bearing entries include every occupied slot in their range');
     const missingTag = tokenButtons[0].querySelector('.card-missing-status');
     assert(missingTag?.textContent === en['inspector.missing'], 'a missing non-leading stack member must show the Missing tag');
     const missingBox = missingTag.getBoundingClientRect();
