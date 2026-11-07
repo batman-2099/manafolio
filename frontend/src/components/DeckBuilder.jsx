@@ -55,12 +55,28 @@ const deckEditorState = (deck) => ({
   commander_card_id: deck.commander_card_id || null
 });
 
-const formatCardLocations = (locations, t) => locations.map(location => {
-  const { take, storage_unit_name, location_name, compartment_display } = location;
-  const slot = getSlotNumber(location);
-  return `${take > 1 ? `×${take} ` : ''}${[storage_unit_name, location_name, compartment_display,
-    slot != null ? t('loc.slotNumber', { n: slot }) : null].filter(Boolean).join(' · ')}`;
-}).join(', ');
+const formatCardLocations = (locations, t) => {
+  const groups = new Map();
+  for (const location of locations) {
+    const slot = getSlotNumber(location);
+    const key = JSON.stringify([location.location_id, location.compartment_id, location.storage_unit_name,
+      location.location_name, location.compartment_display, slot == null]);
+    if (!groups.has(key)) groups.set(key, { location, take: 0, slots: new Set() });
+    const group = groups.get(key);
+    group.take += location.take;
+    if (slot != null) group.slots.add(slot);
+  }
+  return [...groups.values()].map(({ location, take, slots }) => {
+    const { storage_unit_name, location_name, compartment_display } = location;
+    const numbers = [...slots].sort((a, b) => a - b);
+    const consecutive = numbers.every((number, index) => index === 0 || number === numbers[index - 1] + 1);
+    const slotLabel = numbers.length > 1
+      ? t('loc.slotRanges', { slots: consecutive ? `${numbers[0]} - ${numbers.at(-1)}` : numbers.join(',') })
+      : numbers.length ? t('loc.slotNumber', { n: numbers[0] }) : null;
+    return `${take > 1 ? `×${take} ` : ''}${[storage_unit_name, location_name, compartment_display,
+      slotLabel].filter(Boolean).join(' · ')}`;
+  }).join(', ');
+};
 
 const locationCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
@@ -1209,7 +1225,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
           if (!bLocation) return -1;
           return locationCollator.compare(aLocation.location_name, bLocation.location_name)
             || locationCollator.compare(aLocation.compartment_display || '', bLocation.compartment_display || '')
-            || (getSlotNumber(bLocation) ?? 0) - (getSlotNumber(aLocation) ?? 0)
+            || (getSlotNumber(aLocation) ?? Infinity) - (getSlotNumber(bLocation) ?? Infinity)
             || displayName(a).localeCompare(displayName(b));
         })
       }]

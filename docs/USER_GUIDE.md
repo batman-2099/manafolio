@@ -827,6 +827,8 @@ To start from storage instead, open a nonempty Physical or Graveyard container a
 
 Physical card locations in the deck's List, Grid, and card preview include the stored slot number after the page/row label. Source choices also show a slot when they represent one known position. Unassigned copies and source groups spanning multiple entries do not show a guessed slot. Slot numbers describe physical storage, not the printing's collector number.
 
+Copies in the same container and page/row share one compact slot label: consecutive slots appear as **Slots 2 - 4**; slots with gaps appear as **Slots 2,4,7**. Repeated slots appear only once, while the copy count is preserved.
+
 This does not move collection cards or reserve them before checkout. Missing copies, copies reserved by another deck, Arena, Wishlist, and Graveyard do not supply a Physical deck. Return a checked-out deck before changing its source. If the source becomes unavailable, select another source or Automatic and save; checkout does not silently substitute another location.
 
 The selection is anchored to an existing collection copy and follows its current location/compartment if it moves. Deleting that anchor leaves an unavailable selection that you must replace before checkout. Normal saves still work with unowned, missing, reserved, or source-short cards and previously saved unavailable sources; they do not reserve copies or certify that the deck can be checked out. Arena decks do not show this control.
@@ -843,7 +845,7 @@ The selection is anchored to an existing collection copy and follows its current
 
 **Expected result:** the card changes are persisted together after a successful Save. Until then, **Unsaved changes** means they remain a local draft. Closing the editor or navigating away can discard them after confirmation. If saving fails, the draft remains available to correct and retry.
 
-**Location** sort keeps containers and pages/rows grouped, then orders stored slots from highest to lowest within each group. Unknown slot positions follow known slots.
+**Location** sort keeps containers and pages/rows grouped, then orders stored slots from lowest to highest within each group. Unknown slot positions follow known slots.
 
 Ordinary additions cannot exceed owned printing quantities, and nonbasic cards are constrained by the editor's four-copy check across same-name printings; basic lands are exempt. This is not a full format validator. Red availability warnings identify quantities beyond currently available copies, including reservations in other decks. Inventory ownership and play availability are different: a copy you own may already be reserved.
 

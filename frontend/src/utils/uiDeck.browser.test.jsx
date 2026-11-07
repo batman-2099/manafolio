@@ -143,9 +143,28 @@ export async function runUiDeckRegressions() {
     for (const mode of ['List', 'Grid']) {
       await click([...host.querySelectorAll('.deck-display-controls button')].find(element => element.textContent.trim() === mode));
       const ordered = [...host.querySelectorAll(`button[aria-label^="${en['deck.previewArt']}:"]`)].map(element => element.getAttribute('aria-label').split(': ')[1]);
-      assert(ordered.join(',') === ['earlier-page', 'slot-high', card.name, 'slot-low', 'slot-unknown'].join(','),
-        'location sort preserves page grouping and sorts numeric slots descending, with unknown slots last');
+      assert(ordered.join(',') === ['earlier-page', 'slot-low', card.name, 'slot-high', 'slot-unknown'].join(','),
+        'location sort preserves page grouping and sorts numeric slots ascending, with unknown slots last');
     }
+    const stored = locations[0].locations[0];
+    for (const [positions, summary] of [
+      [[7000, 8000, 9000, 7000], '7 - 9'],
+      [[11000, 7000, 9000], '7,9,11']
+    ]) {
+      await click(button('deck.backToDecks'));
+      locations[0].locations = [...positions.map(position => ({ ...stored, position })), unassigned];
+      await click([...host.querySelectorAll('button')].find(element => element.textContent.trim() === deck.name));
+      const label = `×${positions.length} Sample binder · Page 2 · ${en['loc.slotRanges'].replace('{slots}', summary)}, Unassigned Pile`;
+      for (const mode of ['List', 'Grid']) {
+        await click([...host.querySelectorAll('.deck-display-controls button')].find(element => element.textContent.trim() === mode));
+        assert([...host.querySelectorAll('[title]')].some(element => element.title === label),
+          'stacked locations deduplicate slots and use a range only without gaps, retaining unassigned copies');
+      }
+      await click(host.querySelector(`button[aria-label="${en['deck.previewArt']}: ${card.name}"]`));
+      assert(host.querySelector('dialog').textContent.includes(label), 'preview uses the same compact slot summary');
+      await cancelDialog();
+    }
+    locations[0].locations = [unassigned];
     deck.cards = [card];
     locations.splice(1);
     locations[0].locations[0] = unassigned;
