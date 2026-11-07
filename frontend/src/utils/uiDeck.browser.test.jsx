@@ -82,6 +82,7 @@ export async function runUiDeckRegressions() {
     }
     if (url === '/api/decks') return response([deck]);
     if (url === '/api/decks/7') { detailRequests++; return response(deck); }
+    if (url === '/api/decks/7/cards/fixture/sources') return response({ sources: locations[0].locations.map(location => ({ ...location, available: 2, quantity: 2 })) });
     if (url === '/api/decks/7/locations') {
       locationRequests++;
       return response(locationsFail ? { error: 'Fixture locations failure' } : locations, locationsFail ? 503 : 200);
@@ -116,7 +117,21 @@ export async function runUiDeckRegressions() {
       await click(button('deck.backToDecks'));
     }
     deck.inventory_type = 'collection';
+    const unassigned = locations[0].locations[0];
+    locations[0].locations[0] = { ...unassigned, location_name: 'Sample binder', location_id: 9, compartment_id: 90, compartment_display: 'Page 2', position: 7000 };
     await click([...host.querySelectorAll('button')].find(element => element.textContent.trim() === deck.name));
+    const storedLabel = `Sample binder · Page 2 · ${en['loc.slotNumber'].replace('{n}', 7)}`;
+    for (const mode of ['List', 'Grid']) {
+      await click([...host.querySelectorAll('.deck-display-controls button')].find(element => element.textContent.trim() === mode));
+      assert([...host.querySelectorAll('[title]')].some(element => element.title.includes(storedLabel)), 'both deck card views show the stored slot, not collector number');
+    }
+    await click(host.querySelector(`button[aria-label="${en['deck.previewArt']}: ${card.name}"]`));
+    assert(host.querySelector('dialog').textContent.includes(storedLabel), 'card preview includes its physical slot');
+    const sourceOptions = [...host.querySelectorAll('#deck-card-source option')];
+    assert(sourceOptions.some(option => option.textContent.includes(storedLabel)), 'specific source choices include their stored slot');
+    assert(sourceOptions.some(option => option.textContent.includes('Unassigned Pile') && !option.textContent.includes('Slot')), 'unassigned copies do not invent a physical slot');
+    await cancelDialog();
+    locations[0].locations[0] = unassigned;
     const search = async query => {
       await change(host.querySelector('.deck-search-form input'), query);
       await act(async () => host.querySelector('.deck-search-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));

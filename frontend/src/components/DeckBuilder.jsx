@@ -8,6 +8,7 @@ import CheckoutWizardModal from './CheckoutWizardModal';
 import { useBackGuard } from '../utils/useBackGuard';
 import { ownedImportIndex, findOwnedImportCard, buildDeckExport, parseDeckLine } from '../utils/deckText';
 import { deckContainers } from '../utils/deckContainers';
+import { getSlotNumber } from '../utils/getSlotNumber';
 import { defaultGame, isGameEnabled } from '../utils/games';
 import { MTG_FORMATS } from '../utils/cardOptions';
 import { preconFormat } from '../utils/preconFormat';
@@ -54,9 +55,12 @@ const deckEditorState = (deck) => ({
   commander_card_id: deck.commander_card_id || null
 });
 
-const formatCardLocations = (locations) => locations.map(({ take, storage_unit_name, location_name, compartment_display }) =>
-  `${take > 1 ? `×${take} ` : ''}${storage_unit_name ? `${storage_unit_name} · ` : ''}${location_name}${compartment_display ? ` · ${compartment_display}` : ''}`
-).join(', ');
+const formatCardLocations = (locations, t) => locations.map(location => {
+  const { take, storage_unit_name, location_name, compartment_display } = location;
+  const slot = getSlotNumber(location);
+  return `${take > 1 ? `×${take} ` : ''}${[storage_unit_name, location_name, compartment_display,
+    slot != null ? t('loc.slotNumber', { n: slot }) : null].filter(Boolean).join(' · ')}`;
+}).join(', ');
 
 const locationCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
@@ -382,6 +386,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
     source.storage_unit_name,
     source.location_name || t('bulk.unassignedPile'),
     source.compartment_display,
+    getSlotNumber(source) != null ? t('loc.slotNumber', { n: getSlotNumber(source) }) : null,
     t('deck.sourceAvailable', { available: source.available, quantity: source.quantity })
   ].filter(Boolean).join(' · ');
 
@@ -2398,8 +2403,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
                                       <div style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName(card)}</div>
                                       <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.set_name} • #{card.number}</div>
                                       {deckCardLocations[card.id]?.length > 0 && (
-                                        <div title={formatCardLocations(deckCardLocations[card.id])} style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          <MapPin size={11} /> {formatCardLocations(deckCardLocations[card.id])}
+                                        <div title={formatCardLocations(deckCardLocations[card.id], t)} style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          <MapPin size={11} /> {formatCardLocations(deckCardLocations[card.id], t)}
                                         </div>
                                       )}
                                     </div>
@@ -2463,8 +2468,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
                                     )}
                                   </button>
                                   {deckCardLocations[card.id]?.length > 0 && (
-                                    <div title={formatCardLocations(deckCardLocations[card.id])} style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 5px 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                      <MapPin size={10} /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatCardLocations(deckCardLocations[card.id])}</span>
+                                    <div title={formatCardLocations(deckCardLocations[card.id], t)} style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '4px 5px 0', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                      <MapPin size={10} /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatCardLocations(deckCardLocations[card.id], t)}</span>
                                     </div>
                                   )}
                                   <div style={{ padding: '4px', display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', background: 'var(--bg-secondary)' }}>
@@ -3085,6 +3090,11 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
             <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: 'var(--text-sm)' }}>
               {previewCard.set_name} • #{previewCard.number} ({previewCard.rarity || 'Common'})
             </p>
+            {deckCardLocations[previewCard.id]?.length > 0 && (
+              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', overflowWrap: 'anywhere' }}>
+                {formatCardLocations(deckCardLocations[previewCard.id], t)}
+              </p>
+            )}
             {previewDeckCard && (
               <div className="deck-source-field">
                 <label htmlFor="deck-card-source">{t('deck.sourceLocation')}</label>

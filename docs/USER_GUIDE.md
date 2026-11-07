@@ -825,6 +825,8 @@ To start from storage instead, open a nonempty Physical or Graveyard container a
 4. Changing the location automatically saves the whole deck, including other unsaved changes. If saving fails, your draft remains; close the preview and use **Save** in the toolbar to retry.
 5. Check out the deck normally. The pull checklist uses copies from the selected source; returning the deck releases those exact reservations.
 
+Physical card locations in the deck's List, Grid, and card preview include the stored slot number after the page/row label. Source choices also show a slot when they represent one known position. Unassigned copies and source groups spanning multiple entries do not show a guessed slot. Slot numbers describe physical storage, not the printing's collector number.
+
 This does not move collection cards or reserve them before checkout. Missing copies, copies reserved by another deck, Arena, Wishlist, and Graveyard do not supply a Physical deck. Return a checked-out deck before changing its source. If the source becomes unavailable, select another source or Automatic and save; checkout does not silently substitute another location.
 
 The selection is anchored to an existing collection copy and follows its current location/compartment if it moves. Deleting that anchor leaves an unavailable selection that you must replace before checkout. Normal saves still work with unowned, missing, reserved, or source-short cards and previously saved unavailable sources; they do not reserve copies or certify that the deck can be checked out. Arena decks do not show this control.
