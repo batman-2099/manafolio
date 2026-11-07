@@ -843,6 +843,8 @@ The selection is anchored to an existing collection copy and follows its current
 
 **Expected result:** the card changes are persisted together after a successful Save. Until then, **Unsaved changes** means they remain a local draft. Closing the editor or navigating away can discard them after confirmation. If saving fails, the draft remains available to correct and retry.
 
+**Location** sort keeps containers and pages/rows grouped, then orders stored slots from highest to lowest within each group. Unknown slot positions follow known slots.
+
 Ordinary additions cannot exceed owned printing quantities, and nonbasic cards are constrained by the editor's four-copy check across same-name printings; basic lands are exempt. This is not a full format validator. Red availability warnings identify quantities beyond currently available copies, including reservations in other decks. Inventory ownership and play availability are different: a copy you own may already be reserved.
 
 Return a checked-out deck before manually changing its card composition or inventory type. **Improve with AI** can update its composition while keeping it checked out. **Save** is also required before checkout, return, or **Improve with AI** when there are unsaved changes.

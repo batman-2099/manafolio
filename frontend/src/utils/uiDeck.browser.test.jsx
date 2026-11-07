@@ -119,6 +119,14 @@ export async function runUiDeckRegressions() {
     deck.inventory_type = 'collection';
     const unassigned = locations[0].locations[0];
     locations[0].locations[0] = { ...unassigned, location_name: 'Sample binder', location_id: 9, compartment_id: 90, compartment_display: 'Page 2', position: 7000 };
+    const sortCards = [
+      ['slot-low', 2000, 'Page 2'], ['slot-high', 10000, 'Page 2'],
+      ['slot-unknown', null, 'Page 2'], ['earlier-page', 1000, 'Page 1']
+    ].map(([id, position, page]) => {
+      locations.push({ card_id: id, missing: 0, locations: [{ ...locations[0].locations[0], position, compartment_display: page }] });
+      return { ...card, id, name: id };
+    });
+    deck.cards = [card, ...sortCards];
     await click([...host.querySelectorAll('button')].find(element => element.textContent.trim() === deck.name));
     const storedLabel = `Sample binder · Page 2 · ${en['loc.slotNumber'].replace('{n}', 7)}`;
     for (const mode of ['List', 'Grid']) {
@@ -131,7 +139,18 @@ export async function runUiDeckRegressions() {
     assert(sourceOptions.some(option => option.textContent.includes(storedLabel)), 'specific source choices include their stored slot');
     assert(sourceOptions.some(option => option.textContent.includes('Unassigned Pile') && !option.textContent.includes('Slot')), 'unassigned copies do not invent a physical slot');
     await cancelDialog();
+    await change(host.querySelector('.deck-display-controls select'), 'location');
+    for (const mode of ['List', 'Grid']) {
+      await click([...host.querySelectorAll('.deck-display-controls button')].find(element => element.textContent.trim() === mode));
+      const ordered = [...host.querySelectorAll(`button[aria-label^="${en['deck.previewArt']}:"]`)].map(element => element.getAttribute('aria-label').split(': ')[1]);
+      assert(ordered.join(',') === ['earlier-page', 'slot-high', card.name, 'slot-low', 'slot-unknown'].join(','),
+        'location sort preserves page grouping and sorts numeric slots descending, with unknown slots last');
+    }
+    deck.cards = [card];
+    locations.splice(1);
     locations[0].locations[0] = unassigned;
+    await click(button('deck.backToDecks'));
+    await click([...host.querySelectorAll('button')].find(element => element.textContent.trim() === deck.name));
     const search = async query => {
       await change(host.querySelector('.deck-search-form input'), query);
       await act(async () => host.querySelector('.deck-search-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));

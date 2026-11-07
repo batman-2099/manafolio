@@ -1209,7 +1209,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
           if (!bLocation) return -1;
           return locationCollator.compare(aLocation.location_name, bLocation.location_name)
             || locationCollator.compare(aLocation.compartment_display || '', bLocation.compartment_display || '')
-            || (aLocation.position || 0) - (bLocation.position || 0)
+            || (getSlotNumber(bLocation) ?? 0) - (getSlotNumber(aLocation) ?? 0)
             || displayName(a).localeCompare(displayName(b));
         })
       }]
