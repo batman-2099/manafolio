@@ -1,11 +1,6 @@
-// Links to the marketplaces a card's price comes from.
-//
-// The rule: a "view this card" link resolves to THAT CARD or it does not exist.
-// Only two things satisfy that — a TCGplayer product id, or a Cardmarket product
-// id — so those are the only things these functions will build one from.
-//
-// A search is still offered — see searchUrl — but as its own separately labelled
-// action, so the reader knows which one they are getting.
+import { setCode } from './languages.js';
+
+// Direct printing links stay separate from explicitly labelled name searches.
 function cardGame(card) {
   if (card?.game) return card.game;
   if (card?.supertype === 'MTG' || String(card?.id).startsWith('mtg-')) return 'mtg';
@@ -40,16 +35,12 @@ export function tcgplayerUrl(card) {
   return null;
 }
 
-// The card's page on Cardmarket, or null.
-//
-// Cardmarket has no public API and blocks automated requests, so there is no id to
-// look up and no way to verify a URL from here — every shape below is one a provider
-// handed us:
-//   - Scryfall's `purchase_uris.cardmarket`, which is the '?idProduct=' form.
-// A search fallback is deliberately absent for the same reason as above.
-export function cardmarketUrl(card) {
-  const url = card?.cardmarket_url;
-  return /idProduct=/.test(String(url || '')) ? url : null;
+// Mana Pool resolves a set code and collector number to the printing's page.
+export function manapoolUrl(card) {
+  const code = setCode(card)?.toLowerCase();
+  const number = String(card?.number ?? '').trim();
+  if (cardGame(card) !== 'mtg' || !code || !number) return null;
+  return `https://manapool.com/card/${encodeURIComponent(code)}/${encodeURIComponent(number)}`;
 }
 
 // A marketplace SEARCH for the card's name. Never presented as a link to the card —
@@ -90,6 +81,6 @@ export function priceSource(card) {
 
 // Why there is no link to the card, when there isn't one.
 export function noLinkReason(card) {
-  if (tcgplayerUrl(card) || cardmarketUrl(card)) return null;
+  if (tcgplayerUrl(card) || manapoolUrl(card)) return null;
   return 'No marketplace product found for this printing. It may not be sold individually, or its set may not be matched to a TCGplayer group yet.';
 }

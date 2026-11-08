@@ -6,7 +6,7 @@ import { getCardDisplayName } from '../utils/langHelper';
 import { translatedName, setCode, isEnglish } from '../utils/languages';
 import { formatPrice, priceText } from '../utils/formatPrice';
 import { resolveCardPrice } from '../utils/resolveCardPrice';
-import { tcgplayerUrl, cardmarketUrl, searchUrl, priceSource, noLinkReason } from '../utils/marketplaceLinks';
+import { tcgplayerUrl, manapoolUrl, searchUrl, priceSource, noLinkReason } from '../utils/marketplaceLinks';
 import CardImage from './CardImage';
 import CardDeckStatus from './CardDeckStatus';
 import CardImageZoom from './CardImageZoom';
@@ -951,18 +951,18 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                     <ExternalLink size={13} /> {t('inspector.viewOnTcgplayer')}
                   </a>
                 )}
-                {cardmarketUrl(activeCard) && (
+                {manapoolUrl(activeCard) && (
                   <a
-                    href={cardmarketUrl(activeCard)} target="_blank" rel="noopener noreferrer"
+                    href={manapoolUrl(activeCard)} target="_blank" rel="noopener noreferrer"
                     className="btn btn-secondary"
                     style={{ flex: 1, minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: 'var(--text-sm)' }}
                   >
-                    <ExternalLink size={13} /> Cardmarket
+                    <ExternalLink size={13} /> Mana Pool
                   </a>
                 )}
                 {/* Only shown when there is no direct link — as a fallback the reader
                     chooses, not a substitute presented as the real thing. */}
-                {!tcgplayerUrl(activeCard) && !cardmarketUrl(activeCard) && searchUrl(activeCard) && (
+                {!tcgplayerUrl(activeCard) && !manapoolUrl(activeCard) && searchUrl(activeCard) && (
                   <a
                     href={searchUrl(activeCard)} target="_blank" rel="noopener noreferrer"
                     className="btn btn-secondary"

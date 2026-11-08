@@ -18,6 +18,9 @@ export async function runInspectorNavigationRegressions() {
   const root = createRoot(host);
   const cards = [1, 2, 3].map(entry_id => ({ entry_id, id: 'sample-printing', card_id: 'sample-printing', name: `Sample ${entry_id}`, quantity: entry_id, game: 'mtg', list_type: 'collection', printing: 'Normal', set_id: `set${entry_id}`, set_name: `Sample Set ${entry_id}` }));
   cards[0] = { ...cards[0], subtypes: ['Token'], image_url: '/logo.svg?front', reverse_card_id: 'sample-reverse', reverse_name: 'Sample reverse', reverse_image_url: '/logo.svg?reverse' };
+  cards[0].set_id = 'mtg-set1';
+  cards[0].number = '42★';
+  cards[0].cardmarket_url = 'https://www.cardmarket.com/en/Magic/Products?idProduct=123';
   cards[2] = { ...cards[2], stack_entries: [{ ...cards[2], position: 10000, missing: 1 }, { ...cards[2], entry_id: 4, position: 2000, quantity: 1 }, { ...cards[2], entry_id: 5, quantity: 1, missing: 1 }] };
   cards[2].stack_entries[0].deck_allocations = [
     { deck_id: 1, name: 'Sample reserved deck', quantity: 1, checked_out: true },
@@ -62,6 +65,10 @@ export async function runInspectorNavigationRegressions() {
   const setDetails = () => [...host.querySelectorAll('p')].find(node => node.textContent.includes('Sample Set'));
   try {
     await act(async () => root.render(<Preview />));
+    const manaPool = host.querySelector('a[href^="https://manapool.com/"]');
+    assert(manaPool?.href === 'https://manapool.com/card/set1/42%E2%98%85'
+      && manaPool.textContent.includes('Mana Pool'), 'marketplace link uses the exact set and encoded collector number');
+    assert(!host.querySelector('a[href*="cardmarket.com"]'), 'card details replace the legacy Cardmarket link');
     assert(host.textContent.includes(en['loc.errLoadCards']), 'missing dashboard allocation data must report lookup failures');
     deckLookupFails = false;
     await click(button(en['loc.retry']));
@@ -87,6 +94,7 @@ export async function runInspectorNavigationRegressions() {
     }
     await click(next());
     assert(host.querySelector('.section-heading').textContent.includes('Sample 2'), 'same-printing entries navigate by entry identity');
+    assert(!host.querySelector('a[href^="https://manapool.com/"]'), 'printing without a collector number does not retain or invent a Mana Pool link');
     assert(setDetails().textContent.includes('Sample Set 2') && !setDetails().querySelector('img'), 'navigation keeps the set name without leaking the previous set symbol');
     assert(host.querySelectorAll('.ci-image-col .ci-image-wrap').length === 1, 'unpaired card does not retain the previous reverse artwork');
     assert(host.querySelector('.stored-entry-status .card-deck-status-summary')?.textContent.includes('Pulled sample')

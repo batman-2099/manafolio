@@ -1154,7 +1154,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="control-label" htmlFor="rapid-printing">{t('card.printing')}</label>
-            <select id="rapid-printing" className="select-control" value={printing} onChange={(e) => setPrinting(e.target.value)}>
+            <select id="rapid-printing" className="select-control" style={{ width: '10rem', maxWidth: '100%' }} value={printing} onChange={(e) => setPrinting(e.target.value)}>
               {getPrintings().map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
             </div>
@@ -1201,7 +1201,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                     {price === null ? t('priceCheck.unavailable') : `${priceText(price, entry.card.price_currency || 'USD')} ${t('dash.each')}`}
                   </span>
                   <label>{t('card.printing')}
-                    <select className="select-control" data-rapid-printing value={encodePrinting(entry.printing, entry.foil_treatment)}
+                    <select className="select-control" style={{ width: '100%', minWidth: 0 }} data-rapid-printing value={encodePrinting(entry.printing, entry.foil_treatment)}
                       disabled={entry.busy} onChange={event => updateRapidPrinting(entry, event.target.value)}>
                       {getPrintings().map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
