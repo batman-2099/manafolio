@@ -40,7 +40,7 @@ export default function DeckHistory({ deck, saved, unsaved, onClose, onRestored 
   const names = new Map([...(data?.cards || []), ...deck.cards].map(card => [card.id, card]));
   const cardName = id => {
     const card = names.get(id);
-    return card ? `${card.printed_name || card.name} · ${card.set_name || ''} #${card.number || ''}` : id || t('history.none');
+    return card ? `${card.printed_name || card.name} #${card.number || ''}` : id || t('history.none');
   };
   const before = new Map((from?.cards || []).map(card => [card.card_id, card]));
   const after = new Map((to?.cards || []).map(card => [card.card_id, card]));
