@@ -903,6 +903,7 @@
 
 .deck-history-changes {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr));
   gap: var(--space-3);
   list-style: none;
   margin: 0;
@@ -916,8 +917,13 @@
   border-bottom: 1px solid var(--border-glass);
 }
 
+.deck-history-changes > li:not(.deck-history-card-change) {
+  grid-column: 1 / -1;
+}
+
 .deck-history-changes .deck-history-card-change {
-  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
   gap: var(--space-3);
   align-items: start;
   padding-block: var(--space-3);
@@ -927,7 +933,7 @@
 
 
 .deck-history-card-change img {
-  width: 64px;
+  width: 100%;
   aspect-ratio: 5 / 7;
   object-fit: contain;
   border-radius: 4px;

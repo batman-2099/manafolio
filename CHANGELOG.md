@@ -5,6 +5,7 @@ Release history starts with Manafolio 2.0.
 ## Unreleased
 
 - Include cached artwork in Deck History so removed cards retain their images when compared with the current deck.
+- Display Deck History card changes in a responsive artwork grid, with Added/Removed labels and quantity changes beneath each card.
 
 ## 2.8.0 — 2026-11-09
 
