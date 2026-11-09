@@ -80,19 +80,16 @@ const AFFILIATE_SEARCH =
   assert.strictEqual(links.searchUrl({ name: '稲妻', game: 'mtg' }), null,
     'a localized-only name cannot be searched, so no search action either');
 
-  // --- 3c. Cardmarket requires a product id --------------------------------
-  // Cardmarket has no API and blocks automated requests, so an id is the only
-  // evidence a URL points anywhere real.
-  assert.strictEqual(
-    links.cardmarketUrl({ name: 'Lightning Bolt', cardmarket_url: 'https://www.cardmarket.com/en/Magic/Products?idProduct=665247' }),
-    'https://www.cardmarket.com/en/Magic/Products?idProduct=665247'
-  );
-  assert.strictEqual(
-    links.cardmarketUrl({ name: 'Lightning Bolt', cardmarket_url: 'https://www.cardmarket.com/en/Magic/Products/Search?searchString=Lightning+Bolt' }),
-    null,
-    'a Cardmarket search URL must not be served as the card'
-  );
-  assert.strictEqual(links.cardmarketUrl({ name: 'Lightning Bolt' }), null);
+  // Mana Pool identifies the printing by set and collector number, not its name.
+  const printing = { game: 'mtg', set_id: 'mtg-SLD', number: '917', name: 'Command Tower' };
+  assert.strictEqual(links.manapoolUrl(printing), 'https://manapool.com/card/sld/917');
+  assert.strictEqual(links.noLinkReason(printing), null);
+  assert.strictEqual(links.manapoolUrl({ ...printing, number: '42★', name: '稲妻' }),
+    'https://manapool.com/card/sld/42%E2%98%85');
+  for (const incomplete of [null, { ...printing, set_id: null }, { ...printing, number: '' },
+    { ...printing, game: 'unsupported' }]) {
+    assert.strictEqual(links.manapoolUrl(incomplete), null, 'missing or unsupported identities cannot invent a printing link');
+  }
 
   // --- 3d. priceSource reads the row, it does not infer --------------------
   assert.strictEqual(

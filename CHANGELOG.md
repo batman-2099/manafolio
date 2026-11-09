@@ -2,12 +2,17 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.8.0 — 2026-11-09
 
 - List all supported foil types directly in Printing, without Scryfall availability restrictions or a separate foil-type selector. Preserve selections across scans, edits, trades, exports, backups, and storage stacks.
 - Remove Traditional Foil from Printing choices; existing saved records remain intact and display as Foil in the selector.
 - Keep foil tags below Condition in collection cards and storage details, with distinct readable colors for each foil type across card badges.
 - Sort named foil types alphabetically in Printing, keeping Nonfoil and generic Foil before them.
+- Show physical slot numbers beneath container cards, with compact one-line ranges and comma-separated gaps for stacked entries.
+- Show stored slots in Deck Builder card details and previews. Location sorting keeps container/page groups together and orders slots lowest first, with unknown positions last.
+- Combine Deck Builder copies in the same container and page/row into one slot label: a range for consecutive slots or a comma-separated list when there are gaps.
+- Keep Rapid Add's Printing dropdown compact and receipt dropdowns within their cards without removing finish choices.
+- Replace Cardmarket shopping links in card details with Mana Pool links to the exact set and collector number; retain existing price sources and TCGplayer links.
 
 ## 2.7.0 — 2026-11-06
 
