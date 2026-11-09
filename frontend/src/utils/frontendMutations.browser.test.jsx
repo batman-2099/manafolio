@@ -95,6 +95,7 @@ export async function runFrontendMutationRegressions() {
       assert(matchesPrinting(decoded, option.value), 'specific filters match their own option');
       if (decoded.printing === 'Holofoil') assert(matchesPrinting(decoded, 'Holofoil'), 'general Foil filter includes every treatment');
     }
+    await changeValue(printingSelect, 'foil:double_rainbow');
     await changeValue(host.querySelector('select[id$="-language"]'), 'German');
     assert(printingSelect.value === 'foil:double_rainbow', 'language changes preserve the selected foil type');
     await act(async () => root.render(null));
