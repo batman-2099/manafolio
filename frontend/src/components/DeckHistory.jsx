@@ -86,25 +86,33 @@ export default function DeckHistory({ deck, saved, unsaved, onClose, onRestored 
           comparisonRef.current?.focus();
         }}>{t('history.compareCurrent')}</button>
         <p>{t('history.direction')}</p>
-        <ul className="deck-history-changes" ref={comparisonRef} tabIndex={-1} aria-label={t('history.comparison')}>
-          {metadata.map(key => <li key={key}><strong>{t(`history.${key}`)}</strong><span>{key === 'commander_card_id' ? cardName(from[key]) : from[key]} → {key === 'commander_card_id' ? cardName(to[key]) : to[key]}</span></li>)}
-          {changes.map(id => {
-            const oldQuantity = before.get(id)?.quantity || 0;
-            const newQuantity = after.get(id)?.quantity || 0;
-            const kind = !oldQuantity ? 'added' : !newQuantity ? 'removed' : 'changed';
-            const delta = newQuantity - oldQuantity;
-            return <li key={id} className={`deck-history-card-change deck-history-card-change--${kind}`}>
-              <CardImage card={names.get(id) || { id }} loading="lazy" />
-              <div>
-                <strong>{cardName(id)}</strong>
-                <span className="deck-history-change-label">{t(`history.${kind}`)}</span>
-                <span>{oldQuantity} → {newQuantity} ({delta > 0 ? '+' : ''}{delta})</span>
-                {(from?.commander_card_id === id) !== (to?.commander_card_id === id) && <span>{t('history.commander_card_id')}: {t(from?.commander_card_id === id ? 'history.removed' : 'history.added')}</span>}
-                {(before.get(id)?.source_entry_id ?? null) !== (after.get(id)?.source_entry_id ?? null) && <span>{t('history.source')}: {before.get(id)?.source_entry_id ?? t('history.none')} → {after.get(id)?.source_entry_id ?? t('history.none')}</span>}
-              </div>
-            </li>;
+        <div className="deck-history-comparison" ref={comparisonRef} tabIndex={-1} aria-label={t('history.comparison')}>
+          {!!metadata.length && <ul className="deck-history-changes">
+            {metadata.map(key => <li key={key}><strong>{t(`history.${key}`)}</strong><span>{key === 'commander_card_id' ? cardName(from[key]) : from[key]} → {key === 'commander_card_id' ? cardName(to[key]) : to[key]}</span></li>)}
+          </ul>}
+          {['removed', 'added', 'changed'].map(kind => {
+            const cards = changes.filter(id => (!before.get(id)?.quantity ? 'added' : !after.get(id)?.quantity ? 'removed' : 'changed') === kind);
+            return cards.length > 0 && <section key={kind} className="deck-history-group" aria-labelledby={`deck-history-${kind}`}>
+              <h3 id={`deck-history-${kind}`}>{t(`history.${kind}`)}</h3>
+              <ul className="deck-history-changes">
+                {cards.map(id => {
+                  const oldQuantity = before.get(id)?.quantity || 0;
+                  const newQuantity = after.get(id)?.quantity || 0;
+                  const delta = newQuantity - oldQuantity;
+                  return <li key={id} className={`deck-history-card-change deck-history-card-change--${kind}`}>
+                    <CardImage card={names.get(id) || { id }} loading="lazy" />
+                    <div>
+                      <strong>{cardName(id)}</strong>
+                      <span>{oldQuantity} → {newQuantity} ({delta > 0 ? '+' : ''}{delta})</span>
+                      {(from?.commander_card_id === id) !== (to?.commander_card_id === id) && <span>{t('history.commander_card_id')}: {t(from?.commander_card_id === id ? 'history.removed' : 'history.added')}</span>}
+                      {(before.get(id)?.source_entry_id ?? null) !== (after.get(id)?.source_entry_id ?? null) && <span>{t('history.source')}: {before.get(id)?.source_entry_id ?? t('history.none')} → {after.get(id)?.source_entry_id ?? t('history.none')}</span>}
+                    </div>
+                  </li>;
+                })}
+              </ul>
+            </section>;
           })}
-        </ul>
+        </div>
         {!changes.length && !metadata.length && <p>{t('history.identical')}</p>}
         {unsaved && <p role="status">{t('history.unsaved')}</p>}
         {!!deck.checked_out && <p>{t('history.checkedOut')}</p>}

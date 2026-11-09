@@ -945,8 +945,11 @@
   min-width: 0;
 }
 
-.deck-history-change-label {
-  font-weight: 700;
+.deck-history-comparison,
+.deck-history-group {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
 }
 
 .deck-overview-grid {
