@@ -21,7 +21,7 @@ router.get('/:id/revisions', async (req, res) => {
     const deck = await db.get("SELECT id FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'", [req.params.id, req.user.id]);
     if (!deck) return res.status(404).json({ error: 'Deck not found' });
     const revisions = await db.all('SELECT id, created_at, kind, snapshot FROM deck_revisions WHERE deck_id = ? ORDER BY id DESC', [deck.id]);
-    const cards = await db.all(`SELECT id, name, printed_name, set_name, number FROM card_cache WHERE id IN (
+    const cards = await db.all(`SELECT id, name, printed_name, set_name, number, image_url FROM card_cache WHERE id IN (
       SELECT json_extract(card.value, '$.card_id') FROM deck_revisions r, json_each(r.snapshot, '$.cards') card WHERE r.deck_id = ?
     )`, [deck.id]);
     res.json({ revisions: revisions.map(row => ({ ...row, snapshot: JSON.parse(row.snapshot) })), cards });

@@ -17,6 +17,7 @@ const db = require('../src/db');
     await db.run(`INSERT INTO card_cache (id, name, game, supertype, subtypes) VALUES
       ('old', 'Old commander', 'mtg', 'Creature', '[]'), ('new', 'New commander', 'mtg', 'Creature', '[]'),
       ('land', 'Forest', 'mtg', 'Land', '["Basic","Land"]')`);
+    await db.run("UPDATE card_cache SET image_url = '/logo.svg?removed-card' WHERE id = 'old'");
     const source = (await db.run("INSERT INTO collection (card_id, quantity, game, user_id, list_type) VALUES ('old', 1, 'mtg', 1, 'collection')")).lastID;
     await db.run("INSERT INTO collection (card_id, quantity, game, user_id, list_type) VALUES ('new', 1, 'mtg', 1, 'collection'), ('land', 10, 'mtg', 1, 'collection')");
     const id = (await db.run("INSERT INTO decks (name, game, format, user_id, commander_card_id) VALUES ('History', 'mtg', 'Commander', 1, 'old')")).lastID;
@@ -44,6 +45,8 @@ const db = require('../src/db');
     const baseline = first[1];
     assert.strictEqual(baseline.snapshot.commander_card_id, 'old');
     assert.deepStrictEqual(baseline.snapshot.cards, [{ card_id: 'land', quantity: 2, source_entry_id: null }, { card_id: 'old', quantity: 1, source_entry_id: source }]);
+    const removed = (await request('GET', `/decks/${id}/revisions`)).body.cards.find(card => card.id === 'old');
+    assert.strictEqual(removed.image_url, '/logo.svg?removed-card', 'history retains artwork for a printing removed from the current deck');
     assert.strictEqual((await request('PUT', `/decks/${id}/editor`, { ...draft, cards: [...draft.cards].reverse() })).status, 200);
     assert.deepStrictEqual(await history(), first, 'identical saves and reordered input do not add revisions');
     draft.cards[1].quantity = 5;

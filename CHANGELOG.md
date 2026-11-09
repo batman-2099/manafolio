@@ -2,6 +2,10 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Include cached artwork in Deck History so removed cards retain their images when compared with the current deck.
+
 ## 2.8.0 — 2026-11-09
 
 - List all supported foil types directly in Printing, without Scryfall availability restrictions or a separate foil-type selector. Preserve selections across scans, edits, trades, exports, backups, and storage stacks.
