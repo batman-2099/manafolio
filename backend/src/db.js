@@ -346,6 +346,7 @@ async function initDb() {
       checked_out_at DATETIME,
       game TEXT DEFAULT 'mtg',
       inventory_type TEXT DEFAULT 'collection',
+      container_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
       wins INTEGER NOT NULL DEFAULT 0,
       losses INTEGER NOT NULL DEFAULT 0,
       sleeved INTEGER NOT NULL DEFAULT 0 CHECK (sleeved IN (0, 1, 2, 3)),
@@ -738,6 +739,9 @@ async function initDb() {
   }
   if (!decksCols.some(c => c.name === 'inventory_type')) {
     await run(`ALTER TABLE decks ADD COLUMN inventory_type TEXT DEFAULT 'collection'`);
+  }
+  if (!decksCols.some(c => c.name === 'container_id')) {
+    await run(`ALTER TABLE decks ADD COLUMN container_id INTEGER REFERENCES locations(id) ON DELETE SET NULL`);
   }
   if (!decksCols.some(c => c.name === 'commander_card_id')) {
     await run(`ALTER TABLE decks ADD COLUMN commander_card_id TEXT`);

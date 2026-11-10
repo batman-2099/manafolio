@@ -976,17 +976,20 @@ Estimates use cached nonfoil prices for all Needed copies, including copies alre
 
 1. Save pending changes. Review unavailable-copy warnings and your actual physical cards.
 2. Select **Check Out for Play** in the open deck, or **Checkout** in **Your decks**.
-3. When **Deck Checked Out** opens, follow the location groups, page/row previews, slot labels, and quantities to gather the cards. Unassigned cards are grouped separately.
-4. Mark each row or highlighted card complete as you gather it. **Select all** is available per group and for the whole checklist.
-5. When every listed entry is marked complete, select **Done**.
+3. If the deck has no linked container, choose **Create box and check out**, **Check out without container**, or **Cancel**. For creation, review the box name. Manafolio creates and links a Physical Deck Box, moves all required eligible copies into it, and checks out the deck together. If any required copy cannot be moved, nothing changes; resolve the error or continue without a container. Locked storage, missing copies, other decks' reservations, and your selected sources are respected.
+4. When **Deck Checked Out** opens, follow the location groups, page/row previews, slot labels, and quantities to gather the cards. Unassigned cards are grouped separately. If you created a box, its saved slots are now the cards' locations; physically move those copies into the new box.
+5. Mark each row or highlighted card complete as you gather it. **Select all** is available per group and for the whole checklist.
+6. When every listed entry is marked complete, select **Done**.
 
-**Expected result:** the deck is **In Deck**, and its quantities are reserved against other Physical decks. The reservation is made before the guide opens. Checkout does not erase or change the recorded storage slots; those slots remain the return addresses.
+**Expected result:** the deck is **In Deck**, and its quantities are reserved against other Physical decks. The reservation is made before the guide opens. Ordinary checkout leaves recorded storage slots unchanged. Choosing to create a box moves the selected copies and makes the new box their return address. Already-linked decks skip the creation prompt; their checkout does not move cards.
 
 In a binder with stacking enabled, the highlighted shared pocket acts on a requested physical entry, not an unrelated first copy in that pocket. Use the individual checklist rows when gathering multiple requested entries from the same pocket.
 
 Completing a group keeps its rows open so you can correct a checkmark. Use the container heading to collapse or reopen it. Tab reaches card and group controls; Enter or Space activates them. In storage layouts, these keys also select/open binder pockets and pick/place cards in Arrange; arrow keys move between coverflow cards.
 
 If you use the guide's **Cancel**/X, click outside it, or use its back action, Manafolio attempts to undo the checkout. The guide and its checkmarks stay open while cancellation runs; repeated cancellation and completion are blocked. If undo fails, read the inline status and use **Retry cancellation** or finish the guide. Do not treat cancellation as completion.
+
+After **Create box and check out**, canceling the guide only undoes checkout. The created box, container link, and saved card movements remain. Returning the deck later also leaves those new storage placements intact.
 
 If checkout succeeds but its locations cannot load, the recovery guide says the deck is checked out. **Retry** loads the guide without submitting another checkout.
 
@@ -1019,6 +1022,18 @@ Arena and Graveyard decks cannot be checked out, even if a checkout control is v
 **Expected result:** related-token references and inventory information, with explicit actions to save copies. The panel does not promise how many token copies a game will require. An empty result means no related tokens were returned, not a general ruling on every possible card interaction.
 
 The card inspector's **Related tokens** and AI drafts offer the same viewer. Ownership matches names case-insensitively, including explicitly paired reverse faces. Decks prefer the commander's set or corresponding token set, then any set in their inventory. If several physical sources exist, choose **Physical source** before adding to a deck. Same-named tokens can have different rules or stats: check artwork and text. Wishlist does not count, and Graveyard token ownership stays separate from Physical and Arena. Scryfall supplies the relations; references alone do not affect deck size, reserve copies, or enter deck exports. Tokens explicitly added to a deck become ordinary deck entries.
+
+### Link a deck to an existing container
+
+In a Physical or Graveyard deck, choose **Linked container** below **Sleeved** in **Deck Health & Rules**. Choose **No linked container** to remove the association. Changes save immediately; other unsaved deck edits remain untouched. Save a change of deck inventory before choosing its container.
+
+Only your Magic-compatible containers in the same inventory are offered. This is a label for where the deck belongs: it does not move cards, choose source copies, reserve inventory, or change checkout. Multiple decks may link to the same container. Arena decks have no container link.
+
+The link survives reloads and complete account backups. Deleting the container or changing either inventory incompatibly clears it. Duplicating a deck, creating a deck from a container, and the standalone **Create Container** action do not automatically set this link. **Create box and check out** does.
+
+When you save changed card quantities in a linked Physical or Graveyard deck, **Move cards when saving?** lists additions and removals. **Save and move** places added copies in the linked container and moves removed copies from it to the selected container or **Unassigned Pile**. Spare eligible copies already in the linked container are reused. **Save without moving** saves only the deck; **Cancel** retains the unsaved draft. The same prompt appears for **Improve with AI → Save Deck** on linked Physical decks, not **Save as New Deck**.
+
+Saving and movement are atomic: missing eligible copies, locked or incompatible storage, stale deck/link confirmations, or another failure leave both unchanged. Placement follows existing container rules and overflow behavior. Selected sources follow moved copies; if filing spreads them across compartments, the source becomes Automatic rather than pointing to an insufficient compartment. Move the actual cards yourself to match their saved locations.
 
 ### Create a container from a deck
 
@@ -1167,7 +1182,7 @@ If no eligible cards match, adjust filters or ask questions without generating a
    - **Save Deck** to replace the original's name, description, cards, and commander while retaining its identity, results, and settings. Composition changes are recorded in **Deck history** so you can compare or restore the previous list; failed saves leave both the deck and history unchanged. The reviewed strategy is appended to existing Notes without overwriting them; an identical strategy already at the end is not repeated.
    - **Save as New Deck** to keep the original and create a separate unchecked-out deck with the reviewed strategy in its Notes.
 
-**Expected result:** only the explicitly selected save action persists the draft. **Save Deck is a replacement, not a merge**. Saving a checked-out source checks it in and releases all its reservations. Cards retained from the original are marked **Pulled**, even if their quantities increase; newly added cards remain unpulled. Put removed cards back and collect any additional copies yourself; saving does not move storage locations. Eligible source-deck copies remain usable for planning despite its own reservation or the filters, up to the source quantities, but must satisfy the selected Color theme. Other decks' reservations can be included for planning but cannot be shared at checkout. **Save as New Deck** leaves the original's reservations unchanged; return those copies before checking out the new deck with them.
+**Expected result:** only the explicitly selected save action persists the draft. **Save Deck is a replacement, not a merge**. Saving a checked-out source checks it in and releases all its reservations. Cards retained from the original are marked **Pulled**, even if their quantities increase; newly added cards remain unpulled. Linked Physical decks offer the storage-movement prompt described above; otherwise storage locations stay unchanged. Physically put removed cards back and collect additions to match their saved locations. Eligible source-deck copies remain usable for planning despite its own reservation or the filters, up to the source quantities, but must satisfy the selected Color theme. Other decks' reservations can be included for planning but cannot be shared at checkout. **Save as New Deck** leaves the original's reservations unchanged; return those copies before checking out the new deck with them.
 
 ## Settings and preferences
 

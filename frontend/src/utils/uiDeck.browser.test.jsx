@@ -29,6 +29,8 @@ export async function runUiDeckRegressions() {
   let holdMutation = false;
   let settleMutation;
   const mutations = { checkout: 0, return: 0 };
+  const checkoutRequests = [];
+  let detailFails = false;
   let locationRequests = 0;
   let detailRequests = 0;
   let settleArchidekt;
@@ -81,7 +83,7 @@ export async function runUiDeckRegressions() {
       return response(createFails ? { error: 'Fixture creation failure' } : { id: 7 }, createFails ? 503 : 200);
     }
     if (url === '/api/decks') return response([deck]);
-    if (url === '/api/decks/7') { detailRequests++; return response(deck); }
+    if (url === '/api/decks/7') { detailRequests++; return response(detailFails ? { error: 'Fixture detail failure' } : deck, detailFails ? 503 : 200); }
     if (url === '/api/decks/7/cards/fixture/sources') return response({ sources: locations[0].locations.map(location => ({ ...location, available: 2, quantity: 2 })) });
     if (url === '/api/decks/7/locations') {
       locationRequests++;
@@ -90,9 +92,18 @@ export async function runUiDeckRegressions() {
     if (url === '/api/decks/7/checkout' || url === '/api/decks/7/return') {
       const operation = String(url).split('/').at(-1);
       mutations[operation]++;
+      const body = options.body ? JSON.parse(options.body) : undefined;
+      if (operation === 'checkout') checkoutRequests.push({ method: options.method, body });
       const complete = (status = 200) => {
-        if (status < 400) deck.checked_out = operation === 'checkout' ? 1 : 0;
-        return response({}, status);
+        if (status >= 400) return response({ error: 'Fixture checkout failure' }, status);
+        deck.checked_out = operation === 'checkout' ? 1 : 0;
+        if (body?.container_name) {
+          deck.container_id = 45;
+          deck.container_name = body.container_name;
+          deck.cards = deck.cards.map(card => ({ ...card, source_entry_id: 121 }));
+          return response({ message: 'Checked out', container_id: deck.container_id, container_name: deck.container_name });
+        }
+        return response({});
       };
       return holdMutation ? new Promise(resolve => { settleMutation = status => resolve(complete(status)); }) : complete();
     }
@@ -100,7 +111,7 @@ export async function runUiDeckRegressions() {
     if (String(url).startsWith('/api/collection?')) return holdCompare ? new Promise(resolve => { settleCompare = () => resolve(response([])); }) : response([]);
     if (url === '/api/ai-decks/account') return response({ connected: true });
     if (String(url).startsWith('/api/ai-decks/inventory?')) return response({ cards: aiInventory });
-    if (url === '/api/sets?game=mtg' || url === '/api/locations') return response([]);
+    if (url === '/api/sets?game=mtg' || url === '/api/locations' || String(url).startsWith('/api/locations?')) return response([]);
     if (url === '/api/ai-decks/suggest') { suggestBody = JSON.parse(options.body); return new Promise(resolve => { settleSuggest = resolve; }); }
     if (url === '/api/ai-decks' && options.method === 'POST') return new Promise(resolve => { settleSave = resolve; });
     throw new Error(`Unexpected fixture request: ${url}`);
@@ -316,6 +327,18 @@ export async function runUiDeckRegressions() {
     const action = text => [...host.querySelectorAll('button')].find(el => el.textContent.trim() === text);
     locationsFail = true;
     await click(action('Checkout'));
+    assert(host.querySelector('dialog[open] #deck-container-title')?.textContent === en['deck.checkoutContainerTitle'] && mutations.checkout === 0, 'unlinked list checkout opens the named native prompt without mutating');
+    assert(host.querySelector('dialog').textContent.includes(en['deck.checkoutContainerCancelHint']), 'prompt explains persistent moves and link after guide cancellation');
+    const checkoutTrigger = action('Checkout');
+    await cancelDialog();
+    assert(!host.querySelector('dialog') && mutations.checkout === 0 && document.activeElement === checkoutTrigger, 'Escape cancels the prompt without mutation and restores focus');
+    await click(action('Checkout'));
+    await click(button('common.cancel'));
+    assert(!host.querySelector('dialog') && mutations.checkout === 0, 'Cancel leaves the deck untouched');
+    await click(action('Checkout'));
+    await change(host.querySelector('#deck-container-name'), '');
+    await click(button('deck.checkoutWithoutContainer'));
+    assert(checkoutRequests[0].method === 'PUT' && checkoutRequests[0].body === undefined && !deck.container_id, 'explicit skip checks out normally without a box even with an empty name');
     assert(mutations.checkout === 1 && host.querySelector('dialog [role="alert"]')?.textContent.includes(en['deck.checkoutLocationsFailed']), 'successful checkout with failed locations keeps a recoverable guide');
     assert(button('bulk.done').disabled, 'failed guide cannot be mistaken for an empty completed guide');
     locationsFail = false;
@@ -338,6 +361,7 @@ export async function runUiDeckRegressions() {
 
     holdMutation = false;
     await click(action('Checkout'));
+    await click(button('deck.checkoutWithoutContainer'));
     await click(button('wizard.selectAll'));
     await click(button('bulk.done'));
     locationsFail = true;
@@ -357,6 +381,60 @@ export async function runUiDeckRegressions() {
     await cancelDialog();
     await act(async () => { settleMutation(200); });
     assert(!host.querySelector('dialog') && deck.checked_out === 1, 'return cancellation retry restores checkout and closes guide');
+
+    holdMutation = false;
+    await click(action('Return'));
+    await click(button('wizard.selectAll'));
+    await click(button('bulk.done'));
+    deck.cards = deck.cards.map(card => ({ ...card, source_entry_id: 21 }));
+    deck.notes = 'Saved notes stay intact';
+    await click(action(deck.name));
+    await click(action('Check Out for Play'));
+    assert(host.querySelector('#deck-container-title') && host.querySelector('#deck-container-name').value === deck.name, 'detail checkout prompts with the deck name');
+    await click(button('common.cancel'));
+    const beforeCreate = mutations.checkout;
+    const beforeCreateSuccesses = toasts.filter(([, type]) => type === 'success').length;
+    await click(action('Check Out for Play'));
+    await change(host.querySelector('#deck-container-name'), '  Travel box  ');
+    holdMutation = true;
+    await click(button('deck.checkoutContainerSubmit'));
+    await cancelDialog();
+    await act(async () => { window.dispatchEvent(new PopStateEvent('popstate')); });
+    await act(async () => host.querySelector('dialog form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    assert(mutations.checkout === beforeCreate + 1 && host.querySelector('#deck-container-name').disabled && button('deck.checkoutWithoutContainer').disabled, 'pending create checkout vetoes Escape, Back and duplicate submit');
+    assert(checkoutRequests.at(-1).method === 'PUT' && JSON.stringify(checkoutRequests.at(-1).body) === JSON.stringify({ container_name: 'Travel box' }), 'accept sends one checkout request with the trimmed name');
+    await act(async () => { settleMutation(409); });
+    assert(host.querySelector('dialog [role="alert"]').textContent === 'Fixture checkout failure' && !host.querySelector('#deck-container-name').disabled && !deck.container_id, 'failed creation stays in a retryable prompt without linking');
+    assert(toasts.filter(([, type]) => type === 'success').length === beforeCreateSuccesses, 'failed mutation never reports success');
+    await click(button('deck.checkoutContainerSubmit'));
+    detailFails = true;
+    await act(async () => { settleMutation(200); });
+    assert(!host.querySelector('#deck-container-name') && button('bulk.done').disabled && mutations.checkout === beforeCreate + 2, 'committed creation with failed source refresh stays in recoverable guide, not the creation prompt');
+    assert(deck.container_id === 45 && deck.container_name === 'Travel box', 'creation links the returned box');
+    detailFails = false;
+    await click(button('common.retry'));
+    assert(mutations.checkout === beforeCreate + 2 && host.querySelector('#deck-notes').value === 'Saved notes stay intact' && button('common.save').disabled, 'refresh retries only reads, preserves notes and updates the saved source baseline');
+    assert(host.querySelector('#deck-linked-container').value === '45', 'active deck displays the new association');
+    holdMutation = false;
+    await cancelDialog();
+    assert(!host.querySelector('dialog') && deck.checked_out === 0 && deck.container_id === 45 && deck.cards[0].source_entry_id === 121, 'guide cancel returns checkout only, keeping the box and moved source anchor');
+    await click(host.querySelector(`button[aria-label="${en['deck.previewArt']}: ${card.name}"]`));
+    assert(host.querySelector('#deck-card-source').value === '121', 'editor source choice follows the moved row rather than the leftover stack');
+    await cancelDialog();
+    const beforeLinked = mutations.checkout;
+    await click(action('Check Out for Play'));
+    assert(mutations.checkout === beforeLinked + 1 && !host.querySelector('#deck-container-name') && checkoutRequests.at(-1).body === undefined, 'linked detail checkout bypasses creation and sends no body');
+    await click(button('wizard.selectAll'));
+    await click(button('bulk.done'));
+    await click(button('deck.backToDecks'));
+    await click(action('Return'));
+    await click(button('wizard.selectAll'));
+    await click(button('bulk.done'));
+    const beforeLinkedList = mutations.checkout;
+    await click(action('Checkout'));
+    assert(mutations.checkout === beforeLinkedList + 1 && !host.querySelector('#deck-container-name'), 'refreshed linked list metadata also bypasses the prompt');
+    await click(button('wizard.selectAll'));
+    await click(button('bulk.done'));
 
     await click(button('deck.createDeck'));
     const archidektUrl = 'https://archidekt.com/decks/24321624/spellslinger';
@@ -426,7 +504,7 @@ export async function runUiDeckRegressions() {
     await loadArchidekt();
     await act(async () => { root.render(null); });
     assert(archidektSignal.aborted, 'unmount aborts pending Archidekt preview');
-    return ['AI dirty/busy navigation, unload, settings, Back, save failure/retry/success', 'mobile/desktop ordering and always-visible deck actions', 'native export focus/cancel and clipboard failure/recovery', 'pending import dismissal and long summary scroll', 'checkout/return locations failure and safe retry', 'cancel failure/progress retention, Back/Escape veto and duplicate-mutation guards', 'native ManaBox picker and file import', 'Archidekt preview recovery, commander defaults, exclusive sources, create retry/save, Escape/unmount abort and stale response guard'];
+    return ['AI dirty/busy navigation, unload, settings, Back, save failure/retry/success', 'mobile/desktop ordering and always-visible deck actions', 'native export focus/cancel and clipboard failure/recovery', 'pending import dismissal and long summary scroll', 'checkout/return locations failure and safe retry', 'unlinked checkout prompt/cancel/skip, atomic payload, failure retry, source refresh recovery and linked bypass', 'cancel failure/progress retention, Back/Escape veto and duplicate-mutation guards', 'native ManaBox picker and file import', 'Archidekt preview recovery, commander defaults, exclusive sources, create retry/save, Escape/unmount abort and stale response guard'];
   } finally {
     await act(async () => { root.unmount(); });
     host.remove();

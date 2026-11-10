@@ -22,6 +22,18 @@ async function request(id, name, user = 1) {
   });
   return { status: response.status, body: await response.json() };
 }
+async function checkout(id, name, user = 1) {
+  const response = await fetch(`${base}/api/decks/${id}/checkout`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-test-user': String(user) },
+    ...(name === undefined ? {} : { body: JSON.stringify({ container_name: name }) })
+  });
+  return { status: response.status, body: await response.json() };
+}
+async function returnDeck(id) {
+  const response = await fetch(`${base}/api/decks/${id}/return`, { method: 'PUT' });
+  assert.strictEqual(response.status, 200);
+  await response.json();
+}
 async function insert(table, values) {
   const keys = Object.keys(values);
   return (await db.run(`INSERT INTO ${table} (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`, Object.values(values))).lastID;
@@ -213,6 +225,157 @@ async function run() {
     }
     assert.deepStrictEqual(failed, { status: 500, body: { error: 'Failed to create container from deck' } });
     assert.deepStrictEqual(await snapshot(), rollbackBefore, 'new storage and prior quantity decrement must all roll back');
+
+    for (const id of ['checkout-stack', 'checkout-front', 'checkout-back', 'checkout-slab', 'checkout-auto', 'checkout-blocked', 'checkout-good']) {
+      await insert('card_cache', { id, name: id, game: 'mtg' });
+    }
+    const checkoutSource = await box('Checkout source');
+    const checkoutStack = await copy('checkout-stack', 3, { ...checkoutSource, position: 1000, notes: 'preserve metadata', foil_treatment: 'surge' });
+    const pairedStack = await copy('checkout-front', 3, { ...checkoutSource, position: 2000, reverse_card_id: 'checkout-back' });
+    const checkoutSlab = await copy('checkout-slab', 1, { grader: 'PSA', grade: '10', cert_number: 'checkout-cert' });
+    await copy('checkout-auto', 2);
+    const checkoutDeck = await deck('Checkout with box', [
+      ['checkout-stack', 2, checkoutStack], ['checkout-front', 1, pairedStack],
+      ['checkout-back', 1, pairedStack], ['checkout-slab', 1], ['checkout-auto', 1]
+    ]);
+    const checkoutBefore = await snapshot();
+    const checkoutOwned = await ownership();
+    const checkoutReservations = (await checkedOutSources(1)).sort(byReservation);
+    const boxedCheckout = await checkout(checkoutDeck, '  Checkout box  ');
+    assert.deepStrictEqual(boxedCheckout, { status: 200, body: {
+      message: 'Deck checked out successfully', container_id: boxedCheckout.body.container_id, container_name: 'Checkout box'
+    } });
+    const checkoutBoxId = boxedCheckout.body.container_id;
+    assert.deepStrictEqual(await db.get('SELECT container_id, checked_out FROM decks WHERE id = ?', [checkoutDeck]),
+      { container_id: checkoutBoxId, checked_out: 1 });
+    assert.deepStrictEqual(await db.get('SELECT type, inventory_type, game, user_id FROM locations WHERE id = ?', [checkoutBoxId]),
+      { type: 'Deck Box', inventory_type: 'collection', game: 'mtg', user_id: 1 });
+    const checkoutRows = await db.all('SELECT * FROM collection WHERE location_id = ? ORDER BY position', [checkoutBoxId]);
+    assert.strictEqual(checkoutRows.length, 6);
+    assert.deepStrictEqual(checkoutRows.map(row => row.position), [1000, 2000, 3000, 4000, 5000, 6000]);
+    assert.ok(checkoutRows.every(row => row.quantity === 1));
+    assert.strictEqual((await db.get('SELECT quantity FROM collection WHERE id = ?', [checkoutStack])).quantity, 1);
+    assert.strictEqual((await db.get('SELECT quantity FROM collection WHERE id = ?', [pairedStack])).quantity, 1);
+    assert.strictEqual((await db.get('SELECT location_id FROM collection WHERE id = ?', [checkoutSlab])).location_id, checkoutBoxId);
+    const checkoutAllocations = await db.all('SELECT * FROM deck_card_allocations WHERE deck_id = ? ORDER BY card_id, entry_id', [checkoutDeck]);
+    assert.strictEqual(checkoutAllocations.length, 6);
+    assert.strictEqual(new Set(checkoutAllocations.map(row => row.entry_id)).size, 6, 'paired faces reserve distinct physical copies');
+    assert.ok(checkoutAllocations.every(row => row.quantity === 1 && checkoutRows.some(copy => copy.id === row.entry_id
+      && (copy.card_id === row.card_id || copy.reverse_card_id === row.card_id))));
+    for (const cardId of ['checkout-stack', 'checkout-front', 'checkout-back']) {
+      const anchor = await db.get('SELECT source_entry_id FROM deck_cards WHERE deck_id = ? AND card_id = ?', [checkoutDeck, cardId]);
+      assert.ok(checkoutAllocations.some(row => row.card_id === cardId && row.entry_id === anchor.source_entry_id),
+        'explicit source follows an actually moved and reserved row after splitting');
+      assert.ok(![checkoutStack, pairedStack].includes(anchor.source_entry_id));
+    }
+    assert.deepStrictEqual(await ownership(), checkoutOwned);
+    assert.deepStrictEqual((await checkedOutSources(1)).filter(row => row.deck_id !== checkoutDeck).sort(byReservation), checkoutReservations);
+    const checkoutAfter = await snapshot();
+    for (const table of ['decks', 'deck_cards', 'deck_card_allocations']) {
+      assert.deepStrictEqual(checkoutAfter[table].filter(row => (table === 'decks' ? row.id : row.deck_id) !== checkoutDeck),
+        checkoutBefore[table].filter(row => (table === 'decks' ? row.id : row.deck_id) !== checkoutDeck));
+    }
+    for (const row of checkoutBefore.collection.filter(row => !row.card_id.startsWith('checkout-'))) {
+      assert.deepStrictEqual(checkoutAfter.collection.find(copy => copy.id === row.id), row);
+    }
+    assert.strictEqual((await checkout(checkoutDeck, 'Second box')).status, 409, 'repeated creation cannot replace a linked box');
+    assert.deepStrictEqual(await snapshot(), checkoutAfter);
+    assert.deepStrictEqual(await checkout(checkoutDeck), { status: 200, body: { message: 'Deck checked out successfully' } });
+    assert.deepStrictEqual(await snapshot(), checkoutAfter, 'ordinary repeated checkout remains idempotent');
+    await returnDeck(checkoutDeck);
+    assert.deepStrictEqual(await db.get('SELECT container_id, checked_out FROM decks WHERE id = ?', [checkoutDeck]),
+      { container_id: checkoutBoxId, checked_out: 0 });
+    assert.deepStrictEqual(await db.all('SELECT * FROM collection WHERE location_id = ? ORDER BY position', [checkoutBoxId]), checkoutRows,
+      'cancel/return keeps the saved container and movement');
+    assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM deck_card_allocations WHERE deck_id = ?', [checkoutDeck])).count, 0);
+    assert.strictEqual((await checkout(checkoutDeck)).status, 200, 'updated explicit source anchors support recheckout');
+    const rechecked = await db.all(`SELECT a.* FROM deck_card_allocations a JOIN collection c ON c.id = a.entry_id
+      WHERE a.deck_id = ? AND c.location_id = ?`, [checkoutDeck, checkoutBoxId]);
+    assert.strictEqual(rechecked.reduce((total, row) => total + row.quantity, 0), 6);
+    await returnDeck(checkoutDeck);
+    const linkedBefore = await snapshot();
+    assert.strictEqual((await checkout(checkoutDeck, 'Replace returned box')).status, 409);
+    assert.deepStrictEqual(await snapshot(), linkedBefore);
+
+    const normalSource = await copy('checkout-good', 1);
+    const normalDeck = await deck('No box checkout', [['checkout-good', 1, normalSource]]);
+    assert.deepStrictEqual(await checkout(normalDeck), { status: 200, body: { message: 'Deck checked out successfully' } });
+    assert.strictEqual((await db.get('SELECT container_id FROM decks WHERE id = ?', [normalDeck])).container_id, null);
+    const alreadyOut = await snapshot();
+    assert.strictEqual((await checkout(normalDeck, 'Already out box')).status, 409);
+    assert.deepStrictEqual(await snapshot(), alreadyOut);
+    await returnDeck(normalDeck);
+
+    // Every failed creation must roll back storage, linking, moves and reservation materialization.
+    const rollbackGood = await copy('checkout-good', 3);
+    for (const reason of ['shortage', 'locked location', 'locked compartment', 'missing', 'reserved', 'legacy reserved', 'slab stack', 'foreign user', 'explicit source']) {
+      const blockedSource = await box(`Blocked ${reason}`, { locked: reason === 'locked location' ? 1 : 0 });
+      if (reason === 'locked compartment') await db.run('UPDATE compartments SET locked = 1 WHERE id = ?', [blockedSource.compartment_id]);
+      const blockedCopy = await copy('checkout-blocked', reason === 'slab stack' || reason === 'reserved' || reason === 'legacy reserved' ? 3 : 1, {
+        ...blockedSource, missing: reason === 'missing' ? 1 : 0,
+        user_id: reason === 'foreign user' ? 2 : 1,
+        ...(reason === 'slab stack' ? { cert_number: 'unsplittable-cert' } : {})
+      });
+      if (reason === 'reserved' || reason === 'legacy reserved') {
+        const reserving = await deck(`Reserving ${reason}`, [['checkout-blocked', 1, blockedCopy]], { checked_out: 1 });
+        if (reason === 'reserved') await insert('deck_card_allocations', {
+          deck_id: reserving, card_id: 'checkout-blocked', entry_id: blockedCopy, quantity: 1
+        });
+      }
+      const outsideCopy = await copy('checkout-blocked', 5);
+      const blockedDeck = await deck(`Cannot box ${reason}`, [
+        ['checkout-good', 1, rollbackGood],
+        ['checkout-blocked', reason === 'shortage' || reason === 'explicit source' ? 2 : 1, blockedCopy]
+      ]);
+      const blockedBefore = await snapshot();
+      const rejected = await checkout(blockedDeck, `Rejected ${reason}`);
+      assert.strictEqual(rejected.status, 400, reason);
+      assert.ok(rejected.body.details.some(detail => detail.includes('checkout-blocked')), reason);
+      assert.deepStrictEqual(await snapshot(), blockedBefore, `${reason} must not partially move, link, reserve or create a box`);
+      assert.strictEqual((await db.get('SELECT quantity FROM collection WHERE id = ?', [outsideCopy])).quantity, 5,
+        'explicit sources cannot silently fall back to outside copies');
+    }
+    const reservedPairSource = await box('Reserved paired stack');
+    const reservedPair = await copy('checkout-front', 3, { ...reservedPairSource, reverse_card_id: 'checkout-back' });
+    const pairOwner = await deck('Reserve front face', [['checkout-front', 1, reservedPair]], { checked_out: 1 });
+    await insert('deck_card_allocations', { deck_id: pairOwner, card_id: 'checkout-front', entry_id: reservedPair, quantity: 1 });
+    const reverseDeck = await deck('Cannot move reserved reverse face', [['checkout-back', 1, reservedPair]]);
+    const reservedPairBefore = await snapshot();
+    assert.strictEqual((await checkout(reverseDeck, 'Reserved reverse box')).status, 400);
+    assert.deepStrictEqual(await snapshot(), reservedPairBefore, 'a reservation on either face protects the entire paired stack');
+    const shortageBefore = await snapshot();
+    assert.strictEqual((await checkout(unavailableDeck, 'Automatic shortage box')).status, 400);
+    assert.deepStrictEqual(await snapshot(), shortageBefore, 'automatic shortage also rolls back the new container');
+    const validationBefore = await snapshot();
+    for (const [id, name, user, status] of [
+      [normalDeck, '', 1, 400], [normalDeck, '  ', 1, 400], [normalDeck, null, 1, 400],
+      [normalDeck, ['box'], 1, 400], [normalDeck, 'x'.repeat(121), 1, 400],
+      [normalDeck, 'Checkout box', 1, 400], [normalDeck, 'Private checkout', 2, 404],
+      [foreignDeck, 'Private checkout', 1, 404], [999999, 'Missing checkout', 1, 404],
+      [arena, 'Arena checkout', 1, 400], [archiveDeck, 'Archive checkout', 1, 400], [empty, 'Empty checkout', 1, 400]
+    ]) assert.strictEqual((await checkout(id, name, user)).status, status);
+    assert.deepStrictEqual(await snapshot(), validationBefore);
+
+    const atomicDeck = await deck('Atomic checkout', [['checkout-good', 2, rollbackGood]]);
+    for (const [stage, trigger] of [
+      ['move', `BEFORE INSERT ON collection WHEN NEW.card_id = 'checkout-good'`],
+      ['reservation', `BEFORE INSERT ON deck_card_allocations WHEN NEW.deck_id = ${atomicDeck}`],
+      ['link', `BEFORE UPDATE OF container_id ON decks WHEN NEW.id = ${atomicDeck}`],
+      ['checkout', `BEFORE UPDATE OF checked_out ON decks WHEN NEW.id = ${atomicDeck}`]
+    ]) {
+      const atomicBefore = await snapshot();
+      await db.run(`CREATE TRIGGER fail_atomic_checkout ${trigger} BEGIN SELECT RAISE(ABORT, 'private ${stage} failure'); END`);
+      let result;
+      try {
+        console.error = () => {};
+        result = await checkout(atomicDeck, `Atomic ${stage} box`);
+      } finally {
+        console.error = originalError;
+        await db.run('DROP TRIGGER fail_atomic_checkout');
+      }
+      assert.deepStrictEqual(result, { status: 500, body: { error: 'Failed to checkout deck' } });
+      assert.deepStrictEqual(await snapshot(), atomicBefore, `${stage} failure rolls back every earlier step`);
+    }
   } finally {
     if (server) await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     await new Promise((resolve, reject) => db.dbConnection.close(error => error ? reject(error) : resolve()));

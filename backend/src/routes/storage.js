@@ -529,6 +529,8 @@ router.post('/locations/:id/transfer', async (req, res) => {
           AND (location_id = ? OR compartment_id IN (SELECT id FROM compartments WHERE location_id = ?))
       `, [inventory_type, req.user.id, id, id]);
       await db.run('UPDATE locations SET inventory_type = ? WHERE id = ? AND user_id = ?', [inventory_type, id, req.user.id]);
+      await db.run('UPDATE decks SET container_id = NULL WHERE container_id = ? AND user_id = ? AND inventory_type != ?',
+        [id, req.user.id, inventory_type]);
       return { id: location.id, inventory_type, affected: updated.changes };
     });
     res.json({ message: 'Container transferred', ...result });
@@ -620,6 +622,11 @@ router.put('/locations/:id', async (req, res) => {
         storage_unit_id !== undefined ? 1 : 0, storage_unit_id ?? null,
         cover_card_id !== undefined ? 1 : 0, cover_card_id ?? null,
         id, req.user.id]);
+    if (game !== undefined) {
+      await db.run(`UPDATE decks SET container_id = NULL WHERE container_id = ? AND user_id = ?
+        AND NOT EXISTS (SELECT 1 FROM locations WHERE id = decks.container_id
+          AND inventory_type = decks.inventory_type AND game IN ('mtg', 'any'))`, [id, req.user.id]);
+    }
 
     let evicted = 0;
     if (rule_type !== undefined || rule_config !== undefined || game !== undefined) {

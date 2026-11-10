@@ -13,6 +13,7 @@ const archidektApi = require('../archidektApi');
 const { normalizeCardBack } = require('../utils/cardBack');
 const { acquisitionPlan, acquisitionDeckNeeds } = require('../utils/acquisitionPlanner');
 const { composition, recordRevision } = require('../utils/deckRevisions');
+const { moveDeckCardChanges } = require('../utils/deckCardMoves');
 
 const router = express.Router();
 
@@ -153,6 +154,8 @@ router.get('/', async (req, res) => {
         d.created_at,
         d.checked_out,
         d.inventory_type,
+        d.container_id,
+        container.name AS container_name,
         d.checked_out_at,
         d.wins,
         d.losses,
@@ -166,6 +169,7 @@ router.get('/', async (req, res) => {
         COALESCE(SUM(CASE WHEN cc.color_identity LIKE '%"Green"%' OR cc.color_identity LIKE '%"G"%' THEN dc.quantity ELSE 0 END), 0) AS green_cards,
         COALESCE(SUM(CASE WHEN cc.color_identity = '[]' THEN dc.quantity ELSE 0 END), 0) AS colorless_cards
       FROM decks d
+      LEFT JOIN locations container ON container.id = d.container_id AND container.user_id = d.user_id
       LEFT JOIN deck_cards dc ON d.id = dc.deck_id
       LEFT JOIN card_cache cc ON dc.card_id = cc.id
       WHERE d.user_id = ? AND d.game = 'mtg'
@@ -348,6 +352,128 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.patch('/:id/container-link', async (req, res) => {
+  const deckId = Number(req.params.id);
+  const body = req.body;
+  if (!Number.isSafeInteger(deckId) || deckId < 1) {
+    return res.status(400).json({ error: 'Invalid deck ID' });
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)
+      || Object.keys(body).some(key => key !== 'container_id')
+      || (body.container_id !== null && (!Number.isSafeInteger(body.container_id) || body.container_id < 1))) {
+    return res.status(400).json({ error: 'container_id must be a positive integer or null' });
+  }
+  try {
+    const result = await db.withTransaction(async () => {
+      const deck = await db.get("SELECT inventory_type FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'", [deckId, req.user.id]);
+      if (!deck) throw Object.assign(new Error('Deck not found'), { status: 404 });
+      let container = null;
+      if (body.container_id !== null) {
+        if (!['collection', 'graveyard'].includes(deck.inventory_type)) {
+          throw Object.assign(new Error('Only Physical and Graveyard decks can link containers'), { status: 400 });
+        }
+        container = await db.get('SELECT id, name, inventory_type, game FROM locations WHERE id = ? AND user_id = ?', [body.container_id, req.user.id]);
+        if (!container) throw Object.assign(new Error('Container not found'), { status: 404 });
+        if (container.inventory_type !== deck.inventory_type || !['mtg', 'any'].includes(container.game)) {
+          throw Object.assign(new Error('Choose a Magic container in the same inventory as this deck'), { status: 400 });
+        }
+      }
+      await db.run('UPDATE decks SET container_id = ? WHERE id = ? AND user_id = ?', [body.container_id, deckId, req.user.id]);
+      return { container_id: container?.id ?? null, container_name: container?.name ?? null };
+    });
+    res.json(result);
+  } catch (error) {
+    if (!error.status) console.error(error);
+    res.status(error.status || 500).json({ error: error.status ? error.message : 'Failed to link deck container' });
+  }
+});
+
+// Both callers hold the transaction; standalone filing still permits shortages.
+async function createDeckContainer(deck, userId, containerName, checkout = false) {
+  const cards = await db.all(`
+    SELECT dc.*, COALESCE(cc.name, dc.card_id) AS name FROM deck_cards dc
+    LEFT JOIN card_cache cc ON cc.id = dc.card_id
+    WHERE dc.deck_id = ? ORDER BY dc.card_id
+  `, [deck.id]);
+  if (!cards.length || cards.some(card => !Number.isSafeInteger(card.quantity) || card.quantity <= 0)) {
+    throw Object.assign(new Error('Save a nonempty deck with positive card quantities first'), { status: 400 });
+  }
+  const requested = cards.reduce((total, card) => total + card.quantity, 0);
+  if (!Number.isSafeInteger(requested) || requested > 2147483647) {
+    throw Object.assign(new Error('Deck quantity is too large'), { status: 400 });
+  }
+  const duplicate = await db.get(`SELECT id FROM locations WHERE name = ? AND user_id = ? AND inventory_type = ?`,
+    [containerName, userId, deck.inventory_type]);
+  if (duplicate) throw Object.assign(new Error('A container with this name already exists in this inventory'), { status: 400 });
+  // Freeze legacy fallback identities before filing changes their storage order.
+  for (const source of await checkedOutSources(userId)) {
+    await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+      [source.deck_id, source.card_id, source.entry_id, source.quantity]);
+  }
+  // Include this deck's reservations, including legacy and archived allocations.
+  const allocated = await checkedOutAllocation(userId);
+  const location = await db.run(`
+    INSERT INTO locations (name, type, sort_order, rule_type, game, inventory_type, user_id)
+    VALUES (?, 'Deck Box', 'custom', 'any', 'mtg', ?, ?)
+  `, [containerName, deck.inventory_type, userId]);
+  const compartment = await db.run(`INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, ?)`,
+    [location.lastID, Math.max(defaultCompartmentPlan('Deck Box').capacity, requested)]);
+  const candidates = await db.all(`
+    SELECT c.*, c.id AS entry_id, l.locked AS location_locked, cp.locked AS compartment_locked
+    FROM collection c JOIN card_cache cc ON cc.id = c.card_id AND cc.game = 'mtg'
+    LEFT JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
+    LEFT JOIN compartments cp ON cp.id = c.compartment_id AND cp.location_id = l.id
+    WHERE c.user_id = ? AND c.game = 'mtg' AND c.list_type = ?
+      AND c.quantity > 0 AND COALESCE(c.missing, 0) = 0
+      AND (c.location_id IS NULL OR (l.id IS NOT NULL AND l.inventory_type = ?))
+      AND (c.compartment_id IS NULL OR cp.id IS NOT NULL)
+    ORDER BY c.location_id, c.compartment_id, c.position, c.id
+  `, [userId, deck.inventory_type, deck.inventory_type]);
+  // Exclude whole reserved stacks; their exact return placements stay intact.
+  const entries = candidates.filter(entry => !entry.location_locked && !entry.compartment_locked
+    && !allocated.has(entry.id) && !(entry.quantity > 1 && entry.cert_number));
+  const plans = planCardSources(entries, cards, deck.game);
+  const items = cards.map((card, index) => {
+    const moved = [...plans[index].values()].reduce((sum, quantity) => sum + quantity, 0);
+    return { card_id: card.card_id, name: card.name, requested: card.quantity, moved, missing: card.quantity - moved };
+  });
+  const missing = items.filter(item => item.missing > 0);
+  if (checkout && missing.length) {
+    throw Object.assign(new Error('Not enough eligible cards available to move this deck into a new container. Check selected sources, locked storage, missing copies and other deck reservations.'),
+      { status: 400, details: missing.map(card => `Missing ${card.missing}x ${card.name}`) });
+  }
+  const moves = entries.map(entry => ({ ...entry,
+    available: plans.reduce((sum, plan) => sum + (plan.get(entry.entry_id) || 0), 0) })).filter(entry => entry.available);
+  const movedRows = await moveContainerCopies(userId, location.lastID, compartment.lastID, moves,
+    moves.reduce((sum, entry) => sum + entry.available, 0));
+  if (checkout) {
+    // Reserve the exact moved copies, not a fresh plan that could pick leftover stacks.
+    const offsets = new Map();
+    for (let index = 0; index < cards.length; index++) {
+      const card = cards[index];
+      let sourceEntryId = null;
+      for (const [entryId, quantity] of plans[index]) {
+        const ids = movedRows.get(entryId);
+        const offset = offsets.get(entryId) || 0;
+        for (let copy = offset; copy < offset + quantity; copy++) {
+          sourceEntryId ??= ids[copy];
+          await db.run(`INSERT INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, 1)`,
+            [deck.id, card.card_id, ids[copy]]);
+        }
+        offsets.set(entryId, offset + quantity);
+      }
+      if (card.source_entry_id != null) {
+        await db.run('UPDATE deck_cards SET source_entry_id = ? WHERE deck_id = ? AND card_id = ?',
+          [sourceEntryId, deck.id, card.card_id]);
+      }
+    }
+    await db.run('UPDATE decks SET container_id = ? WHERE id = ?', [location.lastID, deck.id]);
+  }
+  const count = items.reduce((total, item) => total + item.moved, 0);
+  return { id: location.lastID, name: containerName, inventory_type: deck.inventory_type,
+    requested, count, missing: requested - count, items };
+}
+
 // File existing copies from a saved deck without creating ownership or changing checkout.
 router.post('/:id/container', async (req, res) => {
   const deckId = Number(req.params.id);
@@ -366,60 +492,7 @@ router.post('/:id/container', async (req, res) => {
       if (!['collection', 'graveyard'].includes(deck.inventory_type)) {
         throw Object.assign(new Error('Only Physical and Graveyard decks can create containers'), { status: 400 });
       }
-      const cards = await db.all(`
-        SELECT dc.*, COALESCE(cc.name, dc.card_id) AS name FROM deck_cards dc
-        LEFT JOIN card_cache cc ON cc.id = dc.card_id
-        WHERE dc.deck_id = ? ORDER BY dc.card_id
-      `, [deckId]);
-      if (!cards.length || cards.some(card => !Number.isSafeInteger(card.quantity) || card.quantity <= 0)) {
-        throw Object.assign(new Error('Save a nonempty deck with positive card quantities first'), { status: 400 });
-      }
-      const requested = cards.reduce((total, card) => total + card.quantity, 0);
-      if (!Number.isSafeInteger(requested) || requested > 2147483647) {
-        throw Object.assign(new Error('Deck quantity is too large'), { status: 400 });
-      }
-      const duplicate = await db.get(`SELECT id FROM locations WHERE name = ? AND user_id = ? AND inventory_type = ?`,
-        [containerName, req.user.id, deck.inventory_type]);
-      if (duplicate) throw Object.assign(new Error('A container with this name already exists in this inventory'), { status: 400 });
-      // Freeze legacy fallback identities before filing changes their storage order.
-      for (const source of await checkedOutSources(req.user.id)) {
-        await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-          [source.deck_id, source.card_id, source.entry_id, source.quantity]);
-      }
-      // Include this deck's reservations, including legacy and archived allocations.
-      const allocated = await checkedOutAllocation(req.user.id);
-      const location = await db.run(`
-        INSERT INTO locations (name, type, sort_order, rule_type, game, inventory_type, user_id)
-        VALUES (?, 'Deck Box', 'custom', 'any', 'mtg', ?, ?)
-      `, [containerName, deck.inventory_type, req.user.id]);
-      const compartment = await db.run(`INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, ?)`,
-        [location.lastID, Math.max(defaultCompartmentPlan('Deck Box').capacity, requested)]);
-      const candidates = await db.all(`
-        SELECT c.*, c.id AS entry_id, l.locked AS location_locked, cp.locked AS compartment_locked
-        FROM collection c JOIN card_cache cc ON cc.id = c.card_id AND cc.game = 'mtg'
-        LEFT JOIN locations l ON l.id = c.location_id AND l.user_id = c.user_id
-        LEFT JOIN compartments cp ON cp.id = c.compartment_id AND cp.location_id = l.id
-        WHERE c.user_id = ? AND c.game = 'mtg' AND c.list_type = ?
-          AND c.quantity > 0 AND COALESCE(c.missing, 0) = 0
-          AND (c.location_id IS NULL OR (l.id IS NOT NULL AND l.inventory_type = ?))
-          AND (c.compartment_id IS NULL OR cp.id IS NOT NULL)
-        ORDER BY c.location_id, c.compartment_id, c.position, c.id
-      `, [req.user.id, deck.inventory_type, deck.inventory_type]);
-      // Exclude whole reserved stacks; their exact return placements stay intact.
-      const entries = candidates.filter(entry => !entry.location_locked && !entry.compartment_locked
-        && !allocated.has(entry.id) && !(entry.quantity > 1 && entry.cert_number));
-      const plans = planCardSources(entries, cards, deck.game);
-      const items = cards.map((card, index) => {
-        const moved = [...plans[index].values()].reduce((sum, quantity) => sum + quantity, 0);
-        return { card_id: card.card_id, name: card.name, requested: card.quantity, moved, missing: card.quantity - moved };
-      });
-      const moves = entries.map(entry => ({ ...entry,
-        available: plans.reduce((sum, plan) => sum + (plan.get(entry.entry_id) || 0), 0) })).filter(entry => entry.available);
-      await moveContainerCopies(req.user.id, location.lastID, compartment.lastID, moves,
-        moves.reduce((sum, entry) => sum + entry.available, 0));
-      const count = items.reduce((total, item) => total + item.moved, 0);
-      return { id: location.lastID, name: containerName, inventory_type: deck.inventory_type,
-        requested, count, missing: requested - count, items };
+      return createDeckContainer(deck, req.user.id, containerName);
     });
     res.status(201).json(result);
   } catch (error) {
@@ -474,7 +547,9 @@ router.post('/from-container', async (req, res) => {
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const deck = await db.get(`SELECT * FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [id, req.user.id]);
+    const deck = await db.get(`SELECT d.*, container.name AS container_name FROM decks d
+      LEFT JOIN locations container ON container.id = d.container_id AND container.user_id = d.user_id
+      WHERE d.id = ? AND d.user_id = ? AND d.game = 'mtg'`, [id, req.user.id]);
     if (!deck) {
       return res.status(404).json({ error: 'Deck not found' });
     }
@@ -601,9 +676,10 @@ router.put('/:id', async (req, res) => {
         `UPDATE decks
          SET name = ?, description = COALESCE(?, description), format = COALESCE(?, format), category = COALESCE(?, category),
              accent_color = COALESCE(?, accent_color), target_size = COALESCE(?, target_size), inventory_type = ?,
+             container_id = CASE WHEN inventory_type = ? THEN container_id ELSE NULL END,
              commander_card_id = CASE WHEN ? THEN NULL ELSE commander_card_id END
          WHERE id = ? AND user_id = ?`,
-        [String(name).trim(), description, format, category, accent_color, targetSize, inventoryType,
+        [String(name).trim(), description, format, category, accent_color, targetSize, inventoryType, inventoryType,
           format != null && !/commander|edh|brawl/i.test(format), id, req.user.id]
       );
     });
@@ -690,23 +766,30 @@ async function saveDeckEditor(req, res) {
           throw Object.assign(new Error('Return this deck before changing its cards or sources'), { status: 400 });
         }
       }
+      if (body.card_moves !== undefined && (inventory_type !== deck.inventory_type || req.restoringRevision)) {
+        throw Object.assign(new Error('Save inventory changes separately before moving deck cards'), { status: 400 });
+      }
+      const cardsToSave = body.card_moves === undefined ? cards : await moveDeckCardChanges({
+        userId: req.user.id, deck, beforeCards: savedCards, afterCards: cards, moves: body.card_moves,
+      });
       await db.run(
         `UPDATE decks SET name = ?, description = ?, notes = COALESCE(?, notes), format = ?, category = ?, accent_color = ?,
-          target_size = ?, inventory_type = ?, commander_card_id = ? WHERE id = ? AND user_id = ?`,
+          target_size = ?, inventory_type = ?, commander_card_id = ?,
+          container_id = CASE WHEN inventory_type = ? THEN container_id ELSE NULL END WHERE id = ? AND user_id = ?`,
         [req.restoringRevision ? deck.name : name.trim(), req.restoringRevision ? deck.description : description,
           req.restoringRevision ? deck.notes : notes ?? null, format,
           req.restoringRevision ? deck.category : category, req.restoringRevision ? deck.accent_color : accent_color,
-          target_size, inventory_type, commander_card_id, id, req.user.id]
+          target_size, inventory_type, commander_card_id, inventory_type, id, req.user.id]
       );
       if (deck.checked_out) {
         // Preserve the checked-out composition and its reservations, even if inventory has since changed.
-        for (const card of cards) {
+        for (const card of cardsToSave) {
           await db.run(`UPDATE deck_cards SET checked_out = ? WHERE deck_id = ? AND card_id = ?`, [card.pulled ? 1 : 0, id, card.card_id]);
         }
       } else {
         if (archiving) await db.run('DELETE FROM deck_card_allocations WHERE deck_id = ?', [id]);
         await db.run(`DELETE FROM deck_cards WHERE deck_id = ?`, [id]);
-        for (const card of cards) {
+        for (const card of cardsToSave) {
           // Archiving keeps the saved definition, including cards no longer owned.
           if (!archiving || saved.get(card.card_id)?.quantity !== card.quantity) {
             const mode = inventory_type !== deck.inventory_type && inventory_type !== 'graveyard' ? 'addition' : 'draft';
@@ -989,16 +1072,29 @@ router.delete('/:id/cards/:card_id', async (req, res) => {
 // Checkout Deck (mark as in play)
 router.put('/:id/checkout', async (req, res) => {
   const { id } = req.params;
+  const name = req.body?.container_name;
+  const createContainer = name !== undefined;
+  if (createContainer && (typeof name !== 'string' || !name.trim() || name.trim().length > 120)) {
+    return res.status(400).json({ error: 'Container name must be between 1 and 120 characters' });
+  }
   try {
-    await db.withTransaction(async () => {
-      const deck = await db.get(`SELECT id, game, inventory_type, checked_out FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [id, req.user.id]);
+    const container = await db.withTransaction(async () => {
+      const deck = await db.get(`SELECT id, game, inventory_type, checked_out, container_id FROM decks WHERE id = ? AND user_id = ? AND game = 'mtg'`, [id, req.user.id]);
       if (!deck) throw Object.assign(new Error('Deck not found or unauthorized'), { status: 404 });
       if (deck.inventory_type !== 'collection') throw Object.assign(new Error('Only Physical decks can be checked out'), { status: 400 });
-      if (deck.checked_out) return;
-      await reserveDeckSources(deck, req.user.id);
+      if (createContainer && deck.container_id != null) {
+        throw Object.assign(new Error('This deck already has a linked container'), { status: 409 });
+      }
+      if (deck.checked_out) {
+        if (createContainer) throw Object.assign(new Error('Return this deck before creating a checkout container'), { status: 409 });
+        return;
+      }
+      const created = createContainer ? await createDeckContainer(deck, req.user.id, name.trim(), true) : null;
+      if (!created) await reserveDeckSources(deck, req.user.id);
       await db.run(`UPDATE decks SET checked_out = 1, checked_out_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
+      return created;
     });
-    res.json({ message: 'Deck checked out successfully' });
+    res.json({ message: 'Deck checked out successfully', ...(container ? { container_id: container.id, container_name: container.name } : {}) });
   } catch (error) {
     if (!error.status) console.error(error);
     res.status(error.status || 500).json({ error: error.status ? error.message : 'Failed to checkout deck', ...(error.details ? { details: error.details } : {}) });

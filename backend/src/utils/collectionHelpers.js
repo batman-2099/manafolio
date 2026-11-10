@@ -49,9 +49,9 @@ function sourceEntries(entries, card, game) {
 
 // Allocate physical rows, not faces. Reassign earlier choices when a paired
 // token is the only source for a later face, rather than reporting a false shortage.
-function planCardSources(entries, cards, game, allocated = new Map()) {
+function planCardSources(entries, cards, game, allocated = new Map(), selectSources = sourceEntries) {
   const remaining = new Map(entries.map(entry => [entry.entry_id, Math.max(0, entry.quantity - (allocated.get(entry.entry_id) || 0))]));
-  const candidates = cards.map(card => sourceEntries(entries, card, card.game || game));
+  const candidates = cards.map(card => selectSources(entries, card, card.game || game));
   const plans = cards.map(() => new Map());
   function assign(index, needed, seen) {
     if (seen.has(index)) return 0;
@@ -421,8 +421,10 @@ function normalizeRuleConfig(rule_config) {
 
 // The caller holds a transaction. Reuse whole single copies, split only the
 // selected quantity from legacy stacks, and leave remaining source copies intact.
-async function moveContainerCopies(userId, locationId, compartmentId, entries, quantity) {
-  if (quantity <= 0 || entries.length === 0) return;
+// Return moved row IDs by original entry so callers can follow split copies.
+async function moveContainerCopies(userId, locationId, compartmentId, entries, quantity, placement = null) {
+  const moved = new Map();
+  if (quantity <= 0 || entries.length === 0) return moved;
   // Freeze legacy identities before filing changes their allocation order.
   // Persist every source: a partial allocation disables fallback for that card.
   const reservations = new Map();
@@ -433,12 +435,17 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
     if (!reservations.has(source.entry_id)) reservations.set(source.entry_id, []);
     reservations.get(source.entry_id).push(source);
   }
-  await rebalanceCompartmentPositions(db, compartmentId, userId);
-  const occupied = await db.get(
-    `SELECT COUNT(*) AS count FROM collection WHERE compartment_id = ? AND user_id = ?`,
-    [compartmentId, userId]
-  );
-  let slot = occupied.count;
+  // Existing batch callers append; automatic filing supplies a resolved position
+  // and performs scheme-aware rebalancing itself.
+  let slot = 0;
+  if (!placement) {
+    await rebalanceCompartmentPositions(db, compartmentId, userId);
+    const occupied = await db.get(
+      `SELECT COUNT(*) AS count FROM collection WHERE compartment_id = ? AND user_id = ?`,
+      [compartmentId, userId]
+    );
+    slot = occupied.count;
+  }
   const sources = new Set();
   for (const entry of entries) {
     if (quantity <= 0) break;
@@ -446,12 +453,14 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
     quantity -= copies;
     const originalUsed = copies === entry.quantity;
     const retainedQuantity = originalUsed ? 1 : entry.quantity - copies;
+    const movedIds = originalUsed ? [entry.id] : [];
+    moved.set(entry.id, movedIds);
     const segments = [{ id: entry.id, offset: 0, quantity: retainedQuantity }];
     if (originalUsed) {
       await db.run(`
         UPDATE collection SET quantity = 1, location_id = ?, compartment_id = ?, position = ?
         WHERE id = ? AND user_id = ?
-      `, [locationId, compartmentId, ++slot * 1000, entry.id, userId]);
+      `, [locationId, compartmentId, placement ? placement.position : ++slot * 1000, entry.id, userId]);
     } else {
       await db.run(`UPDATE collection SET quantity = quantity - ? WHERE id = ? AND user_id = ?`, [copies, entry.id, userId]);
     }
@@ -467,9 +476,10 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
         entry.card_id, userId, entry.condition, entry.printing, entry.language, entry.purchase_price,
         entry.favorite, entry.is_trade, entry.list_type, entry.game, entry.added_at, entry.notes, entry.grader,
         entry.grade, entry.cert_number, entry.market_value, entry.market_value_source, entry.market_value_at, entry.missing,
-        locationId, compartmentId, ++slot * 1000, entry.last_verified_at, entry.reverse_card_id || null, entry.foil_treatment ?? null
+        locationId, compartmentId, placement ? placement.position : ++slot * 1000, entry.last_verified_at, entry.reverse_card_id || null, entry.foil_treatment ?? null
       ]);
       segments.push({ id: inserted.lastID, offset: entry.quantity - copies + copy, quantity: 1 });
+      movedIds.push(inserted.lastID);
     }
     // As in stocktake, intersect each deck's consecutive reserved copies with
     // the split rows. Retained copies come first; moved copies keep the remainder.
@@ -491,7 +501,8 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
     }
     if (entry.compartment_id) sources.add(entry.compartment_id);
   }
-  for (const source of sources) await rebalanceCompartmentPositions(db, source, userId);
+  if (!placement) for (const source of sources) await rebalanceCompartmentPositions(db, source, userId);
+  return moved;
 }
 module.exports = {
   defaultCompartmentPlan,

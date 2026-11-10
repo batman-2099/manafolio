@@ -253,6 +253,39 @@ async function testEditor() {
       assert.strictEqual((await request('GET', archivedId)).body.inventory_type, inventoryType);
       assert.strictEqual((await save(archivedDraft, archivedId)).status, 200);
     }
+
+    const linkedBox = (await db.run("INSERT INTO locations (name, type, game, user_id) VALUES ('Editor linked box', 'Deck Box', 'mtg', 1)")).lastID;
+    const linkedRow = (await db.run('INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 100)', [linkedBox])).lastID;
+    await db.run("INSERT INTO card_cache (id, name, game) VALUES ('move-old', 'Move old', 'mtg'), ('move-new', 'Move new', 'mtg')");
+    await db.run(`INSERT INTO collection (card_id, quantity, game, user_id, location_id, compartment_id, position)
+      VALUES ('move-old', 2, 'mtg', 1, ?, ?, 1000), ('move-new', 2, 'mtg', 1, NULL, NULL, 0)`, [linkedBox, linkedRow]);
+    const movingDeck = (await db.run("INSERT INTO decks (name, user_id, format, container_id) VALUES ('Moving editor', 1, 'Casual', ?)", [linkedBox])).lastID;
+    await db.run("INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, 'move-old', 2)", [movingDeck]);
+    const movingDraft = {
+      ...archiveDraft, name: 'Moving editor', inventory_type: 'collection',
+      cards: [{ card_id: 'move-old', quantity: 1, pulled: false }, { card_id: 'move-new', quantity: 1, pulled: false }],
+      card_moves: { container_id: linkedBox, before_cards: [{ card_id: 'move-old', quantity: 2 }], removed_location_id: null },
+    };
+    const moved = await save(movingDraft, movingDeck);
+    assert.strictEqual(moved.status, 200, JSON.stringify(moved.body));
+    assert.deepStrictEqual(await db.all(`SELECT card_id, location_id, SUM(quantity) AS quantity FROM collection
+      WHERE card_id IN ('move-old', 'move-new') GROUP BY card_id, location_id ORDER BY card_id, location_id`), [
+      { card_id: 'move-new', location_id: null, quantity: 1 }, { card_id: 'move-new', location_id: linkedBox, quantity: 1 },
+      { card_id: 'move-old', location_id: null, quantity: 1 }, { card_id: 'move-old', location_id: linkedBox, quantity: 1 },
+    ]);
+    const moveSnapshot = async () => Promise.all(['collection', 'decks', 'deck_cards', 'deck_revisions'].map(table => db.all(`SELECT * FROM ${table} ORDER BY rowid`)));
+    const committedMoves = await moveSnapshot();
+    assert.strictEqual((await save(movingDraft, movingDeck)).status, 409, 'stale confirmation cannot apply deltas twice');
+    assert.deepStrictEqual(await moveSnapshot(), committedMoves);
+    const nextMove = {
+      ...movingDraft, cards: movingDraft.cards.map(card => ({ ...card, quantity: card.card_id === 'move-old' ? 2 : 1 })),
+      card_moves: { ...movingDraft.card_moves, before_cards: movingDraft.cards.map(({ card_id, quantity }) => ({ card_id, quantity })) },
+    };
+    await db.run(`CREATE TRIGGER fail_editor_move BEFORE INSERT ON deck_cards WHEN NEW.deck_id = ${movingDeck}
+      BEGIN SELECT RAISE(ABORT, 'deliberate editor insertion failure'); END`);
+    assert.strictEqual((await save(nextMove, movingDeck)).status, 500);
+    assert.deepStrictEqual(await moveSnapshot(), committedMoves, 'failure after movement rolls back copies, deck changes, and history together');
+    await db.run('DROP TRIGGER fail_editor_move');
   } finally {
     if (server) await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     await new Promise((resolve, reject) => db.dbConnection.close(error => error ? reject(error) : resolve()));

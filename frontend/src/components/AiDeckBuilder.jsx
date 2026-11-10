@@ -5,6 +5,8 @@ import { readProgressStream } from '../utils/importStream';
 import MultiSelectDropdown from './MultiSelectDropdown';
 import CardImage from './CardImage';
 import RelatedTokens from './RelatedTokens';
+import DeckCardMoveModal from './DeckCardMoveModal';
+import { deckCardMovePrompt } from '../utils/deckCardMoves';
 import DECK_TYPES from '../../../shared/aiDeckTypes.json';
 import POWER_LEVELS from '../../../shared/aiDeckPowerLevels.json';
 import COLOR_THEMES from '../../../shared/aiDeckColorThemes.json';
@@ -64,6 +66,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState(null);
   const [busy, setBusy] = useState('');
+  const [cardMovePrompt, setCardMovePrompt] = useState(null);
   const saveInFlight = useRef(false);
   const [error, setError] = useState('');
   const [generationLog, setGenerationLog] = useState([]);
@@ -298,6 +301,19 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
     event.preventDefault();
     if (saveInFlight.current || saveDisabled || inventoryController.current?.signal.aborted || !event.currentTarget.checkValidity()) return;
     const replace = !!sourceDeck && event.nativeEvent.submitter?.value === 'replace';
+    const changes = replace && inventoryType === 'collection'
+      ? deckCardMovePrompt(sourceDeck, sourceDeck, draft.cards, inventory) : null;
+    if (changes) {
+      setError('');
+      setCardMovePrompt(changes);
+      setBusy('confirm');
+      return;
+    }
+    await saveDraft(replace);
+  };
+
+  const saveDraft = async (replace, cardMoves) => {
+    if (saveInFlight.current) return;
     saveInFlight.current = true;
     setBusy('save');
     setError('');
@@ -311,19 +327,33 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
           ...(sourceDeck ? { source_deck_id: sourceDeck.id } : {}),
           format, target_size: targetSize, commander_card_id: isCommander ? draft.commander_card_id : null,
           cards: draft.cards,
+          ...(cardMoves ? { card_moves: cardMoves } : {}),
         }),
       }, t('aiDeck.errSave'));
-      if (!signal.aborted) onSaved(data.id);
+      if (!signal.aborted) {
+        setCardMovePrompt(null);
+        onSaved(data.id);
+        setBusy('');
+      }
     } catch (err) {
-      if (!signal.aborted) setError(err.message);
+      if (!signal.aborted) {
+        setError(err.message);
+        setBusy(cardMovePrompt ? 'confirm' : '');
+      }
     } finally {
       saveInFlight.current = false;
-      if (!signal.aborted) setBusy('');
     }
   };
 
   return (
     <section className="ai-deck-builder" aria-labelledby="ai-deck-title">
+      {cardMovePrompt && <DeckCardMoveModal
+        changes={cardMovePrompt}
+        pending={busy === 'save'}
+        error={error}
+        onClose={() => { setCardMovePrompt(null); setBusy(''); setError(''); }}
+        onSave={moves => saveDraft(true, moves)}
+      />}
       <div style={rowStyle}>
         <button type="button" className="btn btn-secondary" onClick={onClose} aria-label={t('common.back')}><ArrowLeft size={18} /></button>
         <h2 id="ai-deck-title" style={{ margin: 0 }}><Sparkles size={20} /> {t(sourceDeck ? 'aiDeck.improve' : 'aiDeck.title')}</h2>

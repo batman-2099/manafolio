@@ -8,6 +8,7 @@ const cardExplanation = require('../utils/cardExplanation');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { validateDeckSource } = require('../utils/collectionHelpers');
 const { composition, recordRevision } = require('../utils/deckRevisions');
+const { moveDeckCardChanges } = require('../utils/deckCardMoves');
 const {
   FORMATS, REVIEW_WARNING, fail, inventoryType, containerIds, sourceDeckId, sourceDeck, preferencesRequest, suggestionRequest, suggestionResponse, draftRequest,
   inventory, cardRules, filterInventory, validateDraft, modelRequest,
@@ -233,7 +234,9 @@ router.post('/suggest', sessionOnly, suggestionLimit, endpoint(async (req, res) 
 
 const saveDeck = endpoint(async (req, res) => {
   const replacementId = sourceDeckId(req.params.id, true);
-  const draft = draftRequest(req.body);
+  const { card_moves: cardMoves, ...draftBody } = req.body || {};
+  const draft = draftRequest(draftBody);
+  if (cardMoves !== undefined && replacementId === undefined) fail('Only an existing deck can move its cards.');
   if (replacementId !== undefined && draft.source_deck_id !== replacementId) {
     fail('Source deck ID must match the deck being replaced.');
   }
@@ -243,9 +246,10 @@ const saveDeck = endpoint(async (req, res) => {
     const id = await db.withTransaction(async () => {
       const source = await sourceDeck(req.user.id, draft.source_deck_id, draft);
       let notes = draft.strategy;
+      let current;
       let wasCheckedOut = false;
       if (replacementId !== undefined) {
-        const current = await db.get('SELECT checked_out, notes FROM decks WHERE id = ? AND user_id = ?', [replacementId, req.user.id]);
+        current = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [replacementId, req.user.id]);
         wasCheckedOut = !!current.checked_out;
         const existingNotes = current.notes || '';
         notes = !draft.strategy || existingNotes.endsWith(draft.strategy)
@@ -271,10 +275,17 @@ const saveDeck = endpoint(async (req, res) => {
         [req.user.id, draft.name, draft.description, notes, draft.inventory_type, draft.format, draft.target_size, draft.commander_card_id]);
         deckId = created.lastID;
       }
-      for (const card of draft.cards) {
+      let cardsToSave = draft.cards.map(card => ({ ...card, source_entry_id: saved?.get(card.card_id)?.source_entry_id ?? null }));
+      if (cardMoves !== undefined) {
+        cardsToSave = await moveDeckCardChanges({
+          userId: req.user.id, deck: { ...current, checked_out: 0 },
+          beforeCards: [...saved.values()], afterCards: cardsToSave, moves: cardMoves,
+        });
+      }
+      for (const card of cardsToSave) {
         const check = await validateDeckAddition({ deckId, userId: req.user.id, cardId: card.card_id, newQty: card.quantity });
         if (!check.ok) fail(check.error);
-        const sourceEntryId = saved?.get(card.card_id)?.source_entry_id ?? null;
+        const sourceEntryId = card.source_entry_id;
         await validateDeckSource(req.user.id, deckId, card.card_id, card.quantity, sourceEntryId);
         const previous = saved?.get(card.card_id);
         const pulled = previous && (wasCheckedOut || (card.quantity <= previous.quantity && previous.checked_out));

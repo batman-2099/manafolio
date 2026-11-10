@@ -1382,6 +1382,42 @@ async function main() {
     assert.strictEqual((await request('PUT', `/ai/${source.lastID}`, { ...replacement, strategy: '' }, 5)).status, 200);
     assert.strictEqual((await request('GET', `/decks/${source.lastID}`, undefined, 5)).body.notes, afterReplacement.deck.notes,
       'an empty edited strategy preserves all existing notes');
+
+    await db.run("INSERT INTO users (id, username, password_hash, share_token) VALUES (13, 'move-ai', '!', 'ai-move-share')");
+    const aiBox = (await db.run("INSERT INTO locations (name, type, game, user_id) VALUES ('AI linked box', 'Deck Box', 'mtg', 13)")).lastID;
+    const aiRow = (await db.run('INSERT INTO compartments (location_id, idx, capacity) VALUES (?, 1, 100)', [aiBox])).lastID;
+    const forestSource = (await db.run(`INSERT INTO collection (card_id, quantity, game, user_id, location_id, compartment_id, position)
+      VALUES (?, 3, 'mtg', 13, ?, ?, 1000)`, [ids.forest, aiBox, aiRow])).lastID;
+    await db.run("INSERT INTO collection (card_id, quantity, game, user_id) VALUES (?, 2, 'mtg', 13)", [ids.bolt]);
+    const movingAi = (await db.run(`INSERT INTO decks (name, user_id, format, target_size, container_id)
+      VALUES ('AI moving deck', 13, 'Casual', 2, ?)`, [aiBox])).lastID;
+    await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, source_entry_id) VALUES (?, ?, 2, ?)', [movingAi, ids.forest, forestSource]);
+    const aiCheckout = await request('PUT', `/decks/${movingAi}/checkout`, {}, 13);
+    assert.strictEqual(aiCheckout.status, 200, JSON.stringify(aiCheckout.body));
+    const moveAiDraft = draft({
+      source_deck_id: movingAi, format: 'Casual', target_size: 2,
+      cards: [{ card_id: ids.forest, quantity: 1 }, { card_id: ids.bolt, quantity: 1 }],
+      card_moves: { container_id: aiBox, before_cards: [{ card_id: ids.forest, quantity: 2 }], removed_location_id: null },
+    });
+    const aiMoveState = async () => Promise.all(['collection', 'decks', 'deck_cards', 'deck_card_allocations', 'deck_revisions']
+      .map(table => db.all(`SELECT * FROM ${table} ORDER BY rowid`)));
+    const beforeAiMove = await aiMoveState();
+    await db.run(`CREATE TRIGGER reject_ai_move BEFORE INSERT ON deck_revisions WHEN NEW.deck_id = ${movingAi}
+      BEGIN SELECT RAISE(ABORT, 'deliberate AI movement history failure'); END`);
+    assert.strictEqual((await request('PUT', `/ai/${movingAi}`, moveAiDraft, 13)).status, 500);
+    assert.deepStrictEqual(await aiMoveState(), beforeAiMove, 'failed history restores movement, original checkout and allocations');
+    await db.run('DROP TRIGGER reject_ai_move');
+    const movedAi = await request('PUT', `/ai/${movingAi}`, moveAiDraft, 13);
+    assert.strictEqual(movedAi.status, 200, JSON.stringify(movedAi.body));
+    assert.deepStrictEqual(await db.all(`SELECT card_id, location_id, SUM(quantity) AS quantity FROM collection
+      WHERE user_id = 13 GROUP BY card_id, location_id ORDER BY card_id, location_id`), [
+      { card_id: ids.forest, location_id: null, quantity: 1 }, { card_id: ids.forest, location_id: aiBox, quantity: 2 },
+      { card_id: ids.bolt, location_id: null, quantity: 1 }, { card_id: ids.bolt, location_id: aiBox, quantity: 1 },
+    ]);
+    assert.strictEqual((await db.get('SELECT checked_out FROM decks WHERE id = ?', [movingAi])).checked_out, 0);
+    assert.deepStrictEqual(await db.all('SELECT * FROM deck_card_allocations WHERE deck_id = ?', [movingAi]), []);
+    assert.strictEqual((await request('PUT', `/ai/${movingAi}`, moveAiDraft, 13)).status, 409);
+    assert.strictEqual((await request('POST', '/ai', moveAiDraft, 13)).status, 400, 'save-as-new never moves the source deck inventory');
     console.log('AI deck owned-inventory, draft, legality and atomic-save self-check passed');
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));

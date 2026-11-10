@@ -20,8 +20,11 @@ import RelatedTokens from './RelatedTokens';
 import Modal from './Modal';
 import DeckCardBack from './DeckCardBack';
 import DeckContainerModal from './DeckContainerModal';
+import DeckContainerLink from './DeckContainerLink';
 import DeckHistory from './DeckHistory';
 import AcquisitionPlanner from './AcquisitionPlanner';
+import DeckCardMoveModal from './DeckCardMoveModal';
+import { deckCardMovePrompt } from '../utils/deckCardMoves';
 import './DeckBuilder.css';
 
 // Basic lands are exempt from the "max 4 of a card" deck rule.
@@ -133,6 +136,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
   const [decks, setDecks] = useState([]);
   const [activeDeck, setActiveDeck] = useState(null);
   const [savedEditorState, setSavedEditorState] = useState(null);
+  const savedDeckCards = useRef([]);
+  const [cardMovePrompt, setCardMovePrompt] = useState(null);
   const [loading, setLoading] = useState(false);
   const [decksLoading, setDecksLoading] = useState(true);
   const [decksError, setDecksError] = useState(false);
@@ -269,6 +274,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
   const [checkoutMode, setCheckoutMode] = useState('checkout'); // 'checkout' | 'checkin'
   const [checkoutDeckId, setCheckoutDeckId] = useState(null); // deck the open modal acts on
   const checkoutBusyRef = useRef(false);
+  const [checkoutContainerDeck, setCheckoutContainerDeck] = useState(null);
+  const checkoutSourcesRefreshRef = useRef(null);
   const [checkoutLocationsError, setCheckoutLocationsError] = useState(false);
   const [checkoutCancelError, setCheckoutCancelError] = useState(false);
   const [returnLocationsDeck, setReturnLocationsDeck] = useState(null);
@@ -278,8 +285,9 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
   const [sleevedError, setSleevedError] = useState(false);
   const [savingCardBack, setSavingCardBack] = useState(false);
   const [showDeckContainerModal, setShowDeckContainerModal] = useState(false);
+  const [savingContainerLink, setSavingContainerLink] = useState(false);
 
-  const editorBusy = savingDeck || savingSleeved || savingCardBack || loading || decksLoading || refreshingInventory || comparingImport || checkingOut || showCheckoutModal || showDeckContainerModal;
+  const editorBusy = savingDeck || !!cardMovePrompt || savingSleeved || savingCardBack || savingContainerLink || loading || decksLoading || refreshingInventory || comparingImport || checkingOut || showCheckoutModal || showDeckContainerModal || !!checkoutContainerDeck;
   const activeEditorState = useMemo(() => activeDeck ? JSON.stringify(deckEditorState(activeDeck)) : null, [activeDeck]);
   const draftEditorState = useMemo(() => activeDeck && deckDraft ? JSON.stringify(deckEditorState({ ...activeDeck, ...deckDraft })) : null, [activeDeck, deckDraft]);
   const hasUnsavedChanges = !!activeDeck && (
@@ -645,6 +653,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
     }
     setActiveDeck(deck => ({
       ...deck, ...deckDraft, name: deckDraft.name.trim(), target_size: Number(deckDraft.target_size), cards,
+      ...(deckDraft.inventory_type !== deck.inventory_type ? { container_id: null, container_name: null } : {}),
       commander_card_id: /commander|edh|brawl/i.test(deckDraft.format) ? deck.commander_card_id : null
     }));
     setDeckDraft(null);
@@ -653,16 +662,27 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
   const handleSaveDeck = async (deck = activeDeck) => {
     const editorState = deck ? JSON.stringify(deckEditorState(deck)) : null;
     if (!deck || editorState === savedEditorState || editorBusy || savingRecord || searching || deckDraft) return;
+    const changes = deckCardMovePrompt(deck, JSON.parse(savedEditorState), deck.cards, savedDeckCards.current);
+    setSaveDeckError(null);
+    if (changes) {
+      setCardMovePrompt({ changes, deck });
+      return;
+    }
+    await saveDeck(deck);
+  };
+
+  const saveDeck = async (deck, cardMoves) => {
     setSavingDeck(true);
     setSaveDeckError(null);
     try {
       const response = await fetch(`/api/decks/${deck.id}/editor`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: editorState
+        body: JSON.stringify({ ...deckEditorState(deck), ...(cardMoves ? { card_moves: cardMoves } : {}) })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || t('deck.errSave'));
+      setCardMovePrompt(null);
       if (await loadDeckDetails(deck.id)) showToast(data.message, 'success');
       else setSaveDeckError(t('deck.errLoadDetails'));
       await fetchDecks();
@@ -701,6 +721,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
       setActiveDeck(data);
       if (data.inventory_type !== 'collection') setDeckCardSortBy('type');
       setSavedEditorState(JSON.stringify(deckEditorState(data)));
+      savedDeckCards.current = data.cards;
       setDeckDraft(null);
       setSaveDeckError(null);
       setSleevedError(false);
@@ -903,10 +924,22 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
   };
 
   // --- CHECKOUT / RETURN ---
+  const refreshCheckoutSources = async (id) => {
+    if (checkoutSourcesRefreshRef.current !== id) return;
+    if (activeDeck?.id === id && !await loadDeckDetails(id)) throw new Error(t('deck.errLoadDetails'));
+    checkoutSourcesRefreshRef.current = null;
+  };
+
   const loadGuideLocations = async (id) => {
+    await refreshCheckoutSources(id);
     const response = await fetch(`/api/decks/${id}/locations`);
     if (!response.ok) throw new Error('Could not load deck locations');
-    return response.json();
+    const locations = await response.json();
+    if (activeDeck?.id === id) {
+      setDeckCardLocations(Object.fromEntries(locations.map(({ card_id, locations: cardLocations }) => [card_id, cardLocations])));
+      setDeckLocationsError(false);
+    }
+    return locations;
   };
 
   const retryCheckoutLocations = async () => {
@@ -924,21 +957,31 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
     }
   };
 
-  const handleCheckout = async (deck = null) => {
-    const targetDeck = deck || activeDeck;
-    if (!targetDeck || targetDeck.inventory_type !== 'collection') return;
-    if (editorBusy || checkoutBusyRef.current) return;
-    if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
+  const performCheckout = async (targetDeck, containerName) => {
+    if (checkoutBusyRef.current) return;
     checkoutBusyRef.current = true;
     setReturnLocationsDeck(null);
     try {
       setCheckingOut(true);
-      const res = await fetch(`/api/decks/${targetDeck.id}/checkout`, { method: 'PUT' });
+      const res = await fetch(`/api/decks/${targetDeck.id}/checkout`, {
+        method: 'PUT',
+        ...(containerName === undefined ? {} : {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ container_name: containerName }),
+        }),
+      });
       if (res.ok) {
+        const data = containerName === undefined ? null : await res.json();
+        const metadata = {
+          checked_out: 1,
+          checked_out_at: new Date().toISOString(),
+          ...(data ? { container_id: data.container_id, container_name: data.container_name } : {}),
+        };
+        if (data) checkoutSourcesRefreshRef.current = targetDeck.id;
         showToast(t('deck.checkedOut', { name: targetDeck.name }), 'success');
-        if (activeDeck && activeDeck.id === targetDeck.id) {
-          setActiveDeck(prev => ({ ...prev, checked_out: 1, checked_out_at: new Date().toISOString() }));
-        }
+        setActiveDeck(prev => prev?.id === targetDeck.id ? { ...prev, ...metadata } : prev);
+        setDecks(prev => prev.map(deck => deck.id === targetDeck.id ? { ...deck, ...metadata } : deck));
+        setCheckoutContainerDeck(null);
         fetchDecks();
         setCheckoutLocations([]);
         setCheckoutLocationsError(false);
@@ -953,19 +996,29 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
         }
       } else {
         const errData = await res.json().catch(() => null);
-        if (errData && errData.details && errData.details.length > 0) {
-          showToast(t('deck.errCheckout', { detail: errData.details[0], extra: errData.details.length > 1 ? t('deck.andMore', { count: errData.details.length - 1 }) : '' }), 'error');
-        } else {
-          showToast(errData?.error || 'Failed to check out deck.', 'error');
-        }
+        throw new Error(errData?.details?.length
+          ? t('deck.errCheckout', { detail: errData.details[0], extra: errData.details.length > 1 ? t('deck.andMore', { count: errData.details.length - 1 }) : '' })
+          : errData?.error || t('deck.errCheckoutGeneric'));
       }
     } catch (err) {
-      console.error(err);
-      showToast(t('deck.errCheckoutGeneric'), 'error');
+      if (checkoutContainerDeck) throw err;
+      showToast(err.message || t('deck.errCheckoutGeneric'), 'error');
     } finally {
       checkoutBusyRef.current = false;
       setCheckingOut(false);
     }
+  };
+
+  const handleCheckout = (deck = null) => {
+    const targetDeck = deck || activeDeck;
+    if (!targetDeck || targetDeck.inventory_type !== 'collection') return;
+    if (editorBusy || checkoutBusyRef.current) return;
+    if (targetDeck.id === activeDeck?.id && hasUnsavedChanges) return showToast(t('deck.saveFirst'), 'error');
+    if (!targetDeck.container_id) {
+      setCheckoutContainerDeck(targetDeck);
+      return;
+    }
+    return performCheckout(targetDeck);
   };
 
   const handleReturn = async (deck = null) => {
@@ -1019,6 +1072,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
     const undo = checkoutMode === 'checkout' ? 'return' : 'checkout';
     (async () => {
       try {
+        await refreshCheckoutSources(checkoutDeckId);
         const res = await fetch(`/api/decks/${checkoutDeckId}/${undo}`, { method: 'PUT' });
         if (!res.ok) throw new Error('Could not undo deck status');
         if (activeDeck && activeDeck.id === checkoutDeckId) {
@@ -1476,6 +1530,16 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
                     {savingSleeved && <p role="status">{t('deck.saving')}</p>}
                     {sleevedError && <p id="deck-sleeved-error" className="deck-source-error" role="alert">{t('deck.errSleeved')}</p>}
                   </div>
+                  {['collection', 'graveyard'].includes(activeDeck.inventory_type) && <DeckContainerLink
+                    key={`${activeDeck.id}/${activeDeck.inventory_type}`}
+                    deck={activeDeck}
+                    disabled={editorBusy || savingRecord || !!deckDraft || activeDeck.inventory_type !== JSON.parse(savedEditorState || '{}').inventory_type}
+                    onBusy={setSavingContainerLink}
+                    onSaved={(deckId, link) => {
+                      setActiveDeck(deck => deck?.id === deckId ? { ...deck, ...link } : deck);
+                      setDecks(current => current.map(deck => deck.id === deckId ? { ...deck, ...link } : deck));
+                    }}
+                  />}
                 </section>
           <section className="deck-overview-section" aria-labelledby="deck-description-heading">
             <h3 id="deck-description-heading" style={{ marginBottom: '0.75rem' }}>{t('deck.description')}</h3>
@@ -1545,6 +1609,13 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {showAcquisitionPlanner && <AcquisitionPlanner decks={decks} onClose={() => setShowAcquisitionPlanner(false)} />}
+      {cardMovePrompt && <DeckCardMoveModal
+        changes={cardMovePrompt.changes}
+        pending={savingDeck}
+        error={saveDeckError}
+        onClose={() => setCardMovePrompt(null)}
+        onSave={moves => saveDeck(cardMovePrompt.deck, moves)}
+      />}
       {returnLocationsDeck && (
         <div role="alert" className="deck-source-error">
           <p>{t('deck.returnLocationsFailed', { name: returnLocationsDeck.name })}</p>
@@ -2546,6 +2617,13 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
       )}
 
       {/* --- POPUPS & MODALS --- */}
+      {checkoutContainerDeck && (
+        <DeckContainerModal
+          deck={checkoutContainerDeck}
+          onClose={() => { if (!checkoutBusyRef.current) setCheckoutContainerDeck(null); }}
+          onCheckout={containerName => performCheckout(checkoutContainerDeck, containerName)}
+        />
+      )}
 
       {showDeckContainerModal && activeDeck && (
         <DeckContainerModal

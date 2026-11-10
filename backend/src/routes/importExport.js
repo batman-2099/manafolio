@@ -255,6 +255,16 @@ async function parseCompleteBackup(data) {
     throw new Error('Invalid backup references');
   }
   const locations = new Map(backup.locations.map(location => [location.id, location]));
+  for (const deck of backup.decks) {
+    if (deck.container_id == null) continue;
+    const location = locations.get(deck.container_id);
+    if (!Number.isSafeInteger(deck.container_id) || deck.container_id < 1 || !location
+        || !['collection', 'graveyard'].includes(deck.inventory_type ?? 'collection')
+        || (deck.inventory_type ?? 'collection') !== (location.inventory_type ?? 'collection')
+        || !['mtg', 'any'].includes(location.game ?? 'any')) {
+      throw new Error('Invalid backup deck container link');
+    }
+  }
   const compartments = new Map(backup.compartments.map(compartment => [compartment.id, compartment]));
   for (const card of backup.collection) {
     const location = locations.get(card.location_id);
@@ -389,12 +399,13 @@ async function restoreCompleteBackup(backup, userId) {
       const result = await db.run(`
         INSERT INTO decks (
           name, description, notes, checked_out, checked_out_at, game, created_at, format, category,
-          accent_color, target_size, commander_card_id, inventory_type, wins, losses, sleeved, card_back_color, card_back_image, user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          accent_color, target_size, commander_card_id, inventory_type, wins, losses, sleeved, card_back_color, card_back_image, user_id, container_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         deck.name, deck.description, deck.notes ?? '', deck.checked_out || 0, deck.checked_out_at, deck.game, deck.created_at,
         deck.format, deck.category, deck.accent_color, deck.target_size, deck.commander_card_id ?? null,
-        deck.inventory_type ?? 'collection', deck.wins ?? 0, deck.losses ?? 0, deck.sleeved ?? 0, deck.card_back_color, deck.card_back_image, userId
+        deck.inventory_type ?? 'collection', deck.wins ?? 0, deck.losses ?? 0, deck.sleeved ?? 0, deck.card_back_color, deck.card_back_image, userId,
+        deck.container_id == null ? null : locationIds.get(deck.container_id)
       ]);
       deckIds.set(deck.id, result.lastID);
     }
