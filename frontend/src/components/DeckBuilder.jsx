@@ -1533,7 +1533,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
                   {['collection', 'graveyard'].includes(activeDeck.inventory_type) && <DeckContainerLink
                     key={`${activeDeck.id}/${activeDeck.inventory_type}`}
                     deck={activeDeck}
-                    disabled={editorBusy || savingRecord || !!deckDraft || activeDeck.inventory_type !== JSON.parse(savedEditorState || '{}').inventory_type}
+                    decks={decks}
+                    disabled={editorBusy || decksError || savingRecord || !!deckDraft || activeDeck.inventory_type !== JSON.parse(savedEditorState || '{}').inventory_type}
                     onBusy={setSavingContainerLink}
                     onSaved={(deckId, link) => {
                       setActiveDeck(deck => deck?.id === deckId ? { ...deck, ...link } : deck);

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '../utils/i18n';
 
-export default function DeckContainerLink({ deck, disabled, onSaved, onBusy }) {
+export default function DeckContainerLink({ deck, decks, disabled, onSaved, onBusy }) {
   const { t } = useT();
   const [locations, setLocations] = useState(null);
   const [loadError, setLoadError] = useState(false);
@@ -51,6 +51,7 @@ export default function DeckContainerLink({ deck, disabled, onSaved, onBusy }) {
     }
   };
 
+  const linkedContainerIds = new Set(decks.filter(other => other.id !== deck.id).map(other => other.container_id));
   return <div className="deck-sleeved-field" aria-busy={saving}>
     <label htmlFor="deck-linked-container">{t('deck.linkedContainer')}</label>
     <select id="deck-linked-container" className="input-control" value={deck.container_id ?? ''}
@@ -58,7 +59,7 @@ export default function DeckContainerLink({ deck, disabled, onSaved, onBusy }) {
       onChange={event => save(event.target.value)}>
       <option value="">{t('deck.noContainer')}</option>
       {deck.container_id && !locations?.some(location => location.id === deck.container_id) && <option value={deck.container_id} disabled>{deck.container_name}</option>}
-      {locations?.map(location => <option key={location.id} value={location.id}>{[location.storage_unit_name, location.name].filter(Boolean).join(' · ')}</option>)}
+      {locations?.filter(location => location.id === deck.container_id || !linkedContainerIds.has(location.id)).map(location => <option key={location.id} value={location.id}>{[location.storage_unit_name, location.name].filter(Boolean).join(' · ')}</option>)}
     </select>
     <p id="deck-container-link-hint">{t('deck.containerLinkHint')}</p>
     <div id="deck-container-link-status" role="status">

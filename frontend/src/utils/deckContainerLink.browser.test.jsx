@@ -20,10 +20,10 @@ export async function runDeckContainerLinkRegressions() {
       const { container_id } = JSON.parse(options.body);
       body = { container_id, container_name: container_id === 11 ? 'Second box' : null };
       Object.assign(deck, body);
-    } else if (url === '/api/decks') body = [deck];
+    } else if (url === '/api/decks') body = [deck, { ...deck, id: 2, name: 'Other linked deck', container_id: 13 }, { ...deck, id: 3, name: 'Existing shared link', container_id: 10 }];
     else if (url === '/api/decks/1') body = deck;
     else if (url === '/api/decks/1/locations') body = [];
-    else if (url === '/api/locations?inventory_type=collection') body = [{ id: 10, name: 'Sample box', game: 'mtg' }, { id: 11, name: 'Second box', game: 'any' }, { id: 12, name: 'Legacy game', game: 'other' }];
+    else if (url === '/api/locations?inventory_type=collection') body = [{ id: 10, name: 'Sample box', game: 'mtg' }, { id: 11, name: 'Second box', game: 'any' }, { id: 12, name: 'Legacy game', game: 'other' }, { id: 13, name: 'Already linked box', game: 'mtg' }];
     else if (String(url).includes('card-art')) body = {};
     else throw new Error(`Unexpected fixture request: ${url}`);
     return { ok: true, json: async () => body };
@@ -39,6 +39,8 @@ export async function runDeckContainerLinkRegressions() {
   try {
     await act(async () => root.render(<I18nProvider><DeckBuilder initialDeckId={1} showToast={() => {}} /></I18nProvider>));
     assert(!host.querySelector('#deck-linked-container option[value="12"]'), 'unsupported game containers are not offered');
+    assert(!host.querySelector('#deck-linked-container option[value="13"]'), 'containers linked to another deck are hidden');
+    assert(host.querySelector('#deck-linked-container').value === '10', 'current association remains visible even when an older shared link exists');
     await act(async () => {
       const notes = host.querySelector('#deck-notes');
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(notes, 'Unsaved sample notes');
@@ -49,10 +51,12 @@ export async function runDeckContainerLinkRegressions() {
     fail = false;
     await select('11');
     assert(host.querySelector('#deck-linked-container').value === '11', 'retry publishes the saved association');
+    assert(!host.querySelector('#deck-linked-container option[value="10"]'), 'previous container is hidden after switching when another deck still links it');
     assert(host.querySelector('#deck-notes').value === 'Unsaved sample notes' && !deck.notes, 'linking never saves or discards unsaved deck edits');
     await select('');
     assert(host.querySelector('#deck-linked-container').value === '' && deck.container_id === null, 'unlink removes only the association');
-    return ['failed link rollback', 'retry', 'unsaved deck edits retained', 'unlink'];
+    assert(host.querySelector('#deck-linked-container option[value="11"]'), 'unlink makes an otherwise unused container available again');
+    return ['other decks’ containers hidden', 'current shared link retained', 'failed link rollback', 'retry', 'unsaved deck edits retained', 'unlink releases container'];
   } finally {
     await act(async () => root.unmount());
     host.remove();

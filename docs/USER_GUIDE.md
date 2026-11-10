@@ -1027,7 +1027,7 @@ The card inspector's **Related tokens** and AI drafts offer the same viewer. Own
 
 In a Physical or Graveyard deck, choose **Linked container** below **Sleeved** in **Deck Health & Rules**. Choose **No linked container** to remove the association. Changes save immediately; other unsaved deck edits remain untouched. Save a change of deck inventory before choosing its container.
 
-Only your Magic-compatible containers in the same inventory are offered. This is a label for where the deck belongs: it does not move cards, choose source copies, reserve inventory, or change checkout. Multiple decks may link to the same container. Arena decks have no container link.
+Only your Magic-compatible containers in the same inventory are offered. Containers linked to another deck are hidden from the dropdown; this deck's current selection remains visible, including existing shared links. Linking alone does not move cards, choose source copies, reserve inventory, or change checkout. Arena decks have no container link.
 
 The link survives reloads and complete account backups. Deleting the container or changing either inventory incompatibly clears it. Duplicating a deck, creating a deck from a container, and the standalone **Create Container** action do not automatically set this link. **Create box and check out** does.
 
