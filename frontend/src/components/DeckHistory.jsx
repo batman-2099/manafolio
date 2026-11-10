@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import Modal from './Modal';
 import CardImage from './CardImage';
+import CardInspectorModal from './CardInspectorModal';
 import { useT } from '../utils/i18n';
 import { useBackGuard } from '../utils/useBackGuard';
 
-export default function DeckHistory({ deck, saved, unsaved, onClose, onRestored }) {
+export default function DeckHistory({ deck, saved, unsaved, onClose, onRestored, onUpdate, showToast }) {
   const { t } = useT();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -12,6 +13,9 @@ export default function DeckHistory({ deck, saved, unsaved, onClose, onRestored 
   const [fromId, setFromId] = useState('');
   const [toId, setToId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [inspectorId, setInspectorId] = useState(null);
+  const [inspectorCard, setInspectorCard] = useState(null);
+  const [inspectorStatus, setInspectorStatus] = useState('');
   const comparisonRef = useRef(null);
   useBackGuard(true, () => busy ? false : onClose());
   useEffect(() => {
@@ -28,6 +32,27 @@ export default function DeckHistory({ deck, saved, unsaved, onClose, onRestored 
       }).catch(err => { if (err.name !== 'AbortError') setError(err.message); });
     return () => controller.abort();
   }, [deck.id, retry, t]);
+
+  useEffect(() => {
+    if (!inspectorId) return;
+    const controller = new AbortController();
+    setInspectorStatus(t('common.loading'));
+    fetch(`/api/collection?${new URLSearchParams({ card_id: inspectorId, list_type: deck.inventory_type || 'collection' })}`, { signal: controller.signal })
+      .then(response => { if (!response.ok) throw new Error(); return response.json(); })
+      .then(entries => {
+        if (controller.signal.aborted) return;
+        setInspectorStatus(entries.length ? '' : t('collection.noMatches'));
+        if (entries.length) setInspectorCard({ ...entries[0], stack_entries: entries });
+        setInspectorId(null);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setInspectorStatus(t('collection.errLoad'));
+          setInspectorId(null);
+        }
+      });
+    return () => controller.abort();
+  }, [inspectorId, deck.inventory_type, t]);
 
   const revisions = data?.revisions || [];
   const from = revisions.find(row => String(row.id) === fromId)?.snapshot;
@@ -71,6 +96,7 @@ export default function DeckHistory({ deck, saved, unsaved, onClose, onRestored 
       {!data && !error && <p role="status">{t('common.loading')}</p>}
       {error && <p role="alert">{error} <button className="btn btn-secondary" disabled={busy} onClick={() => setRetry(value => value + 1)}>{t('common.retry')}</button></p>}
       {data && !revisions.length && <p>{t('history.empty')}</p>}
+      {inspectorStatus && <p role="status">{inspectorStatus}</p>}
       {!!revisions.length && <>
         <div className="deck-history-selectors">
           <label>{t('history.from')}<select className="select-control" value={fromId} disabled={busy} onChange={event => setFromId(event.target.value)}>
@@ -100,9 +126,11 @@ export default function DeckHistory({ deck, saved, unsaved, onClose, onRestored 
                   const newQuantity = after.get(id)?.quantity || 0;
                   const delta = newQuantity - oldQuantity;
                   return <li key={id} className={`deck-history-card-change deck-history-card-change--${kind}`}>
-                    <CardImage card={names.get(id) || { id }} loading="lazy" />
-                    <div>
+                    <button type="button" className="deck-history-card-preview" disabled={busy} onClick={() => setInspectorId(id)} aria-label={`${t('shared.cardDetails')} ${cardName(id)}`}>
+                      <CardImage card={names.get(id) || { id }} loading="lazy" />
                       <strong>{cardName(id)}</strong>
+                    </button>
+                    <div>
                       <span>{oldQuantity} → {newQuantity} ({delta > 0 ? '+' : ''}{delta})</span>
                       {(from?.commander_card_id === id) !== (to?.commander_card_id === id) && <span>{t('history.commander_card_id')}: {t(from?.commander_card_id === id ? 'history.removed' : 'history.added')}</span>}
                       {(before.get(id)?.source_entry_id ?? null) !== (after.get(id)?.source_entry_id ?? null) && <span>{t('history.source')}: {before.get(id)?.source_entry_id ?? t('history.none')} → {after.get(id)?.source_entry_id ?? t('history.none')}</span>}
@@ -120,5 +148,6 @@ export default function DeckHistory({ deck, saved, unsaved, onClose, onRestored 
       </>}
       <button className="btn btn-secondary" disabled={busy} onClick={onClose}>{t('common.close')}</button>
     </section>
+    <CardInspectorModal card={inspectorCard} onClose={() => setInspectorCard(null)} onUpdate={onUpdate} showToast={showToast} />
   </Modal>;
 }

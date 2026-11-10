@@ -2900,6 +2900,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
       {showHistory && activeDeck && <DeckHistory
         deck={activeDeck} saved={JSON.parse(savedEditorState)} unsaved={hasUnsavedChanges}
         onClose={() => setShowHistory(false)}
+        onUpdate={fetchDecks} showToast={showToast}
         onRestored={async () => {
           if (!await loadDeckDetails(activeDeck.id)) throw new Error(t('deck.errLoadDetails'));
           await fetchDecks();

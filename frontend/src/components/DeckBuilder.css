@@ -930,6 +930,19 @@
   border: 0;
   border-bottom: 1px solid var(--border-glass);
 }
+.deck-history-card-preview {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
 
 
 .deck-history-card-change img {
