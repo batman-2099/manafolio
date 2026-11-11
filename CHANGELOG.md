@@ -4,6 +4,7 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Add all 12 colors from the [NFOAI sleeve pack](https://www.amazon.com/dp/B0H5CL783Z) to the card-back sleeve dropdown, with bundled previews cropped from the product's color swatches.
 - Validate account settings before mutation and save password, session, sharing, and provider-token changes atomically; exercise collection authorization through real HTTP routes.
 - Validate core card metadata before account restore; preserve large container-created deck history through backup and revision restoration without relaxing ordinary editor limits.
 - Resolve both foil and nonfoil CSV imports to the requested language, retain explicit printing IDs, and preserve ManaBox CSV language values.

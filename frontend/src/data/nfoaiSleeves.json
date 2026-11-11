@@ -1,0 +1,98 @@
+[
+  {
+    "id": "nfoai-classic-black",
+    "name": "Classic Black - Matte Sleeves",
+    "group": "plain",
+    "image": "sleeves/nfoai/classic-black.webp",
+    "url": "https://www.amazon.com/dp/B0H5CL783Z",
+    "sourceImage": "https://m.media-amazon.com/images/I/51dm876JapL.jpg"
+  },
+  {
+    "id": "nfoai-blaze-crimson",
+    "name": "Blaze Crimson - Matte Dual Sleeves",
+    "group": "plain",
+    "image": "sleeves/nfoai/blaze-crimson.webp",
+    "url": "https://www.amazon.com/dp/B0H5CL783Z",
+    "sourceImage": "https://m.media-amazon.com/images/I/51dm876JapL.jpg"
+  },
+  {
+    "id": "nfoai-mystic-purple",
+    "name": "Mystic Purple - Matte Dual Sleeves",
+    "group": "plain",
+    "image": "sleeves/nfoai/mystic-purple.webp",
+    "url": "https://www.amazon.com/dp/B0H5CL783Z",
+    "sourceImage": "https://m.media-amazon.com/images/I/51dm876JapL.jpg"
+  },
+  {
+    "id": "nfoai-arcane-emerald",
+    "name": "Arcane Emerald - Matte Dual Sleeves",
+    "group": "plain",
+    "image": "sleeves/nfoai/arcane-emerald.webp",
+    "url": "https://www.amazon.com/dp/B0H5CL783Z",
+    "sourceImage": "https://m.media-amazon.com/images/I/51dm876JapL.jpg"
+  },
+  {
+    "id": "nfoai-tideglass-blue",
+    "name": "Tideglass Blue - Matte Dual Sleeves",
+    "group": "plain",
+    "image": "sleeves/nfoai/tideglass-blue.webp",
+    "url": "https://www.amazon.com/dp/B0H5CL783Z",
+    "sourceImage": "https://m.media-amazon.com/images/I/51dm876JapL.jpg"
+  },
+  {
+    "id": "nfoai-frost-white",
+    "name": "Frost White - Matte Dual Sleeves",
+    "group": "plain",
+    "image": "sleeves/nfoai/frost-white.webp",
+    "url": "https://www.amazon.com/dp/B0H5CL783Z",
+    "sourceImage": "https://m.media-amazon.com/images/I/51dm876JapL.jpg"
+  },
+  {
+    "id": "nfoai-mistleaf-green",
+    "name": "Mistleaf Green - Matte Dual Sleeves",
+    "group": "plain",
+    "image": "sleeves/nfoai/mistleaf-green.webp",
+    "url": "https://www.amazon.com/dp/B0H5CL783Z",
+    "sourceImage": "https://m.media-amazon.com/images/I/51dm876JapL.jpg"
+  },
+  {
+    "id": "nfoai-lilac-arcana",
+    "name": "Lilac Arcana - Matte Dual Sleeves",
+    "group": "plain",
+    "image": "sleeves/nfoai/lilac-arcana.webp",
+    "url": "https://www.amazon.com/dp/B0H5CL783Z",
+    "sourceImage": "https://m.media-amazon.com/images/I/51dm876JapL.jpg"
+  },
+  {
+    "id": "nfoai-peach-blush",
+    "name": "Peach Blush - Matte Dual Sleeves",
+    "group": "plain",
+    "image": "sleeves/nfoai/peach-blush.webp",
+    "url": "https://www.amazon.com/dp/B0H5CL783Z",
+    "sourceImage": "https://m.media-amazon.com/images/I/51dm876JapL.jpg"
+  },
+  {
+    "id": "nfoai-oracle-blue",
+    "name": "Oracle Blue - Matte Dual Sleeves",
+    "group": "plain",
+    "image": "sleeves/nfoai/oracle-blue.webp",
+    "url": "https://www.amazon.com/dp/B0H5CL783Z",
+    "sourceImage": "https://m.media-amazon.com/images/I/51dm876JapL.jpg"
+  },
+  {
+    "id": "nfoai-moonlit-silver",
+    "name": "Moonlit Silver - Matte Dual Sleeves",
+    "group": "plain",
+    "image": "sleeves/nfoai/moonlit-silver.webp",
+    "url": "https://www.amazon.com/dp/B0H5CL783Z",
+    "sourceImage": "https://m.media-amazon.com/images/I/51dm876JapL.jpg"
+  },
+  {
+    "id": "nfoai-oathstone-bronze",
+    "name": "Oathstone Bronze - Matte Dual Sleeves",
+    "group": "plain",
+    "image": "sleeves/nfoai/oathstone-bronze.webp",
+    "url": "https://www.amazon.com/dp/B0H5CL783Z",
+    "sourceImage": "https://m.media-amazon.com/images/I/51dm876JapL.jpg"
+  }
+]

@@ -6,6 +6,7 @@ import { prepareImage } from '../utils/prepareImage';
 import dragonShieldSleevesUrl from '../data/dragonShieldSleeves.json?url';
 import ultimateGuardSleevesUrl from '../data/ultimateGuardSleeves.json?url';
 import ultraProSleevesUrl from '../data/ultraProSleeves.json?url';
+import nfoaiSleevesUrl from '../data/nfoaiSleeves.json?url';
 
 // Magic artwork © Wizards of the Coast. Bundled from Scryfall's standard card back:
 // https://backs.scryfall.io/normal/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg
@@ -35,24 +36,26 @@ export default function DeckCardBack({ deck, disabled, onSaved, onBusy }) {
   useEffect(() => {
     if (!open || catalog) return;
     const controller = new AbortController();
-    Promise.all([dragonShieldSleevesUrl, ultimateGuardSleevesUrl, ultraProSleevesUrl].map(async url => {
+    Promise.all([dragonShieldSleevesUrl, ultimateGuardSleevesUrl, ultraProSleevesUrl, nfoaiSleevesUrl].map(async url => {
       const response = await fetch(url, { signal: controller.signal });
       if (!response.ok) throw new Error('catalog');
       return response.json();
-    })).then(([dragonShieldSleeves, ultimateGuardSleeves, ultraProSleeves]) => {
+    })).then(([dragonShieldSleeves, ultimateGuardSleeves, ultraProSleeves, nfoaiSleeves]) => {
       if (controller.signal.aborted) return;
       const sleeves = [
         ...dragonShieldSleeves,
         ...ultimateGuardSleeves.map(sleeve => ({ ...sleeve, image: `${import.meta.env.BASE_URL}${sleeve.image}` })),
         ...ultraProSleeves,
+        ...nfoaiSleeves.map(sleeve => ({ ...sleeve, image: `${import.meta.env.BASE_URL}${sleeve.image}` })),
       ];
       const groups = [
         { provider: 'Dragon Shield', plain: [], art: [] },
         { provider: 'Ultimate Guard', plain: [], art: [] },
         { provider: 'Ultra PRO', plain: [], art: [] },
+        { provider: 'NFOAI', plain: [], art: [] },
       ];
       for (const sleeve of sleeves) {
-        const provider = sleeve.id.startsWith('ultimate-guard-') ? 1 : sleeve.id.startsWith('ultra-pro-') ? 2 : 0;
+        const provider = sleeve.id.startsWith('ultimate-guard-') ? 1 : sleeve.id.startsWith('ultra-pro-') ? 2 : sleeve.id.startsWith('nfoai-') ? 3 : 0;
         const group = sleeve.group || (/(?:Classic|Matte|Matte Dual) Sleeves$/.test(sleeve.name) ? 'plain' : 'art');
         groups[provider][group].push(sleeve);
       }
