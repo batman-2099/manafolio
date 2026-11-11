@@ -299,6 +299,7 @@
   "bulk.confirmDelete.other": "Excluir {count} cartas selecionadas? Não é possível desfazer.",
   "bulk.delete": "Excluir",
   "bulk.done": "Concluído",
+  "bulk.errAction": "A ação em lote falhou. Tente novamente.",
   "bulk.markTrade": "Marcar para troca",
   "bulk.moveToCollection": "Mover para a coleção",
   "bulk.moveToContainer": "Mover para um contêiner…",

@@ -39,6 +39,7 @@ async function testImportRoute() {
   const previewHandler = importRouter.stack.find(layer => layer.route?.path === '/import/preview').route.stack[0].handle;
   const originalBulkFetch = scryfallApi.bulkFetchByIdentifier;
   const originalCacheCards = scryfallApi.cacheCards;
+  const originalAdapter = scryfallApi.client.defaults.adapter;
   const importHandler = importRouter.stack.find(layer => layer.route?.path === '/import').route.stack.at(-1).handle;
   const handler = (req, res) => importHandler({ ...req, accepts: () => 'application/json' }, res);
 
@@ -195,6 +196,44 @@ async function testImportRoute() {
       items: [{ name: 'Caldera Kavu', quantity: 2 }]
     });
     assert.deepStrictEqual(bulkCalls.at(-1).map(row => [row.name, row.set_id, row.number, row.printing]), [['Caldera Kavu', 'PLS', '58', 'Holofoil']]);
+    const englishId = 'mtg-00000000-0000-4000-8000-000000000031';
+    const germanId = 'mtg-00000000-0000-4000-8000-000000000034';
+    await db.run(`UPDATE card_cache SET language = 'English', set_id = 'pls', number = '58' WHERE id = ?`, [englishId]);
+    await db.run(`INSERT INTO card_cache (id, name, game, language, printed_name, set_id, number)
+      VALUES (?, 'Caldera Kavu', 'mtg', 'German', 'Caldera-Kavu', 'pls', '58')`, [germanId]);
+    await db.run(`INSERT INTO card_cache (id, name, game, language, set_id, number)
+      VALUES ('mtg-historical-kavu', 'Caldera Kavu', 'mtg', 'English', 'pls', '58')`);
+    scryfallApi.bulkFetchByIdentifier = async rows => {
+      const card = await db.get('SELECT * FROM card_cache WHERE id = ?', [englishId]);
+      return { cards: [card], pairs: rows.map(row => ({ row, card })) };
+    };
+    const languageRequests = [];
+    scryfallApi.client.defaults.adapter = async config => {
+      languageRequests.push(config.url);
+      assert.strictEqual(config.url, '/cards/pls/58/fr');
+      throw Object.assign(new Error('Printing unavailable'), { response: { status: 404 } });
+    };
+    const importLanguage = async (format, data, expectedId, language, printing) => {
+      const response = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+      await handler({ body: { format, data }, user: { id: 1 } }, response);
+      assert.strictEqual(response.statusCode, 200, JSON.stringify(response.body));
+      assert.deepStrictEqual(await db.get('SELECT card_id, language, printing FROM collection ORDER BY id DESC LIMIT 1'),
+        { card_id: expectedId, language, printing });
+    };
+    for (const printing of ['Normal', 'Holofoil']) {
+      const headers = 'Card ID,Name,Set ID,Card Number,Quantity,Printing,Language\n';
+      await importLanguage('internal', `${headers},Caldera Kavu,PLS,58,1,${printing},German`, germanId, 'German', printing);
+      await importLanguage('internal', `${headers},Caldera Kavu,PLS,58,1,${printing},French`, englishId, 'French', printing);
+      await importLanguage('csv', `Name,Set code,Card number,Quantity,Foil,Language\nCaldera Kavu,PLS,58,1,${printing === 'Holofoil'},German`,
+        germanId, 'German', printing);
+      await importLanguage('internal', `${headers}${englishId},Caldera Kavu,PLS,58,1,${printing},German`, englishId, 'German', printing);
+      await importLanguage('json', [{ card_id: englishId, name: 'Caldera Kavu', quantity: 1, printing, language: 'German' }],
+        englishId, 'German', printing);
+      await importLanguage('json', [{ card_id: 'mtg-historical-kavu', name: 'Caldera Kavu', quantity: 1, printing, language: 'German' }],
+        'mtg-historical-kavu', 'German', printing);
+    }
+    assert.deepStrictEqual(languageRequests, ['/cards/pls/58/fr', '/cards/pls/58/fr'],
+      'unavailable translations keep the resolved printing; explicit UUIDs and JSON identities are not translated');
     scryfallApi.bulkFetchByIdentifier = async rows => {
       const card = resolvedCard(rows[0]);
       return {
@@ -223,6 +262,7 @@ async function testImportRoute() {
   } finally {
     scryfallApi.bulkFetchByIdentifier = originalBulkFetch;
     scryfallApi.cacheCards = originalCacheCards;
+    scryfallApi.client.defaults.adapter = originalAdapter;
     try { db.dbConnection.close(); } catch { /* already closed */ }
     for (const suffix of ['', '-wal', '-shm']) {
       try { fs.unlinkSync(tmpDb + suffix); } catch { /* not present */ }

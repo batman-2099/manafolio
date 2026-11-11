@@ -117,6 +117,7 @@ On narrow screens, use **More** for navigation items that are not shown in the b
 - Multicolor cards contribute to each applicable identity color. Mana-value charts exclude lands, distinguish zero from unknown, and group values of seven or more.
 - Graveyard shows archived quantities, value, costs, and history separately, without deck-performance comparisons. Growth uses original addition dates, not archive dates; history values currently archived cards rather than reconstructing past archive membership.
 - Prices depend on the exact printing and provider data, primarily Scryfall, TCGplayer, and Cardmarket. A graded copy's per-copy value replaces its raw market value in totals and exports. Manafolio does not convert currencies; Collection separates currency subtotals, while Dashboard and public mixed totals are marked rather than presented as converted money.
+- Valuation history has no separate foil or graded-copy price series. Foil copies and copies with a manual value hold their current resolved per-copy value across the chart instead of following nonfoil price changes; this is not a record of their past market prices.
 - Card details link to **Mana Pool** using the printing's set code and collector number, alongside **TCGplayer** when a product link is available. These shopping links do not change the source of the displayed price.
 
 ### Check a card's price without adding it

@@ -12,10 +12,12 @@
     "dev:frontend": "npm run dev --prefix frontend",
     "build:frontend": "npm run build --prefix frontend",
     "test": "npm test --prefix backend && npm test --prefix frontend",
+    "verify": "npm test && npm run lint --prefix frontend && node backend/test/desktoprelease.test.cjs && xvfb-run -a npm run test:browser --prefix frontend && npm run build:frontend",
     "start": "npm start --prefix backend"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "postject": "1.0.0-alpha.6"
   },
   "version": "2.9.0"
 }

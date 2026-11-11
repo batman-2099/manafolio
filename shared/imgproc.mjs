@@ -380,7 +380,7 @@ export function approxPolyDP(pts, epsilon) {
     if (d > dFar) { dFar = d; iFar = i; }
   }
   const simplify = (start, end, out) => {
-    const a = pts[start], b = pts[end];
+    const a = pts[start], b = pts[end % pts.length];
     let idx = -1, max = 0;
     const dx = b.x - a.x, dy = b.y - a.y;
     const len = Math.hypot(dx, dy) || 1;
@@ -397,7 +397,7 @@ export function approxPolyDP(pts, epsilon) {
   const res = [pts[0]];
   simplify(0, iFar, res);
   res.push(pts[iFar]);
-  simplify(iFar, pts.length - 1, res);
+  simplify(iFar, pts.length, res);
   return res;
 }
 

@@ -54,9 +54,27 @@ async function clientCrop(buf, quad) {
 }
 
 async function geometry() {
-  const { orderQuad, getPerspectiveTransform, warpPerspective } = await import('../../shared/imgproc.mjs');
+  const { orderQuad, getPerspectiveTransform, warpPerspective, approxPolyDP, isContourConvex } = await import('../../shared/imgproc.mjs');
   const expected = [{ x: 1, y: 1 }, { x: 7, y: 2 }, { x: 6, y: 7 }, { x: 1, y: 6 }];
   const dst = [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }, { x: 0, y: 4 }];
+  for (const corners of [dst, expected]) {
+    for (const ring of [corners, [...corners].reverse()]) {
+      for (let start = 0; start < ring.length; start++) {
+        const rotated = [...ring.slice(start), ...ring.slice(0, start)];
+        const dense = rotated.flatMap((point, i) => {
+          const next = rotated[(i + 1) % rotated.length];
+          return [point, { x: (point.x + next.x) / 2, y: (point.y + next.y) / 2 }];
+        });
+        for (const points of [rotated, dense, [...dense, dense[0]]]) {
+          const simplified = approxPolyDP(points, 0.1);
+          assert.deepStrictEqual(simplified, rotated, 'closed simplification preserves all four corners');
+          assert.strictEqual(isContourConvex(simplified), true);
+        }
+      }
+    }
+  }
+  const triangle = dst.slice(0, 3);
+  assert.deepStrictEqual(approxPolyDP(triangle, 0.1), triangle, 'triangles must not become card quads');
   const pixels = new Uint8ClampedArray(9 * 9 * 4);
   for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) {
     pixels.set([x * 20, y * 20, 80, 255], (y * 9 + x) * 4);

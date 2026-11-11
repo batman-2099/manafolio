@@ -72,8 +72,39 @@ begin
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  PreviousPath, Directory: String;
+  PayloadDirs: array[0..4] of String;
+  Index: Integer;
 begin
   Result := RunningAppMessage();
+  if Result <> '' then
+    Exit;
+
+  (* Only clean an installation registered by this installer at this path.
+     Never delete app/backend wholesale: archive users can keep .env, database,
+     models and backups there. Desktop user data lives outside {app}. *)
+  if not RegQueryStringValue(HKCU,
+    'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8B26A6D8-3DD2-4B60-91D2-1A823E1E2390}_is1',
+    'InstallLocation', PreviousPath) then
+    Exit;
+  if CompareText(AddBackslash(PreviousPath), AddBackslash(ExpandConstant('{app}'))) <> 0 then
+    Exit;
+
+  PayloadDirs[0] := 'desktop';
+  PayloadDirs[1] := 'app\backend\src';
+  PayloadDirs[2] := 'app\backend\node_modules';
+  PayloadDirs[3] := 'app\frontend\dist';
+  PayloadDirs[4] := 'app\shared';
+  for Index := 0 to GetArrayLength(PayloadDirs) - 1 do
+  begin
+    Directory := ExpandConstant('{app}\') + PayloadDirs[Index];
+    if DirExists(Directory) and not DelTree(Directory, True, True, True) then
+    begin
+      Result := 'Setup could not replace the old application payload. Close Manafolio and any programs using its installation files, then retry. Configuration and user data have not been removed.';
+      Exit;
+    end;
+  end;
 end;
 
 function InitializeUninstall(): Boolean;

@@ -69,11 +69,6 @@ export const LANGUAGE_ORDER = cardOrder.language;
 // sort chronologically, matching the backend's placement engine — without it
 // the display order would disagree with where recommendSlot files cards.
 export function sortCardsByOrder(cards, sortOrder, foilSorting, setsList = []) {
-  const setRank = (name) => {
-    if (!setsList || setsList.length === 0) return 0;
-    const idx = setsList.findIndex(s => s.name === name);
-    return idx >= 0 ? idx : 999999;
-  };
   let criteria = [];
   if (typeof sortOrder === 'string') {
     if (sortOrder.startsWith('[')) {
@@ -86,6 +81,15 @@ export function sortCardsByOrder(cards, sortOrder, foilSorting, setsList = []) {
   }
 
   if (!criteria || criteria.length === 0) return cards;
+  let setRanks;
+  if (setsList?.length && criteria.some(c => c.by === 'set')) {
+    setRanks = new Map();
+    setsList.forEach((set, index) => {
+      // Duplicate names retain the first release rank, matching findIndex.
+      if (!setRanks.has(set.name)) setRanks.set(set.name, index);
+    });
+  }
+  const setRank = name => setRanks ? (setRanks.get(name) ?? 999999) : 0;
 
   cards.sort((a, b) => {
     for (const c of criteria) {

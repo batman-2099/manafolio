@@ -81,6 +81,21 @@ async function testFullBackup() {
       status(code) { this.statusCode = code; return this; },
       json(body) { this.body = body; return this; }
     };
+    const beforeInvalidArrays = await Promise.all(
+      ['card_cache', 'collection', 'locations', 'compartments', 'decks', 'deck_cards'].map(table => db.all(`SELECT * FROM ${table}`)));
+    for (const field of ['types', 'subtypes', 'color_identity']) {
+      for (const value of ['not JSON', '{}', 'null', '"Creature"', '[null]', '[1]', '["Creature",{}]', ['Creature']]) {
+        const invalid = structuredClone(res.body);
+        invalid.card_cache[0][field] = value;
+        restoreRes.statusCode = 200;
+        await importBackup({ body: { format: 'backup', data: invalid }, user: { id: 1 } }, restoreRes);
+        assert.strictEqual(restoreRes.statusCode, 400, `${field} rejects ${JSON.stringify(value)}`);
+        assert.deepStrictEqual(await Promise.all(
+          ['card_cache', 'collection', 'locations', 'compartments', 'decks', 'deck_cards'].map(table => db.all(`SELECT * FROM ${table}`))),
+        beforeInvalidArrays, 'invalid serialized arrays must not change inventory or populate the shared cache');
+      }
+    }
+    restoreRes.statusCode = 200;
     await importBackup({ body: { format: 'backup', data: res.body }, user: { id: 1 } }, restoreRes);
 
     assert.strictEqual(restoreRes.statusCode, 200);
@@ -100,6 +115,14 @@ async function testFullBackup() {
       '["borderless","fullart"]', 'fresh-cache restore preserves printing treatments');
     assert.strictEqual((await db.get("SELECT produced_mana FROM card_cache WHERE id = 'backup-card'")).produced_mana,
       '["R","W"]', 'fresh-cache restore preserves mana production');
+    assert.deepStrictEqual(await db.get("SELECT types, subtypes, color_identity FROM card_cache WHERE id = 'backup-card'"),
+      { types: null, subtypes: null, color_identity: null }, 'legacy SQL null array fields remain valid on fresh-cache restore');
+    const getCollection = require('../src/routes/collection').stack.find(layer =>
+      layer.route?.path === '/collection' && layer.route.methods.get).route.stack.at(-1).handle;
+    const collectionRes = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+    await getCollection({ query: {}, user: { id: 1 } }, collectionRes);
+    assert.strictEqual(collectionRes.statusCode, 200, 'collection remains readable after restore and rejected malformed arrays');
+    assert.deepStrictEqual(collectionRes.body[0].types, []);
     for (const produced_mana of ['not JSON', '{}', '["invalid"]', ['R']]) {
       const invalid = structuredClone(res.body);
       invalid.card_cache[0].produced_mana = produced_mana;

@@ -55,6 +55,11 @@ async function main() {
   for (const key of ['PORT', 'HTTPS_PORT', 'DB_PATH', 'CV_MODEL_DIR', 'DEFAULT_ADMIN_PASSWORD', 'MANAFOLIO_MAC_APP', 'MANAFOLIO_WINDOWS_APP', 'APPIMAGE', 'ELECTRON_RUN_AS_NODE', 'MANAFOLIO_SMOKE_SIGNAL']) delete env[key];
   const silent = ['/CURRENTUSER', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'];
   const config = 'PORT=0\nHTTPS_PORT=\nCATALOG_AUTO_UPDATE=0\nBACKUP_INTERVAL_HOURS=0\n';
+  const obsoleteFiles = ['desktop/obsolete-upgrade.dll', 'app/backend/src/obsolete-upgrade.js',
+    'app/backend/node_modules/obsolete-upgrade/index.js', 'app/frontend/dist/assets/obsolete-upgrade.js', 'app/shared/obsolete-upgrade.json'];
+  const retainedFiles = ['.env', 'user-notes.txt', 'app/backend/.env', 'app/backend/database/upgrade-sentinel',
+    'app/backend/data/models/upgrade-sentinel', 'app/backend/backups/upgrade-sentinel'];
+  const sentinel = 'Upgrade must retain user-owned files.\n';
   await fs.mkdir(data, { recursive: true });
   await fs.mkdir(env.APPDATA, { recursive: true });
   await fs.mkdir(output, { recursive: true });
@@ -72,7 +77,16 @@ async function main() {
       const target = powershell("$shell = New-Object -ComObject WScript.Shell; $shell.CreateShortcut($env:MANAFOLIO_SMOKE_SHORTCUT).TargetPath", { ...env, MANAFOLIO_SMOKE_SHORTCUT: shortcut });
       assert.equal(target.toLowerCase(), desktop.toLowerCase());
       await assert.rejects(fs.access(path.join(appPath, 'smoke.cjs')), 'Smoke harness must never ship');
-      if (preserved) assert.deepEqual(await fs.readFile(path.join(data, 'manafolio.db')), preserved, 'Upgrade must not change user data');
+      if (preserved) {
+        assert.deepEqual(await fs.readFile(path.join(data, 'manafolio.db')), preserved, 'Upgrade must not change user data');
+        assert.equal(await fs.readFile(path.join(data, '.env'), 'utf8'), config, 'Upgrade must preserve desktop configuration');
+        for (const file of obsoleteFiles) {
+          await assert.rejects(fs.access(path.join(install, file)), `Upgrade must remove obsolete payload: ${file}`);
+        }
+        for (const file of retainedFiles) {
+          assert.equal(await fs.readFile(path.join(install, file), 'utf8'), sentinel, `Upgrade must preserve ${file}`);
+        }
+      }
 
       const manifestPath = path.join(appPath, 'package.json');
       const originalManifest = await fs.readFile(manifestPath, 'utf8');
@@ -95,6 +109,13 @@ async function main() {
       await fs.writeFile(path.join(data, '.env'), config);
       await fs.writeFile(manifestPath, originalManifest);
       await fs.rm(path.join(appPath, 'smoke.cjs'));
+      if (attempt === 0) {
+        for (const file of [...obsoleteFiles, ...retainedFiles]) {
+          const destination = path.join(install, file);
+          await fs.mkdir(path.dirname(destination), { recursive: true });
+          await fs.writeFile(destination, sentinel);
+        }
+      }
     }
     const database = await fs.readFile(path.join(data, 'manafolio.db'));
     await run(uninstaller, [...silent, `/LOG=${path.join(output, 'uninstall.log')}`], process.env);
@@ -104,7 +125,10 @@ async function main() {
     await assert.rejects(fs.access(path.join(shortcuts, 'Manafolio.lnk')), 'Uninstall must remove its shortcut');
     assert.deepEqual(await fs.readFile(path.join(data, 'manafolio.db')), database, 'Uninstall must preserve the database');
     assert.equal(await fs.readFile(path.join(data, '.env'), 'utf8'), config, 'Uninstall must preserve configuration');
-    console.log('PASS: installed Windows desktop renders, exports, retains its owner through upgrade, stops its server, and uninstalls without deleting user data.');
+    for (const file of retainedFiles) {
+      assert.equal(await fs.readFile(path.join(install, file), 'utf8'), sentinel, `Uninstall must preserve ${file}`);
+    }
+    console.log('PASS: Windows desktop renders, exports, rejects a running-app upgrade, removes obsolete payload, preserves configuration/data through upgrade and uninstall, and stops its server.');
   } catch (error) {
     console.error(error);
     console.error(await fs.readFile(path.join(data, 'desktop.log'), 'utf8').catch(() => 'No desktop log was created.'));

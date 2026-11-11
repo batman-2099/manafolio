@@ -1,15 +1,11 @@
 // Shared <select> option lists for collection entry fields, previously
 // copy-pasted across LocationManager, CollectionList, CardSearch, and
 // CameraScanner's quick-add/edit forms.
-import { LANGUAGE_NAMES, getLanguageNamesForGame, getLanguagesForGame } from './languages';
 import foilTreatments from '../../../shared/foilTreatments.json';
 
 export const CONDITIONS = ['Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged'];
 export const MTG_FORMATS = ['Commander / EDH', 'Standard', 'Modern', 'Pioneer', 'Legacy', 'Vintage', 'Pauper', 'Alchemy', 'Historic', 'Explorer', 'Timeless', 'Brawl', 'Casual'];
-// Re-exported from the language registry so the entry forms, the search language
-// picker and the backend can never drift out of sync.
-export const LANGUAGES = LANGUAGE_NAMES;
-export { getLanguageNamesForGame, getLanguagesForGame };
+export { getLanguageNamesForGame } from './languages';
 
 export const BASE_PRINTINGS = [{ value: 'Normal', label: 'Nonfoil' }, { value: 'Holofoil', label: 'Foil' }];
 const PRINTINGS = [...BASE_PRINTINGS, ...Object.entries(foilTreatments).filter(([key]) => key !== 'traditional').map(([key, label]) => ({ value: `foil:${key}`, label })).sort((a, b) => a.label.localeCompare(b.label))];

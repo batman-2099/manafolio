@@ -103,6 +103,15 @@ async function testMtgDeckImport() {
     assert.strictEqual(tokenRows[0].id, tokens[0].identifiers.scryfallId);
     assert.deepStrictEqual(tokenRows.map(row => [row.set_id, row.number, row.quantity, row.printing]),
       [['ttst', '1', 3, 'Normal'], ['ttst', '2', 2, 'Holofoil']]);
+    for (const section of ['commander', 'mainBoard', 'sideBoard']) {
+      for (const count of [undefined, null, 0, -2, 1.5, '2oops', '2', NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+        assert.throws(() => mtgjsonApi.deckCardRows({
+          [section]: [{ name: 'Invalid quantity', count, setCode: 'tst', number: '1' }],
+        }), /invalid count.*Invalid quantity/, `${section} must reject ${String(count)} instead of manufacturing copies`);
+      }
+      const playable = { name: 'Valid quantity', count: 2, setCode: 'tst', number: '1' };
+      assert.strictEqual(mtgjsonApi.deckCardRows({ [section]: [playable, { ...playable, count: 3 }] })[0].quantity, 5);
+    }
 
     const importRes = response();
     await importDeck({ params: { fileName: 'ExampleDeck_TST' }, body: { create_container: true, create_deck: true }, user: { id: 1 } }, importRes);

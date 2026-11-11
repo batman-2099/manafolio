@@ -1,0 +1,25 @@
+name: Verify
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm ci --prefix backend && npm ci --prefix frontend && npm ci --prefix desktop/electron
+      - name: Prepare sandboxed browser runtime
+        run: |
+          node desktop/electron/node_modules/electron/install.js
+          sudo chown root:root desktop/electron/node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 desktop/electron/node_modules/electron/dist/chrome-sandbox
+      - name: Complete verification gate
+        run: npm run verify

@@ -317,6 +317,7 @@ async function rowSets(game) {
 // of scoping to a set is that the runner-up from an unwanted set can no longer
 // outrank the right card.
 function searchTopK(emb, cat, n, dim, k, allow) {
+  k = Math.min(k, n);
   const sims = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     if (allow && !allow(i)) { sims[i] = -Infinity; continue; }

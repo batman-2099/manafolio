@@ -303,6 +303,7 @@
   "bulk.confirmDelete.other": "Удалить {count} выбранные карты? Это нельзя отменить.",
   "bulk.delete": "Удалить",
   "bulk.done": "Готово",
+  "bulk.errAction": "Не удалось выполнить групповое действие. Повторите попытку.",
   "bulk.markTrade": "Отметить на обмен",
   "bulk.moveToCollection": "Перенести в коллекцию",
   "bulk.moveToContainer": "Перенести в контейнер…",

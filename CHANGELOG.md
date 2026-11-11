@@ -4,6 +4,18 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Validate account settings before mutation and save password, session, sharing, and provider-token changes atomically; exercise collection authorization through real HTTP routes.
+- Validate core card metadata before account restore; preserve large container-created deck history through backup and revision restoration without relaxing ordinary editor limits.
+- Resolve both foil and nonfoil CSV imports to the requested language, retain explicit printing IDs, and preserve ManaBox CSV language values.
+- Rebalance auto-filed cards and their source compartments atomically; use finish/manual valuations consistently for price filing and limit each container-creation request to 10,000 compartments.
+- Record rapid price changes with atomic, monotonic timestamps. Foil portfolio history uses current resolved value rather than an incompatible nonfoil series.
+- Preserve closed-polygon corners and correctly rank small scan catalogs without changing scanner safety thresholds; make real-model scan diagnostics explicitly opt-in.
+- Preserve hyphenated PSA card names and reject malformed MTGJSON playable-card counts instead of inventing quantities.
+- Ignore superseded reverse-token searches, lock conflicting slab actions while saving, expose catalog-load retry, and translate bulk-action fallback messages.
+- Replace repeated set-catalog scans with one rank map while preserving ordering; remove unused language re-exports.
+- Protect Docker latest/minor aliases against stale releases, share the complete verification gate, restrict release write permission to publication, and lock/check release-tool integrity.
+- Replace obsolete registered Windows application payloads while retaining configuration and user data; extend the native upgrade smoke with removal/preservation sentinels.
+
 ## 2.9.0 — 2026-11-11
 
 - Include cached artwork in Deck History so removed cards retain their images when compared with the current deck.

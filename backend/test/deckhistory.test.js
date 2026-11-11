@@ -91,6 +91,39 @@ const db = require('../src/db');
     assert.strictEqual((await request('POST', `/decks/${copied.id}/revisions/${baseline.id}/restore`, {}, 2)).status, 404, 'revision IDs cannot cross decks');
     assert.strictEqual((await request('DELETE', `/decks/${copied.id}`, undefined, 2)).status, 200);
     assert.deepStrictEqual(await db.all('SELECT * FROM deck_revisions WHERE deck_id = ?', [copied.id]), []);
+    for (const target_size of [0, 301, 1.5, '12cards']) {
+      assert.strictEqual((await request('POST', '/decks', { name: 'Invalid target', target_size })).status, 400);
+    }
+    for (const target_size of [1, 300]) {
+      const created = await request('POST', '/decks', { name: 'Boundary target', target_size });
+      assert.strictEqual(created.status, 201);
+      assert.strictEqual((await request('GET', `/decks/${created.body.id}`)).body.target_size, target_size);
+      assert.strictEqual((await request('DELETE', `/decks/${created.body.id}`)).status, 200);
+    }
+    const location = (await db.run("INSERT INTO locations (name, type, game, user_id) VALUES ('Large container', 'Box', 'mtg', 1)")).lastID;
+    await db.run("INSERT INTO collection (card_id, quantity, game, user_id, location_id) VALUES ('land', 301, 'mtg', 1, ?)", [location]);
+    const large = await request('POST', '/decks/from-container', { location_id: location, name: 'Large container deck' });
+    assert.strictEqual(large.status, 201);
+    const largeDeck = (await request('GET', `/decks/${large.body.id}`)).body;
+    assert.strictEqual(largeDeck.target_size, 301, 'container creation must not truncate its definition');
+    assert.strictEqual(largeDeck.cards[0].quantity, 301);
+    assert.strictEqual((await request('PUT', `/decks/${large.body.id}/editor`, {
+      ...draft, name: largeDeck.name, format: 'Casual', target_size: 300, commander_card_id: null,
+      cards: [{ card_id: 'land', quantity: 301, pulled: false }]
+    })).status, 200);
+    const largeBackup = (await request('GET', '/export?format=backup')).body;
+    const largeBaseline = largeBackup.deck_revisions.find(row => row.deck_id === large.body.id && row.kind === 'baseline');
+    assert.strictEqual(JSON.parse(largeBaseline.snapshot).target_size, 301);
+    assert.strictEqual((await request('POST', '/import', { format: 'backup', data: largeBackup }, 2)).status, 200,
+      'an exported baseline over the editor limit remains a valid complete backup');
+    const copiedLarge = await db.get("SELECT id FROM decks WHERE user_id = 2 AND name = 'Large container deck'");
+    const copiedLargeHistory = (await request('GET', `/decks/${copiedLarge.id}/revisions`, undefined, 2)).body.revisions;
+    const copiedLargeBaseline = copiedLargeHistory.find(row => row.kind === 'baseline');
+    assert.strictEqual(copiedLargeBaseline.snapshot.target_size, 301);
+    assert.strictEqual((await request('POST', `/decks/${copiedLarge.id}/revisions/${copiedLargeBaseline.id}/restore`, {}, 2)).status, 200);
+    const restoredLarge = (await request('GET', `/decks/${copiedLarge.id}`, undefined, 2)).body;
+    assert.strictEqual(restoredLarge.target_size, 301);
+    assert.strictEqual(restoredLarge.cards[0].quantity, 301);
     console.log('Deck history assertions passed: baseline, deduplication, persistence, restore, reservations, ownership, stale sources and backup.');
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));

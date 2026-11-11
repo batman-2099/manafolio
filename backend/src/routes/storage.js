@@ -35,7 +35,7 @@ async function loadEntries(entryIds, userId) {
   if (!entryIds.length) return new Map();
   const holes = entryIds.map(() => '?').join(',');
   const rows = await db.all(`
-    SELECT c.id, c.id AS entry_id, c.card_id, c.reverse_card_id, c.quantity, c.printing, c.foil_treatment, c.language, c.favorite, c.is_trade, c.list_type,
+    SELECT c.id, c.id AS entry_id, c.card_id, c.reverse_card_id, c.quantity, c.printing, c.foil_treatment, c.language, c.favorite, c.is_trade, c.list_type, c.market_value,
            cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.subtypes, cc.supertype, cc.rarity, cc.image_url,
            cc.game, cc.cmc, cc.color_identity,
            cc.price_trend, cc.price_normal, cc.price_holofoil
@@ -308,6 +308,10 @@ router.post('/locations', async (req, res) => {
     (typeof plan[key] === 'number' || (typeof plan[key] === 'string' && plan[key].trim() !== '')) &&
     Number.isSafeInteger(Number(plan[key])) && Number(plan[key]) > 0)) {
     return res.status(400).json({ error: 'Compartment count and capacity must be positive safe integers' });
+  }
+  // Like collection additions, bound expanded rows per request, not capacity.
+  if (Number(plan.count) > 10000) {
+    return res.status(400).json({ error: 'Compartment count must not exceed 10000' });
   }
   try {
     await validateStorageUnit(storage_unit_id, req.user.id);
@@ -970,6 +974,7 @@ router.post('/locations/:id/recommend-batch', async (req, res) => {
         number: entry.number,
         cmc: entry.cmc,
         color_identity: entry.color_identity,
+        market_value: entry.market_value,
         price_trend: entry.price_trend,
         price_normal: entry.price_normal,
         price_holofoil: entry.price_holofoil
@@ -1004,6 +1009,11 @@ router.post('/locations/:id/apply-all', async (req, res) => {
     for (const entryId of entry_ids) {
       const entry = entries.get(String(entryId));
       if (!entry) continue;
+      const source = await db.get(`SELECT cp.id, cp.locked, l.locked AS location_locked, l.sort_order, l.foil_sorting
+        FROM collection c JOIN compartments cp ON cp.id = c.compartment_id
+        JOIN locations l ON l.id = cp.location_id AND l.user_id = c.user_id
+        WHERE c.id = ? AND c.user_id = ?`, [entryId, req.user.id]);
+      if (source?.locked || source?.location_locked) continue;
 
       const recommended = await recommendSlot(db, location, entry, workingCompartments);
       if (!recommended) continue;
@@ -1012,11 +1022,11 @@ router.post('/locations/:id/apply-all', async (req, res) => {
         recommended.location_id || id, recommended.compartment_id, recommended.position, entryId, req.user.id
       ]);
 
-      if (!recommended.stacked) {
-        workingCompartments = workingCompartments.map(c =>
-          c.id === recommended.compartment_id ? { ...c, count: c.count + (location.allow_stacking ? 1 : entry.quantity), free: c.free - (location.allow_stacking ? 1 : entry.quantity) } : c
-        );
+      await rebalanceCompartmentByScheme(db, recommended.compartment_id, location.sort_order, location.foil_sorting);
+      if (source && source.id !== recommended.compartment_id) {
+        await rebalanceCompartmentByScheme(db, source.id, source.sort_order, source.foil_sorting);
       }
+      workingCompartments = await loadCompartments(db, id, req.user.id);
       filed++;
     }
 

@@ -299,6 +299,7 @@
   "bulk.confirmDelete.other": "Supprimer {count} cartes sélectionnées ? Cette action est irréversible.",
   "bulk.delete": "Supprimer",
   "bulk.done": "Terminé",
+  "bulk.errAction": "L’action groupée a échoué. Réessayez.",
   "bulk.markTrade": "Marquer à échanger",
   "bulk.moveToCollection": "Déplacer dans la collection",
   "bulk.moveToContainer": "Déplacer dans un conteneur…",

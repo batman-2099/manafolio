@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import './CatalogueWorkbench.css';
 import { Award, Search, Plus } from 'lucide-react';
 import CardImage from './CardImage';
@@ -25,11 +25,14 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [adding, setAdding] = useState(null);
+  const pending = useRef(false);
 
   const lookup = async (e) => {
     e.preventDefault();
+    if (pending.current) return;
     const digits = cert.replace(/\D/g, '');
     if (!digits) return;
+    pending.current = true;
     setLoading(true);
     setError(null);
     setResult(null);
@@ -48,12 +51,14 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
       console.error(err);
       setError(t('slab.errLookup'));
     } finally {
+      pending.current = false;
       setLoading(false);
     }
   };
 
   const addCandidate = async (card) => {
-    if (!result) return;
+    if (pending.current || !result) return;
+    pending.current = true;
     setAdding(card.id);
     try {
       const res = await fetch('/api/collection', {
@@ -93,6 +98,7 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
       console.error(err);
       showToast && showToast(t('slab.errAdd'), 'error');
     } finally {
+      pending.current = false;
       setAdding(null);
     }
   };
@@ -115,11 +121,12 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
             inputMode="numeric"
             className="input-control"
             value={cert}
-            onChange={(e) => setCert(e.target.value)}
+            disabled={loading || adding !== null}
+            onChange={(e) => { if (!pending.current) setCert(e.target.value); }}
             placeholder={t('slab.certPlaceholder')}
             style={{ flex: 1, minWidth: '180px' }}
           />
-          <button type="submit" className="btn btn-primary" disabled={loading || !cert.trim()} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button type="submit" className="btn btn-primary" disabled={loading || adding !== null || !cert.trim()} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <Search size={16} /> {loading ? t('slab.looking') : t('slab.lookUp')}
           </button>
         </form>
@@ -189,7 +196,7 @@ export default function SlabLookup({ onAddSuccess, showToast }) {
                   <button
                     type="button"
                     className="btn btn-primary"
-                    disabled={adding === card.id}
+                    disabled={loading || adding !== null}
                     onClick={() => addCandidate(card)}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', fontSize: 'var(--text-sm)', padding: '0.4rem' }}
                   >

@@ -426,60 +426,54 @@ router.delete('/api-key', authenticateToken, async (req, res) => {
 
 // Update settings (password, sharing)
 router.put('/settings', authenticateToken, async (req, res) => {
-  const { current_password, password, share_enabled, share_locations, regenerate_share_token, psa_api_token } = req.body;
+  const { current_password, password, share_enabled, share_locations, regenerate_share_token, psa_api_token } = req.body || {};
+  if (password !== undefined) {
+    if (typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    if (typeof current_password !== 'string' || !current_password) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+  }
+  if (psa_api_token !== undefined && typeof psa_api_token !== 'string') {
+    return res.status(400).json({ error: 'PSA API token must be a string' });
+  }
 
   try {
-    if (password !== undefined) {
-      if (typeof password !== 'string' || password.length < 8) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters' });
-      }
-      if (typeof current_password !== 'string' || !current_password) {
-        return res.status(401).json({ error: 'Current password is incorrect' });
-      }
-      const token = req.headers['authorization'].split(' ')[1];
-      const passwordError = await db.withTransaction(async () => {
-        // Middleware may have authenticated before another password change revoked this session.
+    const updatedUser = await db.withTransaction(async () => {
+      const updates = {};
+      if (password !== undefined) {
+        const token = req.headers['authorization'].split(' ')[1];
+        // Recheck credentials after acquiring the transaction: another request may have revoked this session.
         const currentUser = await db.get(`
           SELECT u.password_hash FROM users u
           JOIN sessions s ON s.user_id = u.id
           WHERE u.id = ? AND s.token = ? AND s.expires_at > DATETIME('now')
         `, [req.user.id, token]);
-        if (!currentUser) return 'Invalid or expired session token.';
+        if (!currentUser) throw Object.assign(new Error('Invalid or expired session token.'), { status: 401 });
         if (!verifyPassword(current_password, currentUser.password_hash)) {
-          return 'Current password is incorrect';
+          throw Object.assign(new Error('Current password is incorrect'), { status: 401 });
         }
-        const newHash = db.hashPassword(password);
-        await db.run(`UPDATE users SET password_hash = ? WHERE id = ?`, [newHash, req.user.id]);
+        updates.password_hash = db.hashPassword(password);
         await db.run(`DELETE FROM sessions WHERE user_id = ? AND token <> ?`, [req.user.id, token]);
-      });
-      if (passwordError) return res.status(401).json({ error: passwordError });
-    }
-
-    if (share_enabled !== undefined) {
-      await db.run(`UPDATE users SET share_enabled = ? WHERE id = ?`, [share_enabled ? 1 : 0, req.user.id]);
-    }
-
-    if (share_locations !== undefined) {
-      await db.run(`UPDATE users SET share_locations = ? WHERE id = ?`, [share_locations ? 1 : 0, req.user.id]);
-    }
-
-    if (psa_api_token !== undefined) {
-      await db.run(`UPDATE users SET psa_api_token = ? WHERE id = ?`, [psa_api_token.trim(), req.user.id]);
-    }
-
-    let newShareToken = req.user.share_token;
-    if (regenerate_share_token) {
-      newShareToken = crypto.randomBytes(16).toString('hex');
-      await db.run(`UPDATE users SET share_token = ? WHERE id = ?`, [newShareToken, req.user.id]);
-    }
-
-    // Retrieve updated info
-    const updatedUser = await db.get(`SELECT * FROM users WHERE id = ?`, [req.user.id]);
+      }
+      if (share_enabled !== undefined) updates.share_enabled = share_enabled ? 1 : 0;
+      if (share_locations !== undefined) updates.share_locations = share_locations ? 1 : 0;
+      if (psa_api_token !== undefined) updates.psa_api_token = psa_api_token.trim();
+      if (regenerate_share_token) updates.share_token = crypto.randomBytes(16).toString('hex');
+      const fields = Object.keys(updates);
+      if (fields.length) {
+        await db.run(`UPDATE users SET ${fields.map(field => `${field} = ?`).join(', ')} WHERE id = ?`,
+          [...Object.values(updates), req.user.id]);
+      }
+      return db.get(`SELECT * FROM users WHERE id = ?`, [req.user.id]);
+    });
     res.json({
       message: 'Settings updated successfully',
       user: sanitizeUser(updatedUser)
     });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     console.error(error);
     res.status(500).json({ error: 'Failed to update settings' });
   }

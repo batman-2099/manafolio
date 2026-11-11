@@ -107,7 +107,7 @@ async function parseCompleteBackup(data) {
     }
   }
   for (const card of backup.card_cache) {
-    for (const field of ['finishes', 'promo_types']) {
+    for (const field of ['types', 'subtypes', 'color_identity', 'finishes', 'promo_types']) {
       if (card[field] == null) continue;
       let values;
       try { values = typeof card[field] === 'string' ? JSON.parse(card[field]) : null; } catch {}
@@ -211,7 +211,7 @@ async function parseCompleteBackup(data) {
     if (!deckIds.has(revision.deck_id) || !['baseline', 'save', 'restore'].includes(revision.kind)
         || typeof revision.created_at !== 'string' || !Number.isFinite(Date.parse(revision.created_at))
         || !snapshot || typeof snapshot.format !== 'string'
-        || !Number.isInteger(snapshot.target_size) || snapshot.target_size < 1 || snapshot.target_size > 300
+        || !Number.isSafeInteger(snapshot.target_size) || snapshot.target_size < 1
         || !['collection', 'arena', 'graveyard'].includes(snapshot.inventory_type)
         || !Array.isArray(snapshot.cards)
         || new Set(snapshot.cards.map(card => card?.card_id)).size !== snapshot.cards.length
@@ -723,7 +723,13 @@ router.post('/import', importLimiter, async (req, res) => {
 
       unmatchedCount = magicItems.length - pairs.length;
       failedItems.push(...unmatchedRows.map(failedItem));
-      rawItems = pairs.map(({ row, card }) => ({ ...row, card_id: card.id }));
+      rawItems = [];
+      for (const { row, card } of pairs) {
+        // Explicit printing IDs stay authoritative; identifier fallbacks follow the copy's language.
+        const localized = scryfallApi.scryfallUuid(row.id || row.card_id) ? null
+          : await cardApi.printingInLanguage(card, row.language || 'English');
+        rawItems.push({ ...row, card_id: localized?.id || card.id });
+      }
       if (rawItems.length === 0) {
         return respond(400, { error: 'No Magic cards matched Scryfall', summary: {
           added: { cards: 0, copies: 0, items: [] },
@@ -748,13 +754,6 @@ router.post('/import', importLimiter, async (req, res) => {
       }
     }
     for (const item of rawItems) {
-      if (item.printing === 'Holofoil') {
-        let card = await db.get('SELECT * FROM card_cache WHERE id = ?', [item.card_id || item.id])
-          || await cardApi.getCardById(item.card_id || item.id, { game: 'mtg' });
-        if (!card) throw Object.assign(new Error('Printing not found'), { status: 400 });
-        card = await cardApi.printingInLanguage(card, item.language || 'English') || card;
-        item.card_id = card.id;
-      }
       item.foil_treatment = resolveFoilTreatment(item.printing || 'Normal', item.foil_treatment);
     }
 

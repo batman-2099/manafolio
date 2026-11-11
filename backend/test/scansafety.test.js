@@ -24,11 +24,14 @@ process.env.CV_MODEL_DIR = dir;
   // Real matching/scoping code with deterministic model outputs and an isolated
   // three-row catalog. No installed model, catalog, database or network is used.
   const ort = require('onnxruntime-node');
-  ort.InferenceSession.create = async () => ({ run: async () => ({ embedding: { data: new Float32Array([1, 0]) } }) });
+  let embedding = new Float32Array([1, 0]);
+  ort.InferenceSession.create = async () => ({ run: async () => ({ embedding: { data: embedding } }) });
   fs.writeFileSync(path.join(dir, 'cornelius.onnx'), 'fixture');
   fs.writeFileSync(path.join(dir, 'milo.onnx'), 'fixture');
-  fs.writeFileSync(path.join(dir, 'milo-mtg-local.json'), JSON.stringify({ dim: 2, ids: cards.map(card => card.id) }));
-  fs.writeFileSync(path.join(dir, 'milo-mtg-local.bin'), Buffer.from(new Float32Array([0.94, 0, 0.88, 0, 0.1, 0]).buffer));
+  // Deliberately store the winner last: catalogs smaller than the gap window
+  // must still rank their own neighbourhood before calculating the gap.
+  fs.writeFileSync(path.join(dir, 'milo-mtg-local.json'), JSON.stringify({ dim: 2, ids: [...cards].reverse().map(card => card.id) }));
+  fs.writeFileSync(path.join(dir, 'milo-mtg-local.bin'), Buffer.from(new Float32Array([0.1, 0, 0.88, 0, 0.94, 0]).buffer));
   const cvScan = require('../src/cvScan');
   assert.throws(() => cvScan.isBuilt('unsupported'), /Unsupported game/);
   assert.throws(() => cvScan.builtLangs('unsupported'), /Unsupported game/);
@@ -55,9 +58,23 @@ process.env.CV_MODEL_DIR = dir;
   const scoped = await cvScan.match(image, 'mtg', 8, { cropped: true, sets: ['mtg-neo'] });
   assert.deepStrictEqual(scoped.candidates.map(c => c.cardId), [cards[0].id, cards[2].id]);
   assert.strictEqual(scoped.context.setFallback, false);
+  assert.strictEqual(scoped.gap, null, 'two scoped rows have no neighbourhood gap');
+  const single = await cvScan.match(image, 'mtg', 8, { cropped: true, sets: ['m21'] });
+  assert.deepStrictEqual(single.candidates.map(c => c.cardId), [cards[1].id]);
+  assert.strictEqual(single.gap, null);
   const fallback = await cvScan.match(image, 'mtg', 8, { cropped: true, sets: ['missing'] });
   assert.strictEqual(fallback.context.setFallback, true);
   assert.strictEqual(fallback.candidates[0].cardId, cards[0].id);
+  assert.deepStrictEqual(fallback.candidates.map(c => c.cardId), cards.map(card => card.id));
+  assert.ok(Math.abs(fallback.gap - (0.94 - (0.88 + 0.1) / 2)) < 1e-6,
+    'a catalog smaller than k uses the true winner and ranked neighbours for its gap');
+  assert.strictEqual(fallback.notInCatalog, false);
+  embedding = new Float32Array([0, 0]);
+  const noWinner = await cvScan.match(image, 'mtg', 8, { cropped: true });
+  assert.strictEqual(noWinner.gap, 0);
+  assert.strictEqual(noWinner.notInCatalog, true, 'tied neighbours do not pass the gap floor');
+  assert.strictEqual(noWinner.candidates.length, 3, 'rejected matches retain recovery candidates');
+  embedding = new Float32Array([1, 0]);
 
   const scanOcr = require('../src/utils/scanOcr');
   let evidence = { status: 'unreadable' };

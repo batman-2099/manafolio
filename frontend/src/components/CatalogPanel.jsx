@@ -182,23 +182,32 @@ function BuildPicker({ game, lang, disabled, onBuild, showToast, label }) {
   const [picked, setPicked] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [version, setVersion] = useState(0);
 
   const codeOf = (s) => (s.id || '').replace(/^mtg-/, '');
 
   useEffect(() => {
-    if (!open || sets.length) return;
+    if (!open) return;
+    let live = true;
     setLoading(true);
+    setError(false);
     const l = encodeURIComponent(lang);
     Promise.all([
-      fetch(`/api/sets?game=${game}&lang=${l}&tree=1`).then(r => r.ok ? r.json() : []),
-      fetch(`/api/scan-sets?game=${game}&lang=${l}`).then(r => r.ok ? r.json() : null),
+      fetch(`/api/sets?game=${game}&lang=${l}&tree=1`).then(r => { if (!r.ok) throw new Error(); return r.json(); }),
+      fetch(`/api/scan-sets?game=${game}&lang=${l}`).then(r => { if (!r.ok) throw new Error(); return r.json(); }),
     ]).then(([tree, sc]) => {
+      if (!live) return;
       setSets(tree);
       setCounts(sc?.sets || null);
-    }).catch(() => showToast?.(t('catalog.errListSets'), 'error'))
-      .finally(() => setLoading(false));
+    }).catch(() => {
+      if (!live) return;
+      setError(true);
+      showToast?.(t('catalog.errListSets'), 'error');
+    }).finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, game, lang, version]);
 
   const toggleCode = (code) => setPicked(p => toggleSetCodes(p, code));
   const toggleFamily = (s) => setPicked(p => toggleSetCodes(p, codeOf(s), (s.children || []).map(c => c.code)));
@@ -244,7 +253,14 @@ function BuildPicker({ game, lang, disabled, onBuild, showToast, label }) {
         style={{ padding: '0.5rem 0.75rem', fontSize: 'var(--text-md)' }}
       />
       {loading
-        ? <p style={HINT}>{t('catalog.loadingSets')}</p>
+        ? <p role="status" style={HINT}>{t('catalog.loadingSets')}</p>
+        : error ? (
+          <div role="alert">
+            <p style={HINT}>{t('catalog.errListSets')}</p>
+            <button type="button" className="btn btn-secondary btn-sm" style={BTN}
+              onClick={() => setVersion(value => value + 1)}>{t('common.retry')}</button>
+          </div>
+        )
         : (
           <SetTree
             sets={[...sets].reverse()}
@@ -259,7 +275,7 @@ function BuildPicker({ game, lang, disabled, onBuild, showToast, label }) {
             emptyLabel={t('scan.noSetMatches')}
           />
         )}
-      <button type="button" className="btn btn-primary btn-sm" disabled={disabled || !picked.length}
+      <button type="button" className="btn btn-primary btn-sm" disabled={disabled || loading || error || !picked.length}
         onClick={() => { onBuild(picked); setOpen(false); setPicked([]); setQuery(''); }}
         style={{ ...BTN, alignSelf: 'flex-start' }}>
         <Play size={14} /> {t('catalog.buildNSelected', { count: picked.length || '' })}

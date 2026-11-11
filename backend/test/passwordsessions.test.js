@@ -87,6 +87,23 @@ async function main() {
   assert.strictEqual(before.users[0].password_hash, initial.users[0].password_hash);
   assert.deepStrictEqual(before.sessions, initial.sessions, 'unrelated settings do not revoke sessions');
 
+  for (const psa_api_token of [null, 42, {}, [], true]) {
+    assert.strictEqual((await request('PUT', '/settings', currentToken, {
+      current_password: 'original-password', password: 'replacement-password',
+      share_enabled: false, regenerate_share_token: true, psa_api_token
+    })).status, 400);
+    assert.deepStrictEqual(await snapshot(), before, 'invalid provider tokens change neither settings, passwords nor sessions');
+  }
+
+  await db.run(`CREATE TRIGGER reject_settings_update AFTER UPDATE ON users
+    WHEN NEW.id = ${alice} BEGIN SELECT RAISE(FAIL, 'injected settings update failure'); END`);
+  assert.strictEqual((await request('PUT', '/settings', currentToken, {
+    current_password: 'original-password', password: 'replacement-password',
+    share_enabled: false, psa_api_token: 'new-provider-token', regenerate_share_token: true
+  })).status, 500);
+  assert.deepStrictEqual(await snapshot(), before, 'a failed settings update rolls back every setting and session revocation');
+  await db.run('DROP TRIGGER reject_settings_update');
+
   for (const password of [null, true, 12345678, {}, { length: 10 }, [], ['replacement-password'], '', 'short']) {
     assert.strictEqual((await request('PUT', '/settings', currentToken, {
       current_password: 'original-password', password, share_enabled: false

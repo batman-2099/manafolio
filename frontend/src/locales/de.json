@@ -518,6 +518,7 @@
   "bulk.confirmDelete.other": "{count} ausgewählte Karten löschen? Das kann nicht rückgängig gemacht werden.",
   "bulk.delete": "Löschen",
   "bulk.done": "Fertig",
+  "bulk.errAction": "Die Sammelaktion ist fehlgeschlagen. Bitte versuche es erneut.",
   "bulk.markTrade": "Als Tausch markieren",
   "bulk.moveToCollection": "In die Sammlung verschieben",
   "bulk.archive": "Ins Graveyard archivieren",

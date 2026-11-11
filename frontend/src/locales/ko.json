@@ -291,6 +291,7 @@
   "bulk.confirmDelete.other": "선택한 {count}장을 삭제하시겠습니까? 되돌릴 수 없습니다.",
   "bulk.delete": "삭제",
   "bulk.done": "완료",
+  "bulk.errAction": "일괄 작업에 실패했습니다. 다시 시도하세요.",
   "bulk.markTrade": "교환용으로 표시",
   "bulk.moveToCollection": "컬렉션으로 이동",
   "bulk.moveToContainer": "컨테이너로 이동…",

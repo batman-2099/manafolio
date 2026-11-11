@@ -60,6 +60,18 @@ test('alphabetical set filing differs from chronological collection sorting', as
       ['Apple', 'Zebra', 'Birch']);
     assert.deepEqual(sortCardsByOrder([...cards], [{ by: 'set' }, { by: 'number' }], undefined, sets).map(card => card.name),
       ['Birch', 'Zebra', 'Apple']);
+    const duplicateSets = [{ name: 'Zeta' }, { name: 'Alpha' }, { name: 'Zeta' }];
+    const withUnknown = [...cards, { name: 'Unknown B', set_name: 'Unknown B' }, { name: 'Unknown A', set_name: 'Unknown A' }, { name: 'Missing' }];
+    for (const [dir, expected] of [
+      ['asc', ['Birch', 'Zebra', 'Apple', 'Missing', 'Unknown A', 'Unknown B']],
+      ['desc', ['Unknown B', 'Unknown A', 'Missing', 'Zebra', 'Apple', 'Birch']],
+    ]) {
+      assert.deepEqual(sortCardsByOrder([...withUnknown], [{ by: 'set', dir }, { by: 'number' }], undefined, duplicateSets).map(card => card.name), expected);
+    }
+    for (const list of [[], null]) {
+      assert.deepEqual(sortCardsByOrder([...withUnknown], [{ by: 'set' }, { by: 'number' }], undefined, list).map(card => card.name),
+        ['Missing', 'Zebra', 'Apple', 'Unknown A', 'Unknown B', 'Birch']);
+    }
   } finally {
     await server.close();
   }

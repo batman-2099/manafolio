@@ -1920,6 +1920,7 @@
   "bulk.unassignedPile": "Unassigned Pile",
   "bulk.applyMove": "Apply Move",
   "bulk.done": "Done",
+  "bulk.errAction": "Bulk action failed. Please try again.",
   "settings.title": "Settings",
   "settings.subtitle": "Manage your account security and collection sharing options.",
   "settings.copy": "Copy",

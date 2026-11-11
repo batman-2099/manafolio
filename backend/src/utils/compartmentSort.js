@@ -169,7 +169,7 @@ function sortCards(cards, sortOrder, foilSorting) {
           cmp = (a.name || '').localeCompare(b.name || '');
           break;
         case 'price':
-          cmp = (a.price_trend || 0) - (b.price_trend || 0);
+          cmp = resolveCardPrice(a) - resolveCardPrice(b);
           break;
         case 'set_name':
           cmp = (a.set_name || '').localeCompare(b.set_name || '');
@@ -319,7 +319,7 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
   }
 
   const allLocationCards = await dbClient.all(`
-    SELECT c.id as entry_id, c.card_id, c.reverse_card_id, c.compartment_id, c.position, c.quantity, c.condition, c.printing, c.foil_treatment, c.language, c.purchase_price, c.added_at, c.is_trade, c.favorite, c.list_type,
+    SELECT c.id as entry_id, c.card_id, c.reverse_card_id, c.compartment_id, c.position, c.quantity, c.condition, c.printing, c.foil_treatment, c.language, c.purchase_price, c.market_value, c.added_at, c.is_trade, c.favorite, c.list_type,
            cc.name, cc.printed_name, cc.supertype, cc.types, cc.subtypes, cc.rarity, cc.set_id, cc.set_name, cc.number, cc.image_url,
            cc.price_trend, cc.price_normal, cc.price_holofoil, cc.cmc, cc.color_identity
     FROM collection c
@@ -335,7 +335,6 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
     } else if (!Array.isArray(c.types)) {
       c.types = [];
     }
-    c.price_trend = resolveCardPrice(c);
   });
 
   const cardsByCompId = new Map();
@@ -345,7 +344,6 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
     cardsByCompId.get(c.compartment_id).push(c);
   });
 
-  cardMetadata.price_trend = resolveCardPrice(cardMetadata);
   const cardCat = getSortCategory(cardMetadata, location.sort_order);
   const acceptsCard = c => compartmentAcceptsCard(c, cardMetadata) &&
     (!(c.assignedFilters && c.assignedFilters.length > 0) ||
@@ -578,7 +576,7 @@ async function rebalanceCompartmentByScheme(database, compartmentId, sortOrder, 
   const dbClient = database || db;
   const cards = await dbClient.all(
     `SELECT c.*, cc.name, cc.printed_name, cc.set_id as set_code, cc.set_name, cc.number, cc.types, cc.subtypes, cc.rarity, cc.price_trend,
-            cc.cmc, cc.color_identity
+            cc.price_normal, cc.price_holofoil, cc.cmc, cc.color_identity
      FROM collection c
      LEFT JOIN card_cache cc ON c.card_id = cc.id
      WHERE c.compartment_id = ? AND COALESCE(c.list_type, 'collection') = (
@@ -658,7 +656,7 @@ function getSortCategory(card, sortOrder) {
   }
   if (primary === 'type') return typeCategory(card.subtypes);
   if (primary === 'price') {
-    const p = card.price_trend || 0;
+    const p = resolveCardPrice(card);
     if (p >= 100) return '$100+';
     if (p >= 50) return '$50+';
     if (p >= 20) return '$20+';

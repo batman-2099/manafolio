@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const assert = require('assert');
+const express = require('express');
 
 const tmpDb = path.join(os.tmpdir(), `manafolio-auth-test-${process.pid}.db`);
 process.env.DB_PATH = tmpDb;
@@ -14,7 +15,8 @@ process.env.DEFAULT_ADMIN_PASSWORD = 'test-admin-password';
 
 
 const db = require('../src/db');
-const { verifyPassword } = require('../src/utils/authHelpers');
+const { verifyPassword, generateSession } = require('../src/utils/authHelpers');
+const { authenticateToken } = require('../src/middleware/auth');
 
 function cleanup() {
   try { db.dbConnection.close(); } catch { /* already closed */ }
@@ -61,21 +63,37 @@ async function testCollectionIsolation() {
   }
   await db.run(`INSERT INTO collection (card_id, quantity, user_id) VALUES (?, ?, ?)`, ['card-x', 1, bob]);
 
-  // The user-scoped read (same shape every collection route uses) must never
-  // leak another user's rows.
-  const aliceRows = await db.all(`SELECT id FROM collection WHERE user_id = ?`, [alice]);
-  const bobRows = await db.all(`SELECT id FROM collection WHERE user_id = ?`, [bob]);
-  assert.strictEqual(aliceRows.length, 3, `alice must see only her 3 rows, saw ${aliceRows.length}`);
-  assert.strictEqual(bobRows.length, 1, `bob must see only his 1 row, saw ${bobRows.length}`);
-
-  // A scoped delete keyed on the owner must not touch another user's rows —
-  // this is the guard every DELETE /collection/:id relies on.
-  const del = await db.run(`DELETE FROM collection WHERE id = ? AND user_id = ?`, [aliceRows[0].id, bob]);
-  assert.strictEqual(del.changes, 0, 'bob must not be able to delete alice\'s row via id');
-  const stillThere = await db.get(`SELECT id FROM collection WHERE id = ?`, [aliceRows[0].id]);
-  assert(stillThere, "alice's row must survive bob's scoped delete");
-
-  console.log('PASS: per-user collection isolation on read and scoped delete');
+  const app = express();
+  app.use('/api', authenticateToken, require('../src/routes/collection'));
+  const server = await new Promise(resolve => {
+    const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
+  });
+  try {
+    const aliceToken = await generateSession(alice);
+    const bobToken = await generateSession(bob);
+    const request = (token, route = '/collection', method = 'GET') =>
+      fetch(`http://127.0.0.1:${server.address().port}/api${route}`, {
+        method, headers: { Authorization: `Bearer ${token}` }
+      });
+    const aliceResponse = await request(aliceToken);
+    const bobResponse = await request(bobToken);
+    assert.strictEqual(aliceResponse.status, 200);
+    assert.strictEqual(bobResponse.status, 200);
+    const aliceRows = await aliceResponse.json();
+    const bobRows = await bobResponse.json();
+    assert.strictEqual(aliceRows.length, 3);
+    assert.strictEqual(bobRows.length, 1);
+    const aliceIds = aliceRows.map(row => row.entry_id);
+    assert(!bobRows.some(row => aliceIds.includes(row.entry_id)), 'collection reads cannot expose another account’s entries');
+    assert.strictEqual((await request(bobToken, `/collection/${aliceIds[0]}`, 'DELETE')).status, 404);
+    assert.deepStrictEqual(await (await request(aliceToken)).json(), aliceRows, 'a foreign delete leaves the owner’s collection unchanged');
+    assert.strictEqual((await request(aliceToken, `/collection/${aliceIds[0]}`, 'DELETE')).status, 200);
+    assert.deepStrictEqual((await (await request(aliceToken)).json()).map(row => row.entry_id),
+      aliceIds.slice(1), 'the owner can still delete their own entry');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+  console.log('PASS: real HTTP collection reads and deletes enforce account isolation');
 }
 
 async function main() {

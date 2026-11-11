@@ -299,6 +299,7 @@
   "bulk.confirmDelete.other": "Eliminare {count} carte selezionate? L'operazione non si può annullare.",
   "bulk.delete": "Elimina",
   "bulk.done": "Fatto",
+  "bulk.errAction": "L’azione in blocco non è riuscita. Riprova.",
   "bulk.markTrade": "Segna da scambiare",
   "bulk.moveToCollection": "Sposta nella collezione",
   "bulk.moveToContainer": "Sposta in un contenitore…",

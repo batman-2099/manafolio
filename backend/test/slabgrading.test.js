@@ -67,6 +67,12 @@ const CERTIFICATE = {
   // --- 3. PSA's label shorthand becomes something searchable ------------------
   assert.strictEqual(psaApi.searchableName('LIGHTNING BOLT-FOIL'), 'LIGHTNING BOLT');
   assert.strictEqual(psaApi.searchableName('BLACK LOTUS (ALPHA)'), 'BLACK LOTUS');
+  for (const name of ['KIKI-JIKI, MIRROR BREAKER', 'SPIDER-MAN', 'FOIL', 'FOIL IMP', 'B.F.M. (BIG FURRY MONSTER)']) {
+    assert.strictEqual(psaApi.searchableName(name), name, 'actual card names survive label cleanup');
+    assert.strictEqual(psaApi.searchableName(`${name}-FOIL`), name);
+  }
+  assert.strictEqual(psaApi.searchableName('SPIDER-MAN - FULL ART (FOIL)'), 'SPIDER-MAN');
+  assert.strictEqual(psaApi.searchableName('KIKI-JIKI-PROMO-HOLO'), 'KIKI-JIKI');
 
   // --- 4. normalizeCert reads the documented shape ----------------------------
   const norm = psaApi.normalizeCert(CERTIFICATE, '82613901');

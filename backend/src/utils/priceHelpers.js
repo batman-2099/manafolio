@@ -60,29 +60,22 @@ async function rebalanceCompartmentPositions(db, compartmentId, userId) {
 async function recordPrice(cardId, price) {
   if (!cardId || !(price > 0)) return false;
   const db = require('../db');
-  const last = await db.get(
-    `SELECT price FROM price_history WHERE card_id = ? ORDER BY recorded_at DESC LIMIT 1`,
-    [cardId]
-  );
-  if (last && last.price === price) return false;
-  // Millisecond resolution, not CURRENT_TIMESTAMP. recorded_at is part of the
-  // primary key, and the default is second-resolution — so two genuine price
-  // movements in the same second collided and the second one was silently
-  // dropped by OR IGNORE. %f keeps the guard while making that effectively
-  // impossible. parseSqliteUtc already reads the fractional form correctly.
+  // One statement keeps suppression and timestamp allocation atomic, including
+  // callers already inside a transaction. Advance past the latest stored time
+  // when rapid updates (or a backwards clock adjustment) overtake wall time.
   const res = await db.run(
-    `INSERT OR IGNORE INTO price_history (card_id, price, recorded_at)
-     VALUES (?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'))`,
-    [cardId, price]
+    `WITH latest AS (
+       SELECT price, recorded_at FROM price_history
+       WHERE card_id = ? ORDER BY recorded_at DESC LIMIT 1
+     )
+     INSERT INTO price_history (card_id, price, recorded_at)
+     SELECT ?, ?, MAX(strftime('%Y-%m-%d %H:%M:%f', 'now'),
+       COALESCE(strftime('%Y-%m-%d %H:%M:%f',
+         (SELECT recorded_at FROM latest), '+0.001 seconds'), ''))
+     WHERE (SELECT price FROM latest) IS NOT ?`,
+    [cardId, cardId, price, price]
   );
-  if (res && res.changes === 0) {
-    await db.run(
-      `INSERT OR IGNORE INTO price_history (card_id, price, recorded_at)
-       VALUES (?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now', '+1 millisecond'))`,
-      [cardId, price]
-    );
-  }
-  return true;
+  return res.changes > 0;
 }
 
 // Scryfall: "We only update prices for cards once per day. Fetching card data

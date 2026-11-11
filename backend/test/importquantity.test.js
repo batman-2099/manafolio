@@ -67,7 +67,7 @@ async function request(body, route = '/import') {
     let resolvedRows;
     scryfall.bulkFetchByIdentifier = async rows => {
       resolvedRows = rows;
-      return { cards: [], pairs: rows.map((row, index) => ({ row, card: { id: csvItems[index].card_id } })) };
+      return { cards: [], pairs: rows.map((row, index) => ({ row, card: { id: csvItems[index].card_id, game: 'mtg', language: 'English' } })) };
     };
     for (const format of ['internal', 'manabox']) {
       const data = generateExportCSV(csvItems, format);

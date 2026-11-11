@@ -291,6 +291,7 @@
   "bulk.confirmDelete.other": "選択した {count} 枚を削除しますか？この操作は取り消せません。",
   "bulk.delete": "削除",
   "bulk.done": "完了",
+  "bulk.errAction": "一括操作に失敗しました。もう一度お試しください。",
   "bulk.markTrade": "トレード用にする",
   "bulk.moveToCollection": "コレクションへ移動",
   "bulk.moveToContainer": "コンテナへ移動…",

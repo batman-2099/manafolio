@@ -291,6 +291,7 @@
   "bulk.confirmDelete.other": "要删除所选的 {count} 张卡牌吗？此操作无法撤销。",
   "bulk.delete": "删除",
   "bulk.done": "完成",
+  "bulk.errAction": "批量操作失败。请重试。",
   "bulk.markTrade": "标记为可交换",
   "bulk.moveToCollection": "移到收藏",
   "bulk.moveToContainer": "移到容器…",

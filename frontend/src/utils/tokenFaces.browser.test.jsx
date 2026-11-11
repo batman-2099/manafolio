@@ -21,10 +21,17 @@ export async function runTokenFaceRegressions() {
   let fail = true;
   let searches = 0;
   let candidates = null;
-  window.fetch = async url => {
+  let deferSearch = false;
+  let settleSearch;
+  let searchSignal;
+  window.fetch = async (url, options = {}) => {
     if (String(url).startsWith('/api/sets?')) return { ok: true, json: async () => [{ id: 'mtg-else', name: 'Other Tokens', symbol_url: '/logo.svg' }] };
     if (String(url).startsWith('/api/search?')) {
       searches++;
+      if (deferSearch) {
+        searchSignal = options.signal;
+        return new Promise(resolve => { settleSearch = () => resolve({ ok: true, json: async () => [back] }); });
+      }
       const set = new URL(String(url), location.origin).searchParams.get('set');
       return { ok: !fail, json: async () => (candidates || [front, { ...back, id: 'non-token', set_name: 'Ordinary Set', subtypes: ['Creature'] }, back]).filter(card => !set || card.set_id === set) };
     }
@@ -80,6 +87,33 @@ export async function runTokenFaceRegressions() {
     candidates = [back, { ...back, id: 'another-printing', language: 'German' }];
     await search();
     assert(selected === null && choice().value === '', 'ambiguous numbered results require an explicit printing choice');
+    // Let the old numbered response arrive even after abort, as a body read may
+    // already have completed when the user changes their mind.
+    for (const change of ['choice', 'clear', 'set', 'number', 'query']) {
+      await select(back.id);
+      deferSearch = true;
+      await search();
+      assert(!searchSignal.aborted, 'numbered lookup is pending');
+      if (change === 'choice') await select('another-printing');
+      else if (change === 'clear') await select('');
+      else if (change === 'set') await changeSet('new-set');
+      else {
+        const field = change === 'number' ? numberInput : input();
+        await act(async () => {
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, '3');
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      }
+      const expected = selected?.id;
+      assert(searchSignal.aborted, `${change} synchronously invalidates the pending reverse lookup`);
+      await act(async () => settleSearch());
+      assert(selected?.id === expected && choice().value === (expected || ''), `${change} survives the late numbered result`);
+      assert(choice().options.length === 3, `${change} keeps the manually available printings instead of late results`);
+      assert(!host.querySelector('[role="status"]'), `${change} ends the stale loading state`);
+      deferSearch = false;
+    }
+    await changeSet('');
+    await select('');
     candidates = [];
     await search();
     assert(selected === null && host.textContent.includes(en['token.noResults']), 'an unmatched number does not invent a reverse');

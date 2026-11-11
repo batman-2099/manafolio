@@ -51,7 +51,10 @@ function deckCardRows(deck) {
   for (const section of ['commander', 'mainBoard', 'sideBoard', 'tokens']) {
     for (const card of deck[section] || []) {
       const isToken = section === 'tokens';
-      if (isToken && (!Number.isSafeInteger(card.count) || card.count <= 0)) continue;
+      if (!Number.isSafeInteger(card.count) || card.count <= 0) {
+        if (isToken) continue;
+        throw new Error(`MTGJSON returned an invalid count for ${card.name || 'card'} in ${section}.`);
+      }
       const id = card.identifiers?.scryfallId;
       const set_id = card.setCode;
       const number = card.number;
@@ -65,7 +68,7 @@ function deckCardRows(deck) {
         isCommander: section === 'commander' && card === deck.commander[0],
         ...(reverse_card_id ? { reverse_card_id, reverse_name: card.reverse_name } : {}),
       };
-      row.quantity += Math.max(1, parseInt(card.count, 10) || 1);
+      row.quantity += card.count;
       rows.set(key, row);
     }
   }

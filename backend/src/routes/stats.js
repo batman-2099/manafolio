@@ -390,11 +390,10 @@ router.get('/stats/history', async (req, res) => {
     // used here was actually recorded or is the actual current price — never
     // a fabricated curve.
     const realPriceAt = (item, targetTime) => {
-      // price_history tracks the PRINTING, so for a copy with its own value (a
-      // slab) it is the wrong series entirely — a PSA 10 does not follow the raw
-      // card down. There is no per-copy history to draw instead, so it holds flat
-      // at the value on record rather than reporting the raw card's movement.
-      if (item.market_value > 0) return item.market_value;
+      // History records the card's provider trend, not finish or per-copy
+      // values. Without those series, hold foils and manually valued copies
+      // at their current resolved value rather than inventing normal-price moves.
+      if (item.market_value > 0 || (item.printing && item.printing !== 'Normal')) return resolveCardPrice(item);
       const hist = historyByCard[item.card_id];
       if (!hist || hist.length === 0) return resolveCardPrice(item);
       let best = null;

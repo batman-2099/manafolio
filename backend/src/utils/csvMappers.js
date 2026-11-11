@@ -59,6 +59,7 @@ const STRATEGIES = {
     quantity: csvQuantity(row['Quantity']),
     condition: CONDITION_MAP[(row['Condition'] || '').toLowerCase()] || 'Near Mint',
     printing: (row['Foil'] === 'true' || row['Foil'] === '1' || row['Foil'] === true) ? 'Holofoil' : 'Normal',
+    language: row['Language'] || 'English',
     game: 'mtg'
   })
 };

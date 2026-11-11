@@ -218,7 +218,10 @@ router.post('/', async (req, res) => {
   }
   if (game !== 'mtg') return res.status(400).json({ error: 'Unsupported game' });
   const deckGame = 'mtg';
-  const targetSizeNum = parseInt(target_size, 10) || 60;
+  const targetSizeNum = Number(target_size);
+  if (!Number.isInteger(targetSizeNum) || targetSizeNum < 1 || targetSizeNum > 300) {
+    return res.status(400).json({ error: 'target_size must be between 1 and 300' });
+  }
   if (!['collection', 'arena', 'graveyard'].includes(inventory_type)) {
     return res.status(400).json({ error: 'Invalid deck inventory type' });
   }
@@ -706,7 +709,7 @@ async function saveDeckEditor(req, res) {
   if (notes !== undefined && typeof notes !== 'string') {
     return res.status(400).json({ error: 'Deck notes must be a string' });
   }
-  if (!Number.isInteger(target_size) || target_size < 1 || target_size > 300) {
+  if (!Number.isSafeInteger(target_size) || target_size < 1 || (!req.restoringRevision && target_size > 300)) {
     return res.status(400).json({ error: 'target_size must be between 1 and 300' });
   }
   if (!['collection', 'arena', 'graveyard'].includes(inventory_type)) {

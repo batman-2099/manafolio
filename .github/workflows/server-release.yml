@@ -15,31 +15,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Install dependencies
-        run: npm ci --prefix backend && npm ci --prefix frontend
-      - name: Test backend
-        run: npm test --prefix backend
-      - name: Release policy regressions
-        run: node backend/test/desktoprelease.test.cjs
-      - name: Check frontend
-        run: npm run lint --prefix frontend && npm test --prefix frontend
-      - name: Frontend browser regressions
-        run: |
-          npm ci --prefix desktop/electron
-          node desktop/electron/node_modules/electron/install.js
-          sudo chown root:root desktop/electron/node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 desktop/electron/node_modules/electron/dist/chrome-sandbox
-          xvfb-run -a npm run test:browser --prefix frontend
+    uses: ./.github/workflows/verify.yml
 
   server:
     needs: verify
@@ -73,6 +53,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Install locked release tools
+        run: npm ci --ignore-scripts
 
       - name: Build frontend
         working-directory: frontend
@@ -145,10 +128,10 @@ jobs:
           FUSE=NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
           if [ "${{ runner.os }}" = "macOS" ]; then
             codesign --remove-signature "$EXE"
-            npx --yes postject@1.0.0-alpha.6 "$EXE" NODE_SEA_BLOB sea-prep.blob --sentinel-fuse "$FUSE" --macho-segment-name NODE_SEA
+            node node_modules/postject/dist/cli.js "$EXE" NODE_SEA_BLOB sea-prep.blob --sentinel-fuse "$FUSE" --macho-segment-name NODE_SEA
             codesign --sign - "$EXE"
           else
-            npx --yes postject@1.0.0-alpha.6 "$EXE" NODE_SEA_BLOB sea-prep.blob --sentinel-fuse "$FUSE"
+            node node_modules/postject/dist/cli.js "$EXE" NODE_SEA_BLOB sea-prep.blob --sentinel-fuse "$FUSE"
           fi
           chmod +x "$EXE" || true
           cp -r backend/src          "$ROOT/app/backend/src"
@@ -276,6 +259,8 @@ jobs:
           Categories=Game;
           EOF
           curl -fL https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage -o build/appimagetool
+          # GitHub's digest for AppImage/appimagetool asset 324406736 (release 1.9.1).
+          echo 'ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  build/appimagetool' | sha256sum --check --strict
           chmod +x build/appimagetool
           ARCH=x86_64 build/appimagetool --appimage-extract-and-run "$APPDIR" build/Manafolio-linux-x64.AppImage
 
@@ -295,12 +280,6 @@ jobs:
         with:
           name: manafolio-server-linux-x64-appimage
           path: build/Manafolio-linux-x64.AppImage
-
-      - name: Attach AppImage to release
-        if: github.ref_type == 'tag' && runner.os == 'Linux'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/Manafolio-linux-x64.AppImage
 
       - name: Build Windows desktop installer
         if: runner.os == 'Windows'
@@ -331,12 +310,6 @@ jobs:
         with:
           name: manafolio-windows-x64-installer
           path: build/Manafolio-Setup-windows-x64.exe
-
-      - name: Attach Windows installer to release
-        if: github.ref_type == 'tag' && runner.os == 'Windows'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/Manafolio-Setup-windows-x64.exe
 
       - name: Build macOS DMG
         if: runner.os == 'macOS'
@@ -403,19 +376,34 @@ jobs:
           name: manafolio-server-${{ matrix.target }}-dmg
           path: build/Manafolio-${{ matrix.target }}.dmg
 
-      - name: Attach DMG to release
-        if: github.ref_type == 'tag' && runner.os == 'macOS'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/Manafolio-${{ matrix.target }}.dmg
-
       - uses: actions/upload-artifact@v4
         with:
           name: manafolio-server-${{ matrix.target }}
           path: ${{ env.ASSET }}
 
-      - name: Attach to release
-        if: github.ref_type == 'tag'
+  publish:
+    needs: server
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: manafolio-server-*
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          name: manafolio-windows-x64-installer
+      - name: Attach verified packages to release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ASSET }}
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/*.zip
+            release-assets/*.tar.gz
+            release-assets/*.AppImage
+            release-assets/*.dmg
+            release-assets/*.exe

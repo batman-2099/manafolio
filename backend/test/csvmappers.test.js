@@ -33,4 +33,7 @@ for (const format of ['internal', 'arena', 'tcgplayer', 'dragonshield', 'manabox
       format === 'custom' ? { condition: 'Condition' } : undefined)[0].condition, expected);
   }
 }
+for (const [Language, expected] of [['German', 'German'], ['', 'English'], [undefined, 'English']]) {
+  assert.strictEqual(parseThirdPartyCSV([{ Name: 'Caldera Kavu', Language }], 'manabox')[0].language, expected);
+}
 console.log('csvmappers.test.js: conflicting and empty collector-number columns passed');

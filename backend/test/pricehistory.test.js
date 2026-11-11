@@ -42,6 +42,28 @@ async function main() {
   assert.strictEqual(await recordPrice(null, 5), false, 'no card id, no row');
   assert.strictEqual(await count(), 3, 'junk must not reach the table');
 
+  // A future timestamp forces every rapid update through the collision path.
+  await db.run(`INSERT INTO price_history (card_id, price, recorded_at)
+    VALUES ('rapid', 1, '2099-01-01 00:00:00.000')`);
+  const changes = await Promise.all(Array.from({ length: 40 }, (_, i) => recordPrice('rapid', i + 2)));
+  assert.ok(changes.every(Boolean));
+  const rapid = await db.all("SELECT price, recorded_at FROM price_history WHERE card_id = 'rapid' ORDER BY recorded_at");
+  assert.strictEqual(rapid.length, 41);
+  for (let i = 1; i < rapid.length; i++) {
+    assert.strictEqual(rapid[i].price, i + 1);
+    assert.ok(rapid[i].recorded_at > rapid[i - 1].recorded_at, 'timestamps are non-null and strictly increasing');
+  }
+  assert.deepStrictEqual(await Promise.all(Array.from({ length: 10 }, () => recordPrice('rapid', 41))), Array(10).fill(false));
+  await db.withTransaction(async () => {
+    assert.strictEqual(await recordPrice('rapid', 42), true);
+    assert.strictEqual(await recordPrice('rapid', 42), false);
+  });
+  await assert.rejects(db.withTransaction(async () => {
+    await recordPrice('rapid', 43);
+    throw new Error('rollback price');
+  }), /rollback price/);
+  assert.strictEqual((await db.get("SELECT price FROM price_history WHERE card_id = 'rapid' ORDER BY recorded_at DESC LIMIT 1")).price, 42);
+
   // --- Once-a-day sweep gate ---
   // Scryfall only moves prices once a day, so sweeping more often is pure load.
   // The boot sweep used to re-run on every restart; under nodemon that meant a

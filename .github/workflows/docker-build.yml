@@ -14,48 +14,7 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install backend dependencies
-        run: npm ci
-        working-directory: backend
-
-      # Hard gate: backend tests must pass before an image is built/pushed.
-      - name: Backend tests
-        run: npm test
-        working-directory: backend
-
-      - name: Release policy regressions
-        run: node backend/test/desktoprelease.test.cjs
-
-      - name: Install frontend dependencies
-        run: npm ci
-        working-directory: frontend
-
-      # Enforcing: the frontend lints clean (0 problems). Keep it that way.
-      - name: Lint frontend
-        run: npm run lint
-        working-directory: frontend
-
-      - name: Frontend tests and locales
-        run: npm test
-        working-directory: frontend
-
-      - name: Frontend browser regressions
-        run: |
-          npm ci --prefix desktop/electron
-          node desktop/electron/node_modules/electron/install.js
-          sudo chown root:root desktop/electron/node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 desktop/electron/node_modules/electron/dist/chrome-sandbox
-          xvfb-run -a npm run test:browser --prefix frontend
+    uses: ./.github/workflows/verify.yml
 
   # One leg per architecture, each on a runner of that architecture. QEMU
   # emulation was the alternative and it is far slower here: the image compiles
@@ -154,8 +113,6 @@ jobs:
     needs: build
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    outputs:
-      stable: ${{ steps.stable.outputs.eligible }}
     permissions:
       contents: read
       packages: write
@@ -188,11 +145,10 @@ jobs:
         with:
           images: ${{ steps.image.outputs.name }}
           flavor: latest=false
-          # latest is promoted separately, after checking the current stable release.
+          # Mutable latest/minor aliases are promoted separately under one lock.
           tags: |
             type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=sha,format=short
 
       - name: Create manifest list and push
@@ -205,32 +161,22 @@ jobs:
       - name: Inspect published manifest
         run: docker buildx imagetools inspect ${{ steps.image.outputs.name }}:${{ steps.meta.outputs.version }}
 
-      - name: Check stable release eligibility
-        id: stable
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          RELEASE=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest") || {
-            echo "::warning::Could not resolve the current stable release; latest is unchanged."
-            exit 0
-          }
-          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] &&
-             jq -e --arg tag "$GITHUB_REF_NAME" '.tag_name == $tag and .draft == false and .prerelease == false' <<< "$RELEASE" >/dev/null; then
-            echo "eligible=true" >> "$GITHUB_OUTPUT"
-          fi
 
-  latest:
+  aliases:
     needs: merge
-    if: needs.merge.outputs.stable == 'true'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     concurrency:
-      group: docker-latest-promotion
+      group: docker-release-alias-promotion
       cancel-in-progress: false
     permissions:
       contents: read
       packages: write
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Log in to GitHub Container Registry (GHCR)
@@ -239,15 +185,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Promote current stable release to latest
+      - name: Promote eligible stable aliases
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          # Recheck after acquiring the lock: a newer release may now be current.
-          RELEASE=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest")
-          if jq -e --arg tag "$GITHUB_REF_NAME" '.tag_name == $tag and .draft == false and .prerelease == false' <<< "$RELEASE" >/dev/null; then
-            IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
-            docker buildx imagetools create -t "$IMAGE:latest" "$IMAGE:${GITHUB_REF_NAME#v}"
-          else
-            echo "Not the current stable release; latest is unchanged."
-          fi
+        run: node backend/scripts/promote-docker.cjs

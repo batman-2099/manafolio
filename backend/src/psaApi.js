@@ -110,11 +110,9 @@ function normalizeCert(payload, certNumber) {
 // PSA's card name, turned into something the card search can actually match.
 //
 // Remove grading-label finish annotations before searching for the card.
-const LABEL_NOISE = /\b(HOLO|FOIL|FULL\s*ART|ALT\s*ART|PROMO)\b/gi;
+const LABEL_NOISE = /(?:\s*-\s*(?:HOLO|FOIL|FULL\s*ART|ALT\s*ART|PROMO)|\s+\b(?:HOLO|FOIL|FULL\s*ART|ALT\s*ART|PROMO)|\s*\((?:HOLO|FOIL|FULL\s*ART|ALT\s*ART|PROMO|ALPHA|BETA|UNLIMITED)\))+\s*$/i;
 function searchableName(subject) {
   return String(subject || '')
-    .split('-')[0]
-    .replace(/\([^)]*\)/g, ' ')
     .replace(LABEL_NOISE, ' ')
     .replace(/\s+/g, ' ')
     .trim();

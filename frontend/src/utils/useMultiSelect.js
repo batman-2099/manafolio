@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useLongPress } from './useLongPress';
 import { decodePrinting } from './cardOptions';
+import { useT } from './i18n';
 
 // Long-press-to-arm multi-select + bulk actions over collection entries. Shared
 // by CollectionList and the scanner's recent-scans strip so both get the same
@@ -11,6 +12,7 @@ import { decodePrinting } from './cardOptions';
 // string to block arming/bulk (e.g. a locked container) or a falsy value to
 // allow it; the message is shown as a toast.
 export function useMultiSelect({ showToast, onChanged, guard } = {}) {
+  const { t } = useT();
   const [selectMode, updateSelectMode] = useState(false);
   const [selectedIds, updateSelectedIds] = useState(() => new Set());
   const [bulkMoveTarget, updateBulkMoveTarget] = useState('');
@@ -94,7 +96,7 @@ export function useMultiSelect({ showToast, onChanged, guard } = {}) {
     const blocked = guard && guard();
     if (blocked) { showToast(blocked, 'error'); return; }
     const ids = Array.from(selectedIds);
-    if (ids.length === 0) { showToast('No cards selected.', 'error'); return; }
+    if (ids.length === 0) { showToast(t('search.errNoneSelected'), 'error'); return; }
     if (confirmMsg && !window.confirm(confirmMsg)) return;
     pendingRef.current = true;
     setBulkPending(true);
@@ -108,7 +110,7 @@ export function useMultiSelect({ showToast, onChanged, guard } = {}) {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        showToast(data.message || 'Done.', 'success');
+        showToast(data.message || t('bulk.done'), 'success');
         anchorId.current = null;
         updateSelectedIds(prev => {
           const next = new Set(prev);
@@ -117,11 +119,11 @@ export function useMultiSelect({ showToast, onChanged, guard } = {}) {
         });
         changed = true;
       } else {
-        showToast(data.error || 'Bulk action failed.', 'error');
+        showToast(data.error || t('bulk.errAction'), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Error performing bulk action.', 'error');
+      showToast(t('bulk.errAction'), 'error');
     } finally {
       pendingRef.current = false;
       setBulkPending(false);

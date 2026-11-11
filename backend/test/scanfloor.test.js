@@ -12,10 +12,16 @@
 //      Japanese catalog is missing.
 //   3. Set scoping stays per-catalog: every result must belong to the requested set.
 //
-// Needs the ONNX models, a Japanese Magic catalog and network for one card
-// image; skips rather than fails without them.
+// Opt-in real-model diagnostic: needs ONNX models, a Japanese Magic catalog
+// and network for one card image; skips rather than fails without them.
+// Deterministic gap/scoping coverage lives in scansafety.test.js.
 //
-// Run: node test/scanfloor.test.js
+// Run: node test/scanfloor.test.js --models
+if (!process.argv.includes('--models')) {
+  console.log('scanfloor.test.js: real-model diagnostic skipped (opt in with --models)');
+  process.exit(0);
+}
+
 const assert = require('assert');
 const sharp = require('sharp');
 const cvScan = require('../src/cvScan');
