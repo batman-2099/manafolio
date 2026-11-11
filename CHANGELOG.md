@@ -4,8 +4,14 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+## 2.9.0 — 2026-11-11
+
 - Include cached artwork in Deck History so removed cards retain their images when compared with the current deck.
 - Display Deck History card changes in responsive artwork grids under separate Removed, Added, and Changed sections, hiding empty sections and keeping quantity changes beneath each card; omit set names from card labels.
+- Open collection details from Deck History cards, with a stored-copy chooser when multiple entries match.
+- Link Physical and Graveyard decks to existing containers; preserve links in account backups and hide containers linked to other decks from the dropdown.
+- Offer to create and link a Deck Box when checking out an unlinked Physical deck, moving its required copies and checking out atomically.
+- Prompt when saving changed card quantities or AI replacements: move additions into the linked container and removals to a selected container or Unassigned Pile, save without moving, or cancel. Save and movement roll back together on failure.
 
 ## 2.8.0 — 2026-11-09
 
