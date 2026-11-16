@@ -160,10 +160,10 @@ async function testRedirectPolicy() {
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   try {
-    const check = async expected => {
+    const check = async (expected, host = 'direct.example:3001') => {
       const response = await new Promise((resolve, reject) => {
         http.get(`http://127.0.0.1:${server.address().port}/login`, {
-          headers: { Host: 'direct.example:3001', 'X-Forwarded-Host': 'public.example:8443, other.example', 'X-Forwarded-Proto': 'https, http' },
+          headers: { Host: host, 'X-Forwarded-Host': 'public.example:8443, other.example', 'X-Forwarded-Proto': 'https, http' },
         }, res => {
           res.on('error', reject);
           res.on('end', () => resolve(res));
@@ -178,6 +178,8 @@ async function testRedirectPolicy() {
       app.set('trust proxy', policy);
       await check('http://direct.example:3001/api/auth/oidc/callback');
     }
+    // A malformed Host must not throw while deriving the cookie's Secure flag.
+    await check('http://[/api/auth/oidc/callback', '[');
     for (const policy of [true, 1, 'loopback']) {
       app.set('trust proxy', policy);
       await check('https://public.example:8443/api/auth/oidc/callback');

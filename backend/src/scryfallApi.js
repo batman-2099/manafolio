@@ -817,12 +817,13 @@ async function getPrintingInLang(setCode, number, lang) {
 }
 
 async function getCardById(cardId) {
-  const rawId = cardId.startsWith('mtg-') ? cardId.slice(4) : cardId;
+  const rawId = scryfallUuid(cardId);
   const cached = await db.get(`SELECT * FROM card_cache WHERE id = ?`, [cardId]);
   if (cached && cached.game !== 'mtg') {
     throw Object.assign(new Error('Unsupported card ID or game'), { status: 400 });
   }
   if (cached) return parseCardRow(cached);
+  if (!rawId) return null;
   try {
     // Reuse the downloaded snapshot before spending a rate-limited request.
     let raw;
@@ -836,7 +837,9 @@ async function getCardById(cardId) {
       await cacheCards([norm]);
       return norm;
     }
-  } catch (e) {}
+  } catch (error) {
+    if (error.response?.status !== 404) throw error;
+  }
   return null;
 }
 

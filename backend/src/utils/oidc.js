@@ -12,7 +12,8 @@ function loginCookieOptions(req) {
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: new URL(resolveRedirectUri(req)).protocol === 'https:',
+    // Not `new URL(...)`: without a configured base the URI embeds the raw Host header.
+    secure: resolveRedirectUri(req).startsWith('https:'),
     path: '/api/auth/oidc',
   };
 }

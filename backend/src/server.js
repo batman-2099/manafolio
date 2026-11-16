@@ -168,13 +168,6 @@ app.use(cors({
     }
   }
 }));
-// Import and scan/search requests carry large JSON payloads. All other routes
-// use the small default below; card-art parses uploads after its own auth gate.
-const bigJson = express.json({ limit: '15mb' });
-app.use('/api/import', bigJson);
-app.use('/api/scan-match', bigJson);
-app.use('/api/search', bigJson);
-
 // Rebuild any catalog that has fallen behind, right after the weekly set refresh
 // discovers new releases.
 //
@@ -324,6 +317,10 @@ app.use(compression());
 // Ahead of the bare '/api' mounts so nothing shadows it. Its reads are
 // deliberately unauthenticated — a public shared collection renders card art too.
 app.use('/api/card-art', cardArtRoutes);
+// Import and scan/search requests carry large JSON payloads, so they authenticate
+// before parsing; the '/api' gate below then passes them straight through. All
+// other routes use the small default; card-art parses uploads after its own auth gate.
+app.use(['/api/import', '/api/scan-match', '/api/search'], authenticateToken, express.json({ limit: '15mb' }));
 app.use(express.json({ limit: '1mb' }));
 
 // --- PUBLIC API ROUTES ---
