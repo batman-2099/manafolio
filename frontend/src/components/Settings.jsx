@@ -3,7 +3,7 @@ import { useScrollReveal } from '../utils/useScrollReveal';
 import { ShieldAlert, Share2, Clipboard, RefreshCw, KeyRound, Check, Database, Download, Upload, Eye, EyeOff, SlidersHorizontal, Info, Bug, Lightbulb, MessagesSquare, ScrollText, Github, Languages } from 'lucide-react';
 import { CURRENCIES, getCurrency, setCurrency } from '../utils/formatPrice';
 import { LOCALES, localeName, useT } from '../utils/i18n';
-import { getRepoUrl, issueUrl } from '../utils/repo';
+import { REPO_URL, issueUrl } from '../utils/repo';
 import { downloadBlob } from '../utils/downloadBlob';
 import CodexSettings from './CodexSettings';
 import OfflineSettings from './OfflineSettings';
@@ -84,7 +84,6 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
   const [versionInfo, setVersionInfo] = useState(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [backendReachable, setBackendReachable] = useState(true);
-  const [repoUrl, setRepoUrl] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,15 +142,10 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
   const isDemo = !!import.meta.env.VITE_DEMO;
 
   useEffect(() => {
-    let cancelled = false;
-    getRepoUrl()
-      .then(url => { if (!cancelled) setRepoUrl(url); })
-      .catch(() => { /* Offline support instructions remain visible. */ });
     fetch('/api/settings/version')
       .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then(data => { setVersionInfo(data); setBackendReachable(true); })
       .catch(() => setBackendReachable(false));
-    return () => { cancelled = true; };
   }, []);
 
   const handleCheckUpdate = async () => {
@@ -206,7 +200,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
       '',
       '<!-- Screenshots help a lot. Please remove anything you would rather not share. -->',
     ].join('\n');
-    return issueUrl(repoUrl, { labels: 'bug', title: '[Bug] ', body });
+    return issueUrl(REPO_URL, { labels: 'bug', title: '[Bug] ', body });
   };
 
   const featureRequestUrl = () => {
@@ -219,7 +213,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
       '',
       `<!-- Manafolio ${shownVersion || 'unknown'} -->`,
     ].join('\n');
-    return issueUrl(repoUrl, { labels: 'enhancement', title: '[Feature] ', body });
+    return issueUrl(REPO_URL, { labels: 'enhancement', title: '[Feature] ', body });
   };
 
   const handleImportFile = async (e) => {
@@ -992,12 +986,12 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                 {t('prefs.languageOnlyEnglish')}
               </div>
             )}
-            {repoUrl && <div className="settings-translation" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-md)', marginTop: '0.5rem' }}>
+            <div className="settings-translation" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-md)', marginTop: '0.5rem' }}>
               <Languages size={13} style={{ color: 'var(--accent-yellow)', flexShrink: 0 }} />
               <span style={{ color: 'var(--text-secondary)' }}>
                 {t('prefs.translateCta')}{' '}
                 <a
-                  href={`${repoUrl}/blob/main/docs/TRANSLATING.md`}
+                  href={`${REPO_URL}/blob/main/docs/TRANSLATING.md`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ color: 'var(--accent-yellow)', fontWeight: 600 }}
@@ -1005,7 +999,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                   {t('prefs.translateCtaLink')}
                 </a>
               </span>
-            </div>}
+            </div>
           </div>
 
           <fieldset className="theme-choices" aria-busy={themeLoading} aria-describedby="settings-theme-hint">
@@ -1158,26 +1152,26 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
             <div style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text-strong)', marginBottom: '0.5rem' }}>
               {t('settings.getInvolvedTitle')}
             </div>
-            {repoUrl ? <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <a className="btn btn-secondary" href={bugReportUrl()} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <Bug size={16} /> {t('settings.reportBug')}
               </a>
               <a className="btn btn-secondary" href={featureRequestUrl()} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <Lightbulb size={16} /> {t('settings.requestFeature')}
               </a>
-              <a className="btn btn-secondary" href={`${repoUrl}/blob/main/docs/TRANSLATING.md`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+              <a className="btn btn-secondary" href={`${REPO_URL}/blob/main/docs/TRANSLATING.md`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <Languages size={16} /> {t('settings.helpTranslate')}
               </a>
-              <a className="btn btn-secondary" href={`${repoUrl}/issues`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+              <a className="btn btn-secondary" href={`${REPO_URL}/issues`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <MessagesSquare size={16} /> {t('settings.browseIssues')}
               </a>
-              <a className="btn btn-secondary" href={`${repoUrl}/releases`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+              <a className="btn btn-secondary" href={`${REPO_URL}/releases`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <ScrollText size={16} /> {t('settings.changelog')}
               </a>
-              <a className="btn btn-secondary" href={repoUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+              <a className="btn btn-secondary" href={REPO_URL} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                 <Github size={16} /> {t('settings.source')}
               </a>
-            </div> : <p>{t('settings.supportUnavailable')}</p>}
+            </div>
             <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', marginTop: '0.5rem', lineHeight: 1.4 }}>
               {t('settings.reportNote')}
             </div>
@@ -1185,9 +1179,9 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
 
           <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)' }}>
             {t('settings.updateChecksNote')}{' '}
-            {repoUrl && <a href={`${repoUrl}/releases`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-yellow)' }}>
+            <a href={`${REPO_URL}/releases`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-yellow)' }}>
               {t('settings.source')}
-            </a>}
+            </a>
           </div>
         </div>
       </div>

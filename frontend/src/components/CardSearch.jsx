@@ -70,7 +70,7 @@ function ImportLog({ entries }) {
           const node = event.currentTarget;
           follow.current = node.scrollHeight - node.scrollTop - node.clientHeight < 24;
         }}
-        style={{ maxHeight: 'min(200px, 30dvh)', overflowY: 'auto', overflowWrap: 'anywhere', padding: '0.6rem', marginTop: '0.4rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', fontSize: 'var(--text-sm)' }}
+        style={{ maxHeight: 'min(200px, 30dvh)', overflowY: 'auto', overflowWrap: 'anywhere', padding: '0.6rem', marginTop: '0.4rem', borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', fontSize: 'var(--text-sm)' }}
       >
         {entries.map(entry => (
           <div key={entry.id} role={entry.stage === 'failed' ? 'alert' : undefined} style={{ padding: '0.2rem 0', color: entry.stage === 'failed' ? 'var(--accent-red)' : 'var(--text-secondary)' }}>
@@ -1553,7 +1553,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                 [t('manaboxPreview.normal'), manaBoxPreview.normal],
                 [t('manaboxPreview.foils'), manaBoxPreview.foils],
               ].map(([label, value]) => (
-                <div key={label} style={{ padding: '0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', textAlign: 'center' }}>
+                <div key={label} style={{ padding: '0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', textAlign: 'center' }}>
                   <strong style={{ display: 'block', color: 'var(--text-strong)', fontSize: 'var(--text-md)' }}>{value}</strong>
                   <span style={{ color: 'var(--text-muted)' }}>{label}</span>
                 </div>
@@ -1584,7 +1584,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                 [t('csvPreview.cards'), csvPreview.cards || 0],
                 [t('csvPreview.copies'), csvPreview.quantity || 0],
               ].map(([label, value]) => (
-                <div key={label} style={{ padding: '0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', textAlign: 'center' }}>
+                <div key={label} style={{ padding: '0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', textAlign: 'center' }}>
                   <strong style={{ display: 'block', color: 'var(--text-strong)', fontSize: 'var(--text-md)' }}>{value}</strong>
                   <span style={{ color: 'var(--text-muted)' }}>{label}</span>
                 </div>
@@ -1641,7 +1641,7 @@ function CardSearch({ onAddSuccess, showToast, navigationGuardRef }) {
                 [t('importSummary.added'), importSummary.added],
                 [t('importSummary.failed'), importSummary.failed]
               ].map(([label, summary]) => (
-                <div key={label} style={{ padding: '0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', textAlign: 'center' }}>
+                <div key={label} style={{ padding: '0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', textAlign: 'center' }}>
                   <strong style={{ display: 'block', color: 'var(--text-strong)', fontSize: 'var(--text-md)' }}>{summary.cards} {t('importSummary.cards')}</strong>
                   <span style={{ color: 'var(--text-muted)' }}>{summary.copies} {t('importSummary.copies')} · {label}</span>
                 </div>

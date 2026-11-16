@@ -323,7 +323,7 @@ export default function CodexSettings() {
       </div>}
       <p style={{ color: 'var(--text-secondary)', margin: 0 }}>{t('codexSettings.hint')}</p>
       {!preferences && !preferencesError && <p role="status">{t('common.loading')}</p>}
-      {preferencesError && <p role="alert" style={{ color: 'var(--status-error)' }}>{preferencesError} <button type="button" className="btn btn-secondary" onClick={() => setPreferencesRevision(value => value + 1)}>{t('aiDeck.retry')}</button></p>}
+      {preferencesError && <p role="alert" style={{ color: 'var(--text-negative)' }}>{preferencesError} <button type="button" className="btn btn-secondary" onClick={() => setPreferencesRevision(value => value + 1)}>{t('aiDeck.retry')}</button></p>}
       {account?.connected && preferences && (
         <form onSubmit={save}>
           <fieldset disabled={accountBusy || saving || modelsLoading || !models.length} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -355,13 +355,13 @@ export default function CodexSettings() {
             </div>
             <button type="submit" className="btn btn-primary" disabled={!canSave}>{t(saving ? 'common.loading' : 'codexSettings.save')}</button>
           </fieldset>
-          {staleModel && <p role="alert" style={{ color: 'var(--status-error)' }}>{t('codexSettings.staleModel')}</p>}
-          {staleEffort && <p role="alert" style={{ color: 'var(--status-error)' }}>{t('codexSettings.staleEffort')}</p>}
+          {staleModel && <p role="alert" style={{ color: 'var(--text-negative)' }}>{t('codexSettings.staleModel')}</p>}
+          {staleEffort && <p role="alert" style={{ color: 'var(--text-negative)' }}>{t('codexSettings.staleEffort')}</p>}
         </form>
       )}
       {modelsLoading && <p role="status">{t('aiDeck.loadingModels')}</p>}
       {modelsError && (!isOllama || modelsError !== accountError) && <div className="ai-connection-error" role="alert"><p>{modelsError}</p><button type="button" className="btn btn-secondary" disabled={accountBusy || accountLoading || modelsLoading || saving} onClick={checkConnection}>{t('aiDeck.retry')}</button></div>}
-      {saveError && <p role="alert" style={{ color: 'var(--status-error)' }}>{saveError}</p>}
+      {saveError && <p role="alert" style={{ color: 'var(--text-negative)' }}>{saveError}</p>}
       {saved && <p role="status">{t('codexSettings.saved')}</p>}
     </section>
   );

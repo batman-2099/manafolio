@@ -2350,7 +2350,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
           placeholder={t('scan.manualSearchPlaceholder')} disabled={manualSearching}
           style={{ fontSize: 'var(--text-md)', minHeight: 44 }} />
         <button type="submit" className="btn btn-secondary" disabled={manualSearching || !manualSearchText.trim()}>
-          {manualSearching ? <RefreshCw size={16} className="spin" aria-hidden="true" /> : <Search size={16} aria-hidden="true" />}
+          {manualSearching ? <RefreshCw size={16} className="spin-animation" aria-hidden="true" /> : <Search size={16} aria-hidden="true" />}
           {t(manualSearching ? 'common.loading' : 'search.submit')}
         </button>
         {scanStatus && !loading && <button type="button" className="btn btn-secondary" onClick={closeDrawer}>{t('scan.rescan')}</button>}
@@ -2790,7 +2790,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   disabled={draftBusy || manualSearching || !manualSearchText.trim()}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.75rem', fontSize: 'var(--text-sm)' }}
                 >
-                  {manualSearching ? <RefreshCw size={14} className="spin" /> : <Search size={14} />}
+                  {manualSearching ? <RefreshCw size={14} className="spin-animation" /> : <Search size={14} />}
                   <span>{t('search.submit') || 'Search'}</span>
                 </button>
               </form>
@@ -2865,11 +2865,11 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             <p>{t('scan.reviewHint')}</p>
           </div>
           <button type="button" className="btn btn-secondary" disabled={!scanDrafts.length || draftsLoading || draftsError || draftBusy || draftAction !== null || isDrawerOpen} onClick={() => actOnDrafts('clear')}>
-            {draftAction === 'clear' && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+            {draftAction === 'clear' && <RefreshCw size={16} className="spin-animation" aria-hidden="true" />}
             {t('bulk.clear')}
           </button>
           <button type="button" className="btn btn-primary scan-review-commit" disabled={!scanDrafts.length || draftsLoading || draftsError || draftBusy || draftAction !== null || isDrawerOpen} onClick={() => actOnDrafts('commit')}>
-            {draftAction === 'commit' && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+            {draftAction === 'commit' && <RefreshCw size={16} className="spin-animation" aria-hidden="true" />}
             {t('search.addToCollection')}
           </button>
         </div>
@@ -2900,7 +2900,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   </select>
                 </label>
                 <button type="button" className="btn btn-secondary" disabled={draftBusy || draftAction !== null} onClick={() => discardDraft(draft)}>
-                  {draftAction === draft.draft_id && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+                  {draftAction === draft.draft_id && <RefreshCw size={16} className="spin-animation" aria-hidden="true" />}
                   {t('scan.discardDraft')}
                 </button>
               </div>
@@ -2941,7 +2941,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
               <ListFilter size={16} aria-hidden="true" />{t('scan.backToMatches', { n: lastMatches.length })}
             </button>}
             <button type="button" className="btn btn-secondary" onClick={findOtherPrintings} disabled={findingPrintings}>
-              {findingPrintings ? <RefreshCw size={16} className="spin" aria-hidden="true" /> : <Layers size={16} aria-hidden="true" />}{t(findingPrintings ? 'scan.fetchingCandidates' : 'scan.changePrinting')}
+              {findingPrintings ? <RefreshCw size={16} className="spin-animation" aria-hidden="true" /> : <Layers size={16} aria-hidden="true" />}{t(findingPrintings ? 'scan.fetchingCandidates' : 'scan.changePrinting')}
             </button>
             <button type="button" className="btn btn-secondary" disabled={findingPrintings} onClick={() => { setIsDrawerOpen(false); setScanMatches([selectedCard]); setShowAllMatches(true); }}>
               <Search size={16} aria-hidden="true" />{t('scan.changeCard')}
@@ -3033,7 +3033,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                     title={t('scan.otherPrintingsHint')}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                   >
-                    {findingPrintings ? <RefreshCw size={14} className="spin" /> : <Layers size={14} />}
+                    {findingPrintings ? <RefreshCw size={14} className="spin-animation" /> : <Layers size={14} />}
                     <span>{findingPrintings ? t('scan.fetchingCandidates') : (t('scan.changePrinting') || t('scan.otherPrintings') || t('scan.rightNameWrongPrinting'))}</span>
                   </button>
                   <button type="button" className="btn btn-secondary btn-sm" disabled={draftBusy} onClick={() => { setIsDrawerOpen(false); setScanMatches([selectedCard]); setShowAllMatches(true); }}>
@@ -3043,7 +3043,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 <div className="quick-add-footer-actions">
                   <button type="button" className="btn btn-secondary" onClick={closeDrawer} disabled={draftBusy}>{t('common.cancel')}</button>
                   <button type="submit" className="btn btn-primary" disabled={draftBusy || findingPrintings || draftsLoading || draftsError || languageChanging}>
-                    {draftBusy && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+                    {draftBusy && <RefreshCw size={16} className="spin-animation" aria-hidden="true" />}
                     {t(editingDraftId ? 'common.save' : 'scan.queueCard')}
                   </button>
                 </div>

@@ -20,6 +20,7 @@ import CardDeckStatus from './CardDeckStatus';
 import MultiSelectDropdown from './MultiSelectDropdown';
 import Modal from './Modal';
 import SetCompletion from './SetCompletion';
+import { useBackGuard } from '../utils/useBackGuard';
 
 const labelStyle = { fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text-secondary)' };
 const PAGE_SIZE = 60;
@@ -72,6 +73,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   const [subTab, setSubTab] = useState('collection'); // 'collection', 'unsorted', 'wishlist', 'arena', 'graveyard'
   const inventoryType = subTab === 'graveyard' ? 'graveyard' : 'collection';
   const [showFilters, setShowFilters] = useState(false);
+  useBackGuard(showFilters, () => setShowFilters(false));
   const [page, setPage] = useState(1);
 
   // Search & Filter state

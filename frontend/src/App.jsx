@@ -440,8 +440,12 @@ function App() {
   // lives on the server, so closing the wizard halfway resumes it at the next
   // login on any device; everything it configures is also reachable from Settings
   // and Admin.
+  // Keyed on identity and role, not the user object: a profile refresh (theme,
+  // share) replaces that object and must not reopen a closed wizard.
+  const userId = user?.id;
+  const isAdmin = user?.role === 'admin';
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!isAdmin) return;
     let cancelled = false;
     setSetupProbe('loading');
     import('./components/SetupWizard')
@@ -453,7 +457,7 @@ function App() {
       })
       .catch(() => { if (!cancelled) setSetupProbe('error'); });
     return () => { cancelled = true; };
-  }, [user, setupRetry]);
+  }, [userId, isAdmin, setupRetry]);
 
   // Handle automatic logout on 401
   useEffect(() => {

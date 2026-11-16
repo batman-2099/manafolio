@@ -43,7 +43,6 @@ export async function runUiAdminSettingsRegressions() {
       if (url.startsWith('/api/ai-decks/account?')) return response({ connected: false });
       if (url === '/api/admin/catalogs') return response({ catalogs: [] });
       if (url === '/api/admin/models') return response({});
-      if (url === 'https://api.github.com/repositories/1389194597') return response({ html_url: 'https://github.com/fixture/fixture' });
       throw new Error(`Unexpected fixture request: ${url}`);
     };
     await render(<Settings user={user} showToast={showToast} onUpdateUser={() => {}} onSaveTheme={async () => true} />);

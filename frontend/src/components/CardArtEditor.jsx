@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, Upload, Trash2, Share2 } from 'lucide-react';
 import { artUrl, noteArtChanged, useCardArtIndex } from '../utils/cardArt';
-import { getRepoUrl, issueUrl } from '../utils/repo';
+import { REPO_URL, issueUrl } from '../utils/repo';
 import { useT } from '../utils/i18n';
 import CardAiExplain from './CardAiExplain';
 
@@ -140,7 +140,7 @@ export default function CardArtEditor({ card, hasProviderArt, showToast, onChang
         t('art.issueRights'),
       ].join('\n');
 
-      window.open(issueUrl(await getRepoUrl(), {
+      window.open(issueUrl(REPO_URL, {
         labels: 'card-art',
         title: `[Card art] ${card.name || cardId}`,
         body,

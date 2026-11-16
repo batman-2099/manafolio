@@ -214,7 +214,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
   const cardsRequest = useRef(0);
   const containerMenuButton = useRef(null);
   const [labelContainer, setLabelContainer] = useState(null);
-  const cardsKey = `${inventoryType}:${statsTrigger}`;
+  const cardsKey = inventoryType;
   const cardsReady = loadedCardsKey === cardsKey;
   const [setsList, setSetsList] = useState([]);
   const [showGallery, setShowGallery] = useState(true);
@@ -523,6 +523,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     setActivePageIndex(0);
     setBinderActiveEntryId(null);
     setFilingQueue([]);
+    setFilingMode(false);
     storage.exitSelectMode();
     setMoveMode(false);
     setPickedEntryId(null);
@@ -803,6 +804,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
       if (!response.ok) throw new Error(data.error || t('loc.errCreateDeck'));
       setContainerDeckDraft(null);
       showToast(t('deck.created'), 'success');
+      refreshAll();
       onUpdate?.();
     } catch (error) {
       setContainerDeckError(error.message || t('loc.errCreateDeck'));
@@ -1142,6 +1144,8 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
     if (!over) return;
     // Dropped on the queue: the card leaves the binder rather than moving inside it.
     if (over.id === 'unsorted-queue') {
+      // Already unsorted: reordering inside the queue is not a move.
+      if (unsortedCards.some(c => c.entry_id === active.id)) return;
       unfileCard(active.id);
       return;
     }
@@ -1991,7 +1995,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
               </div>
             )}
 
-            <div style={{ background: 'var(--bg-tertiary, var(--surface-1))', borderRadius: 'var(--radius-sm)', padding: '0.4rem 0.55rem', fontSize: '0.72rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ background: 'var(--surface-1)', borderRadius: 'var(--radius-sm)', padding: '0.4rem 0.55rem', fontSize: '0.72rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               {/* Label only — the count sits in the value beside it, so this is
                   not loc.cardsCurrentlyStored, whose sentence carries a {count}
                   this row has nowhere to put. */}

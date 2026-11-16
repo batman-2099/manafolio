@@ -404,6 +404,7 @@
   overflow-wrap: anywhere;
 }
 
+.deck-source-error,
 .deck-source-field .deck-source-error,
 .deck-sleeved-field .deck-source-error {
   color: var(--accent-red);
