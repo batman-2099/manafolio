@@ -23,6 +23,7 @@ async function runTestFile(file) {
     // account when a password is pinned — a real fresh install gets its owner
     // from the setup wizard instead, and a headless test has no browser.
     const child = spawn(process.execPath, [path.join(TEST_DIR, file)], {
+      timeout: 5 * 60 * 1000, // a hung suite is killed and counted as failed
       env: {
         ...process.env, DEFAULT_ADMIN_PASSWORD: 'test-admin-password',
         TMPDIR: tempDir, TMP: tempDir, TEMP: tempDir,

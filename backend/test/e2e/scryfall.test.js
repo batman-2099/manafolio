@@ -10,6 +10,7 @@ process.env.DB_PATH = tmpDb;
 
 const projectRoot = path.join(__dirname, '../../../');
 const db = require('../../src/db');
+const { parseSqliteUtc } = require('../../src/utils/priceHelpers');
 
 
 async function waitForDatabase() {
@@ -229,7 +230,7 @@ async function runTests() {
       for (let i = 0; i < 25 && !fresh; i++) {
         await new Promise(resolve => setTimeout(resolve, 200));
         const cached = await db.get(`SELECT last_updated FROM card_cache WHERE id = ?`, ['mtg-54321']);
-        fresh = Date.now() - new Date(cached.last_updated).getTime() < 10000;
+        fresh = Date.now() - parseSqliteUtc(cached.last_updated).getTime() < 10000;
       }
       assert.ok(fresh, 'Background refresh should update last_updated to now');
       console.log('PASS: F3-TC8');

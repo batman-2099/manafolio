@@ -26,6 +26,7 @@ try {
   for (const file of files) {
     const { status } = spawnSync(process.execPath, [path.join(TEST_DIR, file)], {
       stdio: 'inherit',
+      timeout: 5 * 60 * 1000, // a hung file is a failure (status null), not a stalled gate
       env: { ...testEnv, DB_PATH: path.join(tempDir, `${file}.db`) },
     });
     if (status !== 0) failed.push(file);
