@@ -17,7 +17,7 @@ const db = require('../src/db');
     await db.run(`INSERT INTO card_cache (id, name, game, supertype, subtypes) VALUES
       ('old', 'Old commander', 'mtg', 'Creature', '[]'), ('new', 'New commander', 'mtg', 'Creature', '[]'),
       ('land', 'Forest', 'mtg', 'Land', '["Basic","Land"]')`);
-    await db.run("UPDATE card_cache SET image_url = '/logo.svg?removed-card' WHERE id = 'old'");
+    await db.run("UPDATE card_cache SET image_url = '/logo.svg?removed-card', cmc = 3 WHERE id = 'old'");
     const source = (await db.run("INSERT INTO collection (card_id, quantity, game, user_id, list_type) VALUES ('old', 1, 'mtg', 1, 'collection')")).lastID;
     await db.run("INSERT INTO collection (card_id, quantity, game, user_id, list_type) VALUES ('new', 1, 'mtg', 1, 'collection'), ('land', 10, 'mtg', 1, 'collection')");
     const id = (await db.run("INSERT INTO decks (name, game, format, user_id, commander_card_id) VALUES ('History', 'mtg', 'Commander', 1, 'old')")).lastID;
@@ -70,6 +70,7 @@ const db = require('../src/db');
     assert.strictEqual(restored.commander_card_id, 'old');
     assert.strictEqual(restored.notes, 'Keep this');
     assert.deepStrictEqual(restored.cards.map(card => [card.id, card.quantity, card.checked_out]).sort(), [['land', 2, 0], ['old', 1, 0]]);
+    assert.strictEqual(restored.cards.find(card => card.id === 'old').cmc, 3, 'deck detail carries mana value for the curve');
     assert.deepStrictEqual(await db.all('SELECT * FROM collection ORDER BY id'), inventory);
     assert.strictEqual((await history())[0].kind, 'restore');
     // An old source must not silently become an automatic selection after it is deleted.
@@ -83,6 +84,9 @@ const db = require('../src/db');
     assert.ok(backup.card_cache.some(card => card.id === 'old'), 'backup includes printings present only in history');
     assert.strictEqual(backup.deck_revisions.length, 5);
     assert.strictEqual((await request('POST', '/import', { format: 'backup', data: backup }, 2)).status, 200);
+    for (const body of [{ format: 'backup', data: '{' }, { format: 'json', data: '{' }, { format: 'csv', data: 'name' }]) {
+      assert.strictEqual((await request('POST', '/import', body, 2)).status, 400, `malformed ${body.format} input is a client error`);
+    }
     const copied = await db.get('SELECT id FROM decks WHERE user_id = 2');
     const copiedHistory = (await request('GET', `/decks/${copied.id}/revisions`, undefined, 2)).body.revisions;
     assert.strictEqual(copiedHistory.length, backup.deck_revisions.length);

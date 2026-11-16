@@ -36,6 +36,14 @@ async function createBackup() {
   return { file: path.basename(dest), size: st.size, created_at: st.mtime.toISOString() };
 }
 
+// Snapshot unless the newest backup is younger than `hours`. Judged from the files
+// rather than from process uptime, so a restart neither skips nor repeats one.
+async function backupIfDue(hours) {
+  const [newest] = listBackups();
+  if (newest && Date.now() - Date.parse(newest.created_at) < hours * 60 * 60 * 1000) return null;
+  return createBackup();
+}
+
 // Start a periodic auto-backup. Interval from BACKUP_INTERVAL_HOURS (default 24);
 // set to 0 to disable. Returns the timer, or null when disabled.
 function startAutoBackup() {
@@ -47,14 +55,16 @@ function startAutoBackup() {
     return null;
   }
   console.log(`Auto-backup enabled: every ${hours}h, keeping newest ${KEEP_LAST}.`);
+  // Hourly tick (sooner for sub-hour intervals): a long interval would overflow
+  // the 32-bit timer, and one counted from boot never fires on daily restarts.
   return setInterval(async () => {
     try {
-      const b = await createBackup();
-      console.log(`Auto-backup created: ${b.file} (${b.size} bytes).`);
+      const b = await backupIfDue(hours);
+      if (b) console.log(`Auto-backup created: ${b.file} (${b.size} bytes).`);
     } catch (err) {
       console.error('Auto-backup failed:', err);
     }
-  }, hours * 60 * 60 * 1000);
+  }, Math.min(hours, 1) * 60 * 60 * 1000);
 }
 
-module.exports = { BACKUP_DIR, listBackups, createBackup, startAutoBackup };
+module.exports = { BACKUP_DIR, listBackups, createBackup, backupIfDue, startAutoBackup };

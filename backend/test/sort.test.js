@@ -85,6 +85,9 @@ async function testCardTypeFiling(userId) {
   assert.strictEqual(getSortCategory({ subtypes: '["Artifact","Creature"]' }, 'type-name'), 'Creature');
   assert.strictEqual(getSortCategory({ subtypes: '{broken' }, 'type-name'), 'Other');
   assert.strictEqual(getSortCategory({}, 'type-name'), 'Other');
+  // Scryfall's `special` and `bonus` rarities rank between and above the familiar four.
+  assert.deepStrictEqual(sortCards(['Common', 'Bonus', 'Special', 'Mythic', 'Rare', 'Uncommon'].map(rarity => ({ name: rarity, rarity })),
+    [{ by: 'rarity', dir: 'desc' }]).map(card => card.name), ['Bonus', 'Mythic', 'Special', 'Rare', 'Uncommon', 'Common']);
 
   const locationId = (await db.run(
     `INSERT INTO locations (name, type, sort_order, user_id) VALUES ('Card type fixture', 'Box', 'type-name', ?)`, [userId]

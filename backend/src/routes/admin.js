@@ -111,7 +111,8 @@ router.put('/users/:id', async (req, res) => {
         return res.status(400).json({ error: 'Invalid role' });
       }
       // Block admin demoting themselves
-      if (parseInt(id, 10) === req.user.id && role !== 'admin') {
+      // Number(), as SQLite coerces the id: parseInt('10e-1') is 10 but the row matched is 1.
+      if (Number(id) === req.user.id && role !== 'admin') {
         return res.status(400).json({ error: 'You cannot demote yourself from Administrator role.' });
       }
     }
@@ -143,7 +144,7 @@ router.put('/users/:id', async (req, res) => {
 router.delete('/users/:id', async (req, res) => {
   const { id } = req.params;
 
-  if (parseInt(id, 10) === req.user.id) {
+  if (Number(id) === req.user.id) {
     return res.status(400).json({ error: 'You cannot delete your own Administrator account.' });
   }
 
@@ -251,7 +252,7 @@ router.post('/backups', async (req, res) => {
     res.status(201).json(meta);
   } catch (error) {
     console.error('BACKUP ERROR:', error);
-    res.status(500).json({ error: 'Backup failed', message: error.message });
+    res.status(500).json({ error: 'Backup failed' });
   }
 });
 

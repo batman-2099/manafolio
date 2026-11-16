@@ -285,6 +285,41 @@ async function main() {
     if (update) await update;
     cardApi.printingInLanguage = originalPrinting;
   }
+
+  // Set Code rules read card_cache.set_id, and a rejected bulk move leaves the card filed.
+  await db.run("INSERT INTO card_cache (id, name, set_id) VALUES ('lea', 'Alpha card', 'lea'), ('leb', 'Beta card', 'leb')");
+  const setOnly = await location(user, 'Alpha only');
+  await db.run("UPDATE locations SET rule_type = 'compound', rule_config = ? WHERE id = ?",
+    [JSON.stringify({ rules: [{ action: 'include', field: 'set_id', operator: 'equals', value: 'lea' }] }), setOnly.id]);
+  const home = await location(user, 'Home');
+  const alpha = await entry('lea', 1, home.compartments[0], home.id);
+  const beta = await entry('leb', 1, home.compartments[0], home.id);
+  const setMove = (await request('POST', '/collection/bulk', { entry_ids: [alpha, beta], action: 'move', value: setOnly.id })).body;
+  assert.strictEqual(setMove.message, 'Moved 1 of 2 card(s)');
+  assert.strictEqual(setMove.affected, 1);
+  assert.strictEqual((await db.get('SELECT location_id FROM collection WHERE id = ?', [alpha])).location_id, setOnly.id);
+  assert.deepStrictEqual(await db.get('SELECT location_id, compartment_id FROM collection WHERE id = ?', [beta]),
+    { location_id: home.id, compartment_id: home.compartments[0] }, 'a rejected card stays where it was');
+  assert.strictEqual((await request('POST', '/collection/bulk', { entry_ids: [beta], action: 'move', value: 'abc' })).status, 400);
+  // Re-sort returns cards the container cannot place to Unassigned instead of hiding them.
+  await db.run('UPDATE collection SET location_id = ?, compartment_id = NULL, position = 0 WHERE id = ?', [setOnly.id, beta]);
+  assert.strictEqual((await request('POST', `/locations/${setOnly.id}/resort`, {})).status, 200);
+  assert.strictEqual((await db.get('SELECT location_id FROM collection WHERE id = ?', [beta])).location_id, null);
+  assert.strictEqual((await db.get('SELECT location_id FROM collection WHERE id = ?', [alpha])).location_id, setOnly.id);
+
+  // Values the schema would reject are 400s at the boundary, not constraint 500s.
+  for (const [method, route, body] of [
+    ['POST', '/collection', { card_id: 'mtg-a', condition: 'Mint' }],
+    ['POST', '/collection', { card_id: 'mtg-a', printing: 'Shiny' }],
+    ['POST', '/collection', { card_id: 'mtg-a', purchase_price: 'free' }],
+    ['PUT', `/collection/${alpha}`, { condition: 'Mint' }],
+    ['PUT', `/collection/${alpha}`, { printing: 'Shiny' }],
+    ['PUT', `/collection/${alpha}`, { purchase_price: -1 }],
+    ['POST', '/locations', { name: 'Crate', type: 'Crate' }],
+    ['PUT', `/locations/${home.id}`, { type: 'Crate' }],
+  ]) {
+    assert.strictEqual((await request(method, route, body)).status, 400, `${method} ${route} ${JSON.stringify(body)}`);
+  }
   console.log('inventorymutations.test.js passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {

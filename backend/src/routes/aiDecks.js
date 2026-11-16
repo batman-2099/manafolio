@@ -16,8 +16,6 @@ const {
 
 const router = express.Router();
 const suggesting = new Set();
-// ponytail: serialize this endpoint's saves on the app's single SQLite connection.
-let saving = false;
 
 function sessionOnly(req, res, next) {
   if (req.user.via_api_key) return res.status(403).json({ error: 'Sign in with your browser session to use AI deck generation and preferences.' });
@@ -240,68 +238,62 @@ const saveDeck = endpoint(async (req, res) => {
   if (replacementId !== undefined && draft.source_deck_id !== replacementId) {
     fail('Source deck ID must match the deck being replaced.');
   }
-  if (saving) fail('Another deck is being saved. Please try again.', 409);
-  saving = true;
-  try {
-    const id = await db.withTransaction(async () => {
-      const source = await sourceDeck(req.user.id, draft.source_deck_id, draft);
-      let notes = draft.strategy;
-      let current;
-      let wasCheckedOut = false;
-      if (replacementId !== undefined) {
-        current = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [replacementId, req.user.id]);
-        wasCheckedOut = !!current.checked_out;
-        const existingNotes = current.notes || '';
-        notes = !draft.strategy || existingNotes.endsWith(draft.strategy)
-          ? existingNotes : existingNotes ? `${existingNotes}\n\n${draft.strategy}` : draft.strategy;
-      }
-      const selected = new Set(draft.cards.map(card => card.card_id));
-      const cards = await cardRules((await inventory(req.user.id, draft.inventory_type, { ...draft, sourceDeck: source })).filter(card => selected.has(card.id)));
-      validateDraft(draft, cards);
-      let deckId = replacementId;
-      let saved;
-      if (replacementId !== undefined) {
-        saved = new Map((await db.all('SELECT card_id, quantity, checked_out, source_entry_id FROM deck_cards WHERE deck_id = ?', [deckId]))
-          .map(card => [card.card_id, card]));
-        await db.run('UPDATE decks SET name = ?, description = ?, commander_card_id = ?, notes = ? WHERE id = ?',
-          [draft.name, draft.description, draft.commander_card_id, notes, deckId]);
-        // Check in atomically with the replacement; failures restore checkout and reservations.
-        if (wasCheckedOut) await db.run('UPDATE decks SET checked_out = 0, checked_out_at = NULL WHERE id = ?', [deckId]);
-        await db.run('DELETE FROM deck_cards WHERE deck_id = ?', [deckId]);
-      } else {
-        const created = await db.run(`INSERT INTO decks
-          (user_id, name, description, notes, game, inventory_type, format, target_size, commander_card_id)
-          VALUES (?, ?, ?, ?, 'mtg', ?, ?, ?, ?)`,
-        [req.user.id, draft.name, draft.description, notes, draft.inventory_type, draft.format, draft.target_size, draft.commander_card_id]);
-        deckId = created.lastID;
-      }
-      let cardsToSave = draft.cards.map(card => ({ ...card, source_entry_id: saved?.get(card.card_id)?.source_entry_id ?? null }));
-      if (cardMoves !== undefined) {
-        cardsToSave = await moveDeckCardChanges({
-          userId: req.user.id, deck: { ...current, checked_out: 0 },
-          beforeCards: [...saved.values()], afterCards: cardsToSave, moves: cardMoves,
-        });
-      }
-      for (const card of cardsToSave) {
-        const check = await validateDeckAddition({ deckId, userId: req.user.id, cardId: card.card_id, newQty: card.quantity });
-        if (!check.ok) fail(check.error);
-        const sourceEntryId = card.source_entry_id;
-        await validateDeckSource(req.user.id, deckId, card.card_id, card.quantity, sourceEntryId);
-        const previous = saved?.get(card.card_id);
-        const pulled = previous && (wasCheckedOut || (card.quantity <= previous.quantity && previous.checked_out));
-        await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out, source_entry_id) VALUES (?, ?, ?, ?, ?)',
-          [deckId, card.card_id, card.quantity, pulled ? 1 : 0, sourceEntryId]);
-      }
-      if (replacementId !== undefined) {
-        const updatedCards = await db.all('SELECT card_id, quantity, source_entry_id FROM deck_cards WHERE deck_id = ? AND quantity > 0', [deckId]);
-        await recordRevision(deckId, composition(source, [...saved.values()].filter(card => card.quantity > 0)), composition(draft, updatedCards));
-      }
-      return deckId;
-    });
-    res.status(replacementId === undefined ? 201 : 200).json({ id });
-  } finally {
-    saving = false;
-  }
+  const id = await db.withTransaction(async () => {
+    const source = await sourceDeck(req.user.id, draft.source_deck_id, draft);
+    let notes = draft.strategy;
+    let current;
+    let wasCheckedOut = false;
+    if (replacementId !== undefined) {
+      current = await db.get('SELECT * FROM decks WHERE id = ? AND user_id = ?', [replacementId, req.user.id]);
+      wasCheckedOut = !!current.checked_out;
+      const existingNotes = current.notes || '';
+      notes = !draft.strategy || existingNotes.endsWith(draft.strategy)
+        ? existingNotes : existingNotes ? `${existingNotes}\n\n${draft.strategy}` : draft.strategy;
+    }
+    const selected = new Set(draft.cards.map(card => card.card_id));
+    const cards = await cardRules((await inventory(req.user.id, draft.inventory_type, { ...draft, sourceDeck: source })).filter(card => selected.has(card.id)));
+    validateDraft(draft, cards);
+    let deckId = replacementId;
+    let saved;
+    if (replacementId !== undefined) {
+      saved = new Map((await db.all('SELECT card_id, quantity, checked_out, source_entry_id FROM deck_cards WHERE deck_id = ?', [deckId]))
+        .map(card => [card.card_id, card]));
+      await db.run('UPDATE decks SET name = ?, description = ?, commander_card_id = ?, notes = ? WHERE id = ?',
+        [draft.name, draft.description, draft.commander_card_id, notes, deckId]);
+      // Check in atomically with the replacement; failures restore checkout and reservations.
+      if (wasCheckedOut) await db.run('UPDATE decks SET checked_out = 0, checked_out_at = NULL WHERE id = ?', [deckId]);
+      await db.run('DELETE FROM deck_cards WHERE deck_id = ?', [deckId]);
+    } else {
+      const created = await db.run(`INSERT INTO decks
+        (user_id, name, description, notes, game, inventory_type, format, target_size, commander_card_id)
+        VALUES (?, ?, ?, ?, 'mtg', ?, ?, ?, ?)`,
+      [req.user.id, draft.name, draft.description, notes, draft.inventory_type, draft.format, draft.target_size, draft.commander_card_id]);
+      deckId = created.lastID;
+    }
+    let cardsToSave = draft.cards.map(card => ({ ...card, source_entry_id: saved?.get(card.card_id)?.source_entry_id ?? null }));
+    if (cardMoves !== undefined) {
+      cardsToSave = await moveDeckCardChanges({
+        userId: req.user.id, deck: { ...current, checked_out: 0 },
+        beforeCards: [...saved.values()], afterCards: cardsToSave, moves: cardMoves,
+      });
+    }
+    for (const card of cardsToSave) {
+      const check = await validateDeckAddition({ deckId, userId: req.user.id, cardId: card.card_id, newQty: card.quantity });
+      if (!check.ok) fail(check.error);
+      const sourceEntryId = card.source_entry_id;
+      await validateDeckSource(req.user.id, deckId, card.card_id, card.quantity, sourceEntryId);
+      const previous = saved?.get(card.card_id);
+      const pulled = previous && (wasCheckedOut || (card.quantity <= previous.quantity && previous.checked_out));
+      await db.run('INSERT INTO deck_cards (deck_id, card_id, quantity, checked_out, source_entry_id) VALUES (?, ?, ?, ?, ?)',
+        [deckId, card.card_id, card.quantity, pulled ? 1 : 0, sourceEntryId]);
+    }
+    if (replacementId !== undefined) {
+      const updatedCards = await db.all('SELECT card_id, quantity, source_entry_id FROM deck_cards WHERE deck_id = ? AND quantity > 0', [deckId]);
+      await recordRevision(deckId, composition(source, [...saved.values()].filter(card => card.quantity > 0)), composition(draft, updatedCards));
+    }
+    return deckId;
+  });
+  res.status(replacementId === undefined ? 201 : 200).json({ id });
 });
 
 router.post('/', saveDeck);

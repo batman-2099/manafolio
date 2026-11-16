@@ -2,7 +2,7 @@
 // module so the split route files (collection, storage, importExport) never have
 // to import each other.
 const db = require('../db');
-const { recommendSlot, compartmentLabel, locationAcceptsCard, STACK_KEY_SQL } = require('./compartmentSort');
+const { recommendSlot, compartmentLabel, locationAcceptsCard, RULE_CARD_COLUMNS, STACK_KEY_SQL } = require('./compartmentSort');
 const { rebalanceCompartmentPositions } = require('./priceHelpers');
 
 // Default compartment plan by container type — used when a caller doesn't
@@ -375,7 +375,7 @@ async function resolveCompartmentAndPosition(opts) {
   if (!location) throw Object.assign(new Error('Invalid location ID'), { status: 400 });
   assertStorageInventory(location, listType);
 
-  let cardMetadata = await db.get(`SELECT name, set_name, number, types, subtypes, price_trend, price_normal, price_holofoil, supertype, rarity, game, cmc, color_identity FROM card_cache WHERE id = ?`, [cId]);
+  let cardMetadata = await db.get(`SELECT ${RULE_CARD_COLUMNS} FROM card_cache cc WHERE cc.id = ?`, [cId]);
   if (!cardMetadata) cardMetadata = { name: cId || '', types: [] };
   // card_cache has no id column selected above, and a stacking container matches
   // a copy against its twin by card id — so carry it on explicitly.

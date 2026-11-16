@@ -126,6 +126,13 @@ async function main() {
   const locCount = await db.get(`SELECT COUNT(*) AS count FROM locations`);
   assert.strictEqual(locCount.count, 1, 'starter locations must not be added to a populated database');
 
+  // Starter containers come with account creation, not with every restart.
+  await db.run('UPDATE collection SET location_id = NULL');
+  await db.run('DELETE FROM locations');
+  await db.initDb();
+  assert.strictEqual((await db.get(`SELECT COUNT(*) AS count FROM locations`)).count, 0,
+    'an owner who deleted every container does not get starter containers back');
+
   console.log('bootstrap owner adoption: OK');
 }
 

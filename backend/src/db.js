@@ -836,7 +836,9 @@ async function initDb() {
 
   if (adminId) {
     await adoptOrphanRows(adminId);
-    await seedStarterLocations(adminId);
+    // Starter containers are for a new account only; an owner who deleted every
+    // container must not get them back on restart.
+    if (userCount.count === 0) await seedStarterLocations(adminId);
   }
   // Freeze legacy checkouts once, so later additions cannot change their return list.
   const { checkedOutSources } = require('./utils/collectionHelpers');

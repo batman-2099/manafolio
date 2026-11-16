@@ -568,6 +568,7 @@ router.get('/:id', async (req, res) => {
         cc.types,
         cc.rarity,
         cc.set_id,
+        cc.cmc,
         cc.set_name,
         cc.number,
         cc.image_url,

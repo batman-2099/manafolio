@@ -77,6 +77,11 @@ function evaluateCompoundRules(rules, cardMetadata) {
   return true;
 }
 
+// card_cache columns a container rule or sort key may read. One list for every
+// query feeding evaluateCompoundRules/sortCards, so a rule field offered in the
+// UI cannot be missing from one of them.
+const RULE_CARD_COLUMNS = 'cc.name, cc.printed_name, cc.set_id, cc.set_name, cc.number, cc.types, cc.subtypes, cc.supertype, cc.rarity, cc.game, cc.cmc, cc.color_identity, cc.price_trend, cc.price_normal, cc.price_holofoil';
+
 function compartmentAcceptsCard(compartment, cardMetadata) {
   const cfg = compartment && compartment.ruleConfig;
   const rules = Array.isArray(cfg) ? cfg : ((cfg && cfg.rules) || []);
@@ -129,14 +134,9 @@ function getColorCategory(card) {
   return colorIdentityName(colors[0]) || 'Colorless';
 }
 
-const RARITY_RANK = [
-  ['enchanted', 9], ['legendary', 8], ['super rare', 7], ['mythic', 6],
-  ['promo', 4], ['rare', 3],
-  ['uncommon', 2], ['common', 1],
-];
 function rarityRank(rarity) {
   const r = (rarity || '').toLowerCase();
-  for (const [kw, rank] of RARITY_RANK) if (r.includes(kw)) return rank;
+  for (const [kw, rank] of Object.entries(cardOrder.rarity)) if (r.includes(kw)) return rank;
   return 0;
 }
 
@@ -681,6 +681,7 @@ module.exports = {
   rebalanceCompartmentByScheme,
   locationAcceptsCard,
   compartmentAcceptsCard,
+  RULE_CARD_COLUMNS,
   loadSetsCache,
   getSortCategory,
   safeJsonParse,
