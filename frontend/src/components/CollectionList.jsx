@@ -10,7 +10,7 @@ import { COLLECTION_SORT_CRITERIA, sortCardsByOrder } from '../utils/cardSort';
 import { buildCollectionExport } from '../utils/collectionExport';
 import { downloadBlob } from '../utils/downloadBlob';
 import { useMultiSelect } from '../utils/useMultiSelect';
-import { defaultGameFilter, isGameEnabled } from '../utils/games';
+import { isGameEnabled } from '../utils/games';
 import { useT } from '../utils/i18n';
 import CardInspectorModal from './CardInspectorModal';
 import AddToDeckSelect from './AddToDeckSelect';
@@ -78,8 +78,6 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
   // Search & Filter state
   const [searchFilter, setSearchFilter] = useState('');
-  // Falls back to a visible game if the Settings default has since been hidden.
-  const [gameFilter, setGameFilter] = useState(() => (isGameEnabled(localStorage.getItem('default_game')) ? localStorage.getItem('default_game') : defaultGameFilter()));
   const [locationFilter, setLocationFilter] = useState([]);
   const [rarityFilter, setRarityFilter] = useState([]);
   const [conditionFilter, setConditionFilter] = useState([]);
@@ -261,7 +259,6 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
   const clearAllFilters = () => {
     setSearchFilter('');
-    setGameFilter('');
     setLocationFilter([]); setRarityFilter([]); setConditionFilter([]); setGraderFilter([]);
     setPrintingFilter([]); setSetFilter([]); setTypeFilter([]); setColorFilter([]);
     setCmcFilter([]); setLanguageFilter([]);
@@ -286,8 +283,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       const matchesLocation = locationFilter.length === 0 ? true :
                               locationFilter.some(f => f === 'unassigned' ? !item.location_id : item.location_id == f);
       // Hidden games remain stored but are excluded from this view and its exports.
-      const itemGame = item.game;
-      const matchesGame = gameFilter === '' ? isGameEnabled(itemGame) : itemGame === gameFilter;
+      const matchesGame = isGameEnabled(item.game);
       const matchesRarity = rarityFilter.length === 0 ? true : rarityFilter.includes(item.rarity);
       const matchesCondition = conditionFilter.length === 0 ? true : conditionFilter.includes(item.condition);
       const matchesPrinting = (finishes.length === 0 || finishes.some(value => matchesPrintingOption(item, value))) &&
@@ -322,7 +318,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       sortCardsByOrder(result, SORT_CRITERIA[sortBy] || SORT_CRITERIA['added-newest'], undefined, setsList);
     }
     return result;
-  }, [collection, searchFilter, gameFilter, locationFilter, rarityFilter, conditionFilter, printingFilter, setFilter, typeFilter, colorFilter, cmcFilter, languageFilter, favoriteOnly, graderFilter, minPriceFilter, maxPriceFilter, notCheckedOutOnly, subTab, sortBy, setsList]);
+  }, [collection, searchFilter, locationFilter, rarityFilter, conditionFilter, printingFilter, setFilter, typeFilter, colorFilter, cmcFilter, languageFilter, favoriteOnly, graderFilter, minPriceFilter, maxPriceFilter, notCheckedOutOnly, subTab, sortBy, setsList]);
 
   // Group duplicate cards if stack option is active
   const processedCollection = useMemo(() => {

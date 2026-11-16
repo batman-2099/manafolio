@@ -16,7 +16,7 @@ const formatBytes = (n) => {
   return `${(n / Math.pow(1024, i)).toFixed(i ? 1 : 0)} ${u[i]}`;
 };
 
-function AdminPanel({ user, onUpdateUser, showToast }) {
+function AdminPanel({ user, showToast }) {
   const { t, locale } = useT();
   const [users, setUsers] = useState([]);
   const [usersStatus, setUsersStatus] = useState('loading');
@@ -373,8 +373,6 @@ function AdminPanel({ user, onUpdateUser, showToast }) {
       {showWizard && (
         <SetupWizard 
           user={user} 
-          onUpdateUser={onUpdateUser} 
-          showToast={showToast} 
           onClose={() => setShowWizard(false)} 
         />
       )}

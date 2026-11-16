@@ -65,13 +65,6 @@
   min-width: 0;
 }
 
-.deck-details-content {
-  display: grid;
-  min-width: 0;
-  gap: var(--space-6);
-  padding-block: var(--space-2);
-}
-
 .ai-deck-setup {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1062,11 +1055,6 @@
 
 .ai-deck-connection > button {
   margin-inline-start: auto;
-}
-
-.ai-deck-guidance {
-  padding-block: var(--space-4);
-  border-top: 1px solid var(--border-glass);
 }
 
 .ai-deck-results {

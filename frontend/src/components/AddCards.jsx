@@ -7,9 +7,9 @@ import SlabLookup from './SlabLookup';
 import MtgDeckImport from './MtgDeckImport';
 import { useT } from '../utils/i18n';
 
-function AddCards({ onAddSuccess, showToast, setActiveTab, navigationGuardRef, initialMode = 'search' }) {
+function AddCards({ onAddSuccess, showToast, navigationGuardRef }) {
   const { t } = useT();
-  const [mode, setMode] = useState(initialMode);
+  const [mode, setMode] = useState('search');
   const localNavigationGuardRef = useRef(null);
   const modeGuardRef = navigationGuardRef || localNavigationGuardRef;
   const changeMode = nextMode => {
@@ -71,7 +71,7 @@ function AddCards({ onAddSuccess, showToast, setActiveTab, navigationGuardRef, i
       </div>
 
       <div>
-        {mode === 'scan' && <CameraScanner onAddSuccess={onAddSuccess} showToast={showToast} setActiveTab={setActiveTab} />}
+        {mode === 'scan' && <CameraScanner onAddSuccess={onAddSuccess} showToast={showToast} />}
         {mode === 'search' && <CardSearch onAddSuccess={onAddSuccess} showToast={showToast} navigationGuardRef={modeGuardRef} />}
         {mode === 'slab' && <SlabLookup onAddSuccess={onAddSuccess} showToast={showToast} />}
         {mode === 'deck' && <MtgDeckImport onAddSuccess={onAddSuccess} showToast={showToast} navigationGuardRef={modeGuardRef} />}

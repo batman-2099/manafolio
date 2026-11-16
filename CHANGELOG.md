@@ -16,6 +16,13 @@ Release history starts with Manafolio 2.0.
 - Replace repeated set-catalog scans with one rank map while preserving ordering; remove unused language re-exports.
 - Protect Docker latest/minor aliases against stale releases, share the complete verification gate, restrict release write permission to publication, and lock/check release-tool integrity.
 - Replace obsolete registered Windows application payloads while retaining configuration and user data; extend the native upgrade smoke with removal/preservation sentinels.
+- Fix a server crash on OIDC requests with a malformed `Host` header; accept only Scryfall UUIDs in card lookups and report provider failures instead of "not found"; authenticate before parsing large import, scan, and search bodies.
+- Apply Set Code storage rules and manual valuations during filing and re-sort. Bulk moves leave rejected cards where they were and report "Moved N of M"; re-sort returns unplaceable cards to the Unassigned Pile.
+- Show the mana curve for saved decks, rank Special and Bonus rarities, and reject invalid condition, printing, purchase price, container type, and malformed import input with clear errors instead of server errors.
+- Schedule automatic backups from the newest snapshot rather than server uptime, create starter containers only with a new owner account, and stop refusing an AI deck save while another user is saving.
+- Fix unstyled error text, stat tiles, and scanner spinners; keep the storage workspace mounted after edits; exit filing mode when switching containers; stop reopening the setup wizard after profile changes.
+- Use a fixed repository link in Settings instead of contacting GitHub, and remove 133 unused translations.
+- Build native modules in a separate Docker stage so the runtime image ships no compiler, follow `PORT` in the container health check, and document OIDC, backup, and catalog variables in `.env.example`.
 
 ## 2.9.0 — 2026-11-11
 

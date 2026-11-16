@@ -75,7 +75,7 @@ export async function runUiAdminSettingsRegressions() {
     await click(keyButton);
     assert(host.querySelector('#settings-access-key').type === 'text', 'key reveal still works');
 
-    await render(<AdminPanel user={{ ...user, role: 'admin' }} showToast={showToast} onUpdateUser={() => {}} />);
+    await render(<AdminPanel user={{ ...user, role: 'admin' }} showToast={showToast} />);
     assert(![...host.querySelectorAll('button')].some(node => /test cards|replace collection/i.test(node.textContent)), 'production admin has no destructive seed action');
     const role = button('admin.toggleRole');
     const remove = button('admin.deleteAccount');

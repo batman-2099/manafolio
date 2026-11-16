@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { detectCard } from '../../../shared/cardDetectPure.mjs';
 import { orderQuad } from '../../../shared/imgproc.mjs';
-import { sharpness } from './sharpness.js';
 
 // Execute the worker entry with its real contour code and an inert model transport.
 const source = readFileSync(new URL('./detectWorker.js', import.meta.url), 'utf8')
@@ -51,12 +50,12 @@ for (const failure of ['network', '404', 'html', 'wasm', 'pending-fetch', 'pendi
           } },
         },
         detectCard: (...args) => { contours++; return detectCard(...args); },
-        orderQuad, sharpness,
+        orderQuad,
       });
       return {
         messages,
         expire: () => expire(),
-        frame: seq => self.onmessage({ data: { buf: new Uint8ClampedArray(64 * 64 * 4).buffer, w: 64, h: 64, seq } }),
+        frame: seq => self.onmessage({ data: { buf: new Uint8ClampedArray(384 * 384 * 4).buffer, w: 384, h: 384, seq } }),
       };
     };
     const worker = startWorker();

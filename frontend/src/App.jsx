@@ -567,7 +567,7 @@ function App() {
       case 'dashboard':
         return <Dashboard statsTrigger={statsTrigger} onNavigate={goTab} onOpenDeck={openDeck} setSelectedLocationId={setSelectedLocationId} setFocusEntryId={setFocusEntryId} onUpdate={triggerRefresh} showToast={showToast} />;
       case 'add-cards':
-        return <AddCards onAddSuccess={triggerRefresh} showToast={showToast} setActiveTab={goTab} navigationGuardRef={navigationGuardRef} />;
+        return <AddCards onAddSuccess={triggerRefresh} showToast={showToast} navigationGuardRef={navigationGuardRef} />;
       case 'collection':
         return (
           <CollectionList 
@@ -613,7 +613,7 @@ function App() {
       case 'settings':
         return <Settings user={user} initialSection={settingsSection} onUpdateUser={handleUpdateUser} onSaveTheme={handleSaveTheme} showToast={showToast} />;
       case 'admin':
-        return <AdminPanel user={user} onUpdateUser={handleUpdateUser} showToast={showToast} />;
+        return <AdminPanel user={user} showToast={showToast} />;
       default:
         return <Dashboard statsTrigger={statsTrigger} onNavigate={goTab} onOpenDeck={openDeck} setSelectedLocationId={setSelectedLocationId} setFocusEntryId={setFocusEntryId} onUpdate={triggerRefresh} showToast={showToast} />;
     }
@@ -624,7 +624,7 @@ function App() {
       <a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); mainRef.current?.focus(); }}>{t('nav.skipContent')}</a>
       {showSetup && (
         <Suspense fallback={null}>
-          <SetupWizard user={user} onUpdateUser={handleUpdateUser} onClose={() => setShowSetup(false)} />
+          <SetupWizard user={user} onClose={() => setShowSetup(false)} />
         </Suspense>
       )}
       <header className="app-header">

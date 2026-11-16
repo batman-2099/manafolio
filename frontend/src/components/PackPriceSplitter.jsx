@@ -4,9 +4,8 @@ import { useT } from '../utils/i18n';
 // Distribute a total price paid (a pack/deck) across a set of collection
 // entries, setting each card's per-card purchase_price. The split math lives
 // server-side in POST /api/collection/bulk (action 'purchase_split'); this is
-// just the total input + method picker shared by the collection bulk bar and
-// the scanner's recent-scans panel.
-export default function PackPriceSplitter({ entryIds, onApplied, showToast, style, runBulk, pending = false }) {
+// just the total input + method picker for the collection bulk bar.
+export default function PackPriceSplitter({ entryIds, showToast, runBulk, pending = false }) {
   const { t } = useT();
   const [total, setTotal] = useState('');
   const [method, setMethod] = useState('weighted');
@@ -19,18 +18,7 @@ export default function PackPriceSplitter({ entryIds, onApplied, showToast, styl
     if (!entryIds.length) { showToast(t('split.errNoCards'), 'error'); return; }
     setBusy(true);
     try {
-      if (runBulk) {
-        if (await runBulk('purchase_split', { total: amount, method })) setTotal('');
-        return;
-      }
-      const res = await fetch('/api/collection/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entry_ids: entryIds, action: 'purchase_split', value: { total: amount, method } }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (res.ok) { showToast(d.message || t('split.applied'), 'success'); setTotal(''); onApplied?.(); }
-      else showToast(d.error || t('split.failed'), 'error');
+      if (await runBulk('purchase_split', { total: amount, method })) setTotal('');
     } catch {
       showToast(t('split.error'), 'error');
     } finally {
@@ -39,7 +27,7 @@ export default function PackPriceSplitter({ entryIds, onApplied, showToast, styl
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', ...style }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{t('split.totalPaid')} $</span>
       <input
         type="number" step="0.01" min="0" value={total}

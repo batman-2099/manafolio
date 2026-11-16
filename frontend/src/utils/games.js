@@ -3,7 +3,6 @@
 // or creates them.
 export const isGameEnabled = (game) => String(game || '').toLowerCase() === 'mtg';
 export const defaultGame = () => 'mtg';
-export const defaultGameFilter = () => 'mtg';
 export const gameLabel = (game, short = false) => isGameEnabled(game)
   ? (short ? 'MTG' : 'Magic: The Gathering')
   : String(game || 'Unknown');
