@@ -62,6 +62,15 @@ async function main() {
     assert.strictEqual((await request('PUT', owner.id, { password: 'replacement-password', role: 'member' })).status, 400);
     assert.deepStrictEqual(await db.get('SELECT * FROM users WHERE id = ?', [owner.id]), owner,
       'a refused self-demotion must not change the password');
+    // The self-protection guard reads the id as SQLite will: '10e-1' is this owner's row.
+    const ownId = `${owner.id}0e-1`;
+    assert.strictEqual((await request('PUT', ownId, { role: 'member' })).status, 400);
+    assert.strictEqual((await request('DELETE', ownId)).status, 400);
+    assert.deepStrictEqual(await db.get('SELECT * FROM users WHERE id = ?', [owner.id]), owner);
+    // Members never reach the admin surface.
+    assert.strictEqual((await fetch(`http://127.0.0.1:${server.address().port}/api/admin/users`, {
+      headers: { Authorization: `Bearer ${memberTokens[0]}` },
+    })).status, 403);
     for (const password of [null, 12345678, {}, 'short']) {
       assert.strictEqual((await request('PUT', memberId, { password, role: 'admin' })).status, 400);
       assert.deepStrictEqual(await db.get('SELECT * FROM users WHERE id = ?', [memberId]), before);

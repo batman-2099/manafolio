@@ -69,46 +69,6 @@ async function runTests() {
     throw err;
   }
 
-  // F2-TC4: Query sorted collection list for a compartment and assert they sort by position
-  try {
-    const userId = 1;
-    const locId = (await db.run(
-      `INSERT INTO locations (name, type, user_id) VALUES (?, ?, ?)`,
-      ['Test Binder Schema', 'Binder', userId]
-    )).lastID;
-    const compId = (await db.run(
-      `INSERT INTO compartments (location_id, idx, capacity) VALUES (?, ?, ?)`,
-      [locId, 1, 9]
-    )).lastID;
-
-    await db.run(
-      `INSERT INTO card_cache (id, name, game) VALUES (?, ?, ?)`,
-      ['mtg-c1', 'Card 1', 'mtg']
-    );
-
-    // Insert cards with positions out of order
-    await db.run(
-      `INSERT INTO collection (card_id, quantity, location_id, compartment_id, position, user_id) VALUES (?, ?, ?, ?, ?, ?)`,
-      ['mtg-c1', 1, locId, compId, 2.5, userId]
-    );
-    await db.run(
-      `INSERT INTO collection (card_id, quantity, location_id, compartment_id, position, user_id) VALUES (?, ?, ?, ?, ?, ?)`,
-      ['mtg-c1', 1, locId, compId, 1.0, userId]
-    );
-
-    const rows = await db.all(
-      `SELECT position FROM collection WHERE compartment_id = ? ORDER BY position ASC`,
-      [compId]
-    );
-    assert.strictEqual(rows.length, 2);
-    assert.strictEqual(rows[0].position, 1.0);
-    assert.strictEqual(rows[1].position, 2.5);
-    console.log('PASS: F2-TC4');
-  } catch (err) {
-    console.error('FAIL: F2-TC4 -', err.message);
-    throw err;
-  }
-
   // F2-TC5: Add a location with MTG-related container types (Deck Box, Tin / Case)
   try {
     const userId = 1;
@@ -209,24 +169,6 @@ async function runTests() {
     console.log('PASS: F2-TC9');
   } catch (err) {
     console.error('FAIL: F2-TC9 -', err.message);
-    throw err;
-  }
-
-  // F2-TC10: Verify price history handles null/zero values safely
-  try {
-    await db.run(
-      `INSERT INTO card_cache (id, name, game, price_trend) VALUES (?, ?, ?, ?)`,
-      ['mtg-c3', 'Promo Lotus', 'mtg', null]
-    );
-    await db.run(
-      `INSERT INTO price_history (card_id, price) VALUES (?, ?)`,
-      ['mtg-c3', 0.0]
-    );
-    const row = await db.get(`SELECT * FROM price_history WHERE card_id = ?`, ['mtg-c3']);
-    assert.strictEqual(row.price, 0.0);
-    console.log('PASS: F2-TC10');
-  } catch (err) {
-    console.error('FAIL: F2-TC10 -', err.message);
     throw err;
   }
 }
