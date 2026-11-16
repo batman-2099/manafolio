@@ -98,11 +98,7 @@ function remove(cardId) {
   return true;
 }
 
-// True when the art being served came from this instance rather than the repo,
-// which is what decides whether the UI offers "remove" and "contribute".
-const isUserArt = (cardId) => isValidId(cardId) && fs.existsSync(fileFor(USER_DIR, cardId));
-
 module.exports = {
-  BUNDLED_DIR, USER_DIR, MAX_WIDTH, MAX_UPLOAD_BYTES,
-  isValidId, resolve, listIds, invalidate, save, remove, isUserArt,
+  MAX_WIDTH, MAX_UPLOAD_BYTES,
+  isValidId, resolve, listIds, invalidate, save, remove,
 };

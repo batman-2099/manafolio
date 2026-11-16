@@ -2,10 +2,14 @@ const db = require('../db');
 const { resolveCardPrice } = require('./priceHelpers');
 
 let setsCache = [];
+// Chronological rank by set name; the first row wins for a duplicated name, as findIndex did.
+let setRank = new Map();
 async function loadSetsCache(database) {
   const dbClient = database || db;
   try {
     setsCache = await dbClient.all('SELECT * FROM sets ORDER BY release_date ASC, id ASC');
+    setRank = new Map();
+    setsCache.forEach((set, index) => { if (!setRank.has(set.name)) setRank.set(set.name, index); });
     console.log(`Loaded ${setsCache.length} sets into compartmentSort cache`);
   } catch (e) {
     console.error('Failed to load sets cache', e);
@@ -175,9 +179,7 @@ function sortCards(cards, sortOrder, foilSorting) {
           cmp = (a.set_name || '').localeCompare(b.set_name || '');
           break;
         case 'set': {
-          const setAIndex = setsCache.findIndex(s => s.name === a.set_name);
-          const setBIndex = setsCache.findIndex(s => s.name === b.set_name);
-          const cmpSetChrono = (setAIndex >= 0 ? setAIndex : 999999) - (setBIndex >= 0 ? setBIndex : 999999);
+          const cmpSetChrono = (setRank.get(a.set_name) ?? 999999) - (setRank.get(b.set_name) ?? 999999);
           if (cmpSetChrono !== 0) { cmp = cmpSetChrono; break; }
           cmp = (a.set_name || '').localeCompare(b.set_name || '');
           break;
@@ -388,51 +390,11 @@ async function recommendSlot(database, location, cardMetadata, overrideCompartme
     dynamicCatsByCompId.set(c.id, Array.from(new Set(cardCats)));
   });
 
-  const validComps = compartments.filter(c => {
-    if (!compartmentAcceptsCard(c, cardMetadata)) return false;
-
-    if (c.assignedFilters && c.assignedFilters.length > 0) {
-      return cardCat && c.assignedFilters.includes(cardCat);
-    }
-    
-    if (location.type !== 'binder') {
-      return true;
-    }
-
-    const dCats = dynamicCatsByCompId.get(c.id) || [];
-    if (dCats.length > 0) {
-      return cardCat && dCats.includes(cardCat);
-    }
-    
-    return true;
-  });
-
-  const assignedComps = validComps.filter(c => {
-    if (c.assignedFilters && c.assignedFilters.length > 0) return true;
-    if (location.type !== 'binder') return false;
-    const dCats = dynamicCatsByCompId.get(c.id) || [];
-    return dCats.length > 0;
-  });
-  
-  const unassignedComps = validComps.filter(c => {
-    if (c.assignedFilters && c.assignedFilters.length > 0) return false;
-    if (location.type !== 'binder') return true;
-    const dCats = dynamicCatsByCompId.get(c.id) || [];
-    return dCats.length === 0;
-  });
-
-  let pool = [...assignedComps];
-  
-  const poolHasFreeSpace = pool.some(hasFreeSpace);
-
-  if (pool.length === 0 || !poolHasFreeSpace) {
-    pool = [...pool, ...unassignedComps];
-  }
-
-
-  if (pool.length === 0 || !pool.some(hasFreeSpace)) {
-    pool = compartments.filter(acceptsCard);
-  }
+  // Prefer compartments assigned to this card's category while one has room;
+  // otherwise any compartment that accepts the card.
+  const validComps = compartments.filter(acceptsCard);
+  const assignedComps = validComps.filter(c => c.assignedFilters && c.assignedFilters.length > 0);
+  const pool = assignedComps.some(hasFreeSpace) ? assignedComps : validComps;
 
   if (pool.length === 0) return null;
 
@@ -684,7 +646,6 @@ module.exports = {
   RULE_CARD_COLUMNS,
   loadSetsCache,
   getSortCategory,
-  safeJsonParse,
   stackKey,
   STACK_KEY_SQL
 };

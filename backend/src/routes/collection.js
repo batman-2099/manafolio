@@ -12,7 +12,7 @@ const { searchLimiter } = require('../middleware/auth');
 const { resolveCardPrice, parseCardRow, recordPrice } = require('../utils/priceHelpers');
 const { parseSetList } = require('../utils/setQuery');
 const { compartmentLabel, isBinderType, rebalanceCompartmentByScheme, stackKey } = require('../utils/compartmentSort');
-const { checkedOutAllocation, checkedOutSources, cardDeckAllocations, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, defaultCompartmentPlan } = require('../utils/collectionHelpers');
+const { checkedOutAllocation, checkedOutSources, freezeSources, cardDeckAllocations, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { splitPrice } = require('../utils/splitPrice');
 const { isMtgToken, validateReverseCard } = require('../utils/tokenPairing');
@@ -1515,10 +1515,7 @@ router.put('/collection/:id', async (req, res) => {
       // Freeze all legacy sources before quantity, identity or placement changes
       // can make fallback reservations switch to different physical copies.
       if (requestedQty !== null || isMoving || language !== undefined || missing !== undefined || req.body.reverse_card_id !== undefined) {
-        for (const source of sources) {
-          await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-            [source.deck_id, source.card_id, source.entry_id, source.quantity]);
-        }
+        await freezeSources(sources);
       }
     }
 

@@ -149,6 +149,25 @@ function scryPostRetried(url, body, config, retries = 4, onProgress) {
   return scryRequestRetried(url, () => client.post(url, body, config), retries, onProgress);
 }
 
+// Every /cards/search page from `url` on. next_page is provider-supplied, so it is
+// followed only on Scryfall's search path, never twice, and never through a redirect.
+async function* searchPages(url, onProgress) {
+  const visited = new Set();
+  while (url) {
+    const parsed = new URL(url, 'https://api.scryfall.com');
+    if (parsed.origin !== 'https://api.scryfall.com' || parsed.pathname !== '/cards/search' || visited.has(parsed.href)) {
+      throw new Error('Invalid set catalog pagination');
+    }
+    visited.add(parsed.href);
+    const { data } = await scryGetRetried(url, { maxRedirects: 0 }, undefined, onProgress);
+    yield data;
+    if (data?.has_more && (typeof data.next_page !== 'string' || !data.next_page)) {
+      throw new Error('Incomplete set catalog pagination');
+    }
+    url = data?.has_more ? data.next_page : null;
+  }
+}
+
 // Scryfall's bulk lookup takes at most 75 identifiers per request.
 const COLLECTION_BATCH = 75;
 
@@ -327,34 +346,21 @@ async function fetchSetScopedRows(rows, onProgress) {
       const chunk = entries.slice(i, i + 30);
       onProgress?.({ stage: 'lookup', current: processed, total: rows.length, set });
       const exactNames = chunk.map(([name]) => `!"${name.replace(/"/g, '\\"')}"`).join(' or ');
-      let url = `/cards/search?q=${encodeURIComponent(`e:${set} (${exactNames})`)}`;
+      const url = `/cards/search?q=${encodeURIComponent(`e:${set} (${exactNames})`)}`;
       const resolved = new Set();
-      const visited = new Set();
-      while (url) {
-        const parsed = new URL(url, 'https://api.scryfall.com');
-        if (parsed.origin !== 'https://api.scryfall.com' || parsed.pathname !== '/cards/search' || visited.has(parsed.href)) {
-          throw new Error('Invalid set catalog pagination');
+      try {
+        for await (const data of searchPages(url, onProgress)) {
+          for (const raw of data?.data || []) {
+            const norm = normalizeCard(raw);
+            const name = [norm.name, raw.name].map(value => String(value || '').toLowerCase()).find(value => names.has(value));
+            if (!name || resolved.has(name)) continue;
+            resolved.add(name);
+            cards.push(norm);
+            for (const row of names.get(name)) pairs.push({ row, card: norm });
+          }
         }
-        visited.add(parsed.href);
-        let resp;
-        try {
-          resp = await scryGetRetried(url, { maxRedirects: 0 }, undefined, onProgress);
-        } catch (error) {
-          if (error.response?.status === 404) break;
-          throw error;
-        }
-        for (const raw of (resp.data && resp.data.data) || []) {
-          const norm = normalizeCard(raw);
-          const name = [norm.name, raw.name].map(value => String(value || '').toLowerCase()).find(value => names.has(value));
-          if (!name || resolved.has(name)) continue;
-          resolved.add(name);
-          cards.push(norm);
-          for (const row of names.get(name)) pairs.push({ row, card: norm });
-        }
-        if (resp.data?.has_more && (typeof resp.data.next_page !== 'string' || !resp.data.next_page)) {
-          throw new Error('Incomplete set catalog pagination');
-        }
-        url = resp.data?.has_more ? resp.data.next_page : null;
+      } catch (error) {
+        if (error.response?.status !== 404) throw error;
       }
       if (onProgress) {
         processed += chunk.reduce((count, [, matchingRows]) => count + matchingRows.length, 0);
@@ -683,15 +689,8 @@ async function runSearch(meta, nameQuery = '', numberQuery = '', setQuery = '', 
 async function getSetChecklist(setCode) {
   const rawCards = new Map();
   let total = null;
-  let url = `/cards/search?q=${encodeURIComponent(`set:${setCode}`)}&unique=prints&include_extras=true&order=set`;
-  const visited = new Set();
-  while (url) {
-    const parsed = new URL(url, 'https://api.scryfall.com');
-    if (parsed.origin !== 'https://api.scryfall.com' || parsed.pathname !== '/cards/search' || visited.has(parsed.href)) {
-      throw new Error('Invalid set catalog pagination');
-    }
-    visited.add(parsed.href);
-    const { data } = await scryGetRetried(url, { maxRedirects: 0 });
+  const url = `/cards/search?q=${encodeURIComponent(`set:${setCode}`)}&unique=prints&include_extras=true&order=set`;
+  for await (const data of searchPages(url)) {
     if (!Array.isArray(data?.data) || !data.data.length || typeof data.has_more !== 'boolean') throw new Error('Incomplete set catalog');
     if (total === null) total = data.total_cards;
     if (!Number.isInteger(total) || total <= 0 || data.total_cards !== total) throw new Error('Incomplete set catalog total');
@@ -701,8 +700,6 @@ async function getSetChecklist(setCode) {
       }
       rawCards.set(raw.id, raw);
     }
-    if (data.has_more && !data.next_page) throw new Error('Incomplete set catalog pagination');
-    url = data.has_more ? data.next_page : null;
   }
   if (rawCards.size !== total) throw new Error('Incomplete set catalog count');
   const cards = [...rawCards.values()].map(raw => ({
@@ -909,4 +906,4 @@ async function getRelatedTokens(cardIds) {
 }
 
 // Export the client and fetchWindow for adapter-based tests.
-module.exports = { searchCards, normalizeCard, cacheCards, getSetChecklist, fetchAndCacheSets, updateCollectionPrices, getCardById, getRelatedTokens, getPrintingInLang, scryGetRetried, bulkFetchByIdentifier, scryfallUuid, client, fetchWindow };
+module.exports = { searchCards, normalizeCard, cacheCards, getSetChecklist, fetchAndCacheSets, updateCollectionPrices, getCardById, getRelatedTokens, getPrintingInLang, scryGetRetried, searchPages, bulkFetchByIdentifier, scryfallUuid, client, fetchWindow };

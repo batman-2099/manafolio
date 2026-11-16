@@ -118,6 +118,15 @@ async function checkedOutSources(userId) {
   return sources;
 }
 
+// Persist reservations as exact entries. Callers freeze legacy fallback sources
+// before a change can make the fallback pick different physical copies.
+async function freezeSources(sources) {
+  for (const source of sources) {
+    await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+      [source.deck_id, source.card_id, source.entry_id, source.quantity]);
+  }
+}
+
 // Shared display allocation: pulled copies are shown, but never reserved.
 async function cardDeckAllocations(userId, sources) {
   const alloc = new Map();
@@ -427,11 +436,11 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
   if (quantity <= 0 || entries.length === 0) return moved;
   // Freeze legacy identities before filing changes their allocation order.
   // Persist every source: a partial allocation disables fallback for that card.
+  const frozen = (await checkedOutSources(userId)).sort((a, b) =>
+    a.deck_id - b.deck_id || a.card_id.localeCompare(b.card_id));
+  await freezeSources(frozen);
   const reservations = new Map();
-  for (const source of (await checkedOutSources(userId)).sort((a, b) =>
-    a.deck_id - b.deck_id || a.card_id.localeCompare(b.card_id))) {
-    await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-      [source.deck_id, source.card_id, source.entry_id, source.quantity]);
+  for (const source of frozen) {
     if (!reservations.has(source.entry_id)) reservations.set(source.entry_id, []);
     reservations.get(source.entry_id).push(source);
   }
@@ -510,6 +519,7 @@ module.exports = {
   sourceEntries,
   planCardSources,
   moveContainerCopies,
+  freezeSources,
   checkedOutAllocation,
   checkedOutSources,
   cardDeckAllocations,

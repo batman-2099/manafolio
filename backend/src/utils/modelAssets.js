@@ -161,4 +161,4 @@ function start(what) {
   return state();
 }
 
-module.exports = { MODELS, CATALOGS, LICENSE, MODEL_DIR, status, start, state, lastResult, isPresent, fetchAsset };
+module.exports = { MODELS, CATALOGS, LICENSE, MODEL_DIR, status, start, state, lastResult, fetchAsset };

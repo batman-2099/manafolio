@@ -11,7 +11,7 @@ const {
   rebalanceCompartmentByScheme,
   STACK_KEY_SQL
 } = require('../utils/compartmentSort');
-const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, checkedOutSources, cardDeckAllocations, physicalCardEntries } = require('../utils/collectionHelpers');
+const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, checkedOutSources, freezeSources, cardDeckAllocations, physicalCardEntries } = require('../utils/collectionHelpers');
 const { normalizeMtgColorIdentity } = require('../utils/mtgColors');
 const { isMtgToken } = require('../utils/tokenPairing');
 const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
@@ -421,11 +421,8 @@ router.post('/locations/:id/stocktake', async (req, res) => {
         .sort((a, b) => a.deck_id - b.deck_id || a.card_id.localeCompare(b.card_id));
       // Freeze every source of affected legacy deck cards, not only this row:
       // a partial persisted allocation would disable fallback for their other copies.
-      for (const source of sources.filter(source => reservations.some(reserved =>
-        reserved.deck_id === source.deck_id && reserved.card_id === source.card_id))) {
-        await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-          [source.deck_id, source.card_id, source.entry_id, source.quantity]);
-      }
+      await freezeSources(sources.filter(source => reservations.some(reserved =>
+        reserved.deck_id === source.deck_id && reserved.card_id === source.card_id)));
       let updatedEntryId = entry_id;
       if (entry.quantity > 1) {
         const original = await db.get('SELECT cert_number FROM collection WHERE id = ? AND user_id = ?', [entry_id, req.user.id]);
@@ -525,10 +522,7 @@ router.post('/locations/:id/transfer', async (req, res) => {
       }
       if (inventory_type === 'graveyard') {
         // Persist legacy reservations before their copies leave physical inventory.
-        for (const source of await checkedOutSources(req.user.id)) {
-          await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-            [source.deck_id, source.card_id, source.entry_id, source.quantity]);
-        }
+        await freezeSources(await checkedOutSources(req.user.id));
       }
       const updated = await db.run(`
         UPDATE collection SET list_type = ? WHERE user_id = ?

@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const cardApi = require('../utils/cardApi');
 const { parseCardRow, recordPrice } = require('../utils/priceHelpers');
-const { deckCardSources, validateDeckSource, deckLocations, reserveDeckSources, deckMissingCards, checkedOutAllocation, checkedOutSources, planCardSources, moveContainerCopies, defaultCompartmentPlan } = require('../utils/collectionHelpers');
+const { deckCardSources, validateDeckSource, deckLocations, reserveDeckSources, deckMissingCards, checkedOutAllocation, checkedOutSources, freezeSources, planCardSources, moveContainerCopies, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { FORMATS } = require('../utils/aiDecks');
 const scryfallApi = require('../scryfallApi');
@@ -409,10 +409,7 @@ async function createDeckContainer(deck, userId, containerName, checkout = false
     [containerName, userId, deck.inventory_type]);
   if (duplicate) throw Object.assign(new Error('A container with this name already exists in this inventory'), { status: 400 });
   // Freeze legacy fallback identities before filing changes their storage order.
-  for (const source of await checkedOutSources(userId)) {
-    await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-      [source.deck_id, source.card_id, source.entry_id, source.quantity]);
-  }
+  await freezeSources(await checkedOutSources(userId));
   // Include this deck's reservations, including legacy and archived allocations.
   const allocated = await checkedOutAllocation(userId);
   const location = await db.run(`

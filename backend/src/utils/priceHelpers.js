@@ -144,7 +144,6 @@ module.exports = {
   markPricesSwept,
   priceRefreshDays,
   DEFAULT_PRICE_REFRESH_DAYS,
-  PRICE_SWEEP_INTERVAL_MS,
   resolveCardPrice,
   parseCardRow,
   rebalanceCompartmentPositions,

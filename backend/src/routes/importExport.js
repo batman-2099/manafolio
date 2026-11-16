@@ -7,7 +7,7 @@ const scryfallApi = require('../scryfallApi');
 const { generateExportCSV } = require('../utils/csvExporters');
 const { resolveCardPrice } = require('../utils/priceHelpers');
 const { isBinderType } = require('../utils/compartmentSort');
-const { assertStorageInventory, checkedOutSources, moveContainerCopies } = require('../utils/collectionHelpers');
+const { assertStorageInventory, checkedOutSources, freezeSources, moveContainerCopies } = require('../utils/collectionHelpers');
 const { normalizeCardBack } = require('../utils/cardBack');
 const { normalizeUploadedImage } = require('../utils/uploadedImage');
 const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
@@ -433,10 +433,7 @@ async function restoreCompleteBackup(backup, userId) {
       await db.run(`INSERT INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
         [deckIds.get(source.deck_id), source.card_id, restoredEntryId(source.entry_id), source.quantity]);
     }
-    for (const source of await checkedOutSources(userId)) {
-      await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-        [source.deck_id, source.card_id, source.entry_id, source.quantity]);
-    }
+    await freezeSources(await checkedOutSources(userId));
   });
 
   return { cards: backup.collection.length, locations: backup.locations.length, decks: backup.decks.length };

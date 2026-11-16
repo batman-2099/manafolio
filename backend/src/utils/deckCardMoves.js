@@ -1,5 +1,5 @@
 const db = require('../db');
-const { planCardSources, sourceEntries, checkedOutSources, deckCardSources, moveContainerCopies, resolveCompartmentAndPosition } = require('./collectionHelpers');
+const { planCardSources, sourceEntries, checkedOutSources, freezeSources, deckCardSources, moveContainerCopies, resolveCompartmentAndPosition } = require('./collectionHelpers');
 const { rebalanceCompartmentByScheme } = require('./compartmentSort');
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -112,10 +112,7 @@ async function moveDeckCardChanges({ userId, deck, beforeCards, afterCards, move
   }
 
   // Freeze every legacy reservation before the first move changes source order.
-  for (const source of reservations) {
-    await db.run('INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)',
-      [source.deck_id, source.card_id, source.entry_id, source.quantity]);
-  }
+  await freezeSources(reservations);
   const touched = new Set();
   async function rebalance(compartmentId) {
     if (!compartmentId) return;

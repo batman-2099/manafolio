@@ -545,11 +545,9 @@ module.exports = {
   getProviderName,
   isAutoProvisionEnabled,
   getDefaultRole,
-  getUserClaimName,
   isUsernameLinkEnabled,
   assertIssuerTransport,
   validateIdTokenClaims,
-  getTokenEndpointAuthMethod,
   getDiscovery,
   generatePkce,
   createStateToken,
@@ -559,6 +557,5 @@ module.exports = {
   getNativeLogin,
   exchangeCode,
   extractUserIdentity,
-  resolveRedirectUri,
   _resetDiscoveryCache: () => { discoveryCache = null; discoveryExpiresAt = 0; }
 };

@@ -21,7 +21,7 @@ const languages = require('./utils/languages');
 const cvScan = require('./cvScan');
 const { binaryPath, readCatalog, publishCatalog } = require('./utils/localCatalog');
 
-const MODEL_DIR = process.env.CV_MODEL_DIR || path.join(__dirname, '..', 'data', 'models');
+const { MODEL_DIR } = require('./utils/modelAssets');
 const SIZE = 448;
 const GAMES = ['mtg'];
 
@@ -456,4 +456,4 @@ function start(game, lang = 'English', opts = {}) {
 let last = null;
 const lastResult = () => last;
 
-module.exports = { list, setCounts, newSetCount, keptFromPrev, start, stop, state, lastResult, binPath, metaPath, GAMES };
+module.exports = { list, setCounts, newSetCount, keptFromPrev, start, stop, state, lastResult, binPath, metaPath };

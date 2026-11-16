@@ -70,8 +70,4 @@ function generateExportCSV(collectionItems, formatType = 'internal') {
   return csvRows.join('\n');
 }
 
-module.exports = {
-  REVERSE_CONDITION_MAP,
-  EXPORT_STRATEGIES,
-  generateExportCSV
-};
+module.exports = { generateExportCSV };

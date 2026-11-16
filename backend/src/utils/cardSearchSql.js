@@ -80,4 +80,4 @@ function localCacheQuery(game, { language, name, number, setList = [], limit, of
   return { sql, params };
 }
 
-module.exports = { collectionQuery, localCacheQuery, nameClause, numberClause };
+module.exports = { collectionQuery, localCacheQuery };

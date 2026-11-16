@@ -161,26 +161,15 @@ async function listAllSets(game, lang) {
 // ponytail: keep raw cards once per scannable face; the catalog only needs the count.
 async function fetchMtgSet(set, lang, { excludeChildCodes = [] } = {}) {
   const scryfallApi = require('./scryfallApi');
-  let url = mtgSearchUrl(await mtgSetFamilyQuery(set, lang, { excludeChildCodes }), lang, '&order=set');
+  const url = mtgSearchUrl(await mtgSetFamilyQuery(set, lang, { excludeChildCodes }), lang, '&order=set');
   const cards = [];
-  const visited = new Set();
-  while (url) {
-    const parsed = new URL(url, 'https://api.scryfall.com');
-    if (parsed.origin !== 'https://api.scryfall.com' || parsed.pathname !== '/cards/search' || visited.has(parsed.href)) {
-      throw new Error('Invalid set catalog pagination');
-    }
-    visited.add(parsed.href);
-    const r = await scryfallApi.scryGetRetried(url, { maxRedirects: 0 });
-    for (const c of r.data.data || []) {
+  for await (const data of scryfallApi.searchPages(url)) {
+    for (const c of data.data || []) {
       if (c.image_uris?.normal) cards.push(c);
       else for (const face of c.card_faces || []) {
         if (face.image_uris?.normal) cards.push(c);
       }
     }
-    if (r.data.has_more && (typeof r.data.next_page !== 'string' || !r.data.next_page)) {
-      throw new Error('Incomplete set catalog pagination');
-    }
-    url = r.data.has_more ? r.data.next_page : null;
     await sleep(120);
   }
   return cards;
@@ -211,5 +200,5 @@ async function cacheFetchedCards(cards, code) {
 }
 
 module.exports = {
-  listAllSets, cacheSetCards, getMtgChildSetMap, getScanExclusions,
+  listAllSets, cacheSetCards, getMtgChildSetMap,
 };

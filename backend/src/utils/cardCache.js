@@ -74,4 +74,4 @@ async function cacheNormalizedCards(cards, game) {
   }
 }
 
-module.exports = { cacheNormalizedCards, CARD_CACHE_COLUMNS: COLUMNS };
+module.exports = { cacheNormalizedCards };
