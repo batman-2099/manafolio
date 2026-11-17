@@ -971,6 +971,7 @@
   background: transparent;
   color: var(--text-strong);
   font: inherit;
+  font-size: var(--text-md);
   font-weight: 700;
   text-align: start;
   cursor: pointer;

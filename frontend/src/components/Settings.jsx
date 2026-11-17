@@ -930,7 +930,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
               type="button"
               onClick={() => importInputRef.current?.click()}
               disabled={importBusy}
-              className="btn btn-primary"
+              className="btn btn-secondary"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-md)' }}
             >
               <Upload size={14} aria-hidden="true" />

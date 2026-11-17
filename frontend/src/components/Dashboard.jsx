@@ -428,7 +428,7 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
           {/* Card Value by Set Chart */}
           <div className="dashboard-subsection view-section">
             <h3 id="dashboard-set-title" className="section-heading">{setTitle}</h3>
-            <div className="chart-container dashboard-set-chart" role="region" aria-labelledby="dashboard-set-title" tabIndex={0}>
+            <div className="chart-container dashboard-set-chart" style={{ height: Math.max(250, sets.length * 48) }} role="region" aria-labelledby="dashboard-set-title" tabIndex={0}>
               {sets.length === 0 ? (
                 <div className="chart-empty">{t('dash.noSetData')}</div>
               ) : (

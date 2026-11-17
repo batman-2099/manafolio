@@ -1,5 +1,11 @@
-/* Hallmark · genre: modern-minimal · theme: Manafolio brand · shape: app screen · redesign: full · signature: collection artwork workbench · nav: two-level desktop, mobile bottom bar · footer: existing app status only · job: manage a card collection · contrast: rendered controls checked across eight dashboard palettes; not a WCAG certification · v2.0.0 */
-/* Hallmark · pre-emit critique: P4 H4 E3 S4 R5 V3 · weakest: E, dense existing responsive rules need integrated review; consolidated theme control overrides and removed ornamental surfaces before the sweep. */
+/* Hallmark · checked: 2026-11-17 · genre: modern-minimal
+ * floor: 0 FAIL from sloplint; open by judgement: 63 (dot-joined card lines, pinned by tests) · fixed: 7 (48, 66, 67, 73, F4, F7, F15) · structural: 2 printed (dashboard column balance, phone header height)
+ * built: Hallmark · theme: Manafolio brand · shape: app screen · signature: collection artwork workbench · nav: two-level desktop, mobile bottom bar · footer: existing app status only · job: manage a card collection · copy: verbatim · contrast: rendered controls checked across eight dashboard palettes; not a WCAG certification · redesign: polish · v2.0.0 */
+/* Hallmark · waive 74 · the pre-flight found #3b82f6 and #8b5cf6 in the project's own palette tokens · these blues and the archive violet are Manafolio's account palette, chosen before Hallmark ran. */
+/* Hallmark · waive 2b · the wordmark gradient is a single-hue blue ramp whose four stops are --logo-ramp tokens · design.md keeps the Cinzel wordmark's original static blue gradient as the brand. */
+/* Hallmark · dismissed 3 · the binder pocket stripe marks where a set run starts in the page order; it is data, not a card ornament. */
+/* Hallmark · dismissed 28a · card grids behind sign-in lazy-load hundreds of thumbnails, so no single artwork is a landing-page LCP image. */
+/* Hallmark · dismissed 40 · the wordmark is gradient text; the measured pair is its transparent fill over the header, not the painted blue. */
 /* Hallmark · waive 28b · CameraScanner displays a live getUserMedia stream with explicit ready/error states · The collection workbench uses a live camera, not prerecorded footage; a poster would misrepresent readiness. */
 /* Hallmark · waive 39b · app screen with 44px controls and larger artwork-bearing selectable rows · the dashboard card row is one complete selection target, not a small toolbar button. */
 /* Hallmark · dropped onMouseEnter={(e) => { e.currentTarget.style.background, onMouseLeave={(e) => { e.currentTarget.style.background, onMouseEnter={e => e.currentTarget.style.background, onMouseEnter={e => { e.currentTarget.style.transform, onMouseLeave={e => { e.currentTarget.style.transform · CSS retains hover feedback; gates 11 and 29 remove decorative deck lift and glow, with all workflow handlers retained. */
@@ -480,6 +486,8 @@ button, input, select, textarea {
 .ci-storage-link[role="button"]:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
 .dashboard-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .dashboard-overview { display: grid; gap: var(--space-8); margin-bottom: var(--space-8); padding-block: var(--space-6); border-block: 1px solid var(--border-glass); }
+/* The overview's own bottom rule separates it from Analytics; a second rule under it is noise. */
+.dashboard-page .dashboard-analytics { border-top: 0; padding-top: 0; margin-top: 0; }
 .dashboard-page .dashboard-timeline { min-width: 0; margin: 0; padding: 0; border: 0; }
 @media (min-width: 1100px) {
   .dashboard-overview { grid-template-columns: 260px minmax(0, 1fr); }
@@ -756,7 +764,7 @@ button.collection-card-trigger {
   color: var(--text-strong);
   letter-spacing: 0;
   text-transform: none;
-  background: var(--logo-wordmark-gradient);
+  background: linear-gradient(180deg, var(--logo-ramp-highlight) 10%, var(--logo-ramp-light) 42%, var(--logo-ramp-deep) 52%, var(--logo-ramp-base) 90%);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -785,6 +793,16 @@ button.collection-card-trigger {
   background: var(--accent-red);
   color: var(--text-on-accent);
 }
+
+/* A toggle that is on shows a selection, not the primary action's fill: a raised
+   surface ringed in the accent, with its unselected neighbours stepped back. */
+.btn-primary:is([aria-pressed="true"], [aria-current], [aria-expanded="true"]),
+.btn-primary:is([aria-pressed="true"], [aria-current], [aria-expanded="true"]):not(:disabled):not([aria-disabled="true"]):hover {
+  background: var(--surface-3);
+  color: var(--text-strong);
+  box-shadow: inset 0 0 0 1px var(--accent-red);
+}
+.btn-secondary[aria-pressed="false"] { color: var(--text-secondary); }
 
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .btn-primary:not(:disabled):not([aria-disabled="true"]):hover {
@@ -1270,6 +1288,8 @@ button.collection-card-trigger {
   flex-wrap: wrap;
   gap: var(--space-1);
 }
+/* Two lines reserved, so a wrapping set name does not push the tag and price out of row. */
+.tcg-card-set { min-height: 2lh; align-content: start; }
 
 .tcg-card-price {
   font-weight: 600;
@@ -1355,7 +1375,7 @@ button.collection-card-trigger {
 
 .card-missing-status {
   margin-block-start: var(--space-1);
-  background: color-mix(in srgb, var(--text-negative) 60%, #000);
+  background: color-mix(in srgb, var(--text-negative) 60%, var(--media-background));
   color: var(--media-foreground);
   font-weight: 800;
 }
@@ -1387,10 +1407,7 @@ button.collection-card-trigger {
 }
 
 .set-progress-item {
-  background: var(--surface-1);
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-sm);
-  padding: var(--space-3);
+  padding-block: var(--space-1);
 }
 
 .set-progress-header {

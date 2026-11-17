@@ -5,15 +5,15 @@
 // (amber/blue vs amber/gray), and foil overlay treatment, so the same card
 // looked different depending on where you saw it. Everything now routes here.
 
-// Short uppercase badge label shown on card thumbnails.
+// Short badge label shown on card thumbnails.
 export function getPrintingBadgeLabel(printing, foilTreatment) {
   if (printing === 'Holofoil' && foilTreatment) return ({
-    etched: 'FOIL-ETCHED', traditional: 'TRADITIONAL FOIL', textured: 'TEXTURED FOIL',
-    surge: 'SURGE FOIL', galaxy: 'GALAXY FOIL', halo: 'HALO FOIL',
-    raised: 'RAISED FOIL', neon_ink: 'NEON INK FOIL', double_rainbow: 'DOUBLE RAINBOW FOIL',
-  })[foilTreatment] || 'FOIL';
+    etched: 'Foil-etched', traditional: 'Traditional foil', textured: 'Textured foil',
+    surge: 'Surge foil', galaxy: 'Galaxy foil', halo: 'Halo foil',
+    raised: 'Raised foil', neon_ink: 'Neon ink foil', double_rainbow: 'Double rainbow foil',
+  })[foilTreatment] || 'Foil';
   switch (printing) {
-    case 'Holofoil': return 'FOIL';
+    case 'Holofoil': return 'Foil';
     default: return '';
   }
 }

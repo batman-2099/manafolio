@@ -871,7 +871,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                   {(item.missing || item.stack_entries?.some(entry => entry.missing)) && (
                     <span id={`${deckStatusId}-missing-${item.entry_id}`} className="card-missing-status">{missingLabel(item)}</span>
                   )}
-                  <span className="tcg-card-meta">
+                  <span className="tcg-card-meta tcg-card-set">
                     <span>{item.set_name} • #{item.number}</span>
                   </span>
                   <span className="tcg-card-meta" style={{ alignItems: 'baseline', flexWrap: 'nowrap' }}>

@@ -58,11 +58,11 @@ export function getRarityBadgeStyle(rarity) {
 
 export function getRarityBadgeLabel(rarity) {
   const r = (rarity || '').toLowerCase();
-  if (r.includes('mythic')) return 'MYTHIC';
-  if (r.includes('bonus')) return 'BONUS';
-  if (r.includes('special')) return 'SPEC';
-  if (r.includes('rare')) return 'RARE';
-  if (r.includes('promo')) return 'PROMO';
-  if (r.includes('uncommon')) return 'UNC';
-  return 'COM';
+  if (r.includes('mythic')) return 'Mythic';
+  if (r.includes('bonus')) return 'Bonus';
+  if (r.includes('special')) return 'Special';
+  if (r.includes('rare')) return 'Rare';
+  if (r.includes('promo')) return 'Promo';
+  if (r.includes('uncommon')) return 'Uncommon';
+  return 'Common';
 }

@@ -1,14 +1,13 @@
 /* Hallmark · scope: app · redesign: full · indexed account forms */
 .settings-page { display: flex; flex-direction: column; gap: var(--space-6); }
 .settings-layout { display: grid; grid-template-columns: 14rem minmax(0, 1fr); align-items: start; gap: var(--space-8); }
-.settings-sections { display: flex; flex-direction: column; position: sticky; top: var(--space-6); gap: var(--space-1); min-width: 0; overflow-x: auto; counter-reset: settings-index; }
+.settings-sections { display: flex; flex-direction: column; position: sticky; top: var(--space-6); gap: var(--space-1); min-width: 0; overflow-x: auto; }
 .settings-sections a { display: flex; gap: var(--space-3); align-items: baseline; min-height: 44px; padding: var(--space-2); color: var(--text-secondary); text-decoration: none; line-height: 1.5; font-size: var(--text-md); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
-.settings-sections a::before { flex-shrink: 0; counter-increment: settings-index; content: counter(settings-index, decimal-leading-zero); color: var(--text-muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
 .settings-sections a:hover { color: var(--text-strong); background: var(--surface-2); }
 .settings-grid { display: grid; min-width: 0; gap: 0; }
 .settings-grid > :is(.view-section, .ai-settings) { display: grid; gap: var(--space-4); min-width: 0; padding: var(--space-6) 0 var(--space-8); border: 0; border-top: 1px solid var(--border-glass); border-radius: 0; background: none; box-shadow: none; }
 .settings-grid > :first-child { padding-top: 0; border-top: 0; }
-.settings-grid h3[id] { scroll-margin-top: var(--space-6); font-family: var(--font-main); font-size: var(--text-lg); }
+.settings-grid h3[id] { scroll-margin-top: var(--space-6); font-family: var(--font-main); font-size: var(--text-lg); text-align: start; }
 .settings-page p { max-width: 50ch; }
 .settings-grid .form-group { max-width: 65ch; }
 .settings-translation a { display: inline-block; white-space: nowrap; }
