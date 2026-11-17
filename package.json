@@ -19,5 +19,5 @@
     "concurrently": "^8.2.2",
     "postject": "1.0.0-alpha.6"
   },
-  "version": "2.9.0"
+  "version": "2.10.0"
 }

@@ -2,7 +2,7 @@
 
 Release history starts with Manafolio 2.0.
 
-## Unreleased
+## 2.10.0 — 2026-11-17
 
 - Add all 12 colors from the [NFOAI sleeve pack](https://www.amazon.com/dp/B0H5CL783Z) to the card-back sleeve dropdown, with bundled previews cropped from the product's color swatches.
 - Validate account settings before mutation and save password, session, sharing, and provider-token changes atomically; exercise collection authorization through real HTTP routes.
@@ -23,6 +23,7 @@ Release history starts with Manafolio 2.0.
 - Fix unstyled error text, stat tiles, and scanner spinners; keep the storage workspace mounted after edits; exit filing mode when switching containers; stop reopening the setup wizard after profile changes.
 - Use a fixed repository link in Settings instead of contacting GitHub, and remove 133 unused translations.
 - Build native modules in a separate Docker stage so the runtime image ships no compiler, follow `PORT` in the container health check, and document OIDC, backup, and catalog variables in `.env.example`.
+- Show rarity and foil tags in sentence case, mark active toggles as selections rather than primary actions, keep long set names from overlapping on the dashboard chart, align card tags and prices across the collection grid, and remove the numbered Settings links and boxed set-progress rows.
 
 ## 2.9.0 — 2026-11-11
 
