@@ -12,7 +12,8 @@ router.get('/notes', async (req, res) => {
     );
     res.json({ notes });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch notes', message: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch notes' });
   }
 });
 
@@ -33,7 +34,8 @@ router.post('/notes', async (req, res) => {
     const note = await db.get(`SELECT * FROM notes WHERE id = ?`, [result.lastID]);
     res.status(201).json({ note });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create note', message: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Failed to create note' });
   }
 });
 
@@ -64,7 +66,8 @@ router.put('/notes/:id', async (req, res) => {
     const note = await db.get(`SELECT * FROM notes WHERE id = ?`, [req.params.id]);
     res.json({ note });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update note', message: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update note' });
   }
 });
 
@@ -80,7 +83,8 @@ router.delete('/notes/:id', async (req, res) => {
     }
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete note', message: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Failed to delete note' });
   }
 });
 

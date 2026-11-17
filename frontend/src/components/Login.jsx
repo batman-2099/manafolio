@@ -121,9 +121,9 @@ function Login({ onLoginSuccess, pendingContainer }) {
         body: JSON.stringify({ username, password })
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || t('login.errFailed'));
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data) {
+        throw new Error(data?.error || t('login.errFailed'));
       }
 
       onLoginSuccess(data.token, data.user);

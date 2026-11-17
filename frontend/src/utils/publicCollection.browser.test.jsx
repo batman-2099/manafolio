@@ -81,7 +81,7 @@ export async function runCollectionPrintingRegressions() {
   const { default: CardEntryFields } = await import('../components/CardEntryFields');
   const assert = (value, message) => { if (!value) throw new Error(message); };
   const saved = { fetch: window.fetch, act: globalThis.IS_REACT_ACT_ENVIRONMENT, lang: document.documentElement.lang };
-  const storage = new Map(['manafolio_ui_lang', 'collection_default_view', 'default_game'].map(key => [key, localStorage.getItem(key)]));
+  const storage = new Map(['manafolio_ui_lang', 'collection_default_view'].map(key => [key, localStorage.getItem(key)]));
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
@@ -142,7 +142,6 @@ export async function runCollectionPrintingRegressions() {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     localStorage.setItem('manafolio_ui_lang', 'en');
     localStorage.setItem('collection_default_view', 'gallery');
-    localStorage.setItem('default_game', 'mtg');
     await act(async () => root.render(<I18nProvider><CollectionList statsTrigger={0} /></I18nProvider>));
     assert(requests.length === 1 && !requests[0].params.has('include_treatments') && requests[0].params.get('list_type') === 'collection', 'ordinary collection reads do not hydrate metadata');
     for (const card of host.querySelectorAll('.card-grid .tcg-card')) {

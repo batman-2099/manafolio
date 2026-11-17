@@ -836,18 +836,15 @@ async function initDb() {
 
   if (adminId) {
     await adoptOrphanRows(adminId);
-    await seedStarterLocations(adminId);
+    // Starter containers are for a new account only; an owner who deleted every
+    // container must not get them back on restart.
+    if (userCount.count === 0) await seedStarterLocations(adminId);
   }
   // Freeze legacy checkouts once, so later additions cannot change their return list.
-  const { checkedOutSources } = require('./utils/collectionHelpers');
+  const { checkedOutSources, freezeSources } = require('./utils/collectionHelpers');
   await withTransaction(async () => {
     const users = await all(`SELECT DISTINCT user_id FROM decks WHERE checked_out = 1 AND inventory_type = 'collection'`);
-    for (const { user_id } of users) {
-      for (const source of await checkedOutSources(user_id)) {
-        await run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-          [source.deck_id, source.card_id, source.entry_id, source.quantity]);
-      }
-    }
+    for (const { user_id } of users) await freezeSources(await checkedOutSources(user_id));
   });
 }
 
@@ -898,6 +895,5 @@ module.exports = {
   createCompartments,
   seedStarterLocations,
   adoptOrphanRows,
-  hashPassword,
-  DB_FILENAME
+  hashPassword
 };

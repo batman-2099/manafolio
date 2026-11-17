@@ -21,7 +21,42 @@ COPY docs/images/ /app/docs/images/
 RUN npm run build
 
 # =========================================
-# Stage 2: Set up Production Server
+# Stage 2: Install Backend Dependencies
+# =========================================
+# Same base image as the production stage below, deliberately: sqlite3 is
+# compiled here against the glibc it will run on, and the sharp/onnxruntime-node
+# prebuilts are the ones for this platform. The compiler toolchain stays in this
+# stage instead of shipping in the runtime image.
+FROM node:22-slim AS backend-deps
+WORKDIR /app/backend
+
+# Native build tools for SQLite3.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV NODE_ENV=production
+
+# Copy backend packages and lockfiles. Cache the package-manager download
+# directory so a dependency rebuild reuses already downloaded tarballs across
+# ordinary updates.
+COPY backend/package*.json ./
+# Install production backend dependencies (prebuilt native binaries).
+# ONNXRUNTIME_NODE_INSTALL_CUDA=skip: onnxruntime-node's postinstall otherwise
+# fetches the CUDA/DirectML native packages from api.nuget.org, which fails on any
+# build host without access to it. Inference here is CPU-only (two small models),
+# and the CPU binaries ship inside the npm package itself.
+RUN --mount=type=cache,target=/root/.npm \
+    ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --omit=dev
+# Recompile ONLY sqlite3 from source: its node-pre-gyp prebuilt is linked
+# against a newer glibc (GLIBC_2.38) than this Debian base provides, so the
+# prebuilt aborts at startup with ERR_DLOPEN_FAILED. Building here links against
+# the base image's own glibc. Scoped to sqlite3 so sharp keeps its prebuilt (sharp
+# can't build from source without libvips-dev).
+RUN --mount=type=cache,target=/root/.npm npm rebuild sqlite3 --build-from-source
+
+# =========================================
+# Stage 3: Set up Production Server
 # =========================================
 # Debian (glibc), NOT alpine. The original reason was onnxruntime-node (pulled in
 # by @huggingface/transformers for CLIP inference), which shipped glibc-linked
@@ -32,10 +67,10 @@ RUN npm run build
 FROM node:22-slim AS production
 WORKDIR /app
 
-# Native build tools for SQLite3, gosu to drop root, healthcheck/HTTPS tools,
-# and native footer OCR with English data (set codes/collector numbers are Latin).
+# gosu to drop root, healthcheck/HTTPS tools, and native footer OCR with English
+# data (set codes/collector numbers are Latin).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      python3 make g++ gosu wget ca-certificates tesseract-ocr tesseract-ocr-eng \
+      gosu wget ca-certificates tesseract-ocr tesseract-ocr-eng \
   && rm -rf /var/lib/apt/lists/*
 
 # Set environment to production
@@ -61,23 +96,12 @@ ENV CV_MODEL_DIR=/app/database/models
 # startup, as its own user.
 RUN mkdir -p /app/database
 
-# Copy backend configuration. Cache the package-manager download directory so a
-# dependency rebuild reuses already downloaded tarballs across ordinary updates.
+# Copy backend configuration.
 COPY --chown=node:node backend/package*.json ./backend/
 WORKDIR /app/backend
-# Install production backend dependencies (prebuilt native binaries).
-# ONNXRUNTIME_NODE_INSTALL_CUDA=skip: onnxruntime-node's postinstall otherwise
-# fetches the CUDA/DirectML native packages from api.nuget.org, which fails on any
-# build host without access to it. Inference here is CPU-only (two small models),
-# and the CPU binaries ship inside the npm package itself.
-RUN --mount=type=cache,target=/root/.npm \
-    ONNXRUNTIME_NODE_INSTALL_CUDA=skip npm ci --omit=dev
-# Recompile ONLY sqlite3 from source: its node-pre-gyp prebuilt is linked
-# against a newer glibc (GLIBC_2.38) than this Debian base provides, so the
-# prebuilt aborts at startup with ERR_DLOPEN_FAILED. Building here links against
-# the image's own glibc. Scoped to sqlite3 so sharp keeps its prebuilt (sharp
-# can't build from source without libvips-dev).
-RUN --mount=type=cache,target=/root/.npm npm rebuild sqlite3 --build-from-source
+# Production dependencies from Stage 2. No --chown: they stay root-owned, as they
+# were when npm ran in this stage.
+COPY --from=backend-deps /app/backend/node_modules ./node_modules
 
 # Copy only application files as node. This avoids a final recursive chown of
 # /app, which previously created a duplicate ~735 MB layer on every app change.
@@ -106,9 +130,10 @@ ENTRYPOINT ["/entrypoint.sh"]
 EXPOSE 3001 3443
 
 # Liveness/readiness probe. start-period covers startup (set sync + price job).
-# wget is installed above (slim has no wget by default).
+# wget is installed above (slim has no wget by default). Shell form, so the
+# container's PORT is read at probe time.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD wget -qO- http://localhost:3001/api/health || exit 1
+  CMD wget -qO- http://localhost:${PORT:-3001}/api/health || exit 1
 
 # Command to start Express server
 CMD ["node", "src/server.js"]

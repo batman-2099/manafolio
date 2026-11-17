@@ -101,6 +101,14 @@ async function main() {
     const repaired = await api.searchCards({ scope: 'collection', userId: 1, name: citadel.name });
     assert.deepStrictEqual(repaired.cards[0].types, ['Red', 'White'], 'collection matching sees repaired multicolor land metadata even when prices were just refreshed');
     assert.deepStrictEqual((await api.getCardById(citadelId)).produced_mana, ['R', 'W']);
+    // Only a Scryfall UUID may reach the provider path; provider failures are not "not found".
+    const requested = [];
+    api.client.get = async url => { requested.push(url); return { data: {} }; };
+    assert.strictEqual(await api.getCardById('mtg-search?q=e:lea'), null);
+    assert.deepStrictEqual(requested, [], 'a non-UUID id is never interpolated into a provider path');
+    api.client.get = async () => { throw new Error('Provider unavailable'); };
+    await assert.rejects(api.getCardById('mtg-00000000-0000-4000-8000-00000000abcd'), /Provider unavailable/);
+    api.client.get = async () => ({ data: {} });
     await api.updateCollectionPrices();
     assert.strictEqual(repairs, 1, 'successfully repaired lands do not repeatedly bypass the price interval');
     console.log('scryfallstalerefresh.test.js: UTC age and per-ID refresh lifecycle passed');

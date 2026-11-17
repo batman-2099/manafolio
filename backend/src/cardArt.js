@@ -71,10 +71,11 @@ async function save(cardId, buffer) {
   if (buffer.length > MAX_UPLOAD_BYTES) throw new Error('Image too large');
 
   const sharp = require('sharp');
-  const meta = await sharp(buffer).metadata();
+  const limits = { limitInputPixels: 20000000 }; // as utils/uploadedImage.js
+  const meta = await sharp(buffer, limits).metadata();
   if (!meta.width || !meta.height) throw new Error('Not a readable image');
 
-  const png = await sharp(buffer)
+  const png = await sharp(buffer, limits)
     .rotate()
     .resize({ width: MAX_WIDTH, withoutEnlargement: true })
     .png({ compressionLevel: 9 })
@@ -97,11 +98,7 @@ function remove(cardId) {
   return true;
 }
 
-// True when the art being served came from this instance rather than the repo,
-// which is what decides whether the UI offers "remove" and "contribute".
-const isUserArt = (cardId) => isValidId(cardId) && fs.existsSync(fileFor(USER_DIR, cardId));
-
 module.exports = {
-  BUNDLED_DIR, USER_DIR, MAX_WIDTH, MAX_UPLOAD_BYTES,
-  isValidId, resolve, listIds, invalidate, save, remove, isUserArt,
+  MAX_WIDTH, MAX_UPLOAD_BYTES,
+  isValidId, resolve, listIds, invalidate, save, remove,
 };

@@ -10,7 +10,7 @@ import { COLLECTION_SORT_CRITERIA, sortCardsByOrder } from '../utils/cardSort';
 import { buildCollectionExport } from '../utils/collectionExport';
 import { downloadBlob } from '../utils/downloadBlob';
 import { useMultiSelect } from '../utils/useMultiSelect';
-import { defaultGameFilter, isGameEnabled } from '../utils/games';
+import { isGameEnabled } from '../utils/games';
 import { useT } from '../utils/i18n';
 import CardInspectorModal from './CardInspectorModal';
 import AddToDeckSelect from './AddToDeckSelect';
@@ -20,6 +20,7 @@ import CardDeckStatus from './CardDeckStatus';
 import MultiSelectDropdown from './MultiSelectDropdown';
 import Modal from './Modal';
 import SetCompletion from './SetCompletion';
+import { useBackGuard } from '../utils/useBackGuard';
 
 const labelStyle = { fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text-secondary)' };
 const PAGE_SIZE = 60;
@@ -72,12 +73,11 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
   const [subTab, setSubTab] = useState('collection'); // 'collection', 'unsorted', 'wishlist', 'arena', 'graveyard'
   const inventoryType = subTab === 'graveyard' ? 'graveyard' : 'collection';
   const [showFilters, setShowFilters] = useState(false);
+  useBackGuard(showFilters, () => setShowFilters(false));
   const [page, setPage] = useState(1);
 
   // Search & Filter state
   const [searchFilter, setSearchFilter] = useState('');
-  // Falls back to a visible game if the Settings default has since been hidden.
-  const [gameFilter, setGameFilter] = useState(() => (isGameEnabled(localStorage.getItem('default_game')) ? localStorage.getItem('default_game') : defaultGameFilter()));
   const [locationFilter, setLocationFilter] = useState([]);
   const [rarityFilter, setRarityFilter] = useState([]);
   const [conditionFilter, setConditionFilter] = useState([]);
@@ -259,7 +259,6 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
 
   const clearAllFilters = () => {
     setSearchFilter('');
-    setGameFilter('');
     setLocationFilter([]); setRarityFilter([]); setConditionFilter([]); setGraderFilter([]);
     setPrintingFilter([]); setSetFilter([]); setTypeFilter([]); setColorFilter([]);
     setCmcFilter([]); setLanguageFilter([]);
@@ -284,8 +283,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       const matchesLocation = locationFilter.length === 0 ? true :
                               locationFilter.some(f => f === 'unassigned' ? !item.location_id : item.location_id == f);
       // Hidden games remain stored but are excluded from this view and its exports.
-      const itemGame = item.game;
-      const matchesGame = gameFilter === '' ? isGameEnabled(itemGame) : itemGame === gameFilter;
+      const matchesGame = isGameEnabled(item.game);
       const matchesRarity = rarityFilter.length === 0 ? true : rarityFilter.includes(item.rarity);
       const matchesCondition = conditionFilter.length === 0 ? true : conditionFilter.includes(item.condition);
       const matchesPrinting = (finishes.length === 0 || finishes.some(value => matchesPrintingOption(item, value))) &&
@@ -320,7 +318,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
       sortCardsByOrder(result, SORT_CRITERIA[sortBy] || SORT_CRITERIA['added-newest'], undefined, setsList);
     }
     return result;
-  }, [collection, searchFilter, gameFilter, locationFilter, rarityFilter, conditionFilter, printingFilter, setFilter, typeFilter, colorFilter, cmcFilter, languageFilter, favoriteOnly, graderFilter, minPriceFilter, maxPriceFilter, notCheckedOutOnly, subTab, sortBy, setsList]);
+  }, [collection, searchFilter, locationFilter, rarityFilter, conditionFilter, printingFilter, setFilter, typeFilter, colorFilter, cmcFilter, languageFilter, favoriteOnly, graderFilter, minPriceFilter, maxPriceFilter, notCheckedOutOnly, subTab, sortBy, setsList]);
 
   // Group duplicate cards if stack option is active
   const processedCollection = useMemo(() => {
@@ -873,7 +871,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                   {(item.missing || item.stack_entries?.some(entry => entry.missing)) && (
                     <span id={`${deckStatusId}-missing-${item.entry_id}`} className="card-missing-status">{missingLabel(item)}</span>
                   )}
-                  <span className="tcg-card-meta">
+                  <span className="tcg-card-meta tcg-card-set">
                     <span>{item.set_name} • #{item.number}</span>
                   </span>
                   <span className="tcg-card-meta" style={{ alignItems: 'baseline', flexWrap: 'nowrap' }}>

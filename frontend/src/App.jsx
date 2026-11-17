@@ -440,8 +440,12 @@ function App() {
   // lives on the server, so closing the wizard halfway resumes it at the next
   // login on any device; everything it configures is also reachable from Settings
   // and Admin.
+  // Keyed on identity and role, not the user object: a profile refresh (theme,
+  // share) replaces that object and must not reopen a closed wizard.
+  const userId = user?.id;
+  const isAdmin = user?.role === 'admin';
   useEffect(() => {
-    if (!user || user.role !== 'admin') return;
+    if (!isAdmin) return;
     let cancelled = false;
     setSetupProbe('loading');
     import('./components/SetupWizard')
@@ -453,7 +457,7 @@ function App() {
       })
       .catch(() => { if (!cancelled) setSetupProbe('error'); });
     return () => { cancelled = true; };
-  }, [user, setupRetry]);
+  }, [userId, isAdmin, setupRetry]);
 
   // Handle automatic logout on 401
   useEffect(() => {
@@ -563,7 +567,7 @@ function App() {
       case 'dashboard':
         return <Dashboard statsTrigger={statsTrigger} onNavigate={goTab} onOpenDeck={openDeck} setSelectedLocationId={setSelectedLocationId} setFocusEntryId={setFocusEntryId} onUpdate={triggerRefresh} showToast={showToast} />;
       case 'add-cards':
-        return <AddCards onAddSuccess={triggerRefresh} showToast={showToast} setActiveTab={goTab} navigationGuardRef={navigationGuardRef} />;
+        return <AddCards onAddSuccess={triggerRefresh} showToast={showToast} navigationGuardRef={navigationGuardRef} />;
       case 'collection':
         return (
           <CollectionList 
@@ -609,7 +613,7 @@ function App() {
       case 'settings':
         return <Settings user={user} initialSection={settingsSection} onUpdateUser={handleUpdateUser} onSaveTheme={handleSaveTheme} showToast={showToast} />;
       case 'admin':
-        return <AdminPanel user={user} onUpdateUser={handleUpdateUser} showToast={showToast} />;
+        return <AdminPanel user={user} showToast={showToast} />;
       default:
         return <Dashboard statsTrigger={statsTrigger} onNavigate={goTab} onOpenDeck={openDeck} setSelectedLocationId={setSelectedLocationId} setFocusEntryId={setFocusEntryId} onUpdate={triggerRefresh} showToast={showToast} />;
     }
@@ -620,7 +624,7 @@ function App() {
       <a className="skip-link" href="#main-content" onClick={event => { event.preventDefault(); mainRef.current?.focus(); }}>{t('nav.skipContent')}</a>
       {showSetup && (
         <Suspense fallback={null}>
-          <SetupWizard user={user} onUpdateUser={handleUpdateUser} onClose={() => setShowSetup(false)} />
+          <SetupWizard user={user} onClose={() => setShowSetup(false)} />
         </Suspense>
       )}
       <header className="app-header">

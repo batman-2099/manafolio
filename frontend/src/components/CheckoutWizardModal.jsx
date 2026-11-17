@@ -50,7 +50,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
   const [done, setDone] = useState(new Set());
   const [collapsedContainers, setCollapsedContainers] = useState({});
   const titleId = useId();
-  const [setsList, setSetsList] = useState([]);
+  const [setsList, setSetsList] = useState(null);
   const [grids, setGrids] = useState({}); // page.key -> { compartment, cards, locationType, sortOrder }
 
   useBackGuard(true, cancel);
@@ -114,7 +114,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
 
   useEffect(() => {
     if (kind === 'checkin') return;
-    fetch('/api/sets').then(r => r.json()).then(setSetsList).catch(() => {});
+    fetch('/api/sets').then(r => r.json()).then(setSetsList).catch(() => setSetsList([]));
   }, [kind]);
 
   // Load each located page's compartment layout so pulled cards can be
@@ -122,6 +122,7 @@ const CheckoutWizardModal = ({ locationsData, mode = 'checkout', onClose, onCanc
   useEffect(() => {
     let active = true;
     if (kind === 'checkin' || pagesFlat.length === 0) { setGrids({}); return; }
+    if (!setsList) return;   // wait for set order so the layouts load once
 
     const locCache = new Map();
     const fetchLocation = async (locationId) => {

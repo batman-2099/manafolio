@@ -18,7 +18,6 @@ import {
   shouldCapture, shouldRearm, autoStatusKey, scanMatchReasons, recordScanPass, waitForVideoFrame,
   SCAN_MATCH_MIN_SCORE,
 } from '../utils/autoCapture';
-import { defaultGame, isGameEnabled } from '../utils/games';
 import { useT } from '../utils/i18n';
 import SetTree from './SetTree';
 import { toggleSetCodes } from '../utils/setSelection';
@@ -166,7 +165,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
   const detectStart = useRef(0);
   const lastDetectMs = useRef(null);
   const lastRunMs = useRef(null);   // inference alone, without the JS around it
-  const bestFrame = useRef(null);       // latest { sharp, fill, steady } for capture gating
+  const bestFrame = useRef(null);       // latest { fill, steady } for capture gating
   const [guideOffset, setGuideOffset] = useState({ x: 0, y: 0 });
   const [guideAngle, setGuideAngle] = useState(0);
   const [guideScale, setGuideScale] = useState(1);
@@ -222,12 +221,6 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
   const [zoomAdjusting, setZoomAdjusting] = useState(false);
   const zoomTrackRef = useRef(null);
   const zoomPendingRef = useRef(false);
-  // Keep a supported saved game; ignore legacy non-Magic preferences.
-  const [scanGame] = useState(() => {
-    const saved = localStorage.getItem('scanner_game');
-    if (saved && isGameEnabled(saved)) return saved;
-    return defaultGame() || 'mtg';
-  });
   // Which language of card is being fed in. Card art is language-specific, so
   // this selects which set index the scan is matched against — and it becomes the
   // language each added copy is recorded as. Remembered across sessions because
@@ -237,12 +230,10 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
   const setsKey = (game, lang) => (lang === 'en' ? `scanner_set_${game}` : `scanner_set_${game}_${lang}`);
   // Set-scoped scanning across one or more sets, persisted per game and language.
   const [scanSetCodes, setScanSetCodesState] = useState(() => {
-    const savedGame = localStorage.getItem('scanner_game');
-    const g = (savedGame && isGameEnabled(savedGame)) ? savedGame : (defaultGame() || 'mtg');
     const l = localStorage.getItem('scanner_lang') || 'en';
-    return (localStorage.getItem(setsKey(g, l)) || '').split(',').map(s => s.trim()).filter(Boolean);
+    return (localStorage.getItem(setsKey('mtg', l)) || '').split(',').map(s => s.trim()).filter(Boolean);
   });
-  const persistSets = (arr) => { setScanSetCodesState(arr); if (!priceCheck) localStorage.setItem(setsKey(scanGame, scanLang), arr.join(',')); };
+  const persistSets = (arr) => { setScanSetCodesState(arr); if (!priceCheck) localStorage.setItem(setsKey('mtg', scanLang), arr.join(',')); };
   const scanSetParam = scanSetCodes.join(',');
   const [setInput, setSetInput] = useState('');
   const [setList, setSetList] = useState([]);        // {id,name,children[],...} for the active game
@@ -267,8 +258,8 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
   // Which languages this game has a catalog of its own in. Empty until /scan-sets
   // answers, and every check below treats empty as "do not claim anything".
   const scanBuiltLangs = scanSets?.builtLangs || [];
-  const currentGameSets = setList.filter(s => !s.game || s.game === scanGame);
-  const strayCatalogSets = (scanSets?.game === scanGame ? Object.entries(scanSets?.sets || {}) : [])
+  const currentGameSets = setList.filter(s => !s.game || s.game === 'mtg');
+  const strayCatalogSets = (scanSets?.game === 'mtg' ? Object.entries(scanSets?.sets || {}) : [])
     .filter(([sid, v]) => v.embedded > 0
       && !currentGameSets.some(s => String(setScanCode(s)).toLowerCase() === sid
         || (s.children || []).some(c => String(c.code).toLowerCase() === sid)))
@@ -553,14 +544,14 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     lastRawQuad.current = null;
     steadyFrames.current = 0;
     smoothed.current = null;
-  }, [scanGame, scanLang, scanSetParam, scanDetail, autoAdd, autoScan, priceCheck,
+  }, [scanLang, scanSetParam, scanDetail, autoAdd, autoScan, priceCheck,
     guideOffset.x, guideOffset.y, guideAngle, guideScale, exposure, isTorchOn, zoom, zoomAdjusting, minFill, minSteady]);
 
-  // On game switch: restore that game's remembered set filter and load its set
-  // tree (families + subsets).
+  // On language switch: restore that language's remembered set filter and load
+  // its set tree (families + subsets).
   useEffect(() => {
     let cancelled = false;
-    setScanSetCodesState((localStorage.getItem(setsKey(scanGame, scanLang)) || '').split(',').map(s => s.trim()).filter(Boolean));
+    setScanSetCodesState((localStorage.getItem(setsKey('mtg', scanLang)) || '').split(',').map(s => s.trim()).filter(Boolean));
     setSetInput('');
     setSetList([]);
     setScanSets(null);
@@ -570,7 +561,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
 
     // tree=1: parents carrying their subsets, so the filter can offer a release
     // family as one tick and still let its tokens/art cards be dropped.
-    fetch(`/api/sets?game=${scanGame}&lang=${encodeURIComponent(scanLang)}&tree=1`)
+    fetch(`/api/sets?game=mtg&lang=${encodeURIComponent(scanLang)}&tree=1`)
       .then(r => r.ok ? r.json() : [])
       .then(data => {
         if (!cancelled) setSetList(data);
@@ -580,7 +571,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
       });
 
     // Coverage keeps the filter from offering sets the scanner cannot match.
-    fetch(`/api/scan-sets?game=${scanGame}&lang=${encodeURIComponent(scanLang)}`)
+    fetch(`/api/scan-sets?game=mtg&lang=${encodeURIComponent(scanLang)}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!cancelled) setScanSets(data);
@@ -592,7 +583,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     return () => {
       cancelled = true;
     };
-  }, [scanGame, scanLang]);
+  }, [scanLang]);
 
   // Selecting a set no longer builds anything. It is a FILTER over the catalog
   // the scanner already has — the server skips catalog rows outside the chosen
@@ -811,7 +802,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
         // harmless. Cornelius declines outright, and a null here reads as "the
         // detector has not spoken yet", which frameWorthCapturing treats as
         // permission to fire — auto-scan then photographed an empty desk.
-        bestFrame.current = { at: Date.now(), sharp: 0, fill: 0, steady: 0, none: true };
+        bestFrame.current = { at: Date.now(), fill: 0, steady: 0, none: true };
         // The frame emptying is the normal way a card is "finished": the user
         // lifts it off the mat. Require a few consecutive empty frames so a
         // hand passing over the card does not re-arm mid-scan.
@@ -840,7 +831,6 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
       steadyFrames.current = drift < STEADY_DRIFT ? steadyFrames.current + 1 : 0;
       bestFrame.current = {
         at: Date.now(),
-        sharp: found.sharp || 0,
         fill: found.pick?.fill ?? 0,
         steady: steadyFrames.current,
       };
@@ -1376,7 +1366,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
-          body: JSON.stringify({ game: scanGame, image: imageData, cropped: !!cropped,
+          body: JSON.stringify({ game: 'mtg', image: imageData, cropped: !!cropped,
             set: scanSetParam, lang: scanLang }),
         });
         const data = await response.json();
@@ -1499,7 +1489,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     setLanguageChanging(true);
     const isCurrent = () => mounted.current && request === printingRequest.current && generation === drawerGeneration.current;
     try {
-      const targetGame = selectedCard.game || scanGame;
+      const targetGame = selectedCard.game || 'mtg';
       const resp = await fetch(`/api/cards/${encodeURIComponent(selectedCard.id)}/printing?lang=${encodeURIComponent(newLang)}&game=${encodeURIComponent(targetGame)}`);
       if (!resp.ok) throw new Error('Printing lookup failed');
       const localized = await resp.json();
@@ -1530,7 +1520,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     const controller = new AbortController();
     scanAbortRef.current = controller;
     try {
-      const searchGame = selectedCard.game || scanGame;
+      const searchGame = selectedCard.game || 'mtg';
       const searchLang = scanLang;
       const p = new URLSearchParams({
         game: searchGame,
@@ -1594,7 +1584,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
     scanAbortRef.current = controller;
     try {
       const p = new URLSearchParams({
-        game: scanGame,
+        game: 'mtg',
         lang: scanLang,
         scope: 'internet',
         q,
@@ -1606,7 +1596,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             signal: controller.signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              game: scanGame,
+              game: 'mtg',
               lang: scanLang,
               scope: 'internet',
               q,
@@ -2049,7 +2039,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 >
                   {/* Keep languages without their own catalog available for
                       artwork matching, but make the limitation visible. */}
-                  {getLanguagesForGame(scanGame).map(l => (
+                  {getLanguagesForGame('mtg').map(l => (
                     <option key={l.code} value={l.code}>
                       {l.name}{scanBuiltLangs.length && !scanBuiltLangs.includes(l.name)
                         ? ` — ${t('scan.langNoCatalogTag')}` : ''}
@@ -2350,7 +2340,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
           placeholder={t('scan.manualSearchPlaceholder')} disabled={manualSearching}
           style={{ fontSize: 'var(--text-md)', minHeight: 44 }} />
         <button type="submit" className="btn btn-secondary" disabled={manualSearching || !manualSearchText.trim()}>
-          {manualSearching ? <RefreshCw size={16} className="spin" aria-hidden="true" /> : <Search size={16} aria-hidden="true" />}
+          {manualSearching ? <RefreshCw size={16} className="spin-animation" aria-hidden="true" /> : <Search size={16} aria-hidden="true" />}
           {t(manualSearching ? 'common.loading' : 'search.submit')}
         </button>
         {scanStatus && !loading && <button type="button" className="btn btn-secondary" onClick={closeDrawer}>{t('scan.rescan')}</button>}
@@ -2401,7 +2391,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 type="text"
                 value={setInput}
                 onChange={(e) => setSetInput(e.target.value)}
-                placeholder={t(scanGame === 'mtg' ? 'scan.setSearchMtg' : 'scan.setSearch')}
+                placeholder={t('scan.setSearchMtg')}
                 style={{ padding: '0.35rem 0.5rem', fontSize: 'var(--text-md)', background: 'var(--surface-2)', border: `1px solid ${scanSetCodes.length ? 'var(--accent-green)' : 'var(--border-glass)'}`, borderRadius: 'var(--radius-sm)', color: 'var(--text-strong)' }}
               />
               {/* Scoping to a set the catalog does not hold is worse than not
@@ -2790,7 +2780,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   disabled={draftBusy || manualSearching || !manualSearchText.trim()}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.75rem', fontSize: 'var(--text-sm)' }}
                 >
-                  {manualSearching ? <RefreshCw size={14} className="spin" /> : <Search size={14} />}
+                  {manualSearching ? <RefreshCw size={14} className="spin-animation" /> : <Search size={14} />}
                   <span>{t('search.submit') || 'Search'}</span>
                 </button>
               </form>
@@ -2865,11 +2855,11 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
             <p>{t('scan.reviewHint')}</p>
           </div>
           <button type="button" className="btn btn-secondary" disabled={!scanDrafts.length || draftsLoading || draftsError || draftBusy || draftAction !== null || isDrawerOpen} onClick={() => actOnDrafts('clear')}>
-            {draftAction === 'clear' && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+            {draftAction === 'clear' && <RefreshCw size={16} className="spin-animation" aria-hidden="true" />}
             {t('bulk.clear')}
           </button>
           <button type="button" className="btn btn-primary scan-review-commit" disabled={!scanDrafts.length || draftsLoading || draftsError || draftBusy || draftAction !== null || isDrawerOpen} onClick={() => actOnDrafts('commit')}>
-            {draftAction === 'commit' && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+            {draftAction === 'commit' && <RefreshCw size={16} className="spin-animation" aria-hidden="true" />}
             {t('search.addToCollection')}
           </button>
         </div>
@@ -2900,7 +2890,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   </select>
                 </label>
                 <button type="button" className="btn btn-secondary" disabled={draftBusy || draftAction !== null} onClick={() => discardDraft(draft)}>
-                  {draftAction === draft.draft_id && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+                  {draftAction === draft.draft_id && <RefreshCw size={16} className="spin-animation" aria-hidden="true" />}
                   {t('scan.discardDraft')}
                 </button>
               </div>
@@ -2941,7 +2931,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
               <ListFilter size={16} aria-hidden="true" />{t('scan.backToMatches', { n: lastMatches.length })}
             </button>}
             <button type="button" className="btn btn-secondary" onClick={findOtherPrintings} disabled={findingPrintings}>
-              {findingPrintings ? <RefreshCw size={16} className="spin" aria-hidden="true" /> : <Layers size={16} aria-hidden="true" />}{t(findingPrintings ? 'scan.fetchingCandidates' : 'scan.changePrinting')}
+              {findingPrintings ? <RefreshCw size={16} className="spin-animation" aria-hidden="true" /> : <Layers size={16} aria-hidden="true" />}{t(findingPrintings ? 'scan.fetchingCandidates' : 'scan.changePrinting')}
             </button>
             <button type="button" className="btn btn-secondary" disabled={findingPrintings} onClick={() => { setIsDrawerOpen(false); setScanMatches([selectedCard]); setShowAllMatches(true); }}>
               <Search size={16} aria-hidden="true" />{t('scan.changeCard')}
@@ -3033,7 +3023,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                     title={t('scan.otherPrintingsHint')}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                   >
-                    {findingPrintings ? <RefreshCw size={14} className="spin" /> : <Layers size={14} />}
+                    {findingPrintings ? <RefreshCw size={14} className="spin-animation" /> : <Layers size={14} />}
                     <span>{findingPrintings ? t('scan.fetchingCandidates') : (t('scan.changePrinting') || t('scan.otherPrintings') || t('scan.rightNameWrongPrinting'))}</span>
                   </button>
                   <button type="button" className="btn btn-secondary btn-sm" disabled={draftBusy} onClick={() => { setIsDrawerOpen(false); setScanMatches([selectedCard]); setShowAllMatches(true); }}>
@@ -3043,7 +3033,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                 <div className="quick-add-footer-actions">
                   <button type="button" className="btn btn-secondary" onClick={closeDrawer} disabled={draftBusy}>{t('common.cancel')}</button>
                   <button type="submit" className="btn btn-primary" disabled={draftBusy || findingPrintings || draftsLoading || draftsError || languageChanging}>
-                    {draftBusy && <RefreshCw size={16} className="spin" aria-hidden="true" />}
+                    {draftBusy && <RefreshCw size={16} className="spin-animation" aria-hidden="true" />}
                     {t(editingDraftId ? 'common.save' : 'scan.queueCard')}
                   </button>
                 </div>

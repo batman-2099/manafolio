@@ -30,6 +30,11 @@ async function runTests() {
     const noAuth = await fetch(`${base}/api/collection`);
     assert.ok(noAuth.status === 401 || noAuth.status === 403, `collection must require auth, got ${noAuth.status}`);
     console.log('PASS: F1-TC2');
+
+    // Large-body routes authenticate before parsing: an anonymous malformed body is 401, not a parse error.
+    const anonymousBody = await fetch(`${base}/api/import`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{' });
+    assert.strictEqual(anonymousBody.status, 401, 'large JSON bodies are not parsed for anonymous clients');
+    console.log('PASS: large-body routes authenticate before parsing');
   } finally {
     await stopServer(server);
     for (const suffix of ['', '-wal', '-shm']) {

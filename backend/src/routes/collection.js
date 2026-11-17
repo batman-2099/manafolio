@@ -12,7 +12,7 @@ const { searchLimiter } = require('../middleware/auth');
 const { resolveCardPrice, parseCardRow, recordPrice } = require('../utils/priceHelpers');
 const { parseSetList } = require('../utils/setQuery');
 const { compartmentLabel, isBinderType, rebalanceCompartmentByScheme, stackKey } = require('../utils/compartmentSort');
-const { checkedOutAllocation, checkedOutSources, cardDeckAllocations, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, defaultCompartmentPlan } = require('../utils/collectionHelpers');
+const { checkedOutAllocation, checkedOutSources, freezeSources, cardDeckAllocations, reserveDeckSources, resolveCompartmentAndPosition, assertStorageInventory, describePlacement, defaultCompartmentPlan } = require('../utils/collectionHelpers');
 const { validateDeckAddition } = require('../utils/deckRules');
 const { splitPrice } = require('../utils/splitPrice');
 const { isMtgToken, validateReverseCard } = require('../utils/tokenPairing');
@@ -621,6 +621,10 @@ function assertAddRowLimit(bodies, copies = 1) {
 // Mirrors the collection.grader CHECK constraint in db.js. 'Raw' is the default
 // and means an ungraded card, not a missing value.
 const GRADERS = ['Raw', 'PSA', 'BGS', 'CGC', 'SGC', 'TAG'];
+// Allowed field values mirror the collection table CHECK constraints in db.js.
+const CONDITIONS = ['Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged'];
+const PRINTINGS = ['Normal', 'Holofoil'];
+const validPrice = value => Number.isFinite(Number(value)) && Number(value) >= 0;
 
 // Draft/product-deck callers already hold a transaction and supply cached metadata.
 // Ordinary single/bulk adds resolve provider metadata before taking their own lock.
@@ -655,6 +659,9 @@ async function addCardToCollection(user, body, preparedCard = null, inTransactio
   if (!LIST_TYPES.includes(list_type)) {
     throw new AddCardError(400, 'Invalid list_type');
   }
+  if (condition != null && !CONDITIONS.includes(condition)) throw new AddCardError(400, 'Invalid condition');
+  if (printing != null && !PRINTINGS.includes(printing)) throw new AddCardError(400, 'Invalid printing');
+  if (!validPrice(purchase_price)) throw new AddCardError(400, 'purchase_price must be a nonnegative number');
 
   // Grading, validated here rather than at the two call sites, so the single add
   // and the bulk add cannot disagree about what a slab is.
@@ -822,10 +829,10 @@ async function normalizeScanDraft(body, previous = {}) {
   if (!Number.isInteger(draft.quantity) || draft.quantity < 1 || draft.quantity > 250) {
     throw new AddCardError(400, 'quantity must be an integer from 1 to 250');
   }
-  if (!['Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged'].includes(draft.condition)) {
+  if (!CONDITIONS.includes(draft.condition)) {
     throw new AddCardError(400, 'Invalid condition');
   }
-  if (!['Normal', 'Holofoil'].includes(draft.printing)) {
+  if (!PRINTINGS.includes(draft.printing)) {
     throw new AddCardError(400, 'Invalid printing');
   }
   const language = typeof draft.language === 'string' && languages.LANGUAGES.find(l =>
@@ -1361,6 +1368,9 @@ router.put('/collection/:id', async (req, res) => {
     location_id, compartment_id, list_type, is_trade, favorite, game, notes,
     grader, grade, cert_number, market_value, missing
   } = req.body;
+  if (condition != null && !CONDITIONS.includes(condition)) return res.status(400).json({ error: 'Invalid condition' });
+  if (printing != null && !PRINTINGS.includes(printing)) return res.status(400).json({ error: 'Invalid printing' });
+  if (purchase_price !== undefined && !validPrice(purchase_price)) return res.status(400).json({ error: 'purchase_price must be a nonnegative number' });
 
   try {
     const requestedQty = quantity !== undefined ? collectionQuantity(quantity) : null;
@@ -1505,10 +1515,7 @@ router.put('/collection/:id', async (req, res) => {
       // Freeze all legacy sources before quantity, identity or placement changes
       // can make fallback reservations switch to different physical copies.
       if (requestedQty !== null || isMoving || language !== undefined || missing !== undefined || req.body.reverse_card_id !== undefined) {
-        for (const source of sources) {
-          await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-            [source.deck_id, source.card_id, source.entry_id, source.quantity]);
-        }
+        await freezeSources(sources);
       }
     }
 
@@ -1622,9 +1629,6 @@ router.delete('/collection/:id', async (req, res) => {
 
 // 5b. Bulk actions
 const BULK_ACTIONS = ['delete', 'move', 'trade', 'untrade', 'list_type', 'condition', 'printing', 'purchase_split', 'add_to_deck', 'missing'];
-// Allowed field values mirror the collection table CHECK constraints in db.js.
-const BULK_CONDITIONS = ['Near Mint', 'Lightly Played', 'Moderately Played', 'Heavily Played', 'Damaged'];
-const BULK_PRINTINGS = ['Normal', 'Holofoil'];
 router.post('/collection/bulk', async (req, res) => {
   const { entry_ids = [], action, value } = req.body;
   if (!Array.isArray(entry_ids) || entry_ids.length === 0) {
@@ -1711,7 +1715,7 @@ router.post('/collection/bulk', async (req, res) => {
     }
 
     if (action === 'condition' || action === 'printing') {
-      const allowed = action === 'condition' ? BULK_CONDITIONS : BULK_PRINTINGS;
+      const allowed = action === 'condition' ? CONDITIONS : PRINTINGS;
       if (!allowed.includes(value)) return res.status(400).json({ error: `Invalid ${action}` });
       if (action === 'printing') {
         const affected = await db.withTransaction(async () => {
@@ -1763,7 +1767,8 @@ router.post('/collection/bulk', async (req, res) => {
       return res.json(result);
     }
 
-    const locationId = value ? parseInt(value, 10) : null;
+    const locationId = value ? Number(value) : null;
+    if (value && !(Number.isInteger(locationId) && locationId > 0)) return res.status(400).json({ error: 'Invalid location ID' });
     const result = await db.withTransaction(async () => {
     if (locationId) {
       const loc = await db.get(`SELECT id, inventory_type FROM locations WHERE id = ? AND user_id = ?`, [locationId, req.user.id]);
@@ -1785,16 +1790,18 @@ router.post('/collection/bulk', async (req, res) => {
         locationId, userId: req.user.id, cardId: entry.card_id, printing: entry.printing, foilTreatment: entry.foil_treatment, language: entry.language,
         listType: entry.list_type, quantity: entry.quantity, excludeEntryId: entry.id, reverseCardId: entry.reverse_card_id
       });
-      const finalLoc = resolved.compartment_id ? (resolved.location_id ?? locationId) : null;
+      // A locked, full or rule-mismatched container leaves the card where it was.
+      if (resolved.rejected) continue;
+      const finalLoc = resolved.location_id ?? locationId;
       await db.run(`UPDATE collection SET location_id = ?, compartment_id = ?, position = ? WHERE id = ? AND user_id = ?`, [finalLoc, resolved.compartment_id, resolved.position, id, req.user.id]);
-      if (resolved.compartment_id) touched.set(resolved.compartment_id, finalLoc);
+      touched.set(resolved.compartment_id, finalLoc);
       moved++;
     }
     for (const [compId, locId] of touched) {
       const rbLoc = await db.get(`SELECT sort_order, foil_sorting FROM locations WHERE id = ? AND user_id = ?`, [locId, req.user.id]);
       if (rbLoc) await rebalanceCompartmentByScheme(db, compId, rbLoc.sort_order, rbLoc.foil_sorting);
     }
-    return { message: `Moved ${moved} card(s)`, affected: moved };
+    return { message: moved === ids.length ? `Moved ${moved} card(s)` : `Moved ${moved} of ${ids.length} card(s)`, affected: moved };
     });
     return res.json(result);
   } catch (error) {

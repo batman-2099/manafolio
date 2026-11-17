@@ -246,10 +246,24 @@ async function inventory(userId, type, { include_checked_out = false, container_
         OR cc.id IN (SELECT card_id FROM deck_cards WHERE deck_id = ?))` : ''}
     ORDER BY cc.name, cc.id LIMIT ?`,
   [userId, type, ...(container_ids.length ? [...container_ids, source?.id ?? null] : []), MAX_INVENTORY + 1]);
+  if (rows.length > MAX_INVENTORY) fail(`This inventory exceeds the ${MAX_INVENTORY}-printing AI limit; no cards were omitted or sent.`, 413);
+  // Index entries by either face once: scanning every entry per catalog row is quadratic.
+  const byFace = list => {
+    const map = new Map();
+    for (const entry of list) {
+      for (const id of new Set([entry.card_id, entry.reverse_card_id])) {
+        if (!map.has(id)) map.set(id, []);
+        map.get(id).push(entry);
+      }
+    }
+    return map;
+  };
+  const ownedByFace = byFace(entries);
+  const eligibleByFace = byFace(eligibleEntries);
+  const availableByFace = byFace(availableEntries);
   const cards = [];
   for (const row of rows) {
-    const matches = entry => entry.card_id === row.id || entry.reverse_card_id === row.id;
-    const ownedEntries = entries.filter(matches);
+    const ownedEntries = ownedByFace.get(row.id) || [];
     const selected = container_ids.length ? ownedEntries.filter(entry => selectedLocations.has(entry.location_id)) : ownedEntries;
     const source_qty = sourceQuantities.get(row.id) || 0;
     if (container_ids.length && !selected.length && !source_qty) continue;
@@ -259,11 +273,11 @@ async function inventory(userId, type, { include_checked_out = false, container_
     const owned_qty = Math.max(sum(selected, usable), Math.min(globalOwned, source_qty));
     const missing_qty = Math.max(sum(selected, entry => !usable(entry)),
       Math.min(sum(ownedEntries, entry => !usable(entry)), source_qty));
-    const sources = eligibleEntries.filter(matches);
+    const sources = eligibleByFace.get(row.id) || [];
     const globalAvailable = Math.max(0, globalOwned - Math.max(reservedByFace.get(row.id) || 0,
       ownedEntries.reduce((sum, entry) => sum + (allocated.get(entry.entry_id) || 0), 0)));
-    const selectedAvailable = availableEntries.filter(entry => matches(entry)
-      && (!container_ids.length || selectedLocations.has(entry.location_id)))
+    const selectedAvailable = (availableByFace.get(row.id) || [])
+      .filter(entry => !container_ids.length || selectedLocations.has(entry.location_id))
       .reduce((sum, entry) => sum + entry.quantity, 0);
     const available_qty = Math.min(globalAvailable, Math.max(selectedAvailable, Math.min(globalAvailable, source_qty)));
     const card = parseCardRow(row);
@@ -274,7 +288,6 @@ async function inventory(userId, type, { include_checked_out = false, container_
       color_identity_known: row.color_identity != null,
     });
   }
-  if (rows.length > MAX_INVENTORY) fail(`This inventory exceeds the ${MAX_INVENTORY}-printing AI limit; no cards were omitted or sent.`, 413);
   return cards;
 }
 

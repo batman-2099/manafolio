@@ -7,7 +7,7 @@ const scryfallApi = require('../scryfallApi');
 const { generateExportCSV } = require('../utils/csvExporters');
 const { resolveCardPrice } = require('../utils/priceHelpers');
 const { isBinderType } = require('../utils/compartmentSort');
-const { assertStorageInventory, checkedOutSources, moveContainerCopies } = require('../utils/collectionHelpers');
+const { assertStorageInventory, checkedOutSources, freezeSources, moveContainerCopies } = require('../utils/collectionHelpers');
 const { normalizeCardBack } = require('../utils/cardBack');
 const { normalizeUploadedImage } = require('../utils/uploadedImage');
 const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
@@ -51,7 +51,7 @@ function parseCsvRows(data) {
   }
   if (quoted) throw Object.assign(new Error('CSV contains an unterminated quoted field'), { status: 400 });
   finishRecord();
-  if (records.length <= 1) throw new Error('CSV file is empty or missing headers');
+  if (records.length <= 1) throw Object.assign(new Error('CSV file is empty or missing headers'), { status: 400 });
   const [headers, ...dataRows] = records;
   const rows = dataRows.filter(values => values.length >= headers.length)
     .map(values => Object.fromEntries(headers.map((header, index) => [header, values[index]])));
@@ -65,8 +65,13 @@ function csvFormat(headers, format) {
 }
 
 
+function parseJsonInput(data) {
+  if (typeof data !== 'string') return data;
+  try { return JSON.parse(data); } catch { throw Object.assign(new Error('Invalid JSON data'), { status: 400 }); }
+}
+
 async function parseCompleteBackup(data) {
-  const backup = typeof data === 'string' ? JSON.parse(data) : data;
+  const backup = parseJsonInput(data);
   const arrays = ['collection', 'card_cache', 'locations', 'compartments', 'compartment_assignments', 'decks', 'deck_cards'];
   if (!backup || backup.format !== 'manafolio-backup' || backup.version !== 1 || !arrays.every(key => Array.isArray(backup[key]))) {
     throw new Error('Invalid backup file');
@@ -428,10 +433,7 @@ async function restoreCompleteBackup(backup, userId) {
       await db.run(`INSERT INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
         [deckIds.get(source.deck_id), source.card_id, restoredEntryId(source.entry_id), source.quantity]);
     }
-    for (const source of await checkedOutSources(userId)) {
-      await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-        [source.deck_id, source.card_id, source.entry_id, source.quantity]);
-    }
+    await freezeSources(await checkedOutSources(userId));
   });
 
   return { cards: backup.collection.length, locations: backup.locations.length, decks: backup.decks.length };
@@ -557,7 +559,8 @@ router.get('/export', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=pokedexrr_collection_${targetFormat}.csv`);
     res.send(csvContent);
   } catch (error) {
-    res.status(500).json({ error: 'Export failed', message: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Export failed' });
   }
 });
 
@@ -658,7 +661,7 @@ router.post('/import', importLimiter, async (req, res) => {
     }
 
     if (formatKey === 'json') {
-      rawItems = typeof data === 'string' ? JSON.parse(data) : data;
+      rawItems = parseJsonInput(data);
     } else if (formatKey === 'manabox') {
       rawItems = parseManaboxText(data);
       if (rawItems.length === 0) {
@@ -838,9 +841,10 @@ router.post('/import', importLimiter, async (req, res) => {
     });
   } catch (error) {
     const status = error.status || (error.message.startsWith('Invalid backup') ? 400 : 500);
+    if (status >= 500) console.error(error);
     return respond(status, {
       error: status === 400 ? error.message : 'Import failed',
-      message: streamStarted ? undefined : error.message
+      message: streamStarted || status >= 500 ? undefined : error.message
     });
   }
 });

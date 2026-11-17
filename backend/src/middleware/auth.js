@@ -3,6 +3,7 @@ const db = require('../db');
 const themes = require('../../../shared/themes.json');
 
 async function authenticateToken(req, res, next) {
+  if (req.user) return next(); // already authenticated by an earlier mount
   let token = null;
   const authHeader = req.headers['authorization'];
   if (authHeader && authHeader.startsWith('Bearer ')) {

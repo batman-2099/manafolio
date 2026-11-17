@@ -88,8 +88,8 @@ router.get('/oidc/login', authLimiter, async (req, res) => {
     const authUrl = await oidc.buildAuthorizationUrl(req, res);
     res.redirect(302, authUrl);
   } catch (error) {
-    console.error('OIDC login initiation failed.');
-    res.status(500).json({ error: 'Failed to initiate OIDC login', message: error.message });
+    console.error('OIDC login initiation failed:', error.message);
+    res.status(500).json({ error: 'Failed to initiate OIDC login' });
   }
 });
 

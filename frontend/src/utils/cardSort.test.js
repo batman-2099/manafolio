@@ -102,6 +102,9 @@ test('card type sorting uses the type line, with stable multi-type precedence an
     assert.equal(typeCategory({ Creature: true }), 'Other');
     assert.equal(colorCategory(['White', 'Blue']), 'Multicolor', 'printed-color filters remain independent of card type');
     assert.equal(colorCategory([]), 'Colorless');
+    assert.deepEqual(sortCardsByOrder(['Common', 'Bonus', 'Special', 'Mythic', 'Rare', 'Uncommon'].map(rarity => ({ name: rarity, rarity })),
+      [{ by: 'rarity', dir: 'desc' }]).map(card => card.name), ['Bonus', 'Mythic', 'Special', 'Rare', 'Uncommon', 'Common'],
+      'bonus and special rarities share the backend filing order');
   } finally {
     await server.close();
   }

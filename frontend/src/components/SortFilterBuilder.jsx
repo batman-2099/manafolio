@@ -38,7 +38,8 @@ const SORT_KEYS = ['favorite', 'name', 'price', 'set', 'set_name', 'number', 'pr
 
 export function SortBuilder({ value, onChange }) {
   const { t } = useT();
-  const items = Array.isArray(value) ? value : [];
+  // Server-side re-sort saves criteria without ids; rows are keyed and edited by id.
+  const items = (Array.isArray(value) ? value : []).map((item, i) => item.id ? item : { ...item, id: `rule-${i}` });
   
   // activationConstraint: touch needs a short press so a tap/scroll on the handle
   // isn't misread as a drag; distance covers mouse. Without it (plus touch-action:

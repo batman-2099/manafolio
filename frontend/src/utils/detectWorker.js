@@ -26,7 +26,6 @@
 //                             26.8 MB jsep binary into dist/assets.
 //   'onnxruntime-web/wasm'    the CPU backend alone, which is all this can reach.
 import * as ort from 'onnxruntime-web/wasm';
-import { sharpness } from './sharpness.js';
 import { detectCard } from '../../../shared/cardDetectPure.mjs';
 import { orderQuad } from '../../../shared/imgproc.mjs';
 
@@ -103,15 +102,12 @@ function detectWithFallback(rgba, w, h, seq, why) {
   return {
     seq, detected: true, quad, engine: 'contour', degraded: why,
     pick: { fill: quadArea(quad) },
-    sharp: sharpness(rgba, w, h),
   };
 }
 
-// Square-resize into the model's input. `fit: fill` on the server, so squash
-// here too — letterboxing would move the corners the model predicts.
-//
-// Resize and normalise straight into the tensor. When the caller passes a 384x384
-// canvas (scaled in GPU hardware), this is a direct 1:1 vectorised normalisation pass.
+// Normalise straight into the tensor. The caller always passes a 384x384 canvas
+// (squashed in GPU hardware; `fit: fill` on the server too — letterboxing would
+// move the corners the model predicts), so this is a direct 1:1 pass.
 const PLANE = CORN_SIZE * CORN_SIZE;
 const tensorData = new Float32Array(3 * PLANE);   // reused every frame
 const invStd0 = 1 / (255 * STD[0]), invStd1 = 1 / (255 * STD[1]), invStd2 = 1 / (255 * STD[2]);
@@ -123,37 +119,12 @@ for (let v = 0; v < 256; v++) {
   lut2[v] = v * invStd2 + offset2;
 }
 
-function toTensor(rgba, w, h) {
-  if (w === CORN_SIZE && h === CORN_SIZE) {
-    const p0 = 0, p1 = PLANE, p2 = 2 * PLANE;
-    for (let i = 0, j = 0; i < PLANE; i++, j += 4) {
-      tensorData[p0 + i] = lut0[rgba[j]];
-      tensorData[p1 + i] = lut1[rgba[j + 1]];
-      tensorData[p2 + i] = lut2[rgba[j + 2]];
-    }
-    return new ort.Tensor('float32', tensorData, [1, 3, CORN_SIZE, CORN_SIZE]);
-  }
-  const xs = w / CORN_SIZE, ys = h / CORN_SIZE;
-  for (let oy = 0; oy < CORN_SIZE; oy++) {
-    const sy = (oy + 0.5) * ys - 0.5;
-    const y0 = Math.max(0, Math.min(h - 1, sy | 0));
-    const y1 = Math.min(h - 1, y0 + 1);
-    const fy = sy - y0;
-    const row0 = y0 * w, row1 = y1 * w;
-    for (let ox = 0; ox < CORN_SIZE; ox++) {
-      const sx = (ox + 0.5) * xs - 0.5;
-      const x0 = Math.max(0, Math.min(w - 1, sx | 0));
-      const x1 = Math.min(w - 1, x0 + 1);
-      const fx = sx - x0;
-      const i00 = (row0 + x0) << 2, i01 = (row0 + x1) << 2;
-      const i10 = (row1 + x0) << 2, i11 = (row1 + x1) << 2;
-      const o = oy * CORN_SIZE + ox;
-      for (let ch = 0; ch < 3; ch++) {
-        const top = rgba[i00 + ch] * (1 - fx) + rgba[i01 + ch] * fx;
-        const bot = rgba[i10 + ch] * (1 - fx) + rgba[i11 + ch] * fx;
-        tensorData[ch * PLANE + o] = ((top * (1 - fy) + bot * fy) / 255 - MEAN[ch]) / STD[ch];
-      }
-    }
+function toTensor(rgba) {
+  const p0 = 0, p1 = PLANE, p2 = 2 * PLANE;
+  for (let i = 0, j = 0; i < PLANE; i++, j += 4) {
+    tensorData[p0 + i] = lut0[rgba[j]];
+    tensorData[p1 + i] = lut1[rgba[j + 1]];
+    tensorData[p2 + i] = lut2[rgba[j + 2]];
   }
   return new ort.Tensor('float32', tensorData, [1, 3, CORN_SIZE, CORN_SIZE]);
 }
@@ -172,9 +143,9 @@ self.onmessage = async (e) => {
       self.postMessage(r);
       return;
     }
-    // Split so a slow frame says WHERE it was slow: the JS resize+normalise and
-    // the sharpness scan are ordinary array work, inference is not.
-    const tensor = toTensor(rgba, w, h);
+    // Split so a slow frame says WHERE it was slow: the JS normalise is
+    // ordinary array work, inference is not.
+    const tensor = toTensor(rgba);
     const tRun = performance.now();
     const out = await session.run({ image: tensor });
     const runMs = Math.round(performance.now() - tRun);
@@ -199,12 +170,8 @@ self.onmessage = async (e) => {
         // covers — which is what the gate was really protecting against, a
         // detection that is too small or too skewed to be the card being aimed.
         pick: { fill: quadArea(quad) },
-        // The model's corner confidence, not image focus. Both matter and they
-        // are not the same thing, so both are reported.
+        // The model's corner confidence, not image focus.
         corners: sharp,
-        // Computed here, where the pixels already are — sending them back for
-        // the main thread to score would undo the point of the transfer.
-        sharp: sharpness(rgba, w, h),
       };
     } else {
       result = { seq, detected: false, engine, runMs, corners: sharp };

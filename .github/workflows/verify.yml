@@ -15,6 +15,9 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
+        # Inference is CPU-only; skip onnxruntime-node's CUDA download (see Dockerfile).
+        env:
+          ONNXRUNTIME_NODE_INSTALL_CUDA: skip
         run: npm ci --prefix backend && npm ci --prefix frontend && npm ci --prefix desktop/electron
       - name: Prepare sandboxed browser runtime
         run: |

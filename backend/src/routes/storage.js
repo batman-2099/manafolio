@@ -6,11 +6,12 @@ const {
   loadCompartments,
   locationAcceptsCard,
   compartmentAcceptsCard,
+  RULE_CARD_COLUMNS,
   sortCards,
   rebalanceCompartmentByScheme,
   STACK_KEY_SQL
 } = require('../utils/compartmentSort');
-const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, checkedOutSources, cardDeckAllocations, physicalCardEntries } = require('../utils/collectionHelpers');
+const { defaultCompartmentPlan, normalizeRuleConfig, assertStorageInventory, checkedOutSources, freezeSources, cardDeckAllocations, physicalCardEntries } = require('../utils/collectionHelpers');
 const { normalizeMtgColorIdentity } = require('../utils/mtgColors');
 const { isMtgToken } = require('../utils/tokenPairing');
 const storageUnitTypes = require('../../../shared/storageUnitTypes.json');
@@ -36,9 +37,7 @@ async function loadEntries(entryIds, userId) {
   const holes = entryIds.map(() => '?').join(',');
   const rows = await db.all(`
     SELECT c.id, c.id AS entry_id, c.card_id, c.reverse_card_id, c.quantity, c.printing, c.foil_treatment, c.language, c.favorite, c.is_trade, c.list_type, c.market_value,
-           cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.subtypes, cc.supertype, cc.rarity, cc.image_url,
-           cc.game, cc.cmc, cc.color_identity,
-           cc.price_trend, cc.price_normal, cc.price_holofoil
+           ${RULE_CARD_COLUMNS}, cc.image_url
     FROM collection c
     JOIN card_cache cc ON c.card_id = cc.id
     WHERE c.user_id = ? AND c.id IN (${holes})
@@ -280,6 +279,8 @@ router.get('/locations', async (req, res) => {
 
 const RULE_TYPES = ['any', 'alphabetical_range', 'specific_sets', 'compound'];
 const GAME_RESTRICTIONS = ['mtg'];
+// Mirrors the locations.type CHECK constraint in db.js.
+const LOCATION_TYPES = ['Binder', 'Toploader Binder', 'Box', 'Toploader Box', 'Graded Slab Box', 'Display Shelf / Stand', 'Deck Box', 'Tin / Case', 'Other'];
 
 router.post('/locations', async (req, res) => {
   const { name, type, sort_order = 'name-asc', foil_sorting = 'normals_first', rule_type = 'any', rule_config, compartmentPlan, game = 'mtg', inventory_type = 'collection', sleeved = 0, storage_unit_id } = req.body;
@@ -291,6 +292,7 @@ router.post('/locations', async (req, res) => {
   if (!name || !type) {
     return res.status(400).json({ error: 'name and type are required' });
   }
+  if (!LOCATION_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid type' });
   if (!RULE_TYPES.includes(rule_type)) {
     return res.status(400).json({ error: 'Invalid rule_type' });
   }
@@ -419,11 +421,8 @@ router.post('/locations/:id/stocktake', async (req, res) => {
         .sort((a, b) => a.deck_id - b.deck_id || a.card_id.localeCompare(b.card_id));
       // Freeze every source of affected legacy deck cards, not only this row:
       // a partial persisted allocation would disable fallback for their other copies.
-      for (const source of sources.filter(source => reservations.some(reserved =>
-        reserved.deck_id === source.deck_id && reserved.card_id === source.card_id))) {
-        await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-          [source.deck_id, source.card_id, source.entry_id, source.quantity]);
-      }
+      await freezeSources(sources.filter(source => reservations.some(reserved =>
+        reserved.deck_id === source.deck_id && reserved.card_id === source.card_id)));
       let updatedEntryId = entry_id;
       if (entry.quantity > 1) {
         const original = await db.get('SELECT cert_number FROM collection WHERE id = ? AND user_id = ?', [entry_id, req.user.id]);
@@ -523,10 +522,7 @@ router.post('/locations/:id/transfer', async (req, res) => {
       }
       if (inventory_type === 'graveyard') {
         // Persist legacy reservations before their copies leave physical inventory.
-        for (const source of await checkedOutSources(req.user.id)) {
-          await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-            [source.deck_id, source.card_id, source.entry_id, source.quantity]);
-        }
+        await freezeSources(await checkedOutSources(req.user.id));
       }
       const updated = await db.run(`
         UPDATE collection SET list_type = ? WHERE user_id = ?
@@ -551,6 +547,7 @@ router.put('/locations/:id', async (req, res) => {
   if (sleeved !== undefined && (!Number.isInteger(sleeved) || sleeved < 0 || sleeved > 3)) {
     return res.status(400).json({ error: 'Sleeved must be an integer between 0 and 3' });
   }
+  if (type != null && !LOCATION_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid type' });
   if (rule_type !== undefined && !RULE_TYPES.includes(rule_type)) {
     return res.status(400).json({ error: 'Invalid rule_type' });
   }
@@ -637,8 +634,7 @@ router.put('/locations/:id', async (req, res) => {
       const updated = await db.get(`SELECT id, rule_type, rule_config, game, inventory_type FROM locations WHERE id = ? AND user_id = ?`, [id, req.user.id]);
       const stored = await db.all(`
         SELECT c.id as entry_id, c.card_id, c.reverse_card_id, c.printing, c.foil_treatment, c.language, c.favorite, c.is_trade, c.list_type,
-               cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.subtypes, cc.rarity, cc.supertype, cc.game,
-               cc.price_trend, cc.price_normal, cc.price_holofoil, cc.cmc, cc.color_identity
+               ${RULE_CARD_COLUMNS}
         FROM collection c
         JOIN card_cache cc ON c.card_id = cc.id
         WHERE c.location_id = ? AND c.user_id = ? AND COALESCE(c.list_type, 'collection') = ?
@@ -841,8 +837,7 @@ router.patch('/compartments/:id', async (req, res) => {
         const compForCheck = { ruleConfig: cfg };
         const stored = await db.all(`
           SELECT c.id AS entry_id, c.card_id, c.reverse_card_id, c.printing, c.foil_treatment, c.language,
-                 cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.subtypes, cc.rarity, cc.supertype, cc.game,
-                 cc.price_trend, cc.cmc, cc.color_identity
+                 ${RULE_CARD_COLUMNS}
           FROM collection c JOIN card_cache cc ON c.card_id = cc.id
           WHERE c.compartment_id = ? AND c.user_id = ? AND COALESCE(c.list_type, 'collection') = ?`, [id, req.user.id, comp.inventory_type]);
         for (const entry of stored) {
@@ -888,7 +883,7 @@ router.post('/locations/:id/recommend', async (req, res) => {
     if (!location) return res.status(404).json({ error: 'Location not found' });
     assertStorageInventory(location, list_type);
 
-    const cardMetadata = await db.get(`SELECT name, set_name, number, types, subtypes, price_trend, price_normal, price_holofoil, supertype, rarity, game, cmc, color_identity FROM card_cache WHERE id = ?`, [card_id]);
+    const cardMetadata = await db.get(`SELECT ${RULE_CARD_COLUMNS} FROM card_cache cc WHERE cc.id = ?`, [card_id]);
     if (!cardMetadata) return res.status(404).json({ error: 'Card not found in cache' });
     cardMetadata.printing = printing;
     cardMetadata.foil_treatment = foil_treatment;
@@ -1071,9 +1066,8 @@ router.post('/locations/:id/resort', async (req, res) => {
     }
 
     const cards = await db.all(`
-      SELECT c.id as entry_id, c.card_id, c.reverse_card_id, c.printing, c.foil_treatment, c.language, c.quantity, c.favorite, c.is_trade, c.list_type,
-             cc.name, cc.printed_name, cc.set_name, cc.number, cc.types, cc.subtypes, cc.rarity, cc.supertype, cc.image_url, cc.game,
-             cc.price_trend, cc.price_normal, cc.price_holofoil, cc.cmc, cc.color_identity
+      SELECT c.id as entry_id, c.card_id, c.reverse_card_id, c.printing, c.foil_treatment, c.language, c.quantity, c.favorite, c.is_trade, c.list_type, c.market_value,
+             ${RULE_CARD_COLUMNS}, cc.image_url
       FROM collection c
       JOIN card_cache cc ON c.card_id = cc.id
       WHERE c.location_id = ? AND c.user_id = ? AND COALESCE(c.list_type, 'collection') = ?
@@ -1083,7 +1077,8 @@ router.post('/locations/:id/resort', async (req, res) => {
 
     if (cards.length === 0) return [];
 
-    await db.run(`UPDATE collection SET compartment_id = NULL, position = 0 WHERE id IN (${cards.map(() => '?').join(',')}) AND user_id = ?`, [...cards.map(card => card.entry_id), req.user.id]);
+    // Unplaceable cards return to Unassigned: a location without a compartment is shown nowhere.
+    await db.run(`UPDATE collection SET location_id = NULL, compartment_id = NULL, position = 0 WHERE id IN (${cards.map(() => '?').join(',')}) AND user_id = ?`, [...cards.map(card => card.entry_id), req.user.id]);
 
     const ordered = sortCards(cards, location.sort_order, location.foil_sorting);
 

@@ -85,8 +85,8 @@ export function autoStatusKey({ armed, busy, blocked, reading, now, minSteady, m
 }
 
 export const SCAN_MATCH_MIN_SCORE = 0.55;
-export const SCAN_MATCH_MIN_INLIERS = 12;
-export const SCAN_MATCH_MIN_MARGIN = 0.02;
+const SCAN_MATCH_MIN_INLIERS = 12;
+const SCAN_MATCH_MIN_MARGIN = 0.02;
 
 // Server safety is required as well as the existing visual confidence gates.
 export function scanMatchReasons({ verified, candidates = [], notInCatalog, safety }) {

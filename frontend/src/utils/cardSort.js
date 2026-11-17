@@ -55,7 +55,7 @@ export function getColorCategory(card) {
 }
 
 
-export function getPrintingRank(printing, foilSorting) {
+function getPrintingRank(printing, foilSorting) {
   const order = foilSorting === 'foils_first' ? cardOrder.printingFoilsFirst : cardOrder.printingNormalsFirst;
   return order[printing] || 10;
 }

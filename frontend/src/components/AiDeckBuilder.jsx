@@ -364,7 +364,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
           {account?.connected ? t('aiDeck.aiConnected') : account === null && !accountError ? t('common.loading') : t('aiDeck.disconnected')}
         </span>
         {account && !account.connected && <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.connectInSettings')}</p>}
-        {accountError && <p role="alert" style={{ color: 'var(--status-error)' }}>{accountError}</p>}
+        {accountError && <p role="alert" style={{ color: 'var(--text-negative)' }}>{accountError}</p>}
         <button type="button" className="btn btn-secondary" disabled={!!busy} onClick={onOpenAiSettings}>{t('aiDeck.openSettings')}</button>
       </section>
 
@@ -657,10 +657,10 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
               const node = event.currentTarget;
               followLog.current = node.scrollHeight - node.scrollTop - node.clientHeight < 24;
             }}
-            style={{ maxHeight: 'min(240px, 35dvh)', overflowY: 'auto', overflowWrap: 'anywhere', overscrollBehavior: 'contain', padding: '0.6rem', marginTop: '0.4rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', fontSize: '0.8rem' }}
+            style={{ maxHeight: 'min(240px, 35dvh)', overflowY: 'auto', overflowWrap: 'anywhere', overscrollBehavior: 'contain', padding: '0.6rem', marginTop: '0.4rem', borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', fontSize: '0.8rem' }}
           >
             {generationLog.map(entry => (
-              <div key={entry.id} style={{ padding: '0.2rem 0', color: entry.stage === 'failed' ? 'var(--status-error)' : 'var(--text-secondary)' }}>
+              <div key={entry.id} style={{ padding: '0.2rem 0', color: entry.stage === 'failed' ? 'var(--text-negative)' : 'var(--text-secondary)' }}>
                 <time dateTime={new Date(entry.time).toISOString()} style={{ color: 'var(--text-muted)' }}>{timeFormat.format(entry.time)}</time>
                 {' · '}{t(`aiDeckLog.${entry.stage}`, entry)}
                 {entry.model && ` · ${t('aiDeck.model')}: ${entry.model}`}
@@ -670,7 +670,7 @@ export default function AiDeckBuilder({ sourceDeck = null, onClose, onSaved, onP
           </div>
         </details>
       )}
-      {error && <p role="alert" style={{ color: 'var(--status-error)' }}>{error}</p>}
+      {error && <p role="alert" style={{ color: 'var(--text-negative)' }}>{error}</p>}
       <p style={{ color: 'var(--text-secondary)' }}>{t('aiDeck.reviewWarning')}</p>
 
     </section>

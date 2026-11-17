@@ -9,7 +9,7 @@ import { useBackGuard } from '../utils/useBackGuard';
 import { ownedImportIndex, findOwnedImportCard, buildDeckExport, parseDeckLine } from '../utils/deckText';
 import { deckContainers } from '../utils/deckContainers';
 import { getSlotNumber } from '../utils/getSlotNumber';
-import { defaultGame, isGameEnabled } from '../utils/games';
+import { isGameEnabled } from '../utils/games';
 import { MTG_FORMATS } from '../utils/cardOptions';
 import { preconFormat } from '../utils/preconFormat';
 import CardImage from './CardImage';
@@ -226,7 +226,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
       })
     )
   ), [searchResults, browseFilters]);
-  const [deckSearchGame, setDeckSearchGame] = useState(() => defaultGame());
 
   // Deck Selection Menu Controls
   const [deckSearchTerm, setDeckSearchTerm] = useState('');
@@ -729,7 +728,6 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
       setBrowseFilters({});
       setShowBrowseFilters(false);
       setImportComparison(null);
-      setDeckSearchGame(data.game);
       setViewMode('detail');
       return true;
     } catch (err) {
@@ -855,6 +853,8 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
       if (response.ok) {
         showToast(t('deck.deleted'), 'success');
         fetchDecks();
+      } else {
+        showToast(t('deck.errDelete'), 'error');
       }
     } catch (err) {
       console.error(err);
@@ -900,12 +900,12 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
       setSearching(true);
       const inventoryType = activeDeck?.inventory_type || 'collection';
       if (forceBrowse || !search.trim() || inventoryType !== 'collection') {
-        const cards = await loadInventoryCards(deckSearchGame, inventoryType);
+        const cards = await loadInventoryCards('mtg', inventoryType);
         if (request !== searchRequest.current) return;
         const query = search.trim().toLowerCase();
         setSearchResults(cards.filter(card => !query || [card.name, card.printed_name, card.set_name, card.number].some(value => String(value || '').toLowerCase().includes(query))));
       } else {
-        const response = await fetch(`/api/search?name=${encodeURIComponent(search)}&scope=collection&game=${deckSearchGame}`);
+        const response = await fetch(`/api/search?name=${encodeURIComponent(search)}&scope=collection&game=mtg`);
         if (request !== searchRequest.current) return;
         if (response.ok) {
           const data = await response.json();
@@ -1653,9 +1653,9 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
               <button type="button" className="btn btn-secondary" onClick={() => setShowAcquisitionPlanner(true)}>{t('planner.title')}</button>
-              {isGameEnabled('mtg') && <button className="btn btn-secondary" onClick={() => { setAiSourceDeck(null); setShowAiBuilder(true); }}>
+              <button className="btn btn-secondary" onClick={() => { setAiSourceDeck(null); setShowAiBuilder(true); }}>
                 <Zap size={18} /> {t('aiDeck.title')}
-              </button>}
+              </button>
             <button 
               className="btn btn-primary" 
               onClick={() => setShowCreateModal(true)}
@@ -1854,7 +1854,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
                               padding: '0.1rem 0.4rem',
                               borderRadius: '4px',
                               background: 'var(--surface-2)',
-                              color: deck.inventory_type === 'arena' ? 'var(--accent-purple)' : 'var(--accent-green)',
+                              color: deck.inventory_type === 'arena' ? 'var(--accent-blue)' : 'var(--accent-green)',
                               border: '1px solid var(--border-glass)'
                             }}>
                               {deck.inventory_type === 'graveyard' ? t('collection.graveyard') : deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}
@@ -2031,7 +2031,7 @@ function DeckBuilder({ showToast, navigationGuardRef, onOpenAiSettings, initialD
                             padding: '1px 6px',
                             borderRadius: '4px',
                             background: 'var(--surface-2)',
-                            color: deck.inventory_type === 'arena' ? 'var(--accent-purple)' : 'var(--accent-green)',
+                            color: deck.inventory_type === 'arena' ? 'var(--accent-blue)' : 'var(--accent-green)',
                             border: '1px solid var(--border-glass)'
                           }}>
                             {deck.inventory_type === 'graveyard' ? t('collection.graveyard') : deck.inventory_type === 'arena' ? t('deck.arena') : t('deck.physical')}

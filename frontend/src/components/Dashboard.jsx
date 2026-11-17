@@ -4,7 +4,7 @@ import { TrendingUp } from 'lucide-react';
 import { getCardDisplayName } from '../utils/langHelper';
 import { priceText, currencySymbol } from '../utils/formatPrice';
 import { getPrintingBadgeLabel, getPrintingBadgeStyle } from '../utils/cardPrinting';
-import { defaultGameFilter, gameLabel } from '../utils/games';
+import { gameLabel } from '../utils/games';
 import { useT } from '../utils/i18n';
 import CardInspectorModal from './CardInspectorModal';
 import CardImage from './CardImage';
@@ -40,7 +40,6 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
   const priceCheckButtonRef = useRef(null);
   const backButtonRef = useRef(null);
   const wasPriceCheckOpen = useRef(false);
-  const gameFilter = defaultGameFilter();
   const [inventoryFilter, setInventoryFilter] = useState('collection');
   const isArchive = inventoryFilter === 'graveyard';
   const valueColor = isArchive ? 'var(--chart-archive)' : 'var(--accent-green)';
@@ -48,7 +47,7 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
   // Timeline Chart State
   const [historyState, setHistoryState] = useState(null);
   const [historyRefresh, setHistoryRefresh] = useState(0);
-  const statsScope = `${gameFilter}:${inventoryFilter}`;
+  const statsScope = `mtg:${inventoryFilter}`;
   const stats = statsState?.scope === statsScope ? statsState.data : null;
   const loading = statsState?.scope !== statsScope || statsState.loading;
   const error = statsState?.scope === statsScope && statsState.error;
@@ -82,7 +81,7 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
     const controller = new AbortController();
     setStatsState(previous => ({ scope: statsScope, data: previous?.scope === statsScope ? previous.data : null, loading: true, error: false }));
     const params = new URLSearchParams({ inventory: inventoryFilter });
-    if (gameFilter) params.set('game', gameFilter);
+    params.set('game', 'mtg');
     const load = async () => {
       try {
         const response = await fetch(`/api/stats?${params}`, { signal: controller.signal });
@@ -95,14 +94,14 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
     };
     load();
     return () => controller.abort();
-  }, [statsTrigger, statsRefresh, gameFilter, inventoryFilter, statsScope]);
+  }, [statsTrigger, statsRefresh, inventoryFilter, statsScope]);
 
   useEffect(() => {
     const controller = new AbortController();
     if (!stats || stats.summary.totalCards === 0) return () => controller.abort();
     setHistoryState(previous => ({ scope: historyScope, data: previous?.scope === historyScope ? previous.data : null, loading: true, error: false }));
     const params = new URLSearchParams({ period: timePeriod, inventory: inventoryFilter });
-    if (gameFilter) params.set('game', gameFilter);
+    params.set('game', 'mtg');
     const load = async () => {
       try {
         const response = await fetch(`/api/stats/history?${params}`, { signal: controller.signal });
@@ -115,7 +114,7 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
     };
     load();
     return () => controller.abort();
-  }, [timePeriod, stats, historyRefresh, gameFilter, inventoryFilter, historyScope]);
+  }, [timePeriod, stats, historyRefresh, inventoryFilter, historyScope]);
 
   const renderFilters = () => (
     <>
@@ -182,18 +181,17 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
   }
 
   if (!stats || stats.summary.totalCards === 0) {
-    const isFiltered = Boolean(gameFilter);
-    const gameName = isFiltered ? gameLabel(gameFilter, true) : '';
+    const gameName = gameLabel('mtg', true);
     return (
       <div className="dashboard-page">
         {renderFilters()}
         {statsStatus}
         <div className="dashboard-empty" style={{ padding: '1.5rem 0', color: 'var(--text-secondary)' }}>
           <h2 style={{ color: 'var(--text-strong)', marginBottom: '0.5rem' }}>
-            {isArchive ? t('dash.emptyArchiveTitle') : isFiltered ? t('dash.emptyFilteredTitle', { game: gameName }) : t('dash.emptyTitle')}
+            {isArchive ? t('dash.emptyArchiveTitle') : t('dash.emptyFilteredTitle', { game: gameName })}
           </h2>
           <p style={{ maxWidth: '400px', margin: '0 0 1.5rem' }}>
-            {isArchive ? (isFiltered ? t('dash.emptyArchiveFilteredBody', { game: gameName }) : t('dash.emptyArchiveBody')) : isFiltered ? t('dash.emptyFilteredBody', { game: gameName }) : t('dash.emptyBody')}
+            {isArchive ? t('dash.emptyArchiveFilteredBody', { game: gameName }) : t('dash.emptyFilteredBody', { game: gameName })}
           </p>
           {!isArchive && <div style={{ display: 'flex', gap: '1rem' }}>
             <div style={{ display: 'inline-block' }}>
@@ -236,7 +234,7 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
     : timePeriod === '1y' ? summary.change1y : summary.change5y;
   const timelineTitle = t(isArchive ? 'dash.archiveTimelineTitle' : 'dash.timelineTitle');
   const setTitle = t(isArchive ? 'dash.archiveValueBySet' : 'dash.valueBySet');
-  const typeTitle = t(gameFilter === 'mtg' ? 'dash.colorDistribution' : 'dash.typeDistribution');
+  const typeTitle = t('dash.colorDistribution');
   const rarityTitle = t('dash.rarityDistribution');
   const currencies = summary.currencies || [];
   const mixedCurrencies = currencies.length > 1;
@@ -430,7 +428,7 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
           {/* Card Value by Set Chart */}
           <div className="dashboard-subsection view-section">
             <h3 id="dashboard-set-title" className="section-heading">{setTitle}</h3>
-            <div className="chart-container dashboard-set-chart" role="region" aria-labelledby="dashboard-set-title" tabIndex={0}>
+            <div className="chart-container dashboard-set-chart" style={{ height: Math.max(250, sets.length * 48) }} role="region" aria-labelledby="dashboard-set-title" tabIndex={0}>
               {sets.length === 0 ? (
                 <div className="chart-empty">{t('dash.noSetData')}</div>
               ) : (
@@ -491,7 +489,7 @@ function Dashboard({ statsTrigger, onNavigate, onOpenDeck, setSelectedLocationId
                 </div>
                 )}
               </div>
-              {typeChartData.length > 0 && <ChartDataTable titleId="dashboard-type-title" title={typeTitle} category={t(gameFilter === 'mtg' ? 'collection.fColor' : 'sort.by.type')} rows={typeChartData} series={[{ key: 'value', label: t('dash.cards') }]} />}
+              {typeChartData.length > 0 && <ChartDataTable titleId="dashboard-type-title" title={typeTitle} category={t('collection.fColor')} rows={typeChartData} series={[{ key: 'value', label: t('dash.cards') }]} />}
             </div>
 
             {/* Rarity Distribution Chart */}

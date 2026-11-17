@@ -86,7 +86,6 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   const dialogRef = useRef(null);
   const closeRef = useRef(null);
   const titleId = useId();
-  const isOpen = !!card;
   const [deckDetails, setDeckDetails] = useState();
   const [deckDetailsError, setDeckDetailsError] = useState(false);
   const [deckDetailsRetry, setDeckDetailsRetry] = useState(0);
@@ -107,7 +106,6 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
   }, [card, needsDeckDetails, deckDetailsRetry]);
 
   useEffect(() => {
-    if (!isOpen) return;
     const dialog = dialogRef.current;
     const trigger = returnFocusRef.current;
     dialog.showModal();
@@ -116,17 +114,17 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
       dialog.close();
       if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
     };
-  }, [isOpen, returnFocusRef]);
+  }, [returnFocusRef]);
 
   useBackGuard(!!zoomCard, () => setZoomCard(null));
 
-  const targetEntryId = card?.entry_id || card?.id;
+  const targetEntryId = card.entry_id || card.id;
   const targetRef = useRef(targetEntryId);
   targetRef.current = targetEntryId;
   useEffect(() => () => { printingRequest.current++; }, []);
 
-  const activeCard = card && localizedCard?.targetId === targetEntryId ? localizedCard.card : card;
-  const reverseImage = activeCard?.reverse_card_id || isMtgToken(activeCard) ? reverseFace(activeCard) : null;
+  const activeCard = localizedCard?.targetId === targetEntryId ? localizedCard.card : card;
+  const reverseImage = activeCard.reverse_card_id || isMtgToken(activeCard) ? reverseFace(activeCard) : null;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -156,7 +154,6 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
     if (writingRef.current) return;
     setMutationError('');
     setLanguage(newLang);
-    if (!activeCard) return;
     const request = ++printingRequest.current;
     const target = targetEntryId;
     const isCurrent = () => request === printingRequest.current && target === targetRef.current;
@@ -233,8 +230,6 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
     closeHandlerRef.current = handleClose;
     return () => { closeHandlerRef.current = null; };
   });
-
-  if (!card || !activeCard) return null;
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -675,7 +670,6 @@ function CardInspectorContent({ card, onClose, onUpdate, onDeleted, showToast, o
                 game={activeCard.game || activeCard.supertype}
                 quantity={q} purchasePrice={purchasePrice} condition={condition} printing={printing} language={language}
                 onQuantity={setQ} onPurchasePrice={setPurchasePrice} onCondition={setCondition} onPrinting={setPrinting} onLanguage={handleLanguageChange}
-                grader={grader} grade={grade} certNumber={certNumber}
               />
 
               {/* What this copy is worth, when the card's market price is not it —

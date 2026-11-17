@@ -1,34 +1,21 @@
+import cardOrder from '../../../shared/cardOrder.json';
+
 // Single source of truth for the rarity tiers used across LocationManager's
 // visualizers (card border, badge color, badge label).
-export function getRarityTier(rarity) {
+function getRarityTier(rarity) {
   const r = (rarity || '').toLowerCase();
-  if (r.includes('mythic') || r.includes('enchanted') || r.includes('legendary') || r.includes('super rare')) {
-    return 'top';
-  }
-  if (r.includes('rare') || r.includes('promo')) return 'rare';
+  if (r.includes('mythic') || r.includes('bonus')) return 'top';
+  if (r.includes('rare') || r.includes('promo') || r.includes('special')) return 'rare';
   if (r.includes('uncommon')) return 'uncommon';
   return 'common';
 }
 
-// Scarcity rank for sorting: higher = rarer. Checked rarest-keyword first so
-// "Super Rare" scores above plain rare, and "Uncommon" before
-// "Common" (it contains the substring). Unknown rarities score 0 (before
-// Common on ascending). Must stay aligned with RARITY_RANK in
-// backend/src/utils/compartmentSort.js so display order matches placement.
-const RARITY_RANK = [
-  { kw: 'enchanted', rank: 9 },
-  { kw: 'legendary', rank: 8 },
-  { kw: 'super rare', rank: 7 },
-  { kw: 'mythic', rank: 6 },
-  { kw: 'promo', rank: 4 },
-  { kw: 'rare', rank: 3 },
-  { kw: 'uncommon', rank: 2 },
-  { kw: 'common', rank: 1 },
-];
-
+// Scarcity rank for sorting: higher = rarer. shared/cardOrder.json lists the
+// keywords rarest first, so "Uncommon" is matched before "Common" (it contains
+// the substring). Unknown rarities score 0 (before Common on ascending).
 export function getRarityRank(rarity) {
   const r = (rarity || '').toLowerCase();
-  for (const { kw, rank } of RARITY_RANK) {
+  for (const [kw, rank] of Object.entries(cardOrder.rarity)) {
     if (r.includes(kw)) return rank;
   }
   return 0;
@@ -71,12 +58,11 @@ export function getRarityBadgeStyle(rarity) {
 
 export function getRarityBadgeLabel(rarity) {
   const r = (rarity || '').toLowerCase();
-  if (r.includes('mythic')) return 'MYTHIC';
-  if (r.includes('enchanted')) return 'ENCH';
-  if (r.includes('legendary')) return 'LEG';
-  if (r.includes('super rare')) return 'SR';
-  if (r.includes('rare')) return 'RARE';
-  if (r.includes('promo')) return 'PROMO';
-  if (r.includes('uncommon')) return 'UNC';
-  return 'COM';
+  if (r.includes('mythic')) return 'Mythic';
+  if (r.includes('bonus')) return 'Bonus';
+  if (r.includes('special')) return 'Special';
+  if (r.includes('rare')) return 'Rare';
+  if (r.includes('promo')) return 'Promo';
+  if (r.includes('uncommon')) return 'Uncommon';
+  return 'Common';
 }

@@ -1,5 +1,36 @@
 [
  {
+  "mode": "redesign",
+  "depth": "polish",
+  "scope": "app",
+  "theme": "Manafolio brand",
+  "genre": "modern-minimal",
+  "shape": "app screen",
+  "nav": "two-level desktop, mobile bottom bar",
+  "footer": "existing app status only",
+  "signature": "collection artwork workbench",
+  "waived": [
+   "74",
+   "2b",
+   "28b",
+   "39b"
+  ],
+  "prompt": "/hallmark redesign with polish",
+  "fixed": [
+   "48",
+   "66",
+   "67",
+   "73",
+   "F4",
+   "F7",
+   "F15"
+  ],
+  "open": [
+   "63"
+  ],
+  "date": "2026-11-17"
+ },
+ {
   "shape": "app screen",
   "theme": "Manafolio brand (retained)",
   "axes": [

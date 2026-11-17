@@ -21,7 +21,7 @@ const { loadNpz } = require('./utils/npz');
 const languages = require('./utils/languages');
 const { binaryPath, readCatalog } = require('./utils/localCatalog');
 
-const MODEL_DIR = process.env.CV_MODEL_DIR || path.join(__dirname, '..', 'data', 'models');
+const { MODEL_DIR } = require('./utils/modelAssets');
 const CORN_SIZE = 384;     // cornelius input
 const EMBED_SIZE = 448;    // milo input, and the dewarp target
 const MEAN = [0.485, 0.456, 0.406];
@@ -302,10 +302,12 @@ async function detectAndDewarp(session, imageBuffer) {
 //
 // Read current metadata for each scoped scan: card lookups and catalog builds
 // populate card_cache while the models stay loaded. Unknown sets remain excluded.
-async function rowSets(game) {
+async function rowSets(game, want) {
   // ponytail: a fresh query per scan avoids a second cache invalidation lifecycle.
+  // Only the wanted sets are read; a row of any other set is excluded either way.
   const db = require('./db');
-  const rows = await db.all(`SELECT id, set_id FROM card_cache WHERE game = ?`, [game]);
+  const sets = [...want];
+  const rows = await db.all(`SELECT id, set_id FROM card_cache WHERE game = ? AND lower(set_id) IN (${sets.map(() => '?').join(',')})`, [game, ...sets]);
   return new Map(rows.map(r => [r.id, (r.set_id || '').toLowerCase()]));
 }
 
@@ -405,7 +407,7 @@ async function match(imageBuffer, game = 'mtg', topK = 8, opts = {}) {
   const want = new Set(wanted.flatMap(x => [x, x.replace(/^mtg-/, ''), `mtg-${x.replace(/^mtg-/, '')}`]));
   let scoped = null;
   const search = [];
-  const byId = wanted.length ? await rowSets(game) : null;
+  const byId = wanted.length ? await rowSets(game, want) : null;
   for (const c of cats) {
     if (!wanted.length) { search.push({ c, allow: null }); continue; }
     const setOf = c.ids.map((raw) => {

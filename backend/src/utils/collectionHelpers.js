@@ -2,7 +2,7 @@
 // module so the split route files (collection, storage, importExport) never have
 // to import each other.
 const db = require('../db');
-const { recommendSlot, compartmentLabel, locationAcceptsCard, STACK_KEY_SQL } = require('./compartmentSort');
+const { recommendSlot, compartmentLabel, locationAcceptsCard, RULE_CARD_COLUMNS, STACK_KEY_SQL } = require('./compartmentSort');
 const { rebalanceCompartmentPositions } = require('./priceHelpers');
 
 // Default compartment plan by container type — used when a caller doesn't
@@ -116,6 +116,15 @@ async function checkedOutSources(userId) {
     }
   }
   return sources;
+}
+
+// Persist reservations as exact entries. Callers freeze legacy fallback sources
+// before a change can make the fallback pick different physical copies.
+async function freezeSources(sources) {
+  for (const source of sources) {
+    await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
+      [source.deck_id, source.card_id, source.entry_id, source.quantity]);
+  }
 }
 
 // Shared display allocation: pulled copies are shown, but never reserved.
@@ -375,7 +384,7 @@ async function resolveCompartmentAndPosition(opts) {
   if (!location) throw Object.assign(new Error('Invalid location ID'), { status: 400 });
   assertStorageInventory(location, listType);
 
-  let cardMetadata = await db.get(`SELECT name, set_name, number, types, subtypes, price_trend, price_normal, price_holofoil, supertype, rarity, game, cmc, color_identity FROM card_cache WHERE id = ?`, [cId]);
+  let cardMetadata = await db.get(`SELECT ${RULE_CARD_COLUMNS} FROM card_cache cc WHERE cc.id = ?`, [cId]);
   if (!cardMetadata) cardMetadata = { name: cId || '', types: [] };
   // card_cache has no id column selected above, and a stacking container matches
   // a copy against its twin by card id — so carry it on explicitly.
@@ -427,11 +436,11 @@ async function moveContainerCopies(userId, locationId, compartmentId, entries, q
   if (quantity <= 0 || entries.length === 0) return moved;
   // Freeze legacy identities before filing changes their allocation order.
   // Persist every source: a partial allocation disables fallback for that card.
+  const frozen = (await checkedOutSources(userId)).sort((a, b) =>
+    a.deck_id - b.deck_id || a.card_id.localeCompare(b.card_id));
+  await freezeSources(frozen);
   const reservations = new Map();
-  for (const source of (await checkedOutSources(userId)).sort((a, b) =>
-    a.deck_id - b.deck_id || a.card_id.localeCompare(b.card_id))) {
-    await db.run(`INSERT OR IGNORE INTO deck_card_allocations (deck_id, card_id, entry_id, quantity) VALUES (?, ?, ?, ?)`,
-      [source.deck_id, source.card_id, source.entry_id, source.quantity]);
+  for (const source of frozen) {
     if (!reservations.has(source.entry_id)) reservations.set(source.entry_id, []);
     reservations.get(source.entry_id).push(source);
   }
@@ -510,6 +519,7 @@ module.exports = {
   sourceEntries,
   planCardSources,
   moveContainerCopies,
+  freezeSources,
   checkedOutAllocation,
   checkedOutSources,
   cardDeckAllocations,

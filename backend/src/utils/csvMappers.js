@@ -122,9 +122,4 @@ function parseManaboxText(data) {
   return [...items.values()];
 }
 
-module.exports = {
-  CONDITION_MAP,
-  STRATEGIES,
-  parseThirdPartyCSV,
-  parseManaboxText
-};
+module.exports = { parseThirdPartyCSV, parseManaboxText };

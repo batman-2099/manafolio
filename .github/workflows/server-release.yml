@@ -63,9 +63,12 @@ jobs:
           npm ci
           npm run build
 
-      # Prod deps only, compiled natively for this runner's OS/arch.
+      # Prod deps only, compiled natively for this runner's OS/arch. Inference is
+      # CPU-only; skip onnxruntime-node's CUDA download (see Dockerfile).
       - name: Install backend deps (prod)
         working-directory: backend
+        env:
+          ONNXRUNTIME_NODE_INSTALL_CUDA: skip
         run: npm ci --omit=dev
 
       - name: Resolve Intel macOS inference runtime version
