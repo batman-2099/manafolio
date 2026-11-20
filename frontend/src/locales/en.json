@@ -1942,6 +1942,7 @@
   "prefs.currencyHint": "Changes the currency displayed for all prices across the app.",
   "prefs.currencySet": "Currency set to {currency}.",
   "theme.dark": "Arcane Blue",
+  "theme.light": "Light",
   "theme.jenny": "Jenny",
   "theme.mana-white": "Plains",
   "theme.mana-blue": "Island",

@@ -2,6 +2,10 @@
 
 Release history starts with Manafolio 2.0.
 
+## Unreleased
+
+- Add a light theme and palette previews in Settings, refine mana surfaces, and use the negative-status color for bulk-action errors.
+
 ## 2.10.0 — 2026-11-17
 
 - Add all 12 colors from the [NFOAI sleeve pack](https://www.amazon.com/dp/B0H5CL783Z) to the card-back sleeve dropdown, with bundled previews cropped from the product's color swatches.

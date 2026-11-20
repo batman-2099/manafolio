@@ -5,7 +5,7 @@ The shared system for Manafolio app screens. Preserve the brand and existing wor
 ## System
 - Genre: modern-minimal app, not a marketing website.
 - Direction: restrained collection workbench; card artwork is the primary visual material.
-- Brand: Outfit UI and Cinzel wordmark with its original static blue gradient, the existing stacked-card logo, Arcane Blue, Jenny and all six mana palettes.
+- Brand: Outfit UI and Cinzel wordmark with its original static blue gradient, the existing stacked-card logo, Arcane Blue, Jenny, a light palette and all six mana palettes.
 - Composition: a full-width app shell with consistent edge padding; brand/account upper row and destination lower row. Mobile retains its bottom navigation and More menu.
 - Dashboard: summary rail alongside collection history on wide screens; card activity and analysis below. Screens share controls and palette but keep task-specific arrangements.
 - Dashboard polish: set-value bars use one series color; mana and rarity distributions retain meaningful category colors. Summary figures use weight 600, and English chart/activity headings use concise sentence case. Other translations and archive-specific wording remain unchanged.
@@ -40,7 +40,7 @@ The shared system for Manafolio app screens. Preserve the brand and existing wor
 - Media overlays use `--media-background/foreground`; set-symbol backing uses `--symbol-background`. Chart series preserve the existing categorical palette in `--chart-series-1` through `--chart-series-10` and domain color tokens.
 
 ## Controls and states
-Controls have 44px hit targets; mobile text inputs remain at least 16px. Fields use `--control-border`; keyboard focus is an immediate outline, never an animated border. Existing loading, empty, error, selection, disabled and confirmation behaviors remain owned by their components.
+Controls have 44px hit targets; mobile text inputs remain at least 16px. Fields use `--control-border`; keyboard focus is an immediate outline, never an animated border. The theme picker previews each palette's background, panel and action colors. Existing loading, empty, error, selection, disabled and confirmation behaviors remain owned by their components.
 
 ## Motion and material
 No glowing text, ornamental gradients, floating decoration or page-entry animation. Short explicit color/opacity transitions communicate state. Scanner activity and in-flight spinners retain reduced-motion fallbacks. Foil remains identifiable through its existing label, restrained surface and outline, without a moving sheen. Elevation is reserved for overlays using `--shadow-overlay`.

@@ -48,10 +48,16 @@
 .theme-choice:has([aria-disabled="true"]) { opacity: 0.6; cursor: wait; }
 .theme-choice input { accent-color: var(--mana-tint, var(--accent-red)); flex: none; }
 .theme-choice-name { overflow-wrap: anywhere; font-size: var(--text-sm); }
+.theme-preview { display: inline-flex; margin-inline-start: auto; flex: none; overflow: clip; border: 1px solid var(--border-glass); border-radius: var(--radius-sm); }
+.theme-preview span { display: block; width: 14px; height: 20px; }
+.theme-preview span:nth-child(1) { background: var(--bg-primary); }
+.theme-preview span:nth-child(2) { background: var(--bg-secondary); }
+.theme-preview span:nth-child(3) { background: var(--accent-red); }
+.theme-choice[data-mana-theme="light"] .mana-theme-symbol { background: var(--bg-secondary); border: 2px solid var(--border-glass); }
 .theme-choice[data-mana-theme="dark"] .mana-theme-symbol { background: var(--theme-arcane); }
 .theme-choice[data-mana-theme="jenny"] .mana-theme-symbol { background: var(--theme-jenny); }
 @media (max-width: 768px) {
   .theme-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .theme-choice { gap: var(--space-2); flex-wrap: wrap; }
-  .theme-choice-name { flex-basis: 100%; }
+  .theme-choice { gap: var(--space-2); }
+  .theme-choice-name { flex: 1; }
 }

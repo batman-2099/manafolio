@@ -63,3 +63,23 @@
   --theme-arcane: #94d5ff;
   --theme-jenny: #fb923c;
 }
+
+[data-theme="light"] {
+  --logo-ramp-highlight: #265f8d;
+  --logo-ramp-light: #1e5682;
+  --logo-ramp-deep: #153e60;
+  --logo-ramp-base: #20567f;
+  --chart-series-1: #185d9a;
+  --chart-series-2: #17633a;
+  --chart-series-3: #795500;
+  --chart-series-4: #b3261e;
+  --chart-series-5: #6941a5;
+  --chart-series-6: #a32770;
+  --chart-series-7: #006b64;
+  --chart-series-8: #a1430a;
+  --chart-series-9: #963392;
+  --chart-series-10: #4954ac;
+  --chart-colorless: #596775;
+  --chart-white: #806000;
+  --chart-archive: #6941a5;
+}

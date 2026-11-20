@@ -55,13 +55,13 @@ async function main() {
   assert.deepStrictEqual(await request('PATCH', '/theme', aliceToken, { theme: 'jenny', user_id: bobId }),
     { status: 200, body: { theme: 'jenny' } });
   assert.strictEqual((await request('GET', '/me', bobToken)).body.user.theme, 'dark', 'client IDs cannot target another account');
-  for (const theme of ['dark', 'jenny', 'mana-white', 'mana-blue', 'mana-black', 'mana-red', 'mana-green', 'mana-colorless']) {
+  for (const theme of ['dark', 'jenny', 'mana-white', 'mana-blue', 'mana-black', 'mana-red', 'mana-green', 'mana-colorless', 'light']) {
     assert.deepStrictEqual(await request('PATCH', '/theme', bobToken, { theme }),
       { status: 200, body: { theme } });
     assert.strictEqual((await request('GET', '/me', bobToken)).body.user.theme, theme);
   }
 
-  for (const theme of ['light', 'mtg', 'lcars', 'unknown', null, ['dark'], undefined]) {
+  for (const theme of ['mtg', 'lcars', 'unknown', null, ['dark'], undefined]) {
     assert.strictEqual((await request('PATCH', '/theme', aliceToken, { theme })).status, 400);
   }
   assert.strictEqual((await request('GET', '/me', aliceToken)).body.user.theme, 'jenny', 'invalid saves leave the preference unchanged');
@@ -77,9 +77,11 @@ async function main() {
   await request('POST', '/logout', aliceToken);
   const reloaded = await request('POST', '/login', null, { username: 'alice', password: 'alice-password' });
   assert.strictEqual(reloaded.body.user.theme, 'jenny', 'a new login restores the account preference');
+  const bobReloaded = await request('POST', '/login', null, { username: 'bob', password: 'bob-password' });
+  assert.strictEqual(bobReloaded.body.user.theme, 'light', 'a new login restores the light theme');
   await db.initDb();
   assert.strictEqual((await request('GET', '/me', reloaded.body.token)).body.user.theme, 'jenny', 'startup migration preserves saved themes');
-  assert.strictEqual((await request('GET', '/me', bobToken)).body.user.theme, 'mana-colorless', 'another account keeps its own preference');
+  assert.strictEqual((await request('GET', '/me', bobToken)).body.user.theme, 'light', 'another account keeps its light preference after startup');
 
   await db.run(`INSERT INTO card_cache (id, name, game) VALUES ('mtg-theme-sample', 'Theme migration sample', 'mtg')`);
   await db.run(`INSERT INTO collection (card_id, user_id, game, list_type, quantity) VALUES ('mtg-theme-sample', ?, 'mtg', 'arena', 3)`, [bobId]);

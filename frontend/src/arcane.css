@@ -1,6 +1,6 @@
 /* Hallmark · genre: modern-minimal · theme: Manafolio Arcane Blue · shape: app screen · redesign: full · copy: verbatim · contrast: pending integrated review · v2.0.0 */
 /* Critique: palette overrides only; every theme now shares the same workbench controls and composition. */
-:root[data-theme="dark"] {
+[data-theme="dark"] {
   color-scheme: dark;
   --bg-primary: #0b1422;
   --bg-secondary: #132136;

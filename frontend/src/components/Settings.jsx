@@ -875,7 +875,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
             <p id="settings-bulk-force" style={{ fontSize: 'var(--text-md)', color: 'var(--text-secondary)', margin: 0 }}>{t('settings.bulkForceHint')}</p>
             {bulkBusy === 'loading' && <p role="status" style={{ color: 'var(--text-secondary)', margin: 0 }}>{t('common.loading')}</p>}
             {bulkNotice && (
-              <p role={bulkNotice.error ? 'alert' : 'status'} style={{ fontSize: 'var(--text-md)', color: bulkNotice.error ? 'var(--accent-red)' : 'var(--text-strong)', margin: 0 }}>
+              <p role={bulkNotice.error ? 'alert' : 'status'} style={{ fontSize: 'var(--text-md)', color: bulkNotice.error ? 'var(--text-negative)' : 'var(--text-strong)', margin: 0 }}>
                 {bulkNotice.message || t(bulkNotice.key, bulkNotice.values)}
               </p>
             )}
@@ -1010,6 +1010,7 @@ function Settings({ user, initialSection, onUpdateUser, onSaveTheme, showToast }
                   <input type="radio" name="settings-theme" value={value} checked={theme === value} aria-disabled={themeLoading} onChange={() => { if (!themeLoading) handleThemeChange(value); }} />
                   <span className="mana-theme-symbol" aria-hidden="true" />
                   <span className="theme-choice-name">{t(`theme.${value}`)}</span>
+                  <span className="theme-preview" data-theme={value} aria-hidden="true"><span /><span /><span /></span>
                 </label>
               ))}
             </div>
