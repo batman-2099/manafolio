@@ -83,6 +83,36 @@ async function main() {
   await request(`/collection/${rowCard}/place`, 'POST', { compartment_id: row.compartment, slot: 2 });
   assert.strictEqual((await stored(rowCard)).position, 2000);
 
+  // Binder capacity is advisory, but direct placement cannot hide an occupant.
+  const pockets = await container('Pocket collision', 'custom', 0, 'Binder');
+  const occupant = await add('a', pockets, 2);
+  const incoming = await add('z');
+  for (const slot of [1, 2]) {
+    await request(`/collection/${incoming}/place`, 'POST', { compartment_id: pockets.compartment, slot }, 409);
+    assert.strictEqual((await stored(incoming)).compartment_id, null);
+  }
+  await request(`/collection/${incoming}/place`, 'POST', { compartment_id: pockets.compartment, slot: 3 });
+  const wide = await add('m', null, 2);
+  await request(`/collection/${wide}/place`, 'POST', { compartment_id: pockets.compartment, slot: 3 }, 409);
+  await request(`/collection/${wide}/place`, 'POST', { compartment_id: pockets.compartment, slot: 4 });
+  await request(`/collection/${incoming}/place`, 'POST', { compartment_id: pockets.compartment, swap_with: occupant }, 409);
+  assert.strictEqual((await stored(incoming)).position, 3000, 'failed swap rolls back both rows');
+  assert.strictEqual((await stored(occupant)).position, 1000);
+
+  const stackPockets = await container('Stacked pockets', 'custom', 1, 'Toploader Binder');
+  const stackFirst = await add('a', stackPockets);
+  const stackTwin = await add('a');
+  await request(`/collection/${stackTwin}/place`, 'POST', { compartment_id: stackPockets.compartment, slot: 1 });
+  const stackOther = await add('z');
+  await request(`/collection/${stackOther}/place`, 'POST', { compartment_id: stackPockets.compartment, slot: 1 }, 409);
+  await request(`/collection/${stackOther}/place`, 'POST', { compartment_id: stackPockets.compartment, swap_with: stackFirst }, 409);
+  assert.strictEqual((await stored(stackOther)).compartment_id, null);
+  assert.strictEqual((await stored(stackTwin)).position, 1000);
+  await request(`/collection/${stackOther}/place`, 'POST', { compartment_id: stackPockets.compartment, slot: 2 });
+  await request(`/collection/${stackTwin}/place`, 'POST', { compartment_id: stackPockets.compartment, swap_with: stackOther }, 409);
+  assert.strictEqual((await stored(stackOther)).position, 2000, 'swap into a remaining stack is rejected atomically');
+  await request(`/collection/${stackOther}/place`, 'POST', { compartment_id: stackPockets.compartment, slot: Number.MAX_SAFE_INTEGER }, 400);
+
   const batch = [await add('a'), await add('z')];
   const recommendations = await request(`/locations/${manual.id}/recommend-batch`, 'POST', { entry_ids: batch });
   assert.deepStrictEqual(recommendations.map(r => [r.recommended.location_id, r.recommended.position]), [[manual.id, 3000], [manual.id, 4000]]);

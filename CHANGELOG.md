@@ -4,6 +4,10 @@ Release history starts with Manafolio 2.0.
 
 ## Unreleased
 
+- Protect manual binder placements and stacked-card deletion; preserve complete preconstructed imports and localized public searches.
+- Make owner setup and password-based session issuance atomic, and correct catalog gap detection and page validation.
+- Improve accent indicator contrast and verify container startup and release-alias policy.
+- Add Parchment, High contrast, Midnight, and Sepia account themes.
 - Add a light theme and palette previews in Settings, refine mana surfaces, and use the negative-status color for bulk-action errors.
 
 ## 2.10.0 — 2026-11-17

@@ -137,6 +137,15 @@ export async function runMountedSessionRegressions() {
   window.fetch = async (url, options = {}) => {
     const path = String(url).split('?')[0];
     if (path === '/api/auth/me') return response({ user: account() });
+    if (path === '/api/auth/theme') {
+      const { theme } = JSON.parse(options.body);
+      users.A.theme = theme;
+      return response({ theme });
+    }
+    if (path === '/api/settings') return response({});
+    if (path === '/api/settings/version') return response({ version: 'fixture' });
+    if (path === '/api/ai-decks/preferences') return response({ provider: 'chatgpt' });
+    if (path === '/api/ai-decks/account') return response({ connected: false });
     if (path === '/api/auth/config') return response({});
     if (path === '/api/card-art/index') return response({ ids: [] });
     if (path === '/api/stats') return response({}, 503);
@@ -171,6 +180,12 @@ export async function runMountedSessionRegressions() {
     // Preload lazy views; still mount and exercise the real App and its real children.
     await Promise.all([import('../components/Dashboard'), import('../components/CollectionList'), import('../components/TradeWorkbench')]);
     await act(async () => root.render(<I18nProvider><App /></I18nProvider>));
+    await click(button('nav.settings', host.querySelector('nav')));
+    await waitForView('input[name="settings-theme"]');
+    await click(host.querySelector('input[name="settings-theme"][value="light"]'));
+    assert(document.documentElement.dataset.theme === 'light' && account().theme === 'light', 'theme selection updates the account and document');
+    await replace('A', '-theme-refresh');
+    assert(document.documentElement.dataset.theme === 'light', 'account theme survives session refresh');
     await click(button('nav.collection', host.querySelector('nav')));
     await waitForView('.tcg-card');
     assert(host.textContent.includes('Private A card'), `A collection is mounted before replacement: ${host.textContent}; unexpected requests: ${unexpected.join(', ')}`);

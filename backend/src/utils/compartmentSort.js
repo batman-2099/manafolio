@@ -610,8 +610,8 @@ function getSortCategory(card, sortOrder) {
   if (primary === 'set') {
     if (!card.set_name) return 'Unknown Set';
     if (!setsCache || setsCache.length === 0) return card.set_name;
-    const idx = setsCache.findIndex(s => s.name === card.set_name);
-    return idx >= 0 ? `${idx + 1}. ${card.set_name}` : card.set_name;
+    const idx = setRank.get(card.set_name);
+    return idx !== undefined ? `${idx + 1}. ${card.set_name}` : card.set_name;
   }
   if (primary === 'color_identity' || primary === 'color') {
     return getColorCategory(card);

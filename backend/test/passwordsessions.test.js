@@ -193,6 +193,36 @@ async function main() {
   assert.strictEqual(expiredSession.status, 401, 'session expiry is also rechecked inside the transaction');
   assert.deepStrictEqual(await snapshot(), winnerState);
   assert.strictEqual((await request('GET', '/me', foreignToken)).status, 200);
+
+  const originalGet = db.get;
+  let entered, release;
+  const reading = new Promise(resolve => { entered = resolve; });
+  const resume = new Promise(resolve => { release = resolve; });
+  db.get = async (sql, params) => {
+    const row = await originalGet(sql, params);
+    if (sql === 'SELECT * FROM users WHERE username = ?' && params[0] === 'alice') {
+      entered();
+      await resume;
+    }
+    return row;
+  };
+  const pendingLogin = request('POST', '/login', null, { username: 'alice', password: 'winning-password' });
+  let reset;
+  try {
+    await Promise.race([reading, pendingLogin.then(() => { throw new Error('Login did not read credentials'); })]);
+    reset = db.withTransaction(async () => {
+      await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [db.hashPassword('admin-reset-password'), alice]);
+      await db.run('DELETE FROM sessions WHERE user_id = ?', [alice]);
+    });
+  } finally {
+    db.get = originalGet;
+    release();
+  }
+  const racingLogin = await pendingLogin;
+  await reset;
+  assert.strictEqual(racingLogin.status, 200);
+  assert.strictEqual((await request('GET', '/me', racingLogin.body.token)).status, 401,
+    'a login using the old password cannot survive a concurrent reset');
   assert.strictEqual((await request('GET', '/me', 'bnd_alice-test')).status, 200);
   console.log('PASS: own password validation, atomic session revocation, rollback, and queued-request protection');
 }

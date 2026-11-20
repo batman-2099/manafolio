@@ -71,6 +71,28 @@ jobs:
         with:
           images: ${{ steps.image.outputs.name }}
 
+      - name: Build image for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platform }}
+          tags: manafolio-smoke:local
+          load: true
+          cache-from: type=gha,scope=${{ matrix.arch }}
+
+      - name: Smoke test image
+        run: |
+          set -eu
+          name="manafolio-smoke-${{ matrix.arch }}"
+          trap 'docker logs "$name" || true; docker rm -f "$name" || true' EXIT
+          docker run -d --name "$name" --tmpfs /app/database -e HTTPS_PORT= manafolio-smoke:local
+          for attempt in $(seq 1 60); do
+            if docker exec "$name" wget -qO- http://localhost:3001/api/health; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+
       - name: Build and push image by digest
         id: build
         uses: docker/build-push-action@v6

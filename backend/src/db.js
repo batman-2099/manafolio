@@ -819,11 +819,15 @@ async function initDb() {
   if (userCount.count === 0 && process.env.DEFAULT_ADMIN_PASSWORD) {
     const defaultPassHash = hashPassword(process.env.DEFAULT_ADMIN_PASSWORD);
     const defaultShareToken = crypto.randomBytes(16).toString('hex');
-    const result = await run(`
-      INSERT INTO users (username, password_hash, role, share_token, share_enabled)
-      VALUES (?, ?, ?, ?, ?)
-    `, ['admin', defaultPassHash, 'admin', defaultShareToken, 0]);
-    adminId = result.lastID;
+    await withTransaction(async () => {
+      const result = await run(`
+        INSERT INTO users (username, password_hash, role, share_token, share_enabled)
+        VALUES (?, ?, ?, ?, ?)
+      `, ['admin', defaultPassHash, 'admin', defaultShareToken, 0]);
+      adminId = result.lastID;
+      await adoptOrphanRows(adminId);
+      await seedStarterLocations(adminId);
+    });
     console.log('Created admin user "admin" from DEFAULT_ADMIN_PASSWORD.');
   } else if (userCount.count === 0) {
     console.log('No accounts yet. Open the web UI to create the owner account.');
@@ -834,11 +838,8 @@ async function initDb() {
     }
   }
 
-  if (adminId) {
+  if (adminId && userCount.count !== 0) {
     await adoptOrphanRows(adminId);
-    // Starter containers are for a new account only; an owner who deleted every
-    // container must not get them back on restart.
-    if (userCount.count === 0) await seedStarterLocations(adminId);
   }
   // Freeze legacy checkouts once, so later additions cannot change their return list.
   const { checkedOutSources, freezeSources } = require('./utils/collectionHelpers');

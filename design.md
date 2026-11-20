@@ -5,7 +5,7 @@ The shared system for Manafolio app screens. Preserve the brand and existing wor
 ## System
 - Genre: modern-minimal app, not a marketing website.
 - Direction: restrained collection workbench; card artwork is the primary visual material.
-- Brand: Outfit UI and Cinzel wordmark with its original static blue gradient, the existing stacked-card logo, Arcane Blue, Jenny, a light palette and all six mana palettes.
+- Brand: Outfit UI and Cinzel wordmark with its original static blue gradient, the existing stacked-card logo, Arcane Blue, Jenny, Light, Parchment, High contrast, Midnight, Sepia and all six mana palettes.
 - Composition: a full-width app shell with consistent edge padding; brand/account upper row and destination lower row. Mobile retains its bottom navigation and More menu.
 - Dashboard: summary rail alongside collection history on wide screens; card activity and analysis below. Screens share controls and palette but keep task-specific arrangements.
 - Dashboard polish: set-value bars use one series color; mana and rarity distributions retain meaningful category colors. Summary figures use weight 600, and English chart/activity headings use concise sentence case. Other translations and archive-specific wording remain unchanged.

@@ -19,6 +19,12 @@ process.env.ALLOW_REGISTRATION = 'true';
 
 const db = require('../src/db');
 const router = require('../src/routes/auth');
+const oidc = require('../src/utils/oidc');
+oidc.isOidcEnabled = () => true;
+oidc.getNativeLogin = () => null;
+oidc.clearLoginCookie = () => {};
+oidc.isAutoProvisionEnabled = () => true;
+oidc.exchangeCode = async ({ code }) => ({ extracted: { sub: `subject-${code}`, username: `oidc-${code}` } });
 let server;
 
 function cleanup() {
@@ -80,6 +86,20 @@ async function main() {
   const loc = await db.run(`INSERT INTO locations (name, type, user_id) VALUES (?, ?, NULL)`, ['Old Binder', 'Binder']);
   await db.run(`INSERT INTO collection (card_id, quantity, user_id) VALUES (?, ?, NULL)`, ['test-card-1', 3]);
 
+  await db.run(`CREATE TRIGGER reject_adoption AFTER UPDATE OF user_id ON collection
+    BEGIN SELECT RAISE(FAIL, 'injected adoption failure'); END`);
+  const oidcFailure = await fetch(`${base}/oidc/callback?code=owner&state=test`, { redirect: 'manual' });
+  assert(new URL(oidcFailure.headers.get('location'), base).searchParams.has('oidc_error'));
+  process.env.DEFAULT_ADMIN_PASSWORD = password;
+  await assert.rejects(db.initDb(), /injected adoption failure/);
+  delete process.env.DEFAULT_ADMIN_PASSWORD;
+  assert.strictEqual((await post('bootstrap', { password })).status, 500);
+  assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM users')).count, 0);
+  assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM sessions')).count, 0);
+  assert.strictEqual((await db.get('SELECT user_id FROM collection WHERE card_id = ?', ['test-card-1'])).user_id, null);
+  assert.strictEqual((await db.get('SELECT user_id FROM locations WHERE id = ?', [loc.lastID])).user_id, null);
+  await db.run('DROP TRIGGER reject_adoption');
+
   const premature = await Promise.all(['member', 'admin'].map(username => post('register', { username, password })));
   assert(premature.every(result => result.status === 403), 'public registration cannot claim the first account, including admin');
   assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM users')).count, 0);
@@ -132,6 +152,10 @@ async function main() {
   await db.initDb();
   assert.strictEqual((await db.get(`SELECT COUNT(*) AS count FROM locations`)).count, 0,
     'an owner who deleted every container does not get starter containers back');
+  const oidcMember = await fetch(`${base}/oidc/callback?code=member&state=test`, { redirect: 'manual' });
+  assert(new URL(oidcMember.headers.get('location'), base).searchParams.has('oidc_token'));
+  assert.strictEqual((await db.get('SELECT COUNT(*) AS count FROM locations')).count, 0,
+    'OIDC member provisioning does not seed owner starter locations');
 
   console.log('bootstrap owner adoption: OK');
 }

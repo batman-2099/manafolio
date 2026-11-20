@@ -18,6 +18,8 @@ export async function runPublicCollectionRegressions() {
   cards[0].subtypes = ['Creature'];
   cards[1].types = ['Blue'];
   cards[1].subtypes = ['Instant'];
+  cards[0].printed_name = 'Nom localisé';
+  cards[0].reverse_printed_name = 'Verso localisé';
   let entries = [...cards, { ...cards[0], entry_id: 122, printing: 'Holofoil' }];
   window.fetch = async url => {
     assert(String(url).startsWith('/api/shared/'), `unexpected request: ${url}`);
@@ -41,6 +43,10 @@ export async function runPublicCollectionRegressions() {
       if (count === 60) await click(button('collection.nextPage'));
     }
     assert(seen.size === 121 && button('collection.nextPage').disabled, 'all matches are reachable exactly once and final page is bounded');
+    await change(host.querySelector('#shared-search'), 'NOM LOCALISÉ');
+    assert(grid().length === 1, 'public search matches the localized front name case-insensitively');
+    await change(host.querySelector('#shared-search'), 'verso localisé');
+    assert(grid().length === 1, 'public search still matches the localized reverse name');
     await change(host.querySelector('#shared-search'), 'Pagination fixture 000');
     assert(grid().length === 1 && !button('collection.nextPage'), 'search from final page does not strand results');
     const mixed = [...host.querySelectorAll('.card-grid .collection-card-tag')].find(tag => tag.textContent === en['shared.mixed']);
@@ -54,7 +60,7 @@ export async function runPublicCollectionRegressions() {
     const type = host.querySelector('#shared-type');
     assert([...type.options].map(option => option.value).join(',') === ',Creature,Instant', 'Type choices use card types rather than colors');
     await change(type, 'Creature');
-    assert(grid().length === 1 && grid()[0].querySelector('.tcg-card-name').textContent === cards[0].name, 'Type filter includes only matching subtypes');
+    assert(grid().length === 1 && grid()[0].querySelector('.tcg-card-name').textContent === cards[0].printed_name, 'Type filter includes only matching subtypes');
     await change(type, '');
     await click(button('collection.nextPage'));
     await click(host.querySelector('#stackCardsSharedOpt'));
@@ -155,6 +161,11 @@ export async function runCollectionPrintingRegressions() {
     }
     await click(host.querySelector(`button[title="${en['collection.listView']}"]`));
     assert([...host.querySelectorAll('.collection-table .card-missing-status')].some(badge => badge.textContent === '2 of 3 Missing'), 'list view shows the same missing-copy count');
+    const stackedRow = [...host.querySelectorAll('.collection-table tr')].find(row => row.textContent.includes('Treatment regular'));
+    await click(stackedRow.querySelector(`button[aria-label="${en['common.delete']}"]`));
+    assert(host.querySelector('dialog[open]')?.textContent.includes(en['inspector.chooseEntry']), 'deleting a stack asks which stored entry to inspect');
+    assert(host.querySelectorAll('.stored-entry-choices button').length === 2, 'the chooser exposes both stack members');
+    await click(button('common.cancel', host.querySelector('dialog[open]')));
     await click(host.querySelector(`button[title="${en['collection.galleryView']}"]`));
     await openFilters();
     await toggle('Foil');

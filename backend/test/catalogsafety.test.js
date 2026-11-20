@@ -10,6 +10,7 @@ fs.mkdirSync(models);
 process.env.DB_PATH = path.join(dir, 'test.db');
 process.env.CV_MODEL_DIR = models;
 process.env.DEFAULT_ADMIN_PASSWORD = 'catalog-test';
+process.env.SCRYFALL_GAP_SCALE = '0';
 const db = require('../src/db');
 const ort = require('onnxruntime-node');
 const create = ort.InferenceSession.create;
@@ -18,6 +19,10 @@ const cv = require('../src/cvScan');
 const { readCatalog, binaryPath } = require('../src/utils/localCatalog');
 const api = require('../src/scryfallApi');
 const get = api.client.get;
+api.client.get = async url => {
+  if (new URL(url).pathname === '/sets') return { data: { data: [{ code: 'tst', card_count: 12 }] } };
+  throw new Error(`Unexpected Scryfall request: ${url}`);
+};
 const metaFile = catalog.metaPath('mtg', 'English');
 let behavior = 'normal', calls = 0, sessions = 0, releases = 0;
 ort.InferenceSession.create = async () => {
@@ -38,9 +43,9 @@ ort.InferenceSession.create = async () => {
     },
   };
 };
-const build = async (opts = {}) => {
+const build = async (opts = {}, lang = 'English') => {
   calls = 0; sessions = 0; releases = 0;
-  catalog.start('mtg', 'English', { skipCache: true, ...opts });
+  catalog.start('mtg', lang, { skipCache: true, ...opts });
   const deadline = Date.now() + 10000;
   while (catalog.state()) {
     assert(Date.now() < deadline, 'catalog job must finish');
@@ -187,7 +192,7 @@ const snapshot = () => {
   const stable = snapshot();
   api.client.get = async url => {
     if (new URL(url).pathname === '/sets') return { data: { data: [{ code: 'tst', card_count: 12 }] } };
-    return { data: { data: [{ id: 'new', name: 'New', image_uris: { normal: image } }] } };
+    return { data: { data: [{ id: 'new', name: 'New', image_uris: { normal: image } }], has_more: false } };
   };
   await db.run(`CREATE TRIGGER fail_cache BEFORE INSERT ON card_cache BEGIN SELECT RAISE(FAIL, 'cache write failed'); END`);
   const failedCache = await build({ skipCache: false });
@@ -196,6 +201,26 @@ const snapshot = () => {
   assert.strictEqual(calls, 0, 'failed card persistence must not proceed to embedding');
   assert.deepStrictEqual(snapshot(), stable);
   await db.run('DROP TRIGGER fail_cache');
+  const missing = Object.assign(new Error('No cards found'), {
+    response: { status: 404, data: { object: 'error', code: 'not_found' } }
+  });
+  api.client.get = async () => { throw missing; };
+  const gapBuild = await build({ skipCache: false }, 'Japanese');
+  assert.strictEqual(gapBuild.phase, 'done');
+  assert.match(gapBuild.message, /1 set\(s\) skipped/);
+  assert.ok(await db.get("SELECT 1 FROM set_data_gaps WHERE game = 'mtg' AND language = 'Japanese' AND set_id = 'tst'"));
+  api.client.get = async () => { throw Object.assign(new Error('offline'), { response: { status: 503 } }); };
+  const failedJapanese = await build({ skipCache: false }, 'Japanese');
+  assert.strictEqual(failedJapanese.phase, 'error');
+  assert.match(failedJapanese.message, /1 set\(s\) failed to cache/);
+  api.client.get = async () => ({ data: { data: [{
+    id: 'japanese-card', name: 'Japanese card', set: 'tst', lang: 'ja',
+    collector_number: '1', image_uris: { normal: image }
+  }], has_more: false } });
+  const fullJapanese = await build({ skipCache: false }, 'Japanese');
+  assert.strictEqual(fullJapanese.phase, 'done');
+  assert.ok(!(await db.get("SELECT 1 FROM set_data_gaps WHERE game = 'mtg' AND language = 'Japanese' AND set_id = 'tst'")));
+  assert.ok(await db.get("SELECT 1 FROM card_cache WHERE id = 'mtg-japanese-card' AND language = 'Japanese'"));
 
   const preload = path.join(dir, 'inference.cjs');
   fs.writeFileSync(preload, `const ort = require(${JSON.stringify(require.resolve('onnxruntime-node'))}); let n = 0; ort.InferenceSession.create = async () => ({ run: async () => ({ embedding: { data: new Float32Array(n++ % 2 ? [0, 1] : [1, 0]) } }), release: async () => {} });`);

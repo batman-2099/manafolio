@@ -55,6 +55,20 @@ async function main() {
         await assert.rejects(operation(), /(?:Invalid|Incomplete) set catalog pagination/, name);
         assert.strictEqual(requests, 1, `${name} rejects unsafe metadata before another request`);
       }
+      for (const malformed of [{}, { data: [] }, { data: [raw] }, { data: 'bad', has_more: false }, { data: [], has_more: false }]) {
+        for (const badPage of [1, 2]) {
+          let requests = 0;
+          api.client.get = async url => {
+            if (url === 'https://api.scryfall.com/sets') return sets;
+            requests++;
+            return { data: requests === badPage ? malformed : {
+              data: [raw], total_cards: 1, has_more: true,
+              next_page: 'https://api.scryfall.com/cards/search?page=2'
+            } };
+          };
+          await assert.rejects(operation(), /Incomplete set catalog page/, `${name} rejects malformed page ${badPage}`);
+        }
+      }
     }
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const localUrl = `http://127.0.0.1:${server.address().port}/start`;

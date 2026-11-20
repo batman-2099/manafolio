@@ -115,6 +115,7 @@ function SharedCollection({ shareToken }) {
     const q = searchFilter.toLowerCase();
     const result = collection.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(q) ||
+        (item.printed_name || '').toLowerCase().includes(q) ||
         (item.reverse_name || '').toLowerCase().includes(q) ||
         (item.reverse_printed_name || '').toLowerCase().includes(q) ||
         (item.set_name || '').toLowerCase().includes(q) ||

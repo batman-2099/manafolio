@@ -2474,7 +2474,7 @@ function CameraScanner({ onAddSuccess, showToast, mode = 'collection' }) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: 'var(--text-strong)',
+                  color: 'var(--text-on-accent)',
                   fontWeight: 900,
                   fontSize: 'var(--text-md)',
                   boxShadow: 'none'

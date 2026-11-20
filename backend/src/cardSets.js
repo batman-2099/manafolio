@@ -163,14 +163,22 @@ async function fetchMtgSet(set, lang, { excludeChildCodes = [] } = {}) {
   const scryfallApi = require('./scryfallApi');
   const url = mtgSearchUrl(await mtgSetFamilyQuery(set, lang, { excludeChildCodes }), lang, '&order=set');
   const cards = [];
-  for await (const data of scryfallApi.searchPages(url)) {
-    for (const c of data.data || []) {
-      if (c.image_uris?.normal) cards.push(c);
-      else for (const face of c.card_faces || []) {
-        if (face.image_uris?.normal) cards.push(c);
+  let pages = 0;
+  try {
+    for await (const data of scryfallApi.searchPages(url)) {
+      pages++;
+      for (const c of data.data) {
+        if (c.image_uris?.normal) cards.push(c);
+        else for (const face of c.card_faces || []) {
+          if (face.image_uris?.normal) cards.push(c);
+        }
       }
+      await sleep(120);
     }
-    await sleep(120);
+  } catch (error) {
+    if (!pages && error.response?.status === 404 && error.response?.data?.object === 'error'
+        && error.response.data.code === 'not_found') throw absent(`no cards for set ${set}`);
+    throw error;
   }
   return cards;
 }

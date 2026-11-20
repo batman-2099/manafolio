@@ -187,6 +187,18 @@ async function testMtgDeckImport() {
     await createDeck({ body: { name: 'Unresolved commander', precon_file: 'ExampleDeck_TST' }, user: { id: 1 } }, missingCommander);
     assert.strictEqual(missingCommander.statusCode, 422);
     assert.deepStrictEqual(await counts(), beforeFailure, 'an unresolved commander must not create a commander-less deck');
+    for (const duplicate of [false, true]) {
+      scryfallApi.bulkFetchByIdentifier = async rows => {
+        const result = await fullFetch(rows);
+        result.pairs = result.pairs.filter(({ row }) => row.name !== 'Example Spell');
+        if (duplicate) result.pairs.push(result.pairs[0]);
+        return result;
+      };
+      const missingSpell = response();
+      await createDeck({ body: { name: 'Incomplete precon', precon_file: 'ExampleDeck_TST' }, user: { id: 1 } }, missingSpell);
+      assert.strictEqual(missingSpell.statusCode, 422);
+      assert.deepStrictEqual(await counts(), beforeFailure, 'an unresolved main-board card must not create a partial deck');
+    }
     scryfallApi.bulkFetchByIdentifier = fullFetch;
     const createRes = response();
     await createDeck({

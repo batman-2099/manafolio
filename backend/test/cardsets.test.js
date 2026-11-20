@@ -17,7 +17,7 @@ async function main() {
   const double = { id: 'double', name: 'Double', card_faces: [{ name: 'Front', image_uris: image }, { image_uris: image }, { image_uris: { small: 'small.jpg' } }] };
   const partial = { id: 'partial', name: 'Partial', image_uris: { small: 'small.jpg' }, card_faces: [{ image_uris: image }, {}] };
   const invisible = { id: 'invisible', image_uris: { small: 'small.jpg' }, card_faces: [{}] };
-  let empty = false;
+  let empty = false, searchError = null, laterError = null;
   let setsOffline = true;
   const now = Date.now;
   try {
@@ -28,11 +28,15 @@ async function main() {
         if (setsOffline) throw Object.assign(new Error('Sets unavailable'), { response: { status: 400 } });
         return { data: { data: [{ code: 'tst', card_count: 3 }] } };
       }
-      if (empty) return { data: { data: [invisible] } };
-      if (parsed.searchParams.get('page') === '2') return { data: { data: [
-        { id: 'top', name: 'Must not overwrite first page', image_uris: image },
-        { name: 'No id', image_uris: image },
-      ] } };
+      if (searchError) throw searchError;
+      if (empty) return { data: { data: [invisible], has_more: false } };
+      if (parsed.searchParams.get('page') === '2') {
+        if (laterError) throw laterError;
+        return { data: { data: [
+          { id: 'top', name: 'Must not overwrite first page', image_uris: image },
+          { name: 'No id', image_uris: image },
+        ], has_more: false } };
+      }
       assert.strictEqual(parsed.searchParams.get('include_multilingual'), 'true');
       assert.match(parsed.searchParams.get('q'), /lang:ja/);
       return { data: { data: [top, double, partial, invisible], has_more: true,
@@ -54,6 +58,23 @@ async function main() {
     ], 'only eligible identities are cached, once per id with the first printing preserved');
     empty = true;
     await assert.rejects(cacheSetCards('mtg', 'tst', 'Japanese'), error => error.absent === true);
+    const missing = Object.assign(new Error('No cards found'), {
+      response: { status: 404, data: { object: 'error', code: 'not_found' } }
+    });
+    searchError = missing;
+    await assert.rejects(cacheSetCards('mtg', 'tst', 'Japanese'), error => error.absent === true);
+    for (const error of [
+      Object.assign(new Error('server error'), { response: { status: 503 } }),
+      Object.assign(new Error('unrelated 404'), { response: { status: 404, data: {} } }),
+    ]) {
+      searchError = error;
+      await assert.rejects(cacheSetCards('mtg', 'tst', 'Japanese'), caught => caught === error);
+    }
+    searchError = null;
+    empty = false;
+    laterError = missing;
+    await assert.rejects(cacheSetCards('mtg', 'tst', 'Japanese'), error => error === missing);
+    laterError = null;
     empty = false;
     await db.run(`CREATE TRIGGER fail_cache BEFORE INSERT ON card_cache BEGIN SELECT RAISE(FAIL, 'cache write failed'); END`);
     await assert.rejects(cacheSetCards('mtg', 'tst', 'Japanese'), /cache write failed/);

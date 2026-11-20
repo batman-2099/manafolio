@@ -173,42 +173,47 @@ router.get('/oidc/callback', authLimiter, async (req, res) => {
 
     // 3. User does not exist: first-run bootstrap or auto-provisioning
     if (!user) {
-      const userCountRow = await db.get(`SELECT COUNT(*) as count FROM users`);
-      const isFirstUser = userCountRow.count === 0;
+      user = await db.withTransaction(async () => {
+        const linkedUser = await db.get(`SELECT * FROM users WHERE oidc_sub = ?`, [sub]);
+        if (linkedUser) return linkedUser;
+        const userCountRow = await db.get(`SELECT COUNT(*) as count FROM users`);
+        const isFirstUser = userCountRow.count === 0;
 
-      if (isFirstUser) {
-        // Bootstrap instance owner via OIDC
-        const shareToken = crypto.randomBytes(16).toString('hex');
-        const lockedHash = `oidc_locked:${crypto.randomBytes(16).toString('hex')}`;
-        const result = await db.run(`
-          INSERT INTO users (username, password_hash, role, share_token, share_enabled, oidc_sub)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `, [OWNER_USERNAME, lockedHash, 'admin', shareToken, 0, sub]);
+        if (isFirstUser) {
+          // Bootstrap instance owner via OIDC
+          const shareToken = crypto.randomBytes(16).toString('hex');
+          const lockedHash = `oidc_locked:${crypto.randomBytes(16).toString('hex')}`;
+          const result = await db.run(`
+            INSERT INTO users (username, password_hash, role, share_token, share_enabled, oidc_sub)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `, [OWNER_USERNAME, lockedHash, 'admin', shareToken, 0, sub]);
 
-        await db.adoptOrphanRows(result.lastID);
-        await db.seedStarterLocations(result.lastID);
-        user = await db.get(`SELECT * FROM users WHERE id = ?`, [result.lastID]);
-      } else if (oidc.isAutoProvisionEnabled() || REGISTRATION_ENABLED) {
-        // Auto-provision new member
-        const shareToken = crypto.randomBytes(16).toString('hex');
-        const lockedHash = `oidc_locked:${crypto.randomBytes(16).toString('hex')}`;
-        const role = oidc.getDefaultRole();
+          await db.adoptOrphanRows(result.lastID);
+          await db.seedStarterLocations(result.lastID);
+          return db.get(`SELECT * FROM users WHERE id = ?`, [result.lastID]);
+        } else if (oidc.isAutoProvisionEnabled() || REGISTRATION_ENABLED) {
+          // Auto-provision new member
+          const shareToken = crypto.randomBytes(16).toString('hex');
+          const lockedHash = `oidc_locked:${crypto.randomBytes(16).toString('hex')}`;
+          const role = oidc.getDefaultRole();
 
-        // Ensure clean, unique username in case of collisions
-        let finalUsername = username;
-        let suffix = 1;
-        while (await db.get(`SELECT id FROM users WHERE username = ?`, [finalUsername])) {
-          finalUsername = `${username}-${suffix++}`;
+          // Ensure clean, unique username in case of collisions
+          let finalUsername = username;
+          let suffix = 1;
+          while (await db.get(`SELECT id FROM users WHERE username = ?`, [finalUsername])) {
+            finalUsername = `${username}-${suffix++}`;
+          }
+
+          const result = await db.run(`
+            INSERT INTO users (username, password_hash, role, share_token, share_enabled, oidc_sub)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `, [finalUsername, lockedHash, role, shareToken, 0, sub]);
+
+          return db.get(`SELECT * FROM users WHERE id = ?`, [result.lastID]);
         }
-
-        const result = await db.run(`
-          INSERT INTO users (username, password_hash, role, share_token, share_enabled, oidc_sub)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `, [finalUsername, lockedHash, role, shareToken, 0, sub]);
-
-        await db.seedStarterLocations(result.lastID);
-        user = await db.get(`SELECT * FROM users WHERE id = ?`, [result.lastID]);
-      } else {
+        return null;
+      });
+      if (!user) {
         return frontendRedirect({
           oidc_error: 'No matching Manafolio account found. Auto-provisioning is disabled; ask an administrator to create your account.'
         }, 'provisioning_disabled');
@@ -253,20 +258,24 @@ router.post('/bootstrap', authLimiter, async (req, res) => {
   try {
     const passwordHash = db.hashPassword(password);
     const shareToken = crypto.randomBytes(16).toString('hex');
-    const result = await db.run(`
-      INSERT INTO users (username, password_hash, role, share_token, share_enabled)
-      SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM users)
-    `, [OWNER_USERNAME, passwordHash, 'admin', shareToken, 0]);
-    if (!result.changes) {
+    const setup = await db.withTransaction(async () => {
+      const result = await db.run(`
+        INSERT INTO users (username, password_hash, role, share_token, share_enabled)
+        SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM users)
+      `, [OWNER_USERNAME, passwordHash, 'admin', shareToken, 0]);
+      if (!result.changes) return null;
+
+      // Both skipped by initDb, which found no account to hand them to.
+      await db.adoptOrphanRows(result.lastID);
+      await db.seedStarterLocations(result.lastID);
+      const token = await generateSession(result.lastID);
+      const user = await db.get(`SELECT * FROM users WHERE id = ?`, [result.lastID]);
+      return { token, user };
+    });
+    if (!setup) {
       return res.status(409).json({ error: 'This instance is already set up. Log in instead.' });
     }
-
-    // Both skipped by initDb, which found no account to hand them to.
-    await db.adoptOrphanRows(result.lastID);
-    await db.seedStarterLocations(result.lastID);
-
-    const token = await generateSession(result.lastID);
-    const user = await db.get(`SELECT * FROM users WHERE id = ?`, [result.lastID]);
+    const { token, user } = setup;
     res.status(201).json({
       message: 'Setup complete',
       token,
@@ -337,12 +346,15 @@ router.post('/login', authLimiter, async (req, res) => {
   const cleanUsername = username.trim().toLowerCase();
 
   try {
-    const user = await db.get(`SELECT * FROM users WHERE username = ?`, [cleanUsername]);
-    if (!user || !verifyPassword(password, user.password_hash)) {
+    const login = await db.withTransaction(async () => {
+      const user = await db.get(`SELECT * FROM users WHERE username = ?`, [cleanUsername]);
+      if (!user || !verifyPassword(password, user.password_hash)) return null;
+      return { user, token: await generateSession(user.id) };
+    });
+    if (!login) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
-
-    const token = await generateSession(user.id);
+    const { user, token } = login;
 
     res.json({
       message: 'Login successful',

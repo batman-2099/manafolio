@@ -55,7 +55,7 @@ async function main() {
   assert.deepStrictEqual(await request('PATCH', '/theme', aliceToken, { theme: 'jenny', user_id: bobId }),
     { status: 200, body: { theme: 'jenny' } });
   assert.strictEqual((await request('GET', '/me', bobToken)).body.user.theme, 'dark', 'client IDs cannot target another account');
-  for (const theme of ['dark', 'jenny', 'mana-white', 'mana-blue', 'mana-black', 'mana-red', 'mana-green', 'mana-colorless', 'light']) {
+  for (const theme of ['dark', 'jenny', 'mana-white', 'mana-blue', 'mana-black', 'mana-red', 'mana-green', 'mana-colorless', 'parchment', 'high-contrast', 'midnight', 'sepia', 'light']) {
     assert.deepStrictEqual(await request('PATCH', '/theme', bobToken, { theme }),
       { status: 200, body: { theme } });
     assert.strictEqual((await request('GET', '/me', bobToken)).body.user.theme, theme);

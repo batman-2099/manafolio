@@ -98,6 +98,128 @@
   --input-bg-focus: #f5faff;
 }
 
+/* Parchment — warm paper and ink. */
+[data-theme="parchment"] {
+  color-scheme: light;
+  --bg-primary: #f3ead7;
+  --bg-secondary: #fffaf0;
+  --bg-glass: #fffaf0;
+  --border-glass: #a38b6b;
+  --border-glass-hover: #705132;
+  --text-primary: #302318;
+  --text-secondary: #503b2a;
+  --text-muted: #66503c;
+  --text-strong: #24180f;
+  --text-on-accent: #ffffff;
+  --accent-red: #85401f;
+  --accent-blue: #325c6a;
+  --accent-yellow: #745100;
+  --accent-green: #385d35;
+  --text-positive: #385d35;
+  --text-negative: #a12c24;
+  --surface-1: #f6ecd9;
+  --surface-2: #ebdec7;
+  --surface-3: #dfceb1;
+  --input-bg: #fffdf7;
+  --input-bg-focus: #fff8e9;
+  --logo-cover: #806849;
+  --logo-spine: #85401f;
+  --logo-page-left: #d8c6a6;
+  --logo-page-right: #fffaf0;
+}
+
+/* High contrast — bright controls and text on near-black surfaces. */
+[data-theme="high-contrast"] {
+  color-scheme: dark;
+  --bg-primary: #080808;
+  --bg-secondary: #121212;
+  --bg-glass: #121212;
+  --border-glass: #b8b8b8;
+  --border-glass-hover: #ffffff;
+  --text-primary: #ffffff;
+  --text-secondary: #eeeeee;
+  --text-muted: #d0d0d0;
+  --text-strong: #ffffff;
+  --text-on-accent: #080808;
+  --accent-red: #ffdf57;
+  --accent-blue: #83d8ff;
+  --accent-yellow: #ffdf57;
+  --accent-green: #8af0a5;
+  --text-positive: #8af0a5;
+  --text-negative: #ffaaa5;
+  --surface-1: #1b1b1b;
+  --surface-2: #282828;
+  --surface-3: #383838;
+  --input-bg: #080808;
+  --input-bg-focus: #202020;
+  --color-focus: #ffdf57;
+  --control-border: #eeeeee;
+  --logo-cover: #d0d0d0;
+  --logo-spine: #ffdf57;
+  --logo-page-left: #eeeeee;
+  --logo-page-right: #ffffff;
+}
+
+/* Midnight — neutral charcoal and silver. */
+[data-theme="midnight"] {
+  color-scheme: dark;
+  --bg-primary: #151618;
+  --bg-secondary: #242629;
+  --bg-glass: #2b2d30;
+  --border-glass: #62676e;
+  --border-glass-hover: #aeb6bf;
+  --text-primary: #f3f4f5;
+  --text-secondary: #d2d5d9;
+  --text-muted: #b9bec4;
+  --text-strong: #ffffff;
+  --text-on-accent: #151618;
+  --accent-red: #c5ced7;
+  --accent-blue: #a9c4db;
+  --accent-yellow: #e4d6aa;
+  --accent-green: #a9d9ba;
+  --text-positive: #a9d9ba;
+  --text-negative: #ffada8;
+  --surface-1: #2b2d30;
+  --surface-2: #383b3f;
+  --surface-3: #484c51;
+  --input-bg: #1b1d1f;
+  --input-bg-focus: #303338;
+  --logo-cover: #929ba5;
+  --logo-spine: #c5ced7;
+  --logo-page-left: #cbd0d5;
+  --logo-page-right: #ffffff;
+}
+
+/* Sepia — dark walnut with copper highlights. */
+[data-theme="sepia"] {
+  color-scheme: dark;
+  --bg-primary: #1c130f;
+  --bg-secondary: #2c1e18;
+  --bg-glass: #35241c;
+  --border-glass: #80604d;
+  --border-glass-hover: #c39a7a;
+  --text-primary: #fff1e3;
+  --text-secondary: #e1c9b5;
+  --text-muted: #d0b49e;
+  --text-strong: #fff8f0;
+  --text-on-accent: #1c130f;
+  --accent-red: #f1ae7e;
+  --accent-blue: #d7c3a3;
+  --accent-yellow: #f1d091;
+  --accent-green: #b8d3a3;
+  --text-positive: #b8d3a3;
+  --text-negative: #ffb0a0;
+  --surface-1: #35241c;
+  --surface-2: #473025;
+  --surface-3: #5a3c2c;
+  --input-bg: #231711;
+  --input-bg-focus: #38261c;
+  --logo-cover: #ad8063;
+  --logo-spine: #f1ae7e;
+  --logo-page-left: #dfc4a8;
+  --logo-page-right: #fff1e3;
+}
+
 /* Jenny — plum surfaces, lavender highlights, and warm orange accents. */
 [data-theme="jenny"] {
   --bg-primary: #160d22;
@@ -1066,8 +1188,8 @@ button.collection-card-trigger {
 }
 #demo-banner button { min-width: 44px; min-height: 44px; }
 #demo-banner button:focus-visible { outline-color: var(--media-background); }
-:root[data-theme="light"] #demo-banner { color: var(--bg-primary); }
-:root[data-theme="light"] #demo-banner button:focus-visible { outline-color: var(--bg-primary); }
+:root:is([data-theme="light"], [data-theme="parchment"]) #demo-banner { color: var(--bg-primary); }
+:root:is([data-theme="light"], [data-theme="parchment"]) #demo-banner button:focus-visible { outline-color: var(--bg-primary); }
 
 /* Mobile responsive tab-bar pinning */
 @media (max-width: 768px) {

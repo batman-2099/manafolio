@@ -3008,7 +3008,7 @@ function LocationManager({ statsTrigger, onUpdate, showToast, selectedLocationId
                         
                         {/* Selected / Picked checkmark badge */}
                         {isHighlighted && (
-                          <div style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 20, width: '20px', height: '20px', borderRadius: '50%', background: 'var(--accent-red)', border: '2px solid var(--media-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', fontWeight: 900 }}>
+                          <div style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 20, width: '20px', height: '20px', borderRadius: '50%', background: 'var(--accent-red)', border: '2px solid var(--media-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-on-accent)', fontSize: 'max(0.75rem, var(--unsorted-text-min, 0rem))', fontWeight: 900 }}>
                             ✓
                           </div>
                         )}

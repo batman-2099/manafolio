@@ -83,3 +83,63 @@
   --chart-white: #806000;
   --chart-archive: #6941a5;
 }
+
+[data-theme="parchment"] {
+  --logo-ramp-highlight: #754522;
+  --logo-ramp-light: #663918;
+  --logo-ramp-deep: #48250e;
+  --logo-ramp-base: #633619;
+  --chart-series-1: #325c6a;
+  --chart-series-2: #385d35;
+  --chart-series-3: #745100;
+  --chart-series-4: #a12c24;
+  --chart-series-5: #6941a5;
+  --chart-series-6: #942b60;
+  --chart-series-7: #00675e;
+  --chart-series-8: #85401f;
+  --chart-series-9: #862d7d;
+  --chart-series-10: #414f9a;
+  --chart-colorless: #5b554d;
+  --chart-white: #745100;
+  --chart-archive: #6941a5;
+}
+
+[data-theme="high-contrast"] {
+  --logo-ramp-highlight: #ffffff;
+  --logo-ramp-light: #ffed9a;
+  --logo-ramp-deep: #ffdf57;
+  --logo-ramp-base: #fff0ad;
+  --chart-series-1: #83d8ff;
+  --chart-series-2: #8af0a5;
+  --chart-series-3: #ffdf57;
+  --chart-series-4: #ffaaa5;
+  --chart-series-5: #d4b8ff;
+  --chart-series-6: #ffb2e0;
+  --chart-series-7: #78f2df;
+  --chart-series-8: #ffc28c;
+  --chart-series-9: #f4aeff;
+  --chart-series-10: #b7c3ff;
+  --chart-colorless: #eeeeee;
+  --chart-white: #ffed9a;
+  --chart-archive: #d4b8ff;
+}
+
+[data-theme="midnight"] {
+  --logo-ramp-highlight: #f5f7f9;
+  --logo-ramp-light: #d6dde4;
+  --logo-ramp-deep: #aebbc8;
+  --logo-ramp-base: #d0d9e1;
+  --chart-colorless: #e0e5ea;
+  --chart-white: #f2dda1;
+  --chart-archive: #c5b1f2;
+}
+
+[data-theme="sepia"] {
+  --logo-ramp-highlight: #ffe9d1;
+  --logo-ramp-light: #f3c49c;
+  --logo-ramp-deep: #e0a272;
+  --logo-ramp-base: #f1bb8f;
+  --chart-colorless: #e0cebd;
+  --chart-white: #f1d091;
+  --chart-archive: #cdb5f4;
+}

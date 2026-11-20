@@ -957,7 +957,7 @@ function CollectionList({ statsTrigger, onUpdate, showToast, selectedCardFilter,
                               <button className="btn btn-secondary btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => openEdit(item)} title={t('common.edit')} aria-label={t('common.edit')}>
                                 <Edit2 size={16} />
                               </button>
-                              <button className="btn btn-danger btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => handleDelete(item.entry_id, pairedCardName(item))} title={t('common.delete')} aria-label={t('common.delete')}>
+                              <button className="btn btn-danger btn-icon-only" style={{ minWidth: '44px', minHeight: '44px' }} onClick={() => item.stack_entries?.length > 1 ? activateCard(item) : handleDelete(item.entry_id, pairedCardName(item))} title={t('common.delete')} aria-label={t('common.delete')}>
                                 <Trash2 size={16} />
                               </button>
                             </div>

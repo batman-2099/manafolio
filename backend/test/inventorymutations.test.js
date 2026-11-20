@@ -87,8 +87,8 @@ async function main() {
     assert.ok(costs.every(r => r.purchase_price >= 0));
     assert.ok(Math.abs(costs.reduce((sum, r) => sum + r.quantity * r.purchase_price, 0) - 0.02) < 1e-9);
   }
-  const unknown = await entry('zero', 3);
-  const unknown2 = await entry('zero', 1);
+  const unknown = await entry('zero', 3, null, null);
+  const unknown2 = await entry('zero', 1, null, null);
   assert.strictEqual((await split([unknown, unknown2], 4, 'weighted')).status, 200);
   assert.deepStrictEqual((await db.all('SELECT purchase_price FROM collection WHERE id IN (?, ?) ORDER BY id', [unknown, unknown2])).map(r => r.purchase_price), [1, 1]);
   for (const amount of ['Infinity', 'NaN', -1]) assert.strictEqual((await split([first], amount)).status, 400);

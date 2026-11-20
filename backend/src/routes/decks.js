@@ -266,6 +266,10 @@ router.post('/', async (req, res) => {
       if (rows.some(row => row.isCommander) && !pairs.some(({ row }) => row.isCommander)) {
         return res.status(422).json({ error: 'The precon commander must resolve before creating a deck.' });
       }
+      if (pairs.length !== rows.length || new Set(pairs.map(({ row }) => row)).size !== rows.length
+        || pairs.some(({ row }) => !rows.includes(row))) {
+        return res.status(422).json({ error: 'All MTGJSON cards must resolve before creating a deck.' });
+      }
       await scryfallApi.cacheCards(cards);
       preconPairs = pairs;
     }

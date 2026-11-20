@@ -1560,33 +1560,54 @@ router.post('/collection/:id/place', async (req, res) => {
 
       const isBinder = isBinderType(comp.loc_type);
 
+      // Capacity is advisory, but distinct binder pockets must not overlap.
+      const assertBinderPocketFree = async (compartmentId, position, card, stacking, excludedIds) => {
+        const occupants = await db.all(
+          `SELECT * FROM collection WHERE compartment_id = ? AND user_id = ? AND id NOT IN (?, ?)`,
+          [compartmentId, req.user.id, ...excludedIds]
+        );
+        const end = position + (stacking ? 1 : card.quantity) * 1000;
+        if (occupants.some(other => {
+          const otherEnd = other.position + (stacking ? 1 : other.quantity) * 1000;
+          return position < otherEnd && other.position < end
+            && !(stacking && position === other.position && stackKey(card) === stackKey(other));
+        })) throw new AddCardError(409, 'Binder pocket is occupied');
+      };
+
       if (swap_with) {
         const other = await db.get(`SELECT * FROM collection WHERE id = ? AND user_id = ?`, [swap_with, req.user.id]);
         if (!other) throw new AddCardError(400, 'Swap target not found');
         assertStorageInventory(comp, other.list_type);
         if (other.compartment_id !== Number(compartment_id)) throw new AddCardError(400, 'Swap target must belong to the destination compartment');
+        let source;
         if (entry.location_id) {
-          const source = await db.get('SELECT inventory_type FROM locations WHERE id = ? AND user_id = ?', [entry.location_id, req.user.id]);
+          source = await db.get('SELECT type, allow_stacking, inventory_type FROM locations WHERE id = ? AND user_id = ?', [entry.location_id, req.user.id]);
           if (!source) throw new AddCardError(400, 'Invalid source container');
           assertStorageInventory(source, other.list_type);
         }
         // Identical copies join a stacking pocket rather than trading places.
         if (comp.allow_stacking && stackKey(entry) === stackKey(other)) {
+          if (isBinder) await assertBinderPocketFree(comp.id, other.position, entry, comp.allow_stacking, [entry.id, entry.id]);
           await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
             [other.compartment_id, other.location_id, other.position, id, req.user.id]);
           return { message: 'Card stacked', placement: await describePlacement(db, id, req.user.id) };
         }
+        if (isBinder) await assertBinderPocketFree(comp.id, other.position, entry, comp.allow_stacking, [entry.id, other.id]);
         await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
           [other.compartment_id, other.location_id, other.position, id, req.user.id]);
+        if (entry.compartment_id && source && isBinderType(source.type)) {
+          await assertBinderPocketFree(entry.compartment_id, entry.position, other, source.allow_stacking, [other.id, other.id]);
+        }
         await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
           [entry.compartment_id, entry.location_id, entry.position, swap_with, req.user.id]);
         return { message: 'Cards swapped', placement: await describePlacement(db, id, req.user.id) };
       }
 
-      if (!Number.isInteger(slot) || slot < 1) throw new AddCardError(400, 'Invalid slot');
+      if (!Number.isSafeInteger(slot) || slot < 1 || !Number.isSafeInteger(slot * 1000)) throw new AddCardError(400, 'Invalid slot');
 
       const sourceComp = entry.compartment_id;
       if (isBinder) {
+        await assertBinderPocketFree(comp.id, slot * 1000, entry, comp.allow_stacking, [entry.id, entry.id]);
         await db.run(`UPDATE collection SET compartment_id = ?, location_id = ?, position = ? WHERE id = ? AND user_id = ?`,
           [compartment_id, comp.loc_id, slot * 1000, id, req.user.id]);
       } else {

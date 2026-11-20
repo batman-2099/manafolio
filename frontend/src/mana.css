@@ -56,6 +56,10 @@
 .theme-choice[data-mana-theme="light"] .mana-theme-symbol { background: var(--bg-secondary); border: 2px solid var(--border-glass); }
 .theme-choice[data-mana-theme="dark"] .mana-theme-symbol { background: var(--theme-arcane); }
 .theme-choice[data-mana-theme="jenny"] .mana-theme-symbol { background: var(--theme-jenny); }
+.theme-choice[data-mana-theme="parchment"] .mana-theme-symbol { background: #e8d8b9; border: 2px solid #85401f; }
+.theme-choice[data-mana-theme="high-contrast"] .mana-theme-symbol { background: #080808; border: 2px solid #ffdf57; }
+.theme-choice[data-mana-theme="midnight"] .mana-theme-symbol { background: #383b3f; border: 2px solid #c5ced7; }
+.theme-choice[data-mana-theme="sepia"] .mana-theme-symbol { background: #473025; border: 2px solid #f1ae7e; }
 @media (max-width: 768px) {
   .theme-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .theme-choice { gap: var(--space-2); }

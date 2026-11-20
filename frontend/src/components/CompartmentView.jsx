@@ -710,7 +710,7 @@ export default function CompartmentView({
                   )}
                   {!pullMode && <CardDeckStatus card={card} compact id={`${deckStatusId}-${card.entry_id}`} />}
                   {selectMode && (
-                    <div style={{ position: 'absolute', top: '3px', left: '3px', zIndex: 25, width: '18px', height: '18px', borderRadius: '50%', background: isSelected(card.entry_id) ? 'var(--accent-red)' : 'var(--media-background)', border: '2px solid var(--media-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.65rem', fontWeight: 900 }}>{isSelected(card.entry_id) ? '✓' : ''}</div>
+                    <div style={{ position: 'absolute', top: '3px', left: '3px', zIndex: 25, width: '18px', height: '18px', borderRadius: '50%', background: isSelected(card.entry_id) ? 'var(--accent-red)' : 'var(--media-background)', border: '2px solid var(--media-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-on-accent)', fontSize: '0.65rem', fontWeight: 900 }}>{isSelected(card.entry_id) ? '✓' : ''}</div>
                   )}
                   {newDividers.length > 0 && (
                     <div style={{ position: 'absolute', top: 0, left: 0, transform: 'translateY(-100%)', display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '2px', zIndex: 20 }}>
@@ -1027,7 +1027,7 @@ export default function CompartmentView({
                     )}
                     {!pullMode && <CardDeckStatus card={card} compact id={`${deckStatusId}-${card.entry_id}`} />}
                     {selectMode && (
-                      <div style={{ position: 'absolute', top: '4px', left: '4px', zIndex: 25, width: '20px', height: '20px', borderRadius: '50%', background: isSelected(card.entry_id) ? 'var(--accent-red)' : 'var(--media-background)', border: '2px solid var(--media-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-strong)', fontSize: '0.7rem', fontWeight: 900 }}>{isSelected(card.entry_id) ? '✓' : ''}</div>
+                      <div style={{ position: 'absolute', top: '4px', left: '4px', zIndex: 25, width: '20px', height: '20px', borderRadius: '50%', background: isSelected(card.entry_id) ? 'var(--accent-red)' : 'var(--media-background)', border: '2px solid var(--media-foreground)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-on-accent)', fontSize: '0.7rem', fontWeight: 900 }}>{isSelected(card.entry_id) ? '✓' : ''}</div>
                     )}
                     
                     {isTarget && (

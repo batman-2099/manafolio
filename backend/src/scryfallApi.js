@@ -160,11 +160,14 @@ async function* searchPages(url, onProgress) {
     }
     visited.add(parsed.href);
     const { data } = await scryGetRetried(url, { maxRedirects: 0 }, undefined, onProgress);
-    yield data;
-    if (data?.has_more && (typeof data.next_page !== 'string' || !data.next_page)) {
+    if (!Array.isArray(data?.data) || !data.data.length || typeof data.has_more !== 'boolean') {
+      throw new Error('Incomplete set catalog page');
+    }
+    if (data.has_more && (typeof data.next_page !== 'string' || !data.next_page)) {
       throw new Error('Incomplete set catalog pagination');
     }
-    url = data?.has_more ? data.next_page : null;
+    yield data;
+    url = data.has_more ? data.next_page : null;
   }
 }
 
